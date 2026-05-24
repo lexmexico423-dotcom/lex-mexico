@@ -1,0 +1,11 @@
+# Ignorar todo por defecto — esta carpeta contiene archivos ajenos al proyecto
+*
+
+# Desbloquear archivos del proyecto LEX México
+!.gitignore
+!CLAUDE.md
+!index.html
+
+# Carpeta de referencia (JS separados — no es la versión activa)
+!SEPARACIÓN DE ARCHIVOS/
+!SEPARACIÓN DE ARCHIVOS/**

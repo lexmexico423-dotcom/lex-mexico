@@ -8274,6 +8274,61 @@ async function generarPDF(datos,folio,qrDataURL){
     doc.setFillColor(232,245,224); doc.rect(margin,y-3,cW,5,'F');
     doc.setTextColor(42,122,58); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
     doc.text('PAGOS PARCIALES',margin+1,y); y+=2.5;
+
+    // ── Fila 0: concepto original + total pactado ──
+    (function(){
+      const c0 = datos.conceptos && datos.conceptos[0] ? datos.conceptos[0] : {};
+      const conceptoTexto = c0.concepto || datos.tramites || 'Trámite';
+      const iniciales = (datos.responsable||'').trim().split(/\s+/).map(w=>(w[0]||'').toUpperCase()).join('').slice(0,4)||'—';
+      const partes = [];
+      if(c0.descripcion) partes.push(c0.descripcion);
+      if(datos.fecha_recibo) partes.push(datos.fecha_recibo+(datos.hora_recibo?' '+datos.hora_recibo:''));
+      partes.push(iniciales);
+      const descOrig = partes.join(' · ');
+      const montoOrig = parseFloat(datos.totalGeneral)||0;
+      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
+      const cLO = doc.splitTextToSize(conceptoTexto, colConceptoW);
+      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
+      const dLO = doc.splitTextToSize(descOrig, colDescripW);
+      const maxLO = Math.max(cLO.length, dLO.length, 1);
+      const rHO = maxLO*3.6+1.2;
+      asegurarEspacio(rHO);
+      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
+      doc.text(cLO, margin, y);
+      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
+      doc.text(dLO, margin+cW*0.38, y);
+      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(42,122,58);
+      doc.text('$'+fmtMXN(montoOrig), margin+cW, y, {align:'right'});
+      doc.setDrawColor(160,200,140); doc.setLineWidth(0.2);
+      doc.line(margin, y+rHO-1, margin+cW, y+rHO-1);
+      y += rHO;
+    })();
+
+    // ── Fila 1: anticipo inicial (solo si > 0) ──
+    const _anticipoSint = parseFloat(datos.anticipo)||0;
+    if(_anticipoSint > 0){
+      const partesA = [];
+      if(datos.fecha_recibo) partesA.push(datos.fecha_recibo+(datos.hora_recibo?' '+datos.hora_recibo:''));
+      if(datos.responsable) partesA.push(datos.responsable);
+      const descAnticipo = partesA.join(' · ');
+      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
+      const cLA = doc.splitTextToSize('Anticipo inicial', colConceptoW);
+      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
+      const dLA = doc.splitTextToSize(descAnticipo, colDescripW);
+      const maxLA = Math.max(cLA.length, dLA.length, 1);
+      const rHA = maxLA*3.6+1.2;
+      asegurarEspacio(rHA);
+      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
+      doc.text(cLA, margin, y);
+      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
+      doc.text(dLA, margin+cW*0.38, y);
+      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(42,122,58);
+      doc.text('$'+fmtMXN(_anticipoSint), margin+cW, y, {align:'right'});
+      doc.setDrawColor(160,200,140); doc.setLineWidth(0.2);
+      doc.line(margin, y+rHA-1, margin+cW, y+rHA-1);
+      y += rHA;
+    }
+
     datos.pagosParciales.forEach(p=>{
       const cant=parseFloat(p.cantidad)||0; totalPagosParciales+=cant;
       doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(20,10,5);
@@ -9622,9 +9677,12 @@ async function _imprimirActualizacionReal(){
   const fechasImpresion = (recibo.fechasImpresion && recibo.fechasImpresion.length)
     ? recibo.fechasImpresion.slice()
     : [{ fecha: recibo.fecha || recibo.fecha_recibo || '', hora: recibo.hora || recibo.hora_recibo || '', etiqueta: 'Original' }];
+  const _retroActivo = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+  const _fechaActualizacion = _retroActivo ? window._reciboRetroactivoFechaPersonalizada : fechaCDMX_ISO();
+  const _horaActualizacion  = _retroActivo ? (window._reciboRetroactivoHoraPersonalizada || horaCDMX_HHMM()) : horaCDMX_HHMM();
   fechasImpresion.push({
-    fecha: fechaCDMX_ISO(),
-    hora:  horaCDMX_HHMM(),
+    fecha: _fechaActualizacion,
+    hora:  _horaActualizacion,
     etiqueta: 'Actualizaci\u00f3n'
   });
 
@@ -9632,10 +9690,13 @@ async function _imprimirActualizacionReal(){
   // para no chocar con los corchetes [fechaHora] que el PDF agrega automáticamente.
   const pagosParciales_conAuth = pagosParciales.map(p => {
     if(p.locked) return p; // los ya impresos conservan su auth previa
-    const authTag = ' \u2014 Autoriz\u00f3: ' + autorizacion.iniciales + ' -' + autorizacion.fechaHora + '-';
+    const fechaHoraFinal = _retroActivo
+      ? (_fechaActualizacion + ' ' + _horaActualizacion)
+      : (p.fechaHora || '');
+    const authTag = ' \u2014 Autoriz\u00f3: ' + autorizacion.iniciales + ' -' + fechaHoraFinal + '-';
     return Object.assign({}, p, {
       descripcion: (p.descripcion || '') + authTag,
-      // Marca para que el PDF NO agregue el corchete [fechaHora] redundante
+      fechaHora: fechaHoraFinal || p.fechaHora,
       _hasAuthInline: true
     });
   });
@@ -9723,8 +9784,8 @@ async function _imprimirActualizacionReal(){
         const mov = {
           id: 'M-REC-' + recibo.folio + '-' + Date.now(),
           folioCaja: '',
-          fecha: recibo.fecha_recibo || recibo.fecha || (typeof hoy === 'function' ? hoy() : new Date().toISOString().split('T')[0]),
-          hora: recibo.hora_recibo || recibo.hora || (typeof hora === 'function' ? hora() : new Date().toTimeString().slice(0,5)),
+          fecha: _retroActivo ? _fechaActualizacion : (recibo.fecha_recibo || recibo.fecha || (typeof hoy === 'function' ? hoy() : new Date().toISOString().split('T')[0])),
+          hora:  _retroActivo ? _horaActualizacion  : (recibo.hora_recibo || recibo.hora || (typeof hora === 'function' ? hora() : new Date().toTimeString().slice(0,5))),
           descripcion: (function(){
             const c0 = recibo.conceptos && recibo.conceptos[0];
             const conc = c0 ? (c0.concepto||'') : '';

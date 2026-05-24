@@ -9576,9 +9576,17 @@ async function _imprimirActualizacionReal(){
     return;
   }
 
-  // Autorización ya capturada al iniciar el flujo (Pago Parcial o Pago Total).
-  const autorizacion = window._autorizacionActual || null;
-  window._autorizacionActual = null; // limpiar para el siguiente uso
+  // Autorización capturada al iniciar el flujo. Si se perdió (flujo retomado
+  // tras reconexión de sesión), pedirla ahora antes de continuar.
+  let autorizacion = window._autorizacionActual || null;
+  window._autorizacionActual = null;
+  if(!autorizacion){
+    autorizacion = await pedirAutorizacion();
+    if(autorizacion === null){
+      setStatus('ok','Impresión cancelada — autorización no proporcionada','ok');
+      return;
+    }
+  }
 
   // Modal de placas: SOLO en Pago Total (desde-liquidacion) Y trámite vehicular.
   // En Pago Parcial o trámite normal se reutilizan placas ya guardadas sin preguntar.

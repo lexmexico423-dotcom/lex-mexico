@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -9044,11 +9044,14 @@ function cancelarAbonoNuevo(){
 reciboEnActualizacion = null;
 
 function abrirModoActualizacion(recibo){
-  // Navegar al panel del formulario si no está activo.
-  // IMPORTANTE: ir('nuevo-recibo') llama limpiarFormCompleto() internamente,
-  // lo que anularía reciboEnActualizacion — por eso la asignación va DESPUÉS.
+  // Guardar respaldo ANTES de ir() porque limpiarFormCompleto (llamado por ir) anula la variable.
+  // window._reciboActualizacionBackup es la fuente de verdad que nada más toca.
+  window._reciboActualizacionBackup = recibo;
+
+  // Navegar al panel — esto llama limpiarFormCompleto() internamente
   if(typeof ir === 'function') ir('nuevo-recibo');
 
+  // Reasignar inmediatamente tras el reset de limpiarFormCompleto
   reciboEnActualizacion = recibo;
 
   // Salir del modo consulta (oculta el iframe del PDF) y entrar al formulario congelado
@@ -9107,6 +9110,7 @@ function abrirModoActualizacion(recibo){
 
 function cancelarActualizacion(){
   reciboEnActualizacion = null;
+  window._reciboActualizacionBackup = null;
   document.body.classList.remove('modo-actualizacion','recibo-frozen','desde-liquidacion',
     'actualizacion-impresa','en-accion-pago','paneles-abiertos-consulta');
   // Restaurar status-bar y botón de búsqueda
@@ -9530,6 +9534,10 @@ async function imprimirActualizacion(){
   }
 
   // Validaciones rápidas antes de pedir confirmación
+  // Restaurar desde respaldo si la variable fue anulada por algun reset interno
+  if(!reciboEnActualizacion && window._reciboActualizacionBackup){
+    reciboEnActualizacion = window._reciboActualizacionBackup;
+  }
   if(!reciboEnActualizacion){ showModal('Error','No hay un recibo en actualizaci\u00f3n.'); return; }
   const _costosExtraTmp = getCostosExtra();
   const _pagosTmp       = getPagosParciales();
@@ -9553,6 +9561,10 @@ async function _imprimirActualizacionReal(){
   }
 
   console.log('[ACTUALIZACION] Click en IMPRIMIR ACTUALIZACIÓN — flujo:', document.body.classList.contains('desde-liquidacion') ? 'PAGO TOTAL' : 'PAGO PARCIAL');
+  // Restaurar desde respaldo si la variable fue anulada por algun reset interno
+  if(!reciboEnActualizacion && window._reciboActualizacionBackup){
+    reciboEnActualizacion = window._reciboActualizacionBackup;
+  }
   if(!reciboEnActualizacion){ showModal('Error','No hay un recibo en actualizaci\u00f3n.'); return; }
   const recibo = reciboEnActualizacion;
   const costosExtra = getCostosExtra();

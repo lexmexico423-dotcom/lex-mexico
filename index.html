@@ -8817,7 +8817,7 @@ async function activarModoConsulta(recibo){
   if(recibo.pdfBase64){
     // Sesión actual: ya tenemos el PDF en memoria
     await mostrarBlobEnIframe(recibo.pdfBase64);
-  } else if(driveToken && Date.now() < tokenExpiry && recibo.archivo){
+  } else if(window.driveToken && Date.now() < (window.tokenExpiry||0) && recibo.archivo){
     // Nueva sesión: descargar el PDF directamente desde Google Drive
     try {
       setStatus('loading','Cargando PDF desde Drive…','loading');
@@ -8827,7 +8827,7 @@ async function activarModoConsulta(recibo){
       );
       const searchRes = await fetch(
         'https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)',
-        { headers:{ Authorization:'Bearer '+driveToken } }
+        { headers:{ Authorization:'Bearer '+window.driveToken } }
       );
       if(!searchRes.ok) throw new Error('Drive search HTTP '+searchRes.status);
       const searchData = await searchRes.json();
@@ -8835,7 +8835,7 @@ async function activarModoConsulta(recibo){
       if(file && file.id){
         const pdfRes = await fetch(
           'https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media',
-          { headers:{ Authorization:'Bearer '+driveToken } }
+          { headers:{ Authorization:'Bearer '+window.driveToken } }
         );
         if(pdfRes.ok){
           const pdfBlob = await pdfRes.blob();
@@ -8857,7 +8857,7 @@ async function activarModoConsulta(recibo){
       console.error('activarModoConsulta Drive fetch:', e);
       setStatus('err','Error al cargar PDF desde Drive: '+e.message,'err');
     }
-  } else if(!driveToken){
+  } else if(!window.driveToken){
     setStatus('err','Conecta Google Drive para ver el PDF del folio','err');
   }
 

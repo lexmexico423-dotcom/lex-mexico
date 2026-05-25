@@ -2523,7 +2523,7 @@ window.console.info = function(){};
     color: #1a5a28;
   }
   body.paneles-busqueda-abiertos #btn-regresar-formulario {
-    display: inline-block;
+    display: inline-flex;
   }
 
   /* Respaldo CSS puro con :has() — cubre apertura manual del panel cuando la clase body no se aplica a tiempo */
@@ -5848,6 +5848,9 @@ window.addEventListener('offline', ()=>{
       <div class="qr-info"><strong>QR automático</strong><br>Folio · Cliente · Total · Fecha · Hora</div>
     </div>
 
+  <div style="display:flex;justify-content:flex-end;align-items:center;padding:6px 20px 4px;">
+    <button id="btn-regresar-formulario" onclick="regresarAlFormulario()">← Regresar</button>
+  </div>
   </div><!-- /recibo-body -->
 
   <!-- PDF VIEWER para modo consulta -->
@@ -5870,7 +5873,6 @@ window.addEventListener('offline', ()=>{
 
   <div class="status-bar">
     <div id="status-msg"><div class="dot" id="status-dot"></div><span id="status-text">Listo para capturar</span></div>
-    <button id="btn-regresar-formulario" onclick="regresarAlFormulario()">← Regresar</button>
     <span style="font-size:0.6rem;opacity:0.5;">LEX-MÉXICO · Despacho Jurídico</span>
   </div>
   <div id="consulta-banner" style="align-items:center;justify-content:space-between;gap:12px;">

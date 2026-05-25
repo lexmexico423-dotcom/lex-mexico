@@ -3289,6 +3289,17 @@ window.addEventListener('offline', ()=>{
             <div style="font-family:monospace;font-size:0.5rem;color:rgba(160,192,255,0.55);text-align:center;line-height:1.4;padding:0 4px;">Edita folio, nombre, conceptos, costos extra, abonos, fecha, vehiculo y más. Regenera el PDF al guardar.</div>
           </div>
 
+          <!-- 19. Consultar PDF por Folio -->
+          <div onclick="adminAbrirConsultarPDF()" style="position:relative;background:rgba(26,74,58,0.2);border:1.5px solid rgba(42,180,130,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#2ab482';this.style.boxShadow='0 8px 20px rgba(42,180,130,0.25)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(42,180,130,0.35)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:linear-gradient(135deg,#1a5a3a,#0f3a28);display:flex;align-items:center;justify-content:center;font-size:1.7rem;">📄</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a0e8c8;text-align:center;line-height:1.3;">Consultar PDF<br>por Folio</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(160,232,200,0.55);text-align:center;line-height:1.4;padding:0 4px;">Ej: necesitas abrir el PDF del folio 26-001B. Busca el folio, elige la versión (A, B, C…) y se abre directo con un enlace de 5 minutos de vigencia</div>
+            <div style="font-family:monospace;font-size:0.52rem;color:rgba(160,232,200,0.5);">Versiones: <strong id="adminVersCnt" style="color:#a0e8c8;">—</strong></div>
+          </div>
+
         </div><!-- /grid -->
       </div><!-- /admin-modal-body -->
 
@@ -3736,6 +3747,37 @@ window.addEventListener('offline', ()=>{
       </div>
       <div class="admin-modal-ftr">
         <button class="btn btn-ghost btn-sm" onclick="adminVolverDesdeAuditoria()">← Volver</button>
+        <button class="btn btn-ghost btn-sm" onclick="cerrarAdminModal()">✕ Cerrar</button>
+      </div>
+    </div>
+
+    <!-- ZONA: CONSULTAR PDF POR FOLIO -->
+    <div id="adminConsultarPDFZone" class="admin-panel">
+      <div class="admin-modal-body">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+          <span style="font-size:1.2rem;">📄</span>
+          <span style="font-family:serif;font-size:0.95rem;color:#a0e8c8;">Consultar PDF por Folio</span>
+          <button onclick="adminVolverPanel()" style="margin-left:auto;background:rgba(42,180,130,0.08);border:1px solid rgba(42,180,130,0.25);border-radius:6px;padding:5px 12px;cursor:pointer;font-family:monospace;font-size:0.6rem;color:rgba(160,232,200,0.75);">← Volver</button>
+        </div>
+
+        <!-- Barra de herramientas -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+          <input type="text" id="cpdf-buscar" placeholder="🔍 Buscar folio o nombre…" oninput="adminConsultarPDFRender()"
+            style="flex:1;min-width:160px;background:rgba(42,180,130,0.06);border:1px solid rgba(42,180,130,0.25);border-radius:6px;padding:7px 10px;font-family:monospace;font-size:0.75rem;color:#a0e8c8;outline:none;">
+          <button onclick="adminConsultarPDFCargar()" title="Recargar desde Supabase"
+            style="background:rgba(42,180,130,0.08);border:1px solid rgba(42,180,130,0.25);border-radius:6px;padding:7px 11px;cursor:pointer;font-family:monospace;font-size:0.65rem;color:rgba(160,232,200,0.8);">⟳ Recargar</button>
+          <button onclick="adminMigrarFoliosAVersiones()"
+            style="background:rgba(200,149,42,0.08);border:1px solid rgba(200,149,42,0.3);border-radius:6px;padding:7px 11px;cursor:pointer;font-family:monospace;font-size:0.65rem;color:var(--gold-l);">↑ Migrar folios</button>
+        </div>
+
+        <!-- Tabla de versiones -->
+        <div id="cpdf-lista" style="max-height:400px;overflow-y:auto;border:1px solid rgba(42,180,130,0.12);border-radius:8px;">
+          <p style="color:var(--muted);text-align:center;padding:24px;font-size:0.75rem;">Abre el panel para cargar versiones…</p>
+        </div>
+        <div id="cpdf-count" style="margin-top:6px;font-family:monospace;font-size:0.55rem;color:rgba(42,180,130,0.4);text-align:right;"></div>
+      </div>
+      <div class="admin-modal-ftr">
+        <button class="btn btn-ghost btn-sm" onclick="adminVolverPanel()">← Volver</button>
         <button class="btn btn-ghost btn-sm" onclick="cerrarAdminModal()">✕ Cerrar</button>
       </div>
     </div>
@@ -11284,6 +11326,137 @@ async function verHistorialVersiones(folio){
     </div>`;
   }).join('');
 }
+
+// ═══════════════════════════════════════════════════════════════
+// ═══ CONSULTAR PDF POR FOLIO (panel admin) ══════════════════════
+// ═══════════════════════════════════════════════════════════════
+
+let _cpdfVersiones = [];
+
+async function adminAbrirConsultarPDF(){
+  document.getElementById('adminPanelZone').classList.remove('show');
+  document.getElementById('adminConsultarPDFZone').classList.add('show');
+  const buscar = document.getElementById('cpdf-buscar');
+  if(buscar) buscar.value = '';
+  document.getElementById('cpdf-lista').innerHTML =
+    '<p style="color:var(--muted);text-align:center;padding:24px;font-size:0.75rem;">⏳ Cargando versiones…</p>';
+  await adminConsultarPDFCargar();
+}
+
+async function adminConsultarPDFCargar(){
+  if(!window.SB || !window.SB_DESPACHO_ID){
+    document.getElementById('cpdf-lista').innerHTML =
+      '<p style="color:#f88;text-align:center;padding:20px;font-size:0.75rem;">Sin conexión a Supabase.</p>';
+    return;
+  }
+  try {
+    const { data, error } = await window.SB.from('versiones_recibo')
+      .select('folio_base,anio_folio,letra,fecha,hora,usuario,pdf_storage_path,datos_completos')
+      .eq('despacho_id', window.SB_DESPACHO_ID)
+      .order('anio_folio', { ascending: false })
+      .order('folio_base', { ascending: false })
+      .order('letra',      { ascending: true });
+    if(error) throw error;
+    _cpdfVersiones = data || [];
+    // Actualizar contador de la tarjeta en el panel principal
+    const cnt = document.getElementById('adminVersCnt');
+    if(cnt) cnt.textContent = _cpdfVersiones.length;
+    adminConsultarPDFRender();
+  } catch(e){
+    document.getElementById('cpdf-lista').innerHTML =
+      '<p style="color:#f88;text-align:center;padding:20px;font-size:0.75rem;">Error: '+e.message+'</p>';
+  }
+}
+
+function adminConsultarPDFRender(){
+  const filtro = ((document.getElementById('cpdf-buscar')||{}).value||'').toLowerCase().trim();
+  const lista  = document.getElementById('cpdf-lista');
+  const countEl= document.getElementById('cpdf-count');
+
+  let vers = _cpdfVersiones;
+  if(filtro){
+    vers = vers.filter(function(v){
+      const folioStr = folioConLetra(v.folio_base, v.anio_folio, v.letra).toLowerCase();
+      const nombre   = ((v.datos_completos && (v.datos_completos.nombre ||
+                        (v.datos_completos.clientes && v.datos_completos.clientes[0] && v.datos_completos.clientes[0].nombre) || ''))+'').toLowerCase();
+      return folioStr.includes(filtro) || nombre.includes(filtro) || String(v.folio_base).includes(filtro);
+    });
+  }
+
+  if(!vers.length){
+    lista.innerHTML = '<p style="color:var(--muted);text-align:center;padding:24px;font-size:0.75rem;">Sin versiones que coincidan.</p>';
+    if(countEl) countEl.textContent = '';
+    return;
+  }
+
+  const tdBase = 'padding:8px 10px;border-bottom:1px solid rgba(42,180,130,0.08);vertical-align:middle;';
+  lista.innerHTML = '<table style="width:100%;border-collapse:collapse;font-family:monospace;font-size:0.72rem;">'
+    + '<thead><tr style="background:rgba(42,180,130,0.07);">'
+    + '<th style="'+tdBase+'color:rgba(160,232,200,0.6);font-weight:600;text-align:left;padding-left:12px;">Folio</th>'
+    + '<th style="'+tdBase+'color:rgba(160,232,200,0.6);font-weight:600;text-align:left;">Nombre</th>'
+    + '<th style="'+tdBase+'color:rgba(160,232,200,0.6);font-weight:600;text-align:left;">Fecha</th>'
+    + '<th style="'+tdBase+'color:rgba(160,232,200,0.6);font-weight:600;text-align:left;">Usuario</th>'
+    + '<th style="'+tdBase+'color:rgba(160,232,200,0.6);font-weight:600;text-align:center;">PDF</th>'
+    + '</tr></thead><tbody>'
+    + vers.map(function(v){
+        const folio  = folioConLetra(v.folio_base, v.anio_folio, v.letra);
+        const nombre = (v.datos_completos && (v.datos_completos.nombre ||
+                       (v.datos_completos.clientes && v.datos_completos.clientes[0] && v.datos_completos.clientes[0].nombre))) || '—';
+        const fecha  = (v.fecha||'') + (v.hora ? ' '+v.hora : '');
+        const user   = (v.usuario||'—');
+        const pathEsc = (v.pdf_storage_path||'').replace(/'/g,"\\'");
+        const pdfBtn = v.pdf_storage_path
+          ? '<button onclick="adminAbrirURLVersion(\''+pathEsc+'\',\''+folio+'\')" '
+            + 'style="background:rgba(42,180,130,0.12);border:1px solid rgba(42,180,130,0.35);border-radius:5px;padding:4px 9px;cursor:pointer;font-family:monospace;font-size:0.62rem;color:#a0e8c8;white-space:nowrap;">'
+            + '🔗 Abrir</button>'
+          : '<span style="color:rgba(255,100,100,0.45);font-size:0.6rem;">sin PDF</span>';
+        return '<tr style="transition:background 0.12s;" onmouseover="this.style.background=\'rgba(42,180,130,0.05)\'" onmouseout="this.style.background=\'\'">'
+          + '<td style="'+tdBase+'padding-left:12px;font-weight:700;color:#a0e8c8;letter-spacing:0.04em;">'+folio+'</td>'
+          + '<td style="'+tdBase+'color:rgba(200,232,220,0.75);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(nombre)+'</td>'
+          + '<td style="'+tdBase+'color:rgba(160,232,200,0.5);white-space:nowrap;">'+fecha+'</td>'
+          + '<td style="'+tdBase+'color:rgba(160,232,200,0.45);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(user)+'</td>'
+          + '<td style="'+tdBase+'text-align:center;">'+pdfBtn+'</td>'
+          + '</tr>';
+      }).join('')
+    + '</tbody></table>';
+
+  if(countEl) countEl.textContent = vers.length + ' versión' + (vers.length===1 ? '' : 'es');
+}
+
+async function adminAbrirURLVersion(pdfPath, folioLabel){
+  if(!window.SB){ toast('Sin conexión a Supabase','err'); return; }
+  if(typeof toast==='function') toast('Generando enlace para '+folioLabel+'…','loading');
+  try {
+    const { data, error } = await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(pdfPath, 300);
+    if(error || !data || !data.signedUrl) throw new Error((error&&error.message)||'Sin URL');
+    window.open(data.signedUrl, '_blank');
+    if(typeof toast==='function') toast('Enlace abierto · válido 5 minutos','ok');
+  } catch(e){
+    if(typeof toast==='function') toast('Error: '+e.message,'err');
+  }
+}
+
+async function adminMigrarFoliosAVersiones(){
+  if(!window.SB || !window.SB_DESPACHO_ID){ toast('Sin conexión a Supabase','err'); return; }
+  const recibos = (typeof appData!=='undefined' ? appData.recibos||[] : []).filter(function(r){ return !r.esComplemento; });
+  if(!recibos.length){ toast('No hay recibos en memoria para migrar','err'); return; }
+  if(!confirm('Se van a registrar '+recibos.length+' recibos en versiones_recibo.\nLos que ya existan se actualizarán (upsert). ¿Continuar?')) return;
+  if(typeof toast==='function') toast('Migrando '+recibos.length+' recibos…','loading');
+  let ok=0, err=0;
+  for(var i=0; i<recibos.length; i++){
+    var r = recibos[i];
+    try {
+      var letra   = r.letra || letraVersion(r) || 'A';
+      var archivo = r.archivo || (folioConLetra(r.folio, r.anio_folio, letra)+'.pdf');
+      await _guardarVersionEnSupabase(r, letra, archivo);
+      ok++;
+    } catch(e){ err++; }
+  }
+  if(typeof toast==='function') toast('Migración: '+ok+' OK'+(err?' · '+err+' error(es)':''),'ok');
+  await adminConsultarPDFCargar();
+}
+
+// ─────────────────────────────────────────────────────────────────
 
 // Descarga el PDF guardado en el snapshot (si existe)
 function descargarSnapshotPDF(folio, idx){
@@ -21129,6 +21302,8 @@ function abrirAdminModal() {
   if (gz3) gz3.classList.remove('show');
   var gz4 = document.getElementById('adminEditarMovDesdeEditarZone');
   if (gz4) gz4.classList.remove('show');
+  var gz5 = document.getElementById('adminConsultarPDFZone');
+  if (gz5) gz5.classList.remove('show');
   document.getElementById('adminError').style.display = 'none';
   document.getElementById('adminUser').value = '';
   document.getElementById('adminPass').value = '';
@@ -21166,7 +21341,8 @@ function cerrarAdminModal() {
     'adminGestionRecibosZone',
     'adminEditarCobrosZone',
     'adminEditarMovDesdeEditarZone',
-    'adminHistoricosZone'
+    'adminHistoricosZone',
+    'adminConsultarPDFZone'
   ];
   zonas.forEach(function(id){
     var el = document.getElementById(id);
@@ -21369,6 +21545,14 @@ function adminMostrarPanel() {
     if(elMovHoy) elMovHoy.textContent = movHoy.length;
     const elRec2 = document.getElementById('adminRecCnt');
     if (elRec2 && typeof appData !== 'undefined') elRec2.textContent = (appData.recibos||[]).length;
+    // Contador de versiones en Supabase (carga asíncrona silenciosa)
+    if(window.SB && window.SB_DESPACHO_ID){
+      window.SB.from('versiones_recibo').select('folio_base',{count:'exact',head:true}).eq('despacho_id',window.SB_DESPACHO_ID)
+        .then(function(res){
+          var cntEl = document.getElementById('adminVersCnt');
+          if(cntEl && res && res.count != null) cntEl.textContent = res.count;
+        }).catch(function(){});
+    }
 
     // Estado del ultimo backup
     const backupEl = document.getElementById('adminBackupStatus');
@@ -21821,7 +22005,7 @@ function adminAbrirBorrarEspecifico() {
 }
 
 function adminVolverPanel() {
-  ['adminBorrarEspecZone','adminEditarCobrosZone','adminEditarMovDesdeEditarZone','adminHistoricosZone','adminCapturaMesZone'].forEach(function(id){
+  ['adminBorrarEspecZone','adminEditarCobrosZone','adminEditarMovDesdeEditarZone','adminHistoricosZone','adminCapturaMesZone','adminConsultarPDFZone'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.classList.remove('show');
   });

@@ -2963,17 +2963,6 @@ window.addEventListener('offline', ()=>{
   </div>
   <!-- ═══ FIN BARRA CAPTURA ═══ -->
 
-  <!-- ═══ BOTÓN EDITAR RECIBO COMPLETO ═══ -->
-  <div style="padding:8px 10px 6px;border-top:1px solid rgba(100,160,255,0.18);">
-    <div style="font-family:monospace;font-size:0.44rem;letter-spacing:0.14em;text-transform:uppercase;color:rgba(150,190,255,0.4);padding:0 4px 5px;">✏️ Edición</div>
-    <button onclick="abrirEdicionCompletaSidebar()"
-      style="width:100%;background:linear-gradient(135deg,#1a4a8a,#0f2f5a);border:1px solid rgba(100,160,255,0.35);border-radius:8px;color:#c8e0ff;padding:9px 8px;cursor:pointer;font-family:monospace;font-size:0.62rem;font-weight:700;letter-spacing:0.04em;text-align:center;transition:all 0.18s;"
-      onmouseover="this.style.borderColor='#60a5fa';this.style.background='linear-gradient(135deg,#2a5aaa,#1a3f7a)'"
-      onmouseout="this.style.borderColor='rgba(100,160,255,0.35)';this.style.background='linear-gradient(135deg,#1a4a8a,#0f2f5a)'">
-      ✏️ Editar Recibo Completo
-    </button>
-  </div>
-  <!-- ═══ FIN BOTÓN EDICIÓN ═══ -->
 
   <div class="sidebar-footer">
     <div class="sidebar-time" id="sHora">--:--</div>
@@ -24813,11 +24802,6 @@ function confirmarVincularRecibo() {
               <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px;">Correo de Google con el que iniciaste sesión.</div>
               <div id="cfg-sesion-info" style="font-family:monospace;font-size:0.7rem;color:var(--gold-d);margin-bottom:8px;word-break:break-all;"></div>
               <button class="btn btn-ghost btn-sm" onclick="abrirLogin()" style="width:100%;justify-content:center;">🔄 Cambiar cuenta</button>
-            </div>
-            <div style="background:var(--surface2);border:1px solid var(--border-l);border-radius:var(--radius);padding:16px;">
-              <div style="font-family:serif;font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:6px;">🔍 Diagnóstico</div>
-              <div style="font-size:0.75rem;color:var(--muted);margin-bottom:10px;">Verifica el cálculo del saldo de caja contra el histórico.</div>
-              <button class="btn btn-ghost btn-sm" onclick="adminDiagnosticoSaldo()" style="width:100%;justify-content:center;">🔍 Verificar saldo</button>
             </div>
           </div>
         </div>

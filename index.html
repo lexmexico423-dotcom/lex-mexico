@@ -8343,7 +8343,8 @@ async function generarPDF(datos,folio,qrDataURL){
     }
     doc.setFillColor(232,245,224); doc.rect(margin,y-3,cW,5,'F');
     doc.setTextColor(42,122,58); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
-    doc.text('PAGOS PARCIALES',margin+1,y); y+=2.5;
+    doc.text('PAGOS PARCIALES',margin+1,y);
+    doc.text('ABONOS',margin+cW,y,{align:'right'}); y+=2.5;
 
     // ── Fila 0: concepto original — OMITIDA en PDF (el total ya aparece en sección conceptos) ──
 
@@ -8384,11 +8385,33 @@ async function generarPDF(datos,folio,qrDataURL){
     datos.pagosParciales.forEach(p=>{
       const cant=parseFloat(p.cantidad)||0; totalPagosParciales+=cant;
       doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(20,10,5);
-      const cLines = doc.splitTextToSize(p.concepto||'Abon\u00f3', colConceptoW);
-      // Si la descripción ya trae auth inline (-fecha-), NO agregar [fechaHora] extra
-      const descripFinal = p._hasAuthInline
-        ? (p.descripcion || '')
-        : ((p.descripcion || '') + ' [' + (p.fechaHora || '') + ']');
+      const conceptoLimpio = p.concepto||'Abono';
+      const cLines = doc.splitTextToSize(conceptoLimpio, colConceptoW);
+      let descripFinal = '';
+      if(p._hasAuthInline){
+        // Extraer iniciales y fecha del tag de autorización — formato: "— Autorizó: INICIALES -FECHA-"
+        const _authMatch = (p.descripcion||'').match(/Autorizó: ([A-Z.]+) -([^-]+)-/);
+        const _esLiqInline = conceptoLimpio.toLowerCase().includes('liquid');
+        if(_esLiqInline && _authMatch){
+          descripFinal = 'DEL TRÁMITE — Autorizó: ' + _authMatch[1] + ' ' + _authMatch[2];
+        } else {
+          descripFinal = (p.descripcion||'').replace(/ -(\d{4}-\d{2}-\d{2} \d{2}:\d{2})-/,' $1');
+        }
+      } else {
+        const _esLiq = conceptoLimpio.toLowerCase().includes('liquid');
+        const _prefijo = _esLiq ? 'DEL TRÁMITE' : 'DEL RECIBO';
+        const _fecha = p.fechaHora||'';
+        const _folioRef = datos.folio ? String((datos.anio_folio||new Date().getFullYear())).slice(-2)+'-'+String(datos.folio).padStart(3,'0') : '';
+        if(_esLiq){
+          // Liquidación: "DEL TRÁMITE — Autorizó: INICIALES FECHA"
+          const _iniciales = (datos.responsable||'').trim().split(/\s+/).map(w=>(w[0]||'').toUpperCase()).join('').slice(0,4)||'—';
+          descripFinal = _prefijo + ' — Autorizó: ' + _iniciales + (_fecha?' '+_fecha:'') + (_folioRef?' ('+_folioRef+')':'');
+        } else {
+          // Pago parcial: "DEL RECIBO — Autorizó: INICIALES FECHA (FOLIO)"
+          const _desc = (p.descripcion||'').replace(/\[[\w-]+\]/g,'').trim();
+          descripFinal = _prefijo + (_desc?' — '+_desc:'') + (_fecha?' '+_fecha:'') + (_folioRef?' ('+_folioRef+')':'');
+        }
+      }
       const dLines = doc.splitTextToSize(descripFinal, colDescripW);
       const maxLines = Math.max(cLines.length, dLines.length, 1);
       const rowH = maxLines * 3.6 + 1.2;

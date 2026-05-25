@@ -22798,6 +22798,8 @@ function adminAbrirEdicionCompleta() {
 
   // Guardar referencia al recibo que se va a editar (por folio, más seguro que por índice)
   _reciboEnEdicionCompleta = r.folio;
+  // Respaldo global: ir() → limpiarFormCompleto() anula _reciboEnEdicionCompleta antes de que el form cargue
+  window._reciboEdicionBackup = r.folio;
 
   // Función interna que carga el formulario
   function _cargarFormEdicion() {
@@ -22862,6 +22864,7 @@ function adminAbrirEdicionCompleta() {
 function cancelarEdicionCompleta() {
   if (!confirm('¿Cancelar la edición? Los cambios no se guardarán.')) return;
   _reciboEnEdicionCompleta = null;
+  window._reciboEdicionBackup = null;
   ['modo-edicion-completa'].forEach(function(c){ document.body.classList.remove(c); });
   var btnG = document.getElementById('btn-guardar');
   if (btnG) btnG.style.display = '';
@@ -22870,6 +22873,9 @@ function cancelarEdicionCompleta() {
 }
 
 async function guardarEdicionCompleta() {
+  if (_reciboEnEdicionCompleta === null && window._reciboEdicionBackup != null) {
+    _reciboEnEdicionCompleta = window._reciboEdicionBackup;
+  }
   if (_reciboEnEdicionCompleta === null) {
     if (typeof toast === 'function') toast('Error: no hay recibo en edición', 'err'); return;
   }
@@ -23037,6 +23043,7 @@ async function guardarEdicionCompleta() {
 
     // Salir del modo edición
     _reciboEnEdicionCompleta = null;
+    window._reciboEdicionBackup = null;
     ['modo-edicion-completa'].forEach(function(c){ document.body.classList.remove(c); });
     var btnG = document.getElementById('btn-guardar');
     if (btnG) btnG.style.display = '';

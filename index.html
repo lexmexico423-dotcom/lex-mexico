@@ -5299,9 +5299,10 @@ window.addEventListener('offline', ()=>{
     <button class="btn-cerrar-consulta" onclick="cerrarConsulta()">✕ CERRAR CONSULTA</button>
     <button class="btn-cancelado" onclick="ejecutarTramiteCancelado()">Anular trámite &rsaquo;&rsaquo;&rsaquo;</button>
     <button onclick="if(reciboEnConsulta) verHistorialVersiones(reciboEnConsulta.folio)"
-      title="Ver versiones anteriores del recibo"
-      style="padding:7px 13px;border-radius:5px;border:1px solid #a07a30;background:#fff8ed;color:#7a4a00;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;cursor:pointer;letter-spacing:0.04em;">
-      🕓 VERSIONES
+      title="Versiones del recibo"
+      id="btn-gear-versiones"
+      style="padding:7px 11px;border-radius:5px;border:1px solid #a07a30;background:#fff8ed;color:#7a4a00;font-size:1rem;cursor:pointer;line-height:1;">
+      ⚙
     </button>
   </div>
   <!-- BOTÓN SALIR — visible solo cuando el folio está liquidado (sin saldo) -->
@@ -8165,7 +8166,8 @@ async function generarPDF(datos,folio,qrDataURL){
       const p=parseFloat(c.precio)||0; total+=p;
       doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(20,10,5);
       const cLines = doc.splitTextToSize(c.concepto||'', colConceptoW);
-      const dLines = doc.splitTextToSize(c.descripcion||'', colDescripW);
+      const _vTagC = ' ['+folioConLetra(folio, datos.anio_folio, c.folioLetra||'A')+']';
+      const dLines = doc.splitTextToSize((c.descripcion||'')+_vTagC, colDescripW);
       const maxLines = Math.max(cLines.length, dLines.length, 1);
       const rowH = maxLines * 4 + 1.5;
       asegurarEspacioConceptos(rowH);
@@ -8254,7 +8256,8 @@ async function generarPDF(datos,folio,qrDataURL){
       const p=parseFloat(c.precio)||0; totalCostosExtra+=p; total+=p;
       doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(20,10,5);
       const cLines = doc.splitTextToSize(c.concepto||'', colConceptoW);
-      const dLines = doc.splitTextToSize((c.descripcion||'')+' ['+(c.fechaHora||'')+']', colDescripW);
+      const _vTagCE = '['+folioConLetra(folio, datos.anio_folio, c.folioLetra||datos.letra||'A')+(c.fechaHora?' '+c.fechaHora:'')+']';
+      const dLines = doc.splitTextToSize((c.descripcion ? c.descripcion+' ' : '')+_vTagCE, colDescripW);
       const maxLines = Math.max(cLines.length, dLines.length, 1);
       const rowH = maxLines * 3.6 + 1.2;
       asegurarEspacioCE(rowH);
@@ -9709,10 +9712,12 @@ async function _imprimirActualizacionReal(){
     const fechaHoraFinal = _retroActivo
       ? (_fechaActualizacion + ' ' + _horaActualizacion)
       : (p.fechaHora || '');
-    const authTag = ' \u2014 Autoriz\u00f3: ' + autorizacion.iniciales + ' -' + fechaHoraFinal + '-';
+    const _vTagPP = ' ['+folioConLetra(recibo.folio, recibo.anio_folio, letraActual)+']';
+    const authTag = _vTagPP + ' \u2014 Autoriz\u00f3: ' + autorizacion.iniciales + ' -' + fechaHoraFinal + '-';
     return Object.assign({}, p, {
       descripcion: (p.descripcion || '') + authTag,
       fechaHora: fechaHoraFinal || p.fechaHora,
+      folioLetra: letraActual,
       _hasAuthInline: true
     });
   });
@@ -9765,7 +9770,7 @@ async function _imprimirActualizacionReal(){
       // Todo lo que acabamos de imprimir queda locked para futuras actualizaciones.
       // CRÍTICO: guardar pagosParciales_conAuth (NO pagosParciales sin auth) para que
       // la autorización del abono actual permanezca FIJA en próximas actualizaciones.
-      appData.recibos[idx].costosExtra = costosExtra.map(c => Object.assign({}, c, {locked:true}));
+      appData.recibos[idx].costosExtra = costosExtra.map(c => Object.assign({}, c, {locked:true, folioLetra: c.folioLetra || letraActual}));
       appData.recibos[idx].pagosParciales = pagosParciales_conAuth.map(p => Object.assign({}, p, {locked:true}));
       appData.recibos[idx].fechasImpresion = fechasImpresion;
       appData.recibos[idx].total = totalGeneral;
@@ -9777,6 +9782,7 @@ async function _imprimirActualizacionReal(){
       appData.recibos[idx].letra = letraActual;
       appData.recibos[idx].placasEntregadas = _placasCapturadas.placas;
       appData.recibos[idx].estadoPlacas     = _placasCapturadas.estado;
+      _guardarVersionEnSupabase(appData.recibos[idx], letraActual, nombreArchivo).catch(e=>console.warn('[SB versiones] actualizacion:',e));
     }
 
     if(!appData.historialPagos) appData.historialPagos = {};
@@ -10821,7 +10827,8 @@ async function guardarRecibo(){
       responsable: datos.responsable,
       nombre_cliente_firma: datos.nombre_cliente_firma,
       fecha_recibo: datos.fecha_recibo,
-      hora_recibo: datos.hora_recibo
+      hora_recibo: datos.hora_recibo,
+      letra: 'A'
     });
 
     // ── ESCRITURA BLOQUEANTE: esperar confirmación de Drive antes de continuar ──
@@ -10838,6 +10845,9 @@ async function guardarRecibo(){
 
     // El folio ya fue reservado e incrementado en Drive al inicio de guardarRecibo().
     pendingNextFolio = null;
+
+    // ── Guardar versión inicial A en Supabase versiones_recibo ──
+    _guardarVersionEnSupabase(appData.recibos[0], 'A', nombreArchivo).catch(e=>console.warn('[SB versiones] inicial:',e));
 
     // Si es comprobante de abono: actualizar saldo del recibo original
     if(folioAntNum){
@@ -11060,50 +11070,145 @@ function _guardarSnapshotRecibo(recibo, motivo){
   } catch(e){ console.warn('[snapshot]',e); }
 }
 
-// Abre el modal con el historial de versiones de un folio
-function verHistorialVersiones(folio){
-  const versiones = (appData.historialVersiones||{})[folio] || [];
-  const recibo    = (appData.recibos||[]).find(r=>r.folio===folio && !r.esComplemento);
+// Guarda un registro permanente de la versión en la tabla versiones_recibo de Supabase.
+// Complementa (no reemplaza) el historial local en appData.historialVersiones.
+async function _guardarVersionEnSupabase(recibo, letra, pdfNombreArchivo){
+  if(!window.SB || !window.SB_DESPACHO_ID) return;
+  try {
+    const quien = (typeof empleadoActual!=='undefined' && empleadoActual && empleadoActual.nombre)
+      ? empleadoActual.nombre
+      : (typeof NOMBRE_TITULAR!=='undefined' ? NOMBRE_TITULAR : '—');
+    const pdfPath = pdfNombreArchivo
+      ? (window.SB_DESPACHO_ID + '/recibos/' + pdfNombreArchivo)
+      : null;
+    const { error } = await window.SB.from('versiones_recibo').upsert({
+      despacho_id:      window.SB_DESPACHO_ID,
+      folio_base:       recibo.folio,
+      anio_folio:       recibo.anio_folio || new Date().getFullYear(),
+      letra:            letra || 'A',
+      datos_completos:  structuredClone(recibo),
+      pdf_storage_path: pdfPath,
+      fecha:            typeof hoy==='function' ? hoy() : new Date().toISOString().split('T')[0],
+      hora:             typeof hora==='function' ? hora() : new Date().toTimeString().slice(0,5),
+      usuario:          quien
+    }, { onConflict: 'despacho_id,folio_base,anio_folio,letra' });
+    if(error) console.warn('[versiones_recibo] upsert error:', error.message);
+    else console.log('[versiones_recibo] ✓ guardada versión', letra, 'folio', recibo.folio);
+  } catch(e){ console.warn('[versiones_recibo]', e); }
+}
+
+// Abre el modal con versiones del recibo. Admin ve todo; empleado solo la versión actual.
+async function verHistorialVersiones(folio){
   const el = document.getElementById('modal-versiones');
   const body = document.getElementById('modal-versiones-body');
   if(!el || !body) return;
-  document.getElementById('modal-versiones-folio').textContent = 'Folio #'+folioFormato(folio);
-  if(!versiones.length){
-    body.innerHTML='<p style="color:var(--muted);font-size:0.8rem;text-align:center;padding:20px;">Sin versiones anteriores registradas para este folio.</p>';
-  } else {
-    // Mostrar de más reciente a más antigua
-    const lista = [...versiones].reverse();
-    body.innerHTML = lista.map((v,i)=>{
-      const snap = v.snapshot;
-      const saldo = snap.saldoPendiente!=null ? snap.saldoPendiente : '—';
-      const total = snap.total != null ? snap.total : (snap.totalGeneral||'—');
-      const abonado = snap.totalAbonado!=null ? snap.totalAbonado : (parseFloat(snap.anticipo)||0);
-      return `<div style="border:1px solid var(--border-light);border-radius:6px;padding:12px 14px;margin-bottom:10px;background:var(--field-bg);">
+
+  const recibo = (appData.recibos||[]).find(r=>r.folio===folio && !r.esComplemento);
+  const anioFolio = recibo?.anio_folio || new Date().getFullYear();
+  const letraActual = recibo?.letra || letraVersion(recibo) || 'A';
+  document.getElementById('modal-versiones-folio').textContent = 'Folio #'+folioConLetra(folio, anioFolio, letraActual);
+
+  const emailActual = (typeof empleadoActual!=='undefined' && empleadoActual && empleadoActual.email)
+    ? empleadoActual.email.toLowerCase() : '';
+  const esAdmin = typeof ADMIN_EMAIL!=='undefined'
+    ? emailActual === ADMIN_EMAIL.toLowerCase()
+    : false;
+
+  body.innerHTML = '<p style="color:var(--muted);font-size:0.8rem;text-align:center;padding:20px;">⏳ Cargando versiones...</p>';
+  el.classList.add('show');
+
+  // Empleado: solo ve la versión actual sin historial
+  if(!esAdmin){
+    body.innerHTML = `<div style="border:1px solid var(--gold);border-radius:6px;padding:14px;background:#fffbf0;text-align:center;">
+      <div style="font-family:'DM Mono',monospace;font-size:0.85rem;font-weight:700;color:var(--gold-d);margin-bottom:6px;">Versión actual: ${folioConLetra(folio, anioFolio, letraActual)}</div>
+      <div style="font-size:0.72rem;color:var(--muted);">El historial completo de versiones es visible solo para el administrador.</div>
+    </div>`;
+    return;
+  }
+
+  // Admin: cargar desde Supabase
+  let versionesSB = [];
+  if(window.SB && window.SB_DESPACHO_ID && recibo){
+    try {
+      const { data, error } = await window.SB.from('versiones_recibo')
+        .select('*')
+        .eq('despacho_id', window.SB_DESPACHO_ID)
+        .eq('folio_base', folio)
+        .eq('anio_folio', anioFolio)
+        .order('letra', {ascending: true});
+      if(!error && data) versionesSB = data;
+    } catch(e){ console.warn('[versiones_recibo]', e); }
+  }
+
+  if(versionesSB.length){
+    const lista = [...versionesSB].reverse(); // más reciente primero
+    body.innerHTML = lista.map((v, i)=>{
+      const snap = v.datos_completos || {};
+      const saldo   = snap.saldoPendiente != null ? snap.saldoPendiente : '—';
+      const total   = snap.total != null ? snap.total : (snap.totalGeneral || '—');
+      const abonado = snap.totalAbonado != null ? snap.totalAbonado : (parseFloat(snap.anticipo)||0);
+      const esUltima = (i === 0);
+      const puedeRestaurar = !esUltima;
+      const badgeActual = esUltima
+        ? ' <span style="font-size:0.62rem;color:#2a7a3a;background:#e8f5e9;padding:2px 6px;border-radius:3px;vertical-align:middle;font-weight:600;">ACTUAL</span>'
+        : '';
+      return `<div style="border:1.5px solid ${esUltima?'var(--gold)':'var(--border-light)'};border-radius:6px;padding:12px 14px;margin-bottom:10px;background:${esUltima?'#fffbf0':'var(--field-bg)'};">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <span style="font-family:'DM Mono',monospace;font-size:0.72rem;font-weight:700;color:var(--gold-d);">Versión ${lista.length-i}</span>
-          <span style="font-size:0.7rem;color:var(--muted);">${v.fecha} ${v.hora} · ${v.quien}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:0.82rem;font-weight:700;color:var(--gold-d);">${folioConLetra(folio, anioFolio, v.letra)}${badgeActual}</span>
+          <span style="font-size:0.68rem;color:var(--muted);">${v.fecha} ${v.hora} · ${v.usuario}</span>
         </div>
-        <div style="font-size:0.75rem;color:var(--ink);margin-bottom:6px;"><strong>Motivo:</strong> ${v.motivo}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-family:'DM Mono',monospace;font-size:0.72rem;">
-          <div style="background:#f5f0e8;border-radius:4px;padding:6px 8px;"><span style="color:var(--muted);display:block;font-size:0.65rem;">TOTAL</span>$${typeof fmtMXN==='function'?fmtMXN(total):total}</div>
-          <div style="background:#eaf4ea;border-radius:4px;padding:6px 8px;"><span style="color:var(--muted);display:block;font-size:0.65rem;">ABONADO</span>$${typeof fmtMXN==='function'?fmtMXN(abonado):abonado}</div>
-          <div style="background:${saldo>0?'#fff4e0':'#eafaea'};border-radius:4px;padding:6px 8px;"><span style="color:var(--muted);display:block;font-size:0.65rem;">SALDO</span>$${typeof fmtMXN==='function'?fmtMXN(saldo):saldo}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-family:'DM Mono',monospace;font-size:0.72rem;margin-bottom:10px;">
+          <div style="background:#f5f0e8;border-radius:4px;padding:6px 8px;"><span style="color:var(--muted);display:block;font-size:0.62rem;">TOTAL</span>$${typeof fmtMXN==='function'?fmtMXN(total):total}</div>
+          <div style="background:#eaf4ea;border-radius:4px;padding:6px 8px;"><span style="color:var(--muted);display:block;font-size:0.62rem;">ABONADO</span>$${typeof fmtMXN==='function'?fmtMXN(abonado):abonado}</div>
+          <div style="background:${saldo>0?'#fff4e0':'#eafaea'};border-radius:4px;padding:6px 8px;"><span style="color:var(--muted);display:block;font-size:0.62rem;">SALDO</span>$${typeof fmtMXN==='function'?fmtMXN(saldo):saldo}</div>
         </div>
-        ${snap.pagosParciales&&snap.pagosParciales.length?`<div style="margin-top:8px;font-size:0.7rem;color:var(--muted);">Abonos registrados: ${snap.pagosParciales.length}</div>`:''}
-        <div style="margin-top:10px;display:flex;gap:8px;">
-          <button onclick="descargarSnapshotPDF(${folio},${versiones.length-1-i})"
-            style="font-size:0.7rem;padding:5px 12px;border-radius:4px;border:1px solid var(--border-light);background:transparent;cursor:pointer;color:var(--ink);">
-            📄 Ver PDF de esta versión
-          </button>
-          <button onclick="restaurarVersionRecibo(${folio},${versiones.length-1-i})"
-            style="font-size:0.7rem;padding:5px 12px;border-radius:4px;border:1.5px solid #c07a10;background:#fff8ed;cursor:pointer;color:#7a4a00;font-weight:600;">
-            ↩ Restaurar esta versión
-          </button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${v.pdf_storage_path?`<button onclick="verPDFVersionSupabase('${v.pdf_storage_path}')"
+            style="font-size:0.7rem;padding:5px 12px;border-radius:4px;border:1px solid var(--border-light);background:transparent;cursor:pointer;color:var(--ink);">📄 Ver PDF</button>`:''}
+          ${puedeRestaurar?`<button onclick="restaurarVersionDesdeSupabase(${folio},'${v.letra}')"
+            style="font-size:0.7rem;padding:5px 12px;border-radius:4px;border:1.5px solid #c07a10;background:#fff8ed;cursor:pointer;color:#7a4a00;font-weight:600;">↩ Restaurar esta versión</button>`:''}
         </div>
       </div>`;
     }).join('');
+    return;
   }
-  el.classList.add('show');
+
+  // Fallback: historial local (para recibos anteriores al sistema de versiones Supabase)
+  const versionesLocal = (appData.historialVersiones||{})[folio] || [];
+  if(!versionesLocal.length){
+    body.innerHTML='<p style="color:var(--muted);font-size:0.8rem;text-align:center;padding:20px;">Sin versiones registradas para este folio.</p>';
+    return;
+  }
+  const lista = [...versionesLocal].reverse();
+  body.innerHTML = lista.map((v,i)=>{
+    const snap = v.snapshot;
+    const saldo   = snap.saldoPendiente!=null ? snap.saldoPendiente : '—';
+    const total   = snap.total!=null ? snap.total : (snap.totalGeneral||'—');
+    const abonado = snap.totalAbonado!=null ? snap.totalAbonado : (parseFloat(snap.anticipo)||0);
+    return `<div style="border:1px solid var(--border-light);border-radius:6px;padding:12px 14px;margin-bottom:10px;background:var(--field-bg);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-family:'DM Mono',monospace;font-size:0.72rem;font-weight:700;color:var(--gold-d);">Versión ${lista.length-i}</span>
+        <span style="font-size:0.7rem;color:var(--muted);">${v.fecha} ${v.hora} · ${v.quien}</span>
+      </div>
+      <div style="font-size:0.75rem;color:var(--ink);margin-bottom:6px;"><strong>Motivo:</strong> ${v.motivo}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;font-family:'DM Mono',monospace;font-size:0.72rem;">
+        <div style="background:#f5f0e8;border-radius:4px;padding:6px 8px;"><span style="color:var(--muted);display:block;font-size:0.65rem;">TOTAL</span>$${typeof fmtMXN==='function'?fmtMXN(total):total}</div>
+        <div style="background:#eaf4ea;border-radius:4px;padding:6px 8px;"><span style="color:var(--muted);display:block;font-size:0.65rem;">ABONADO</span>$${typeof fmtMXN==='function'?fmtMXN(abonado):abonado}</div>
+        <div style="background:${saldo>0?'#fff4e0':'#eafaea'};border-radius:4px;padding:6px 8px;"><span style="color:var(--muted);display:block;font-size:0.65rem;">SALDO</span>$${typeof fmtMXN==='function'?fmtMXN(saldo):saldo}</div>
+      </div>
+      ${snap.pagosParciales&&snap.pagosParciales.length?`<div style="margin-top:8px;font-size:0.7rem;color:var(--muted);">Abonos registrados: ${snap.pagosParciales.length}</div>`:''}
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button onclick="descargarSnapshotPDF(${folio},${versionesLocal.length-1-i})"
+          style="font-size:0.7rem;padding:5px 12px;border-radius:4px;border:1px solid var(--border-light);background:transparent;cursor:pointer;color:var(--ink);">
+          📄 Ver PDF de esta versión
+        </button>
+        <button onclick="restaurarVersionRecibo(${folio},${versionesLocal.length-1-i})"
+          style="font-size:0.7rem;padding:5px 12px;border-radius:4px;border:1.5px solid #c07a10;background:#fff8ed;cursor:pointer;color:#7a4a00;font-weight:600;">
+          ↩ Restaurar esta versión
+        </button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 // Descarga el PDF guardado en el snapshot (si existe)
@@ -11137,6 +11242,73 @@ function restaurarVersionRecibo(folio, idx){
   if(typeof renderCaja==='function') renderCaja();
   document.getElementById('modal-versiones').classList.remove('show');
   showModal('Versión restaurada','El Folio #'+folioFormato(folio)+' fue restaurado al estado del '+v.fecha+' a las '+v.hora+'. El historial de versiones se conserva completo.');
+}
+
+// Abre el PDF de una versión directamente desde Supabase Storage (firmado por 60 s)
+async function verPDFVersionSupabase(pdfPath){
+  if(!window.SB){ showModal('Error','Sin conexión a Supabase.'); return; }
+  try {
+    const { data, error } = await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(pdfPath, 60);
+    if(error || !data){ showModal('Error','No se pudo obtener el PDF: '+(error?.message||'sin URL')); return; }
+    window.open(data.signedUrl, '_blank');
+  } catch(e){ showModal('Error','Error al obtener PDF: '+e.message); }
+}
+
+// Restaura (admin) el folio a la letraTarget y elimina las versiones más nuevas de Supabase
+async function restaurarVersionDesdeSupabase(folio, letraTarget){
+  if(!window.SB || !window.SB_DESPACHO_ID){ showModal('Error','Sin conexión a Supabase.'); return; }
+  const recibo = (appData.recibos||[]).find(r=>r.folio===folio && !r.esComplemento);
+  const anioFolio = recibo?.anio_folio || new Date().getFullYear();
+  if(!confirm('¿Restaurar el folio '+folioConLetra(folio, anioFolio, letraTarget)+'?\n\nLas versiones más recientes serán eliminadas permanentemente. Esta acción no se puede deshacer.')){ return; }
+  try {
+    // 1. Obtener la versión objetivo
+    const { data: vTarget, error: e1 } = await window.SB.from('versiones_recibo')
+      .select('*')
+      .eq('despacho_id', window.SB_DESPACHO_ID)
+      .eq('folio_base', folio)
+      .eq('anio_folio', anioFolio)
+      .eq('letra', letraTarget)
+      .single();
+    if(e1 || !vTarget){ showModal('Error','Versión no encontrada: '+(e1?.message||'')); return; }
+
+    // 2. Obtener versiones posteriores a letraTarget (letras > target → las que se borran)
+    const { data: vMasRecientes } = await window.SB.from('versiones_recibo')
+      .select('letra, pdf_storage_path')
+      .eq('despacho_id', window.SB_DESPACHO_ID)
+      .eq('folio_base', folio)
+      .eq('anio_folio', anioFolio)
+      .gt('letra', letraTarget);
+
+    if(vMasRecientes && vMasRecientes.length){
+      for(const v of vMasRecientes){
+        if(v.pdf_storage_path)
+          await window.SB.storage.from(STORAGE_BUCKET).remove([v.pdf_storage_path]).catch(()=>{});
+      }
+      const letrasABorrar = vMasRecientes.map(v=>v.letra);
+      await window.SB.from('versiones_recibo').delete()
+        .eq('despacho_id', window.SB_DESPACHO_ID)
+        .eq('folio_base', folio)
+        .eq('anio_folio', anioFolio)
+        .in('letra', letrasABorrar);
+    }
+
+    // 3. Restaurar campos del recibo en appData
+    const snap = vTarget.datos_completos || {};
+    const recIdx = (appData.recibos||[]).findIndex(r=>r.folio===folio && !r.esComplemento);
+    if(recIdx<0){ showModal('Error','Recibo no encontrado en datos locales.'); return; }
+    _guardarSnapshotRecibo(appData.recibos[recIdx], 'Antes de restaurar a '+letraTarget);
+    const campos = ['costosExtra','pagosParciales','fechasImpresion','total','saldoPendiente','saldoNuevo','totalAbonado','anticipo','placasEntregadas','estadoPlacas','cancelado'];
+    campos.forEach(c=>{ if(snap[c]!==undefined) appData.recibos[recIdx][c]=structuredClone(snap[c]); });
+    appData.recibos[recIdx].letra  = letraTarget;
+    appData.recibos[recIdx].archivo = folioConLetra(folio, anioFolio, letraTarget)+'.pdf';
+
+    if(typeof save==='function') save();
+    if(typeof actualizarArchivoControl==='function') actualizarArchivoControl().catch(()=>{});
+    document.getElementById('modal-versiones').classList.remove('show');
+    showModal('Versión restaurada','Folio '+folioConLetra(folio, anioFolio, letraTarget)+' restaurado correctamente.');
+    if(typeof renderHistorial==='function') renderHistorial();
+    if(typeof renderCaja==='function') renderCaja();
+  } catch(e){ showModal('Error','Error al restaurar: '+e.message); }
 }
 
 function filtrarHistorial(){

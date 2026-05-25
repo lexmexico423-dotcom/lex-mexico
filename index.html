@@ -23115,6 +23115,7 @@ async function guardarEdicionCompleta() {
   var idx = recibos.findIndex(function(r){ return r.folio === folioOriginal; });
   if (idx < 0) { if (typeof toast === 'function') toast('Error: recibo no encontrado en memoria', 'err'); return; }
   var r = recibos[idx];
+  const letraOriginal = r.letra || 'A'; // capturar antes de cualquier mutación
 
   // ─── Recoger datos del formulario ───────────────────────────────
   var clientes = typeof getClientes === 'function' ? getClientes() : [];
@@ -23261,6 +23262,16 @@ async function guardarEdicionCompleta() {
     }
 
     // ─── Guardar versión en Supabase ────────────────────────────────
+    // Si la letra cambió (mismo folio), renombrar la fila existente antes de upsert
+    if(letraRecibo !== letraOriginal && !folioChanged && window.SB && window.SB_DESPACHO_ID) {
+      window.SB.from('versiones_recibo')
+        .update({ letra: letraRecibo })
+        .eq('despacho_id', window.SB_DESPACHO_ID)
+        .eq('folio_base', r.folio)
+        .eq('anio_folio', r.anio_folio || anioFolio)
+        .eq('letra', letraOriginal)
+        .then(({error}) => { if(error) console.warn('[versiones_recibo letra]', error); });
+    }
     if (typeof _guardarVersionEnSupabase === 'function') {
       _guardarVersionEnSupabase(r, letraRecibo, nombreArchivo).catch(e => console.warn('[versiones] edicion:', e));
     }
@@ -23272,17 +23283,27 @@ async function guardarEdicionCompleta() {
     // ─── Actualizar movimiento en contabilidad ──────────────────────
     if (typeof D !== 'undefined' && Array.isArray(D.movimientos)) {
       const folioStr2 = folioConLetra(r.folio, anioFolioN, letraRecibo);
-      const idMov  = 'M-REC-' + r.folio;
-      const idxMov = D.movimientos.findIndex(function(m){ return m.id === idMov || m.folio === r.folio; });
-      const c0     = (r.conceptos || [])[0];
+      // Buscar por ID antiguo o por folio (ya actualizado por _aplicarMapaRenumeracion)
+      const idMovNuevo = 'M-REC-' + r.folio;
+      const idMovViejo = 'M-REC-' + folioOriginal;
+      const idxMov = D.movimientos.findIndex(function(m){
+        return m.id === idMovNuevo || m.id === idMovViejo || m.folio === r.folio || m.folio === folioOriginal;
+      });
+      const c0      = (r.conceptos || [])[0];
       const txtConc = c0 ? ((c0.concepto||'') + (c0.descripcion ? ' — ' + c0.descripcion : '')) : '';
       const movDesc = 'Recibo #' + folioStr2 + ' · ' + primerNombre + (txtConc ? ' · ' + txtConc : '');
+      const estatus = anticipo < total ? 'Anticipo' : 'Liquidado';
       if (idxMov >= 0) {
+        D.movimientos[idxMov].id          = idMovNuevo;
+        D.movimientos[idxMov].folio       = r.folio;
         D.movimientos[idxMov].nombre      = primerNombre;
         D.movimientos[idxMov].descripcion = movDesc;
         D.movimientos[idxMov].fecha       = fechaRecibo;
+        D.movimientos[idxMov].hora        = horaRecibo;
         D.movimientos[idxMov].monto       = anticipo || total;
         D.movimientos[idxMov].responsable = responsable;
+        D.movimientos[idxMov].cat         = estatus + ' · #' + folioStr2;
+        D.movimientos[idxMov].estatus     = estatus;
       }
     }
 
@@ -35082,7 +35103,16 @@ async function _aplicarMapaRenumeracion(mapa, anioActual, siguiente){
   });
   // 3 — Movimientos contables
   (D.movimientos || []).forEach(m => {
-    if(m.folio != null && mapa.has(m.folio)) m.folio = mapa.get(m.folio);
+    if(m.folio != null && mapa.has(m.folio)){
+      const oldF = m.folio;
+      const newF = mapa.get(oldF);
+      m.folio = newF;
+      if(m.id === 'M-REC-' + oldF) m.id = 'M-REC-' + newF;
+      const oldStr = folioFormato(oldF, anioActual);
+      const newStr = folioFormato(newF, anioActual);
+      if(m.cat)        m.cat        = m.cat.replace('#'+oldStr, '#'+newStr);
+      if(m.descripcion) m.descripcion = m.descripcion.replace('Recibo #'+oldStr, 'Recibo #'+newStr);
+    }
   });
   // 4 — Gestiones
   (D.gestiones || []).forEach(g => {

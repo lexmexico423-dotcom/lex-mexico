@@ -11341,8 +11341,36 @@ async function adminAbrirConsultarPDF(){
   const buscar = document.getElementById('cpdf-buscar');
   if(buscar) buscar.value = '';
   document.getElementById('cpdf-lista').innerHTML =
-    '<p style="color:var(--muted);text-align:center;padding:24px;font-size:0.75rem;">⏳ Cargando versiones…</p>';
+    '<p style="color:var(--muted);text-align:center;padding:24px;font-size:0.75rem;">⏳ Sincronizando versiones…</p>';
+  // Migración silenciosa: registrar en versiones_recibo cualquier recibo de appData que falte
+  await _cpdfMigrarSilencioso();
   await adminConsultarPDFCargar();
+}
+
+async function _cpdfMigrarSilencioso(){
+  if(!window.SB || !window.SB_DESPACHO_ID) return;
+  const recibos = (typeof appData!=='undefined' ? appData.recibos||[] : []).filter(function(r){ return !r.esComplemento; });
+  if(!recibos.length) return;
+  // Obtener los (folio_base, letra) que ya existen para no hacer upserts innecesarios
+  try {
+    const { data: existentes } = await window.SB.from('versiones_recibo')
+      .select('folio_base,anio_folio,letra')
+      .eq('despacho_id', window.SB_DESPACHO_ID);
+    const claves = new Set((existentes||[]).map(function(v){
+      return v.folio_base+'_'+v.anio_folio+'_'+v.letra;
+    }));
+    const faltantes = recibos.filter(function(r){
+      var letra  = r.letra || letraVersion(r) || 'A';
+      var anio   = r.anio_folio || new Date().getFullYear();
+      return !claves.has(r.folio+'_'+anio+'_'+letra);
+    });
+    for(var i=0; i<faltantes.length; i++){
+      var r = faltantes[i];
+      var letra   = r.letra || letraVersion(r) || 'A';
+      var archivo = r.archivo || (folioConLetra(r.folio, r.anio_folio, letra)+'.pdf');
+      await _guardarVersionEnSupabase(r, letra, archivo);
+    }
+  } catch(e){ console.warn('[cpdf migración silenciosa]', e); }
 }
 
 async function adminConsultarPDFCargar(){

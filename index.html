@@ -8152,9 +8152,9 @@ async function generarPDF(datos,folio,qrDataURL){
   let docsData = null;
   try { if(datos.copias) docsData = JSON.parse(datos.copias); } catch(e){ registrarError('catch vacio', e); }
   if (docsData && docsData.docs && docsData.docs.length) {
-    // Subtítulo: tipo de documento (Copia Simple / Escaneado)
-    doc.setFontSize(6.5); doc.setFont('helvetica','italic'); doc.setTextColor(110,85,35);
-    doc.text('(' + docsData.tipodoc + ')', margin, y); y += 3.5;
+    // Subtítulo: tipo de documento (Copia Simple / Escaneado) — resaltado
+    doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(42,100,42);
+    doc.text('• Tipo: ' + docsData.tipodoc, margin, y); y += 4;
 
     // Layout en 2 columnas, fuente Arial/Helvetica normal, tamaño legible
     doc.setFont('helvetica','normal'); doc.setTextColor(15,10,5); doc.setFontSize(7.5);
@@ -8197,7 +8197,7 @@ async function generarPDF(datos,folio,qrDataURL){
   doc.setFillColor(248,244,232); doc.rect(margin,y-3,cW,5,'F');
   doc.setTextColor(154,110,24); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
   doc.text('CONCEPTO',margin+1,y); doc.text('DESCRIPCIÓN',margin+cW*0.38,y);
-  doc.text('PRECIO',margin+cW,y,{align:'right'}); y+=2.5;
+  doc.text('COSTO DEL TRÁMITE',margin+cW,y,{align:'right'}); y+=2.5;
   let total=0;
   const colConceptoW = cW*0.35;
   const colDescripW  = cW*0.42;
@@ -8211,7 +8211,7 @@ async function generarPDF(datos,folio,qrDataURL){
       doc.setTextColor(154,110,24); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
       doc.text('CONCEPTO (continuaci\u00f3n)',margin+1,y);
       doc.text('DESCRIPCI\u00d3N',margin+cW*0.38,y);
-      doc.text('PRECIO',margin+cW,y,{align:'right'}); y+=2.5;
+      doc.text('COSTO DEL TRÁMITE',margin+cW,y,{align:'right'}); y+=2.5;
     }
   }
   datos.conceptos.forEach(c=>{
@@ -8345,42 +8345,24 @@ async function generarPDF(datos,folio,qrDataURL){
     doc.setTextColor(42,122,58); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
     doc.text('PAGOS PARCIALES',margin+1,y); y+=2.5;
 
-    // ── Fila 0: concepto original + total pactado ──
-    (function(){
-      const c0 = datos.conceptos && datos.conceptos[0] ? datos.conceptos[0] : {};
-      const conceptoTexto = c0.concepto || datos.tramites || 'Trámite';
-      const iniciales = (datos.responsable||'').trim().split(/\s+/).map(w=>(w[0]||'').toUpperCase()).join('').slice(0,4)||'—';
-      const partes = [];
-      if(c0.descripcion) partes.push(c0.descripcion);
-      if(datos.fecha_recibo) partes.push(datos.fecha_recibo+(datos.hora_recibo?' '+datos.hora_recibo:''));
-      partes.push(iniciales);
-      const descOrig = partes.join(' · ');
-      const montoOrig = parseFloat(datos.totalGeneral)||0;
-      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
-      const cLO = doc.splitTextToSize(conceptoTexto, colConceptoW);
-      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
-      const dLO = doc.splitTextToSize(descOrig, colDescripW);
-      const maxLO = Math.max(cLO.length, dLO.length, 1);
-      const rHO = maxLO*3.6+1.2;
-      asegurarEspacio(rHO);
-      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
-      doc.text(cLO, margin, y);
-      doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
-      doc.text(dLO, margin+cW*0.38, y);
-      doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(42,122,58);
-      doc.text('$'+fmtMXN(montoOrig), margin+cW, y, {align:'right'});
-      doc.setDrawColor(160,200,140); doc.setLineWidth(0.2);
-      doc.line(margin, y+rHO-1, margin+cW, y+rHO-1);
-      y += rHO;
-    })();
+    // ── Fila 0: concepto original — OMITIDA en PDF (el total ya aparece en sección conceptos) ──
 
     // ── Fila 1: anticipo inicial (solo si > 0) ──
     const _anticipoSint = parseFloat(datos.anticipo)||0;
     if(_anticipoSint > 0){
-      const partesA = [];
-      if(datos.fecha_recibo) partesA.push(datos.fecha_recibo+(datos.hora_recibo?' '+datos.hora_recibo:''));
-      if(datos.responsable) partesA.push(datos.responsable);
-      const descAnticipo = partesA.join(' · ');
+      // Iniciales del responsable (ej. "LACM")
+      const _inicialesResp = (datos.responsable||'').trim().split(/\s+/)
+        .map(w=>(w[0]||'').toUpperCase()).join('').slice(0,4)||'—';
+      // Folio original con letra A (referencia del recibo original)
+      const _folioOrig = datos.folio
+        ? (datos.anio_folio||new Date().getFullYear()).toString().slice(-2)+'-'+
+          String(datos.folio).padStart(3,'0')+'A'
+        : '';
+      // Descripción: "DEL RECIBO ORIGINAL*INICIALES FECHA HORA (26-001A)"
+      const _fechaHoraOrig = (datos.fecha_recibo||'') + (datos.hora_recibo?' '+datos.hora_recibo:'');
+      const descAnticipo = 'DEL RECIBO ORIGINAL*'+_inicialesResp+
+        (_fechaHoraOrig?' '+_fechaHoraOrig:'')+
+        (_folioOrig?' ('+_folioOrig+')':'');
       doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
       const cLA = doc.splitTextToSize('Anticipo inicial', colConceptoW);
       doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
@@ -8538,25 +8520,16 @@ async function generarPDF(datos,folio,qrDataURL){
     y += 14; // empujar el resto del contenido (placas, etc.) hacia abajo
   }
 
-  // ── PLACAS GENERADAS — contorno VERDE, debajo de las firmas ──
+  // ── PLACAS GENERADAS — línea simple sin cuadro, pegada encima del footer ──
   if(datos.placasEntregadas){
-    const placasY = y + 20;
-    const placasH = 12;
-    doc.setFillColor(240,255,242); doc.setDrawColor(30,130,60); doc.setLineWidth(0.6);
-    doc.rect(margin, placasY, cW, placasH, 'FD');
-    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(20,100,40);
-    doc.text('PLACAS GENERADAS EN EL TR\u00c1MITE', margin+3, placasY+3.5);
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(10,80,30);
-    doc.text('N\u00b0:', margin+3, placasY+9);
-    doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(10,120,40);
-    doc.text(String(datos.placasEntregadas), margin+11, placasY+9);
-    if(datos.estadoPlacas){
-      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(10,80,30);
-      doc.text('Estado:', margin+cW*0.45, placasY+9);
-      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(10,100,35);
-      doc.text(String(datos.estadoPlacas), margin+cW*0.45+14, placasY+9);
-    }
-    y += placasH + 2;
+    // Posicionar justo encima del footer (línea en 271, footer en 275)
+    const placasY = 264;
+    doc.setDrawColor(200,160,60); doc.setLineWidth(0.3);
+    doc.line(margin, placasY-1, margin+cW, placasY-1);
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(20,100,40);
+    const placasLabel = 'PLACAS GENERADAS EN EL TRÁMITE:  N°: ' + String(datos.placasEntregadas) +
+      (datos.estadoPlacas ? '   Estado: ' + String(datos.estadoPlacas) : '');
+    doc.text(placasLabel, margin, placasY+3);
   }
 
   // ── NOTA DE CANCELACIÓN ──

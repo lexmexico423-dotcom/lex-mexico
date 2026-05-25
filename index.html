@@ -7938,7 +7938,7 @@ function getLogoDataURL(){
 }
 
 // ── Helper: dibuja el encabezado en el PDF ───────────────────────
-function dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj, letra){
+function dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj, letra, anioFolio){
   const GOLD  = [154,110,24];
   const GBORD = [200,160,60];
   const DARK  = [60, 45, 20];
@@ -8011,7 +8011,7 @@ function dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj, letra){
   doc.rect(rX, rY, rW, rH, 'FD');
 
   // Número dentro del rect — Courier bold, rojo — formato AÑO-NÚMERO (ej. 26-001)
-  const folioTexto = folioConLetra(folio, null, letra || 'A'); // ej. 26-001A
+  const folioTexto = folioConLetra(folio, anioFolio || null, letra || 'A'); // ej. 26-001A
   // Font adaptable: 7 caracteres (26-001A) — ajuste por letra extra
   const folioFontSize = folioTexto.length <= 6 ? 16 : folioTexto.length <= 7 ? 14 : 12;
   doc.setFontSize(folioFontSize); doc.setFont('courier','bold'); doc.setTextColor(...RED);
@@ -8081,7 +8081,7 @@ async function generarPDF(datos,folio,qrDataURL){
   const logoObj = await getLogoDataURL();
 
   // ── ENCABEZADO ──
-  const hBot = dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj, datos.letra);
+  const hBot = dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj, datos.letra, datos.anio_folio);
   const yAfterH = hBot + 3;
 
   // ── RECIBO OFICIAL / COMPROBANTE DE ABONO + fecha ──
@@ -8409,7 +8409,7 @@ async function generarPDF(datos,folio,qrDataURL){
         const _esLiq = conceptoLimpio.toLowerCase().includes('liquid');
         const _prefijo = _esLiq ? 'DEL TRÁMITE' : 'DEL RECIBO';
         const _fecha = p.fechaHora||'';
-        const _folioRef = datos.folio ? String((datos.anio_folio||new Date().getFullYear())).slice(-2)+'-'+String(datos.folio).padStart(3,'0') : '';
+        const _folioRef = datos.folio ? folioConLetra(datos.folio, datos.anio_folio, datos.letra||'A') : '';
         if(_esLiq){
           // Liquidación: "DEL TRÁMITE — Autorizó: INICIALES FECHA"
           const _iniciales = (datos.responsable||'').trim().split(/\s+/).map(w=>(w[0]||'').toUpperCase()).join('').slice(0,4)||'—';

@@ -12232,7 +12232,7 @@ function ir(p){
   if(p==='escrituras'){ if(!Array.isArray(D.escrituras))D.escrituras=[]; escRender(); }
   if(p==='gestiones'){ if(!Array.isArray(D.gestiones))D.gestiones=[]; gestRender(); }
   if(p==='recibos'||p==='contabilidad'||p==='caja'){ repararFoliosDuplicados(); }
-  if(p==='configuracion'){ setTimeout(ocrCargarKeyEnCfg, 100); }
+  if(p==='configuracion'){ setTimeout(ocrCargarKeyEnCfg, 100); setTimeout(cfgMostrarFolioActual, 120); }
   if(p==='nuevo-recibo'){
     // Resetear el formulario completamente al navegar a este panel
     if(typeof limpiarFormCompleto==='function') limpiarFormCompleto();
@@ -24096,6 +24096,35 @@ function confirmarVincularRecibo() {
         </div>
       </div>
 
+      <!-- CONTADOR DE FOLIOS -->
+      <div class="card" style="margin-bottom:20px;border:1.5px solid rgba(200,149,42,0.3);">
+        <div class="card-header" style="background:linear-gradient(90deg,#fffbf0,#fdfaf4);display:flex;align-items:center;justify-content:space-between;">
+          <h2>🔢 Contador de Folios</h2>
+          <span class="card-header-sub">Ajustar numeración de recibos</span>
+        </div>
+        <div class="card-body" style="padding:16px;">
+          <div id="cfg-folio-actual-info" style="font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--muted);margin-bottom:12px;"></div>
+          <div style="background:#fffbf0;border:1px solid rgba(200,149,42,0.25);border-radius:8px;padding:10px 13px;font-size:0.78rem;color:#7a4a00;margin-bottom:14px;line-height:1.6;">
+            Escribe el número desde el que debe continuar la numeración.
+            Si escribes <strong>1</strong>, el siguiente recibo será <strong>26-001A</strong>.
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:10px;">
+            <div style="flex:1;">
+              <label style="font-family:monospace;font-size:0.65rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.1em;display:block;margin-bottom:5px;">Siguiente número de folio</label>
+              <input type="number" id="cfg-nuevo-folio" min="1" step="1" placeholder="1"
+                style="width:100%;padding:9px 13px;border:1.5px solid var(--border-l);border-radius:8px;font-family:'DM Mono',monospace;font-size:1rem;color:var(--ink);background:#fff;outline:none;box-sizing:border-box;"
+                onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border-l)'"
+                oninput="cfgPrevisualizarFolio(this.value)">
+            </div>
+            <button onclick="resetearContadorFolios(document.getElementById('cfg-nuevo-folio').value)"
+              style="padding:10px 22px;border-radius:8px;border:1.5px solid #a07a30;background:linear-gradient(135deg,#c8952a,#8c6518);color:#fff;font-family:'DM Mono',monospace;font-size:0.78rem;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+              Aplicar
+            </button>
+          </div>
+          <div id="cfg-folio-preview" style="margin-top:8px;font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--gold-d);font-weight:600;min-height:20px;"></div>
+        </div>
+      </div>
+
       <!-- ZONA PELIGROSA
       <!-- ZONA PELIGROSA - Limpieza de datos -->
       <div class="card" style="margin-bottom:20px;border:2px solid rgba(192,22,26,0.3);">
@@ -34568,6 +34597,50 @@ async function cambiarPassword(){
   }
 }
 
+
+// ─── Contador de folios ───────────────────────────────────────────────────────
+function cfgPrevisualizarFolio(val){
+  const n = parseInt(val);
+  const prev = document.getElementById('cfg-folio-preview');
+  if(!prev) return;
+  if(!n || n < 1){ prev.textContent = ''; return; }
+  const anio = String((appData?.anioFolioActual || new Date().getFullYear())).slice(-2);
+  prev.textContent = 'Próximo folio: ' + anio + '-' + String(n).padStart(3,'0') + 'A';
+}
+
+function cfgMostrarFolioActual(){
+  const el = document.getElementById('cfg-folio-actual-info');
+  if(!el) return;
+  const actual = appData?.folioActual || 1;
+  const ultimo = actual - 1;
+  const anio   = String((appData?.anioFolioActual || new Date().getFullYear())).slice(-2);
+  const ultimoStr = ultimo > 0 ? anio+'-'+String(ultimo).padStart(3,'0') : '—';
+  const proximoStr = anio+'-'+String(actual).padStart(3,'0');
+  el.innerHTML = 'Último generado: <strong>'+ultimoStr+'</strong> &nbsp;·&nbsp; Próximo: <strong>'+proximoStr+'</strong>';
+  const inp = document.getElementById('cfg-nuevo-folio');
+  if(inp && !inp.value) inp.placeholder = String(actual);
+}
+
+async function resetearContadorFolios(valor){
+  const n = parseInt(valor);
+  if(!n || n < 1){ if(typeof toast==='function') toast('Ingresa un número válido (mínimo 1)','err'); return; }
+  const anio = String((appData?.anioFolioActual || new Date().getFullYear())).slice(-2);
+  const folioStr = anio+'-'+String(n).padStart(3,'0')+'A';
+  if(!confirm('¿Actualizar el contador de folios?\n\nEl próximo recibo generado será el '+folioStr+'.\n\nLos recibos ya existentes no se modifican.')){ return; }
+  appData.folioActual = n;
+  if(typeof REC !== 'undefined' && REC) REC.folioActual = n;
+  try {
+    if(typeof actualizarArchivoControl === 'function') await actualizarArchivoControl();
+    if(typeof toast === 'function') toast('Contador actualizado — próximo folio: '+folioStr,'ok');
+    cfgMostrarFolioActual();
+    const prev = document.getElementById('cfg-folio-preview');
+    if(prev) prev.textContent = '';
+    const inp = document.getElementById('cfg-nuevo-folio');
+    if(inp) inp.value = '';
+  } catch(e){
+    if(typeof toast==='function') toast('Error al guardar: '+e.message,'err');
+  }
+}
 
 // ─── Toggle ojo contraseña en sección Cambiar Contraseña ─────────────────────
 function cfgTogglePass(inputId, svgId){

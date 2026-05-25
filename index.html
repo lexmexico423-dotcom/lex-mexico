@@ -9924,6 +9924,8 @@ async function _imprimirActualizacionReal(){
         fechaActualizacion: _fechaActualizacion,
         horaActualizacion:  _horaActualizacion
       });
+      // Marcar el registro anterior como versión superada (oculta botón ＋Pago en historial)
+      appData.recibos[idx].esVersionAnterior = true;
       // Insertar el nuevo registro al inicio (más reciente primero); el original queda intacto
       appData.recibos.unshift(nuevoRegistro);
       _guardarVersionEnSupabase(nuevoRegistro, letraActual, nombreArchivo).catch(e=>console.warn('[SB versiones] actualizacion:',e));
@@ -11694,7 +11696,7 @@ function filtrarHistorial(){
     const saldoColor=r.saldoPendiente>0?'#b01010':'#2a7a3a';
     const saldoTag=(!r.cancelado && r.saldoPendiente!==undefined)
       ?'<span style="color:'+saldoColor+';font-family:DM Mono,monospace;font-size:0.65rem;margin-left:6px">$'+r.saldoPendiente.toFixed(2)+'</span>':'';
-    const btnPago=(!r.cancelado && !r.esComplemento && r.saldoPendiente>0)
+    const btnPago=(!r.cancelado && !r.esComplemento && !r.esVersionAnterior && r.saldoPendiente>0)
       ?'<button class="download-btn" style="color:#9a6e18;border-color:#c8952a" onclick="abrirComplemento('+r.folio+')">＋ Pago</button>':'';
     return '<div class="historial-item"'+(r.cancelado?' style="opacity:0.65;"':'')+' >'
       +'<span class="folio-num">'+folioStr+'</span>'+compTag+cancelTag

@@ -8440,12 +8440,13 @@ async function generarPDF(datos,folio,qrDataURL){
   const totalGeneral = (datos.totalGeneral !== undefined) ? datos.totalGeneral : total;
 
   // Calcular totalAbonado real:
-  // — Si hay pagosParciales dibujados arriba, usar su suma (incluye el anticipo original)
-  // — Si no, usar el anticipo del recibo directamente (parseado como número)
-  const totalAbonado_raw = datos.totalAbonado !== undefined ? parseFloat(datos.totalAbonado)||0 : anticipo;
+  // totalPagosParciales solo suma el array pagosParciales (abonos).
+  // El anticipo inicial se muestra por separado — sumarlo aquí para el total abonado correcto.
+  const _anticipoEnTotal = parseFloat(datos.anticipo)||0;
+  const totalAbonado_raw = datos.totalAbonado !== undefined ? parseFloat(datos.totalAbonado)||0 : _anticipoEnTotal;
   const abonadoCalculado = totalPagosParciales > 0
-    ? totalPagosParciales
-    : (totalAbonado_raw > 0 ? totalAbonado_raw : anticipo);
+    ? totalPagosParciales + _anticipoEnTotal
+    : (totalAbonado_raw > 0 ? totalAbonado_raw : _anticipoEnTotal);
 
   // saldoFinal: prioridad → datos.saldoNuevo → saldoPendiente guardado → cálculo desde abonado
   const saldoFinal = (datos.saldoNuevo !== undefined && datos.saldoNuevo !== null)

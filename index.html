@@ -9981,6 +9981,21 @@ async function _imprimirActualizacionReal(){
     console.log('[PLACAS] PDF generado. Abriendo ventana de impresora...');
     imprimirDesdeBlob(pdfBlob, nombreArchivo);
 
+    // Resetear modo retro si estaba activo (evita que persista en la siguiente operación)
+    if(_retroActivo){
+      window._reciboRetroactivoActivo = false;
+      window._reciboRetroactivoFechaPersonalizada = null;
+      window._reciboRetroactivoHoraPersonalizada = null;
+      window._reciboRetroactivoMotivo = null;
+      var _btnRetroUpd = document.getElementById('btn-toggle-retro');
+      if(_btnRetroUpd){
+        _btnRetroUpd.style.background = 'none';
+        _btnRetroUpd.style.color = 'var(--muted)';
+        _btnRetroUpd.style.borderColor = 'rgba(200,149,42,0.3)';
+        _btnRetroUpd.textContent = '⏰ RETRO';
+      }
+    }
+
     // ─── FLUJO SIMPLIFICADO: regreso automático a página principal ───
     setTimeout(() => {
       try {
@@ -11021,6 +11036,8 @@ async function guardarRecibo(){
     const _concepto0            = conceptos && conceptos[0] ? (conceptos[0].concepto||'') : '';
     const _tipoTramiteGuardado  = tipoTramite;
     const _saldoInicialGuardado = saldoPendiente;
+    const _retroFechaGuardada   = window._reciboRetroactivoFechaPersonalizada || null;
+    const _retroHoraGuardada    = window._reciboRetroactivoHoraPersonalizada  || null;
 
     setTimeout(() => {
       try {
@@ -11039,8 +11056,8 @@ async function guardarRecibo(){
             const mov = {
               id: idMov,
               folioCaja: '',
-              fecha: typeof hoy  === 'function' ? hoy()  : new Date().toISOString().split('T')[0],
-              hora:  typeof hora === 'function' ? hora() : new Date().toTimeString().slice(0,5),
+              fecha: _retroFechaGuardada || (typeof hoy  === 'function' ? hoy()  : new Date().toISOString().split('T')[0]),
+              hora:  _retroHoraGuardada  || (typeof hora === 'function' ? hora() : new Date().toTimeString().slice(0,5)),
               descripcion: (function(){
                 const c0 = conceptos && conceptos[0];
                 const conc = c0 ? (c0.concepto||'') : '';

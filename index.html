@@ -31191,38 +31191,41 @@ if(document.readyState==='loading'){
 
 // ═══ MODO RETROACTIVO GLOBAL (ADMIN) ════════════════════════════════════
 
-async function adminToggleRetroGlobal(){
-  if(!window.SB || !window.SB_DESPACHO_ID){ toast('Sin conexión', 'err'); return; }
-  try {
-    const { data } = await window.SB.from('app_state')
-      .select('data').eq('despacho_id', window.SB_DESPACHO_ID).single();
-    const d = (data && data.data) ? data.data : {};
-    const estadoActual = !!(d.retro_global && d.retro_global.activo);
-    const nuevoActivo = !estadoActual;
+function adminToggleRetroGlobal(){
+  // Leer estado actual desde variable global (seteada por aplicarRetroGlobal)
+  var nuevoActivo = !window._retroGlobalActivo;
 
-    d.retro_global = {
-      activo:      nuevoActivo,
-      activadoPor: typeof empNombre === 'function' ? empNombre() : 'Admin',
-      fecha:       typeof hoy  === 'function' ? hoy()  : new Date().toISOString().split('T')[0],
-      hora:        typeof hora === 'function' ? hora() : new Date().toTimeString().slice(0,5)
-    };
-    await window.SB.from('app_state')
-      .update({ data: d }).eq('despacho_id', window.SB_DESPACHO_ID);
+  // Actualizar UI e internos INMEDIATAMENTE (sin esperar Supabase)
+  window._retroGlobalActivo = nuevoActivo;
+  aplicarRetroGlobal(nuevoActivo);
+  adminRenderCardRetroGlobal(nuevoActivo);
+  toast(nuevoActivo ? '⏰ Modo Retroactivo habilitado para todos' : '○ Modo Retroactivo deshabilitado', 'ok');
 
-    aplicarRetroGlobal(nuevoActivo);
-    adminRenderCardRetroGlobal(nuevoActivo);
-
-    if(window._lexRealtimeChannel){
-      window._lexRealtimeChannel.send({
-        type: 'broadcast',
-        event: 'retro_global_actualizado',
-        payload: { activo: nuevoActivo, ts: Date.now() }
-      }).catch(function(e){ console.warn('[RetroGlobal] broadcast:', e); });
-    }
-    toast(nuevoActivo ? '⏰ Modo Retroactivo habilitado para todos' : '○ Modo Retroactivo deshabilitado', 'ok');
-  } catch(e){
-    console.error('[RetroGlobal]', e);
-    toast('Error al cambiar modo retroactivo', 'err');
+  // Guardar en Supabase y broadcast en segundo plano
+  if(window.SB && window.SB_DESPACHO_ID){
+    window.SB.from('app_state')
+      .select('data').eq('despacho_id', window.SB_DESPACHO_ID).single()
+      .then(function(res){
+        var d = (res.data && res.data.data) ? res.data.data : {};
+        d.retro_global = {
+          activo:      nuevoActivo,
+          activadoPor: typeof empNombre === 'function' ? empNombre() : 'Admin',
+          fecha:       typeof hoy  === 'function' ? hoy()  : new Date().toISOString().split('T')[0],
+          hora:        typeof hora === 'function' ? hora() : new Date().toTimeString().slice(0,5)
+        };
+        return window.SB.from('app_state')
+          .update({ data: d }).eq('despacho_id', window.SB_DESPACHO_ID);
+      })
+      .then(function(){
+        if(window._lexRealtimeChannel){
+          window._lexRealtimeChannel.send({
+            type: 'broadcast',
+            event: 'retro_global_actualizado',
+            payload: { activo: nuevoActivo, ts: Date.now() }
+          }).catch(function(e){ console.warn('[RetroGlobal] broadcast:', e); });
+        }
+      })
+      .catch(function(e){ console.warn('[RetroGlobal] Supabase save:', e); });
   }
 }
 
@@ -31277,6 +31280,7 @@ async function retroGlobalCargarSupabase(){
       .select('data').eq('despacho_id', window.SB_DESPACHO_ID).single();
     const d = (data && data.data) ? data.data : {};
     const activo = !!(d.retro_global && d.retro_global.activo);
+    window._retroGlobalActivo = activo;
     aplicarRetroGlobal(activo);
     adminRenderCardRetroGlobal(activo);
   } catch(e){ console.warn('[RetroGlobal] Error al cargar:', e); }

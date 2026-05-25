@@ -3698,11 +3698,8 @@ window.addEventListener('offline', ()=>{
           </div>
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0;">
             <span id="retro-global-label" style="font-family:monospace;font-size:0.6rem;color:rgba(139,92,246,0.5);">INACTIVO</span>
-            <div style="position:relative;width:44px;height:24px;" onclick="adminToggleRetroGlobal()">
-              <input type="checkbox" id="retro-global-chk" style="opacity:0;width:0;height:0;position:absolute;">
-              <div id="retro-global-track" style="position:absolute;inset:0;border-radius:12px;background:rgba(90,58,138,0.25);border:1.5px solid rgba(90,58,138,0.4);transition:background 0.2s,border-color 0.2s;"></div>
-              <div id="retro-global-thumb" style="position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#5a3a8a;opacity:0.35;transition:left 0.2s,opacity 0.2s;"></div>
-            </div>
+            <input type="checkbox" id="retro-global-chk" onchange="adminToggleRetroGlobal()"
+              style="width:18px;height:18px;cursor:pointer;accent-color:#8b5cf6;">
           </label>
         </div>
 
@@ -4367,6 +4364,10 @@ window.addEventListener('offline', ()=>{
           <!-- Documentos adjuntos -->
           <div class="field" style="margin-bottom:14px;">
             <label>Documentos entregados</label>
+            <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+              <button class="doc-type-btn active" id="r-btn-doc-copia" onclick="setTipoDocRecibo('copia')">📄 Copias Simples</button>
+              <button class="doc-type-btn" id="r-btn-doc-escaneo" onclick="setTipoDocRecibo('escaneo')">🖨 Escaneados</button>
+            </div>
             <div id="docs-container" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;margin-top:6px;"></div>
           </div>
 
@@ -5912,6 +5913,10 @@ window.addEventListener('offline', ()=>{
   <button class="btn btn-secondary" onclick="cancelarEdicionCompleta()">✕ Cancelar Edición</button>
   <button class="btn btn-primary" id="btn-guardar-edicion-completa" onclick="guardarEdicionCompleta()">💾 Guardar Edición y Regenerar PDF</button>
 </div>
+<div class="actions" id="actions-restauracion" style="display:none;">
+  <button class="btn btn-secondary" onclick="cancelarRestauracion()">✕ Cancelar Restauración</button>
+  <button class="btn btn-primary" id="btn-guardar-restauracion" onclick="guardarRestauracion()">🔄 Restaurar Recibo</button>
+</div>
 
 <div class="historial">
   <div class="historial-header">
@@ -6937,6 +6942,7 @@ async function sincronizarFolio(){
         D.saldoAcumulado        = data.data.saldoAcumulado        || D.saldoAcumulado        || 0;
         D.escrituras            = data.data.escrituras            || D.escrituras            || [];
         D.recibosExcluidosCaja  = data.data.recibosExcluidosCaja  || D.recibosExcluidosCaja  || [];
+        if(data.data.retro_global !== undefined) D.retro_global = data.data.retro_global;
         // ── Proteger captura_meses: nunca sobreescribir con vacío ──
         const sbCapturaMeses = data.data.captura_meses || {};
         const localCapturaMeses = capturaMesCargar() || {};
@@ -9106,7 +9112,7 @@ function cargarReciboEnFormulario(recibo){
 
     const tbodyPP = document.getElementById('pagos-parciales-tbody');
     if(tbodyPP){ tbodyPP.innerHTML = ''; pagoParcialCount = 0; }
-    (recibo.pagosParciales||[]).forEach(pp => agregarPagoParcial(Object.assign({}, pp, {locked: false})));
+    (recibo.pagosParciales||[]).forEach(pp => agregarPagoParcial(Object.assign({}, pp, {locked: true})));
   }
 
   calcTotales();
@@ -17581,7 +17587,10 @@ async function syncEstadoSupabase(){
       saldoAcumulado:        D.saldoAcumulado        || 0,
       escrituras:            D.escrituras            || [],
       recibosExcluidosCaja:  D.recibosExcluidosCaja  || [],
-      captura_meses:         capturaMesCargar() || D.captura_meses || {}
+      captura_meses:         capturaMesCargar() || D.captura_meses || {},
+      retro_global:          window._retroGlobalActivo !== undefined
+                             ? { activo: !!window._retroGlobalActivo }
+                             : (D.retro_global || null)
     };
 
     const recibos = {
@@ -18043,6 +18052,7 @@ const DOCS_LIST = [
 ];
 
 let reciboFrozen = false;
+let recTipoDoc = 'copia';
 // lastPdfBlob — compartido con LEX (declarado arriba)
 let rClientes = [];
 let rConceptos = [];
@@ -18153,6 +18163,14 @@ function rec_getDocumentosSeleccionados() {
   });
 }
 
+function setTipoDocRecibo(tipo) {
+  recTipoDoc = tipo;
+  var btnC = document.getElementById('r-btn-doc-copia');
+  var btnE = document.getElementById('r-btn-doc-escaneo');
+  if (btnC) btnC.classList.toggle('active', tipo === 'copia');
+  if (btnE) btnE.classList.toggle('active', tipo === 'escaneo');
+}
+
 function recToggleVehiculo() {
   var _rv = document.getElementById('r-vehiculo-activo');
   var _vs = document.getElementById('vehiculo-section');
@@ -18243,7 +18261,8 @@ async function guardarReciboInterno() {
     conceptos: structuredClone(rConceptos),
     total: total, anticipo: anticipo, saldo: saldo,
     obs: _obs ? _obs.value : '',
-    documentos: getDocumentosSeleccionados(),
+    documentos: rec_getDocumentosSeleccionados(),
+    tipodocRecibo: (typeof recTipoDoc!=='undefined' && recTipoDoc==='escaneo') ? 'DOCUMENTOS QUE SE ESCANEARON' : 'DOCUMENTOS EN COPIA SIMPLE',
     vehiculo: vehiculoActivo ? {
       clase: (document.getElementById('v-clase')||{value:''}).value,
       marca: (document.getElementById('v-marca')||{value:''}).value,
@@ -18273,6 +18292,10 @@ async function guardarReciboInterno() {
       else appData.recibos.unshift(datos);
     }
     pendingNextFolioRecibo = folio + 1;
+    // Actualizar contador local ANTES de cualquier save(), para que syncEstadoSupabase
+    // use el valor correcto y no revierta folio_actual al número ya usado.
+    REC.folioActual = folio + 1;
+    if(typeof appData!=='undefined') appData.folioActual = folio + 1;
     await guardarFolioEnDrive(folio + 1);
     await subirPDFaD(blob, 'LEX-Recibo-' + folioFormato(folio) + '-' + datos.nombre.replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf');
     save();
@@ -18446,7 +18469,7 @@ async function generarPDFRecibo(datos, folio, qrDataURL) {
     doc.setFillColor(253,250,244); doc.setDrawColor(212,184,112); doc.setLineWidth(0.3);
     doc.roundedRect(mg,y,W-mg*2,dH,2,2,'FD');
     doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(140,101,24);
-    doc.text('DOCUMENTOS ENTREGADOS', mg+4, y+5); y+=10;
+    doc.text(datos.tipodocRecibo || 'DOCUMENTOS ENTREGADOS', mg+4, y+5); y+=10;
     datos.documentos.forEach(function(d,i) {
       var col=i%3, row=Math.floor(i/3);
       var x=mg+4+col*((W-mg*2-8)/3);
@@ -18519,6 +18542,7 @@ function nuevoReciboLimpio() {
   rClientes=[{nombre:'',telefono:'',direccion:''}];
   rConceptos=[{descripcion:'',cantidad:1,precio:''}];
   lastPdfBlob=null;
+  recTipoDoc='copia'; setTipoDocRecibo('copia');
   descongelarRecibo();
   actualizarFolioDisplayRecibo();
   renderClientesRecibo();
@@ -27375,6 +27399,7 @@ function rgenConfirmar(){
     if(el('actions-restauracion')) el('actions-restauracion').style.display='flex';
     ['frozen-banner','consulta-banner','edicion-completa-banner']
       .forEach(id=>{ const e=el(id); if(e) e.style.display='none'; });
+    if(el('restauracion-banner')) el('restauracion-banner').style.display='flex';
 
     // Descongelar completamente
     document.querySelectorAll('#panel-nuevo-recibo input,#panel-nuevo-recibo select,#panel-nuevo-recibo textarea')
@@ -27480,7 +27505,7 @@ async function guardarRestauracion(){
       anio:datos.anio, puertas:datos.puertas, color_veh:datos.color_veh,
       transmision:datos.transmision, cilindros:datos.cilindros, placa:datos.placa,
       ultima_tenencia:datos.ultima_tenencia, origen:datos.origen, combustible:datos.combustible,
-      pagosParciales:anticipo>0?[{cantidad:anticipo,fecha:fechaOrig,nota:'Anticipo del recibo original'}]:[],
+      pagosParciales:[],
       esRestaurado:true, fechaRestauracion:new Date().toISOString(),
       notas:'⚠ Restaurado el '+new Date().toLocaleDateString('es-MX')+' — PDF regenerado'
     };
@@ -31208,19 +31233,12 @@ function adminToggleRetroGlobal(){
 }
 
 function adminRenderCardRetroGlobal(activo){
-  // Toggle dentro del panel Captura Retroactiva
-  const track = document.getElementById('retro-global-track');
-  const thumb = document.getElementById('retro-global-thumb');
   const label = document.getElementById('retro-global-label');
   const chk   = document.getElementById('retro-global-chk');
   if(activo){
-    if(track){ track.style.background='rgba(139,92,246,0.55)'; track.style.borderColor='#8b5cf6'; }
-    if(thumb){ thumb.style.left='23px'; thumb.style.opacity='1'; thumb.style.background='#fff'; }
     if(label){ label.textContent='ACTIVO'; label.style.color='#8b5cf6'; }
     if(chk)   chk.checked = true;
   } else {
-    if(track){ track.style.background='rgba(90,58,138,0.25)'; track.style.borderColor='rgba(90,58,138,0.4)'; }
-    if(thumb){ thumb.style.left='3px'; thumb.style.opacity='0.35'; thumb.style.background='#5a3a8a'; }
     if(label){ label.textContent='INACTIVO'; label.style.color='rgba(139,92,246,0.5)'; }
     if(chk)   chk.checked = false;
   }
@@ -35326,6 +35344,8 @@ async function resetearContadorFolios(valor){
   if(!confirm('¿Actualizar el contador de folios?\n\nEl próximo recibo generado será el '+folioStr+'.\n\nLos recibos ya existentes no se modifican.')){ return; }
   appData.folioActual = n;
   if(typeof REC !== 'undefined' && REC) REC.folioActual = n;
+  // Marcar antes de guardar para que el postgres_changes propio sea ignorado
+  _ultimoSyncPropio = Date.now();
   try {
     if(typeof actualizarArchivoControl === 'function') await actualizarArchivoControl();
     if(typeof toast === 'function') toast('Contador actualizado — próximo folio: '+folioStr,'ok');

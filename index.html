@@ -7359,13 +7359,13 @@ async function generarComplemento(reciboOrig, pago){
         const conc = c0 ? (c0.concepto||'') : '';
         const desc = c0 ? (c0.descripcion||'') : '';
         const txt  = conc + (desc ? ' — ' + desc : '');
-        return tipoMov + ' · Recibo #' + folioFormato(reciboOrig.folio, reciboOrig.anio_folio) + ' · ' + (reciboOrig.nombre||'') + (txt ? ' · ' + txt : '');
+        return tipoMov + ' · Recibo #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, letraVersion(reciboOrig)) + ' · ' + (reciboOrig.nombre||'') + (txt ? ' · ' + txt : '');
       })(),
       nombre: reciboOrig.nombre || '',
       folio: reciboOrig.folio,
       monto: pago,
       tipo: 'ingreso',
-      cat: (liquidado ? 'Liquidación' : 'Abono parcial') + ' · #' + folioFormato(reciboOrig.folio, reciboOrig.anio_folio),
+      cat: (liquidado ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, letraVersion(reciboOrig)),
       estatus: liquidado ? 'Liquidado' : 'Abono parcial',
       fuente: 'recibo',
       responsable: typeof empNombre === 'function' ? empNombre() : (reciboOrig.responsable||'')
@@ -8933,8 +8933,8 @@ function salirModoConsulta(){
 }
 
 function cargarReciboEnFormulario(recibo){
-  // Mostrar folio del recibo consultado
-  $('folio-display').textContent = folioFormato(recibo.folio, recibo.anio_folio);
+  // Mostrar folio del recibo consultado (con letra de versión)
+  $('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo));
 
   // Cargar clientes
   const wrap = $('clientes-wrapper');
@@ -9220,8 +9220,8 @@ function abrirModoActualizacion(recibo){
   // Cargar todos los datos del recibo en el formulario
   cargarReciboEnFormulario(recibo);
 
-  // Asegurar que el folio mostrado sea el ORIGINAL (no se cambia)
-  document.getElementById('folio-display').textContent = (typeof folioFormato==='function') ? folioFormato(recibo.folio, recibo.anio_folio) : String(recibo.folio).padStart(4,'0');
+  // Asegurar que el folio mostrado sea el ORIGINAL con su letra de versión
+  document.getElementById('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo));
 
   // Congelar el formulario (todos los campos originales bloqueados)
   document.body.classList.add('recibo-frozen');
@@ -9244,7 +9244,7 @@ function abrirModoActualizacion(recibo){
   pintarCostosExtra(recibo.costosExtra || []);
   pintarPagosParciales(recibo.pagosParciales || []);
 
-  setStatus('ok','Modo actualización: folio #'+((typeof folioFormato==="function") ? folioFormato(recibo.folio, recibo.anio_folio) : String(recibo.folio).padStart(4,'0'))+' — agrega costos extra o pagos parciales','ok');
+  setStatus('ok','Modo actualización: folio #'+folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo))+' — agrega costos extra o pagos parciales','ok');
 
   setTimeout(()=>{ document.getElementById('seccion-pagos-parciales').scrollIntoView({behavior:'smooth',block:'center'}); }, 200);
 }
@@ -9886,13 +9886,13 @@ async function _imprimirActualizacionReal(){
             const conc = c0 ? (c0.concepto||'') : '';
             const desc = c0 ? (c0.descripcion||'') : '';
             const txt  = conc + (desc ? ' — ' + desc : '');
-            return tipoMov + ' · Recibo #' + folioFormato(recibo.folio, recibo.anio_folio) + ' · ' + (recibo.nombre||'') + (txt ? ' · ' + txt : '');
+            return tipoMov + ' · Recibo #' + folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo)) + ' · ' + (recibo.nombre||'') + (txt ? ' · ' + txt : '');
           })(),
           nombre: recibo.nombre || '',
           folio: recibo.folio,
           monto: montoNuevosAbonos,
           tipo: 'ingreso',
-          cat: (saldoNuevo<=0 ? 'Liquidación' : 'Abono parcial') + ' · #' + folioFormato(recibo.folio, recibo.anio_folio),
+          cat: (saldoNuevo<=0 ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo)),
           estatus: saldoNuevo<=0 ? 'Liquidado' : 'Abono parcial',
           fuente: 'recibo',
           responsable: typeof empNombre === 'function' ? empNombre() : (recibo.responsable||'')
@@ -11394,7 +11394,7 @@ function filtrarHistorial(){
     if(filtro==='pagado'    && (r.cancelado || r.saldoPendiente>0)) return false;
     // Filtro por texto
     if(q){
-      const folioStr = folioFormato(r.folio, r.anio_folio);
+      const folioStr = folioConLetra(r.folio, r.anio_folio, letraVersion(r));
       const nombre   = (r.nombre||'').toLowerCase();
       // Buscar en teléfonos de todos los clientes del recibo
       const telefonos = (r.clientes||[]).map(c=>(c.telefono||'').toLowerCase()).join(' ');
@@ -11413,7 +11413,7 @@ function filtrarHistorial(){
   }
   list.innerHTML = lista.map(r=>{
     const i = appData.recibos.indexOf(r);
-    const folioStr='#'+folioFormato(r.folio, r.anio_folio);
+    const folioStr='#'+folioConLetra(r.folio, r.anio_folio, letraVersion(r));
     const compTag=r.esComplemento?'<span style="color:#b07f1e;font-size:0.58rem;margin-left:3px">↳ ref #'+folioFormato(r.folioRef)+'</span>':'';
     const cancelTag=r.cancelado?'<span style="color:#8a1a1a;font-size:0.58rem;margin-left:5px;background:#fff0f0;border:1px solid #c04040;border-radius:3px;padding:1px 5px;font-family:DM Mono,monospace;letter-spacing:0.06em;">🚫 CANCELADO</span>':'';
     const saldoColor=r.saldoPendiente>0?'#b01010':'#2a7a3a';
@@ -11512,7 +11512,7 @@ function buscarClientePBC(){
     const prioridad = r => r.cancelado?3:(r.esComplemento?2:(r.saldoPendiente>0?0:1));
     const sorted = [...g.recibos].sort((a,b)=>prioridad(a)-prioridad(b)||b.folio-a.folio);
     const chips = sorted.map(r=>{
-      const fs='#'+folioFormato(r.folio, r.anio_folio);
+      const fs='#'+folioConLetra(r.folio, r.anio_folio, letraVersion(r));
       let clase,ico;
       if(r.cancelado)            { clase='cancelado';   ico='🚫'; }
       else if(r.esComplemento)   { clase='complemento'; ico='↳';  }
@@ -23677,12 +23677,21 @@ function renderHistorial2026() {
     var esI = m.tipo === 'ingreso';
     var color = esI ? '#2a9a4a' : '#c0161a';
     var signo = esI ? '+' : '-';
+    // Agregar letra de versión al folio si el movimiento está vinculado a un recibo
+    var letra = 'A';
+    if (m.folio && typeof appData !== 'undefined') {
+      var rLet = (appData.recibos||[]).find(function(r){ return r.folio === m.folio; });
+      if (rLet) letra = letraVersion(rLet);
+    }
+    // Inyectar letra en m.cat (e.g. "#26-001" → "#26-001A") para registros ya guardados
+    var displayCat = (m.cat||'').replace(/(#\d{2}-\d{3,})(?![A-Z\d])/g, '$1' + letra);
+    var folioDisplay = m.folio ? ' · Folio ' + folioConLetra(m.folio, m.anio_folio, letra) : '';
     return [
       '<div style="display:flex;align-items:center;padding:7px 16px;border-bottom:1px solid rgba(200,149,42,0.06);gap:10px;">',
       '<div style="min-width:82px;font-size:0.65rem;color:var(--muted);">'+m.fecha+'</div>',
       '<div style="flex:1;min-width:0;">',
       '<div style="font-size:0.74rem;color:var(--gold-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+m.descripcion+'</div>',
-      '<div style="font-size:0.62rem;color:var(--muted);">'+m.cat+(m.folio?' · Folio '+m.folio:'')+'</div>',
+      '<div style="font-size:0.62rem;color:var(--muted);">'+displayCat+folioDisplay+'</div>',
       '</div>',
       '<div style="font-size:0.76rem;font-weight:700;color:'+color+';flex-shrink:0;">',
       signo+'$'+m.monto.toLocaleString('es-MX'),

@@ -9451,7 +9451,12 @@ function agregarPagoParcial(data){
   // Propagar marca de "auth inline" para que al releer no se duplique fecha
   const hasAuthInline = !!(data && data._hasAuthInline);
 
-  tr.dataset.fechaHora = fechaHora;
+  // Modo retro: solo para filas NUEVAS (no locked, no cargadas del historial)
+  const retroActivo = !isLocked && !isExisting && !!window._reciboRetroactivoActivo;
+  const retroFecha  = (retroActivo && window._reciboRetroactivoFechaPersonalizada) || fechaCDMX_ISO();
+  const retroHora   = (retroActivo && window._reciboRetroactivoHoraPersonalizada)  || horaCDMX_HHMM();
+
+  tr.dataset.fechaHora = retroActivo ? (retroFecha + ' ' + retroHora) : fechaHora;
   if(isLocked) tr.dataset.locked = '1';
   if(hasAuthInline) tr.dataset.hasAuthInline = '1';
 
@@ -9464,8 +9469,19 @@ function agregarPagoParcial(data){
       + '<td><input type="text" class="pp-cantidad price-input pp-locked-field" readonly value="'+escHTML(fmtMXN(parseFloat(data.cantidad)||0))+'"></td>'
       + '<td style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#7a6840;">'+fechaHora+'</td>'
       + '<td></td>';
+  } else if(retroActivo){
+    // Fila editable con fecha/hora manual para captura retroactiva
+    tr.innerHTML =
+        '<td><textarea class="pp-concepto concepto-ta pp-concepto-fijo" rows="1" readonly>'+escHTML(concepto)+'</textarea></td>'
+      + '<td><textarea class="pp-descripcion concepto-ta" rows="1" placeholder="\u00bfPor qu\u00e9 se hizo este pago?">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
+      + '<td><input type="text" class="pp-cantidad price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.cantidad)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()"></td>'
+      + '<td style="padding:2px 4px;">'
+        + '<input type="date" class="pp-fecha-retro" value="'+escHTML(retroFecha)+'" oninput="_ppSyncFechaRetro(this)" style="font-family:\'DM Mono\',monospace;font-size:0.65rem;background:#1a1208;border:1px solid rgba(200,149,42,0.5);border-radius:4px;color:#e8d4a8;padding:2px 4px;width:108px;">'
+        + '<input type="time" class="pp-hora-retro"  value="'+escHTML(retroHora)+'"  oninput="_ppSyncFechaRetro(this)" style="font-family:\'DM Mono\',monospace;font-size:0.65rem;background:#1a1208;border:1px solid rgba(200,149,42,0.5);border-radius:4px;color:#e8d4a8;padding:2px 4px;width:68px;margin-left:3px;">'
+      + '</td>'
+      + '<td><button class="del-concept" onclick="quitarPagoParcial(\''+id+'\')">\u2715</button></td>';
   } else {
-    // Fila editable normal
+    // Fila editable normal \u2014 fecha/hora autom\u00e1tica
     tr.innerHTML =
         '<td><textarea class="pp-concepto concepto-ta pp-concepto-fijo" rows="1" readonly>'+escHTML(concepto)+'</textarea></td>'
       + '<td><textarea class="pp-descripcion concepto-ta" rows="1" placeholder="\u00bfPor qu\u00e9 se hizo este pago?">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
@@ -9479,6 +9495,14 @@ function agregarPagoParcial(data){
 function quitarPagoParcial(id){
   const r = document.getElementById('pago-parcial-row-'+id);
   if(r){ r.remove(); recalcularResumenActualizacion(); }
+}
+// Sincroniza tr.dataset.fechaHora cuando el usuario edita los inputs de fecha/hora retro
+function _ppSyncFechaRetro(el){
+  const tr = el.closest('tr');
+  if(!tr) return;
+  const f = (tr.querySelector('.pp-fecha-retro')||{}).value || '';
+  const h = (tr.querySelector('.pp-hora-retro')||{}).value  || '';
+  if(f && h) tr.dataset.fechaHora = f + ' ' + h;
 }
 function getPagosParciales(){
   const filas = document.querySelectorAll('#pagos-parciales-tbody tr');
@@ -9844,8 +9868,10 @@ async function _imprimirActualizacionReal(){
   // para no chocar con los corchetes [fechaHora] que el PDF agrega automáticamente.
   const pagosParciales_conAuth = pagosParciales.map(p => {
     if(p.locked) return p; // los ya impresos conservan su auth previa
+    // En modo retro: priorizar la fecha capturada por fila (input editable);
+    // si no viene (pago agregado sin retro activo), caer al retro global.
     const fechaHoraFinal = _retroActivo
-      ? (_fechaActualizacion + ' ' + _horaActualizacion)
+      ? (p.fechaHora || _fechaActualizacion + ' ' + _horaActualizacion)
       : (p.fechaHora || '');
     const _vTagPP = ' ['+folioConLetra(recibo.folio, recibo.anio_folio, letraActual)+']';
     const authTag = _vTagPP + ' \u2014 Autoriz\u00f3: ' + autorizacion.iniciales + ' -' + fechaHoraFinal + '-';

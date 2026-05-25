@@ -9665,7 +9665,10 @@ if(document.readyState === 'loading'){
 function recalcularResumenActualizacion(){
   if(!reciboEnActualizacion) return;
   const totalOriginal = parseFloat(reciboEnActualizacion.total) || 0;
-  const sumaCostosExtra = getCostosExtra().reduce((s,c)=>s+(parseFloat(c.precio)||0), 0);
+  // Solo costos NUEVOS (no locked) — recibo.total ya incluye los de versiones anteriores
+  const sumaCostosExtra = getCostosExtra()
+    .filter(c => c.locked !== true)
+    .reduce((s,c)=>s+(parseFloat(c.precio)||0), 0);
   const todosLosPagos = getPagosParciales();
   const sumaAbonosNuevos = todosLosPagos
     .filter(p => p.locked !== true)
@@ -9674,7 +9677,7 @@ function recalcularResumenActualizacion(){
   // El saldo anterior ya refleja todos los pagos previos (anticipo + abonos ya guardados)
   const saldoAnterior = parseFloat(reciboEnActualizacion.saldoPendiente) || 0;
   const totalGeneral = totalOriginal + sumaCostosExtra;
-  // El nuevo saldo = saldo anterior + costos extra agregados ahora - abonos nuevos de esta sesion
+  // El nuevo saldo = saldo anterior + costos nuevos ahora - abonos nuevos de esta sesion
   const nuevoSaldo = Math.max(0, saldoAnterior + sumaCostosExtra - sumaAbonosNuevos);
   const totalAbonado = totalGeneral - nuevoSaldo;
 
@@ -9795,7 +9798,10 @@ async function _imprimirActualizacionReal(){
 
   const totalOriginal = parseFloat(recibo.total) || 0;
   const anticipoOriginal = parseFloat(recibo.anticipo) || 0;
-  const sumaCostosExtra = costosExtra.reduce((s,c)=>s+(parseFloat(c.precio)||0), 0);
+  // Solo costos NUEVOS (no locked) — recibo.total ya incluye los de versiones anteriores
+  const sumaCostosExtra = costosExtra
+    .filter(c => c.locked !== true)
+    .reduce((s,c)=>s+(parseFloat(c.precio)||0), 0);
   // Usar saldoPendiente como base — ya incluye anticipo original y todos los abonos anteriores
   const saldoAnterior = parseFloat(recibo.saldoPendiente) || 0;
   const sumaAbonosNuevos = pagosParciales

@@ -5395,12 +5395,6 @@ window.addEventListener('offline', ()=>{
     <button class="btn-liquidacion" onclick="ejecutarLiquidacionTotal()">✅ PAGO TOTAL</button>
     <button class="btn-cerrar-consulta" onclick="cerrarConsulta()">✕ CERRAR CONSULTA</button>
     <button class="btn-cancelado" onclick="ejecutarTramiteCancelado()">Anular trámite &rsaquo;&rsaquo;&rsaquo;</button>
-    <button onclick="if(reciboEnConsulta) verHistorialVersiones(reciboEnConsulta.folio)"
-      title="Versiones del recibo"
-      id="btn-gear-versiones"
-      style="padding:7px 11px;border-radius:5px;border:1px solid #a07a30;background:#fff8ed;color:#7a4a00;font-size:1rem;cursor:pointer;line-height:1;">
-      ⚙
-    </button>
   </div>
   <!-- BOTÓN SALIR — visible solo cuando el folio está liquidado (sin saldo) -->
   <div id="header-liquidado-btns" style="display:none;align-items:center;justify-content:center;gap:10px;padding:8px 16px;">

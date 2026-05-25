@@ -35578,29 +35578,6 @@ if(typeof toast==='function') toast('✅ Token de Drive guardado — haz clic en
 
 
 
-<!-- ═══ PANEL DE DIAGNÓSTICO LEX ═══ -->
-<button id="lex-diag-fab" onclick="lexDiagToggle()" title="Panel de diagnóstico">
-  🔍<span class="lex-diag-badge" id="lex-diag-badge">0</span>
-</button>
-<div id="lex-diag-panel">
-  <div id="lex-diag-header">
-    <span>⚡ DIAGNÓSTICO EN TIEMPO REAL</span>
-    <div id="lex-diag-filter">
-      <span class="lex-diag-chip on" data-filter="all" onclick="lexDiagFilter(this)">Todo</span>
-      <span class="lex-diag-chip" data-filter="err" onclick="lexDiagFilter(this)">❌ Errores</span>
-      <span class="lex-diag-chip" data-filter="warn" onclick="lexDiagFilter(this)">⚠ Warnings</span>
-      <span class="lex-diag-chip" data-filter="gemini" onclick="lexDiagFilter(this)">🤖 Gemini</span>
-      <span class="lex-diag-chip" data-filter="supabase" onclick="lexDiagFilter(this)">🗄 Supabase</span>
-      <span class="lex-diag-chip" data-filter="net" onclick="lexDiagFilter(this)">🌐 Red</span>
-      <span class="lex-diag-chip" data-filter="ok" onclick="lexDiagFilter(this)">✅ OK</span>
-    </div>
-    <button class="lex-diag-btn" onclick="lexDiagCopiar()">📋 Copiar reporte</button>
-    <button class="lex-diag-btn" onclick="lexDiagLimpiar()">🗑 Limpiar</button>
-    <button class="lex-diag-btn" onclick="lexDiagToggle()">✕</button>
-    <span class="lex-diag-status" id="lex-diag-count">0 entradas</span>
-  </div>
-  <div id="lex-diag-logs"></div>
-</div>
 
 <script>
 function regresarAlFormulario(){

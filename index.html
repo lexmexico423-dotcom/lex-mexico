@@ -6069,8 +6069,16 @@ window.addEventListener('offline', ()=>{
     <div id="placas-error-msg" class="placas-error"></div>
     <div class="placas-grid">
       <div class="placas-field-full">
-        <label class="placas-modal-label" for="placas-numero">Número de placas</label>
-        <input type="text" id="placas-numero" placeholder="Ej. ABC-123-D" maxlength="12" autocomplete="off">
+        <label class="placas-modal-label" for="placas-tipo">Tipo de documento</label>
+        <select id="placas-tipo" onchange="actualizarLabelPlacas()">
+          <option value="placas">🚗 Número de placas</option>
+          <option value="tarjeta">📄 Folio de tarjeta de circulación</option>
+          <option value="otro">📋 Otro</option>
+        </select>
+      </div>
+      <div class="placas-field-full">
+        <label class="placas-modal-label" id="placas-numero-label" for="placas-numero">Número de placas</label>
+        <input type="text" id="placas-numero" placeholder="Ej. ABC-123-D" maxlength="20" autocomplete="off">
       </div>
       <div class="placas-field-full">
         <label class="placas-modal-label" for="placas-estado">Estado emisor</label>
@@ -9788,7 +9796,7 @@ async function _imprimirActualizacionReal(){
   // En Pago Parcial o trámite normal se reutilizan placas ya guardadas sin preguntar.
   let _placasCapturadas;
   const esVehicular = (recibo.tipoTramite === 'vehicular');
-  if(document.body.classList.contains('desde-liquidacion') && esVehicular){
+  if(esVehicular){
     const resultado = await pedirDatosPlacas();
     if(resultado === null){
       setStatus('ok','Impresión cancelada — modal de placas cerrado','ok');
@@ -10512,6 +10520,7 @@ function pedirDatosPlacas(){
     $('placas-estado').value = '';
     $('placas-estado').disabled = false;
     $('placas-sin-placas').checked = false;
+    if($('placas-tipo')){ $('placas-tipo').value = 'placas'; actualizarLabelPlacas(); }
     $('placas-error-msg').classList.remove('show');
     $('placas-error-msg').textContent = '';
     // Mostrar el modal y enfocar el primer campo
@@ -10559,9 +10568,26 @@ function cerrarModalPlacas(){
   }
 }
 
+function actualizarLabelPlacas(){
+  const tipo = ($('placas-tipo')||{value:'placas'}).value;
+  const lbl = document.getElementById('placas-numero-label');
+  const inp = $('placas-numero');
+  if(tipo === 'placas'){
+    if(lbl) lbl.textContent = 'Número de placas';
+    if(inp) inp.placeholder = 'Ej. ABC-123-D';
+  } else if(tipo === 'tarjeta'){
+    if(lbl) lbl.textContent = 'Folio de tarjeta de circulación';
+    if(inp) inp.placeholder = 'Ej. 123456789';
+  } else {
+    if(lbl) lbl.textContent = 'Descripción';
+    if(inp) inp.placeholder = 'Ej. Permiso temporal';
+  }
+}
+
 function confirmarModalPlacas(){
   const sinPlacas = $('placas-sin-placas').checked;
   const errBox = $('placas-error-msg');
+  const tipo = ($('placas-tipo')||{value:'placas'}).value;
   let placas = '';
   let estado = '';
   if(sinPlacas){
@@ -10570,10 +10596,13 @@ function confirmarModalPlacas(){
   } else {
     placas = $('placas-numero').value.trim().toUpperCase();
     estado = $('placas-estado').value;
+    // Prefijo según tipo
+    if(tipo === 'tarjeta') placas = 'TARJETA: ' + placas;
+    else if(tipo === 'otro') placas = 'OTRO: ' + placas;
     // Validación
     const errores = [];
-    if(!placas) errores.push('Ingresa el número de placas o marca "Sin placas".');
-    if(!estado) errores.push('Selecciona el estado emisor de las placas.');
+    if(!$('placas-numero').value.trim()) errores.push('Ingresa el número o folio correspondiente o marca "Sin placas".');
+    if(tipo === 'placas' && !estado) errores.push('Selecciona el estado emisor de las placas.');
     if(errores.length){
       errBox.textContent = errores.join(' ');
       errBox.classList.add('show');

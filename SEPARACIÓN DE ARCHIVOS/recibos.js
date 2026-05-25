@@ -15,11 +15,20 @@ const DOCS_LIST = [
 ];
 
 let reciboFrozen = false;
+let recTipoDoc = 'copia';
 // lastPdfBlob — compartido con LEX (declarado arriba)
 let rClientes = [];
 let rConceptos = [];
 let rQRInstance = null;
 let pendingNextFolioRecibo = null;
+
+function setTipoDocRecibo(tipo) {
+  recTipoDoc = tipo;
+  var btnC = document.getElementById('r-btn-doc-copia');
+  var btnE = document.getElementById('r-btn-doc-escaneo');
+  if (btnC) btnC.classList.toggle('active', tipo === 'copia');
+  if (btnE) btnE.classList.toggle('active', tipo === 'escaneo');
+}
 
 function siguienteFolioRecibo() {
   if (pendingNextFolioRecibo) {
@@ -212,7 +221,8 @@ async function guardarReciboInterno() {
     conceptos: structuredClone(rConceptos),
     total: total, anticipo: anticipo, saldo: saldo,
     obs: _obs ? _obs.value : '',
-    documentos: getDocumentosSeleccionados(),
+    documentos: rec_getDocumentosSeleccionados(),
+    tipodocRecibo: recTipoDoc === 'escaneo' ? 'DOCUMENTOS QUE SE ESCANEARON' : 'DOCUMENTOS EN COPIA SIMPLE',
     vehiculo: vehiculoActivo ? {
       clase: (document.getElementById('v-clase')||{value:''}).value,
       marca: (document.getElementById('v-marca')||{value:''}).value,
@@ -242,6 +252,10 @@ async function guardarReciboInterno() {
       else appData.recibos.unshift(datos);
     }
     pendingNextFolioRecibo = folio + 1;
+    // Actualizar contador local ANTES de cualquier save(), para que syncEstadoSupabase
+    // use el valor correcto y no revierta folio_actual al número ya usado.
+    REC.folioActual = folio + 1;
+    if(typeof appData!=='undefined') appData.folioActual = folio + 1;
     await guardarFolioEnDrive(folio + 1);
     await subirPDFaD(blob, 'LEX-Recibo-' + folioFormato(folio) + '-' + datos.nombre.replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf');
     save();
@@ -409,7 +423,7 @@ async function generarPDFRecibo(datos, folio, qrDataURL) {
     doc.setFillColor(253,250,244); doc.setDrawColor(212,184,112); doc.setLineWidth(0.3);
     doc.roundedRect(mg,y,W-mg*2,dH,2,2,'FD');
     doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(140,101,24);
-    doc.text('DOCUMENTOS ENTREGADOS', mg+4, y+5); y+=10;
+    doc.text(datos.tipodocRecibo || 'DOCUMENTOS ENTREGADOS', mg+4, y+5); y+=10;
     datos.documentos.forEach(function(d,i) {
       var col=i%3, row=Math.floor(i/3);
       var x=mg+4+col*((W-mg*2-8)/3);
@@ -482,6 +496,7 @@ function nuevoReciboLimpio() {
   rClientes=[{nombre:'',telefono:'',direccion:''}];
   rConceptos=[{descripcion:'',cantidad:1,precio:''}];
   lastPdfBlob=null;
+  recTipoDoc='copia'; setTipoDocRecibo('copia');
   descongelarRecibo();
   actualizarFolioDisplayRecibo();
   renderClientesRecibo();

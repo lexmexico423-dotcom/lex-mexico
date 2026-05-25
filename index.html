@@ -9927,6 +9927,7 @@ async function _imprimirActualizacionReal(){
       const montoNuevosAbonos = abonosNuevos.reduce((s,p)=>s+(parseFloat(p.cantidad)||0),0);
       if(montoNuevosAbonos > 0){
         const tipoMov = saldoNuevo<=0 ? 'Liquidación' : 'Abono parcial';
+        const letraActual = letraVersion(recibo);
         const mov = {
           id: 'M-REC-' + recibo.folio + '-' + Date.now(),
           folioCaja: '',
@@ -9937,15 +9938,16 @@ async function _imprimirActualizacionReal(){
             const conc = c0 ? (c0.concepto||'') : '';
             const desc = c0 ? (c0.descripcion||'') : '';
             const txt  = conc + (desc ? ' — ' + desc : '');
-            return tipoMov + ' · Recibo #' + folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo)) + ' · ' + (recibo.nombre||'') + (txt ? ' · ' + txt : '');
+            return tipoMov + ' · Recibo #' + folioConLetra(recibo.folio, recibo.anio_folio, letraActual) + ' · ' + (recibo.nombre||'') + (txt ? ' · ' + txt : '');
           })(),
           nombre: recibo.nombre || '',
           folio: recibo.folio,
           monto: montoNuevosAbonos,
           tipo: 'ingreso',
-          cat: (saldoNuevo<=0 ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo)),
+          cat: (saldoNuevo<=0 ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(recibo.folio, recibo.anio_folio, letraActual),
           estatus: saldoNuevo<=0 ? 'Liquidado' : 'Abono parcial',
           fuente: 'recibo',
+          letra: letraActual,
           responsable: typeof empNombre === 'function' ? empNombre() : (recibo.responsable||'')
         };
         _registrarMovimiento(mov);
@@ -11050,9 +11052,10 @@ async function guardarRecibo(){
               folio:  _folioGuardado,
               monto:  _anticoGuardado,
               tipo:   'ingreso',
-              cat:    'Anticipo · #' + folioFormato(_folioGuardado),
+              cat:    'Anticipo · #' + folioConLetra(_folioGuardado, appData.anioFolioActual || new Date().getFullYear(), 'A'),
               estatus:'Anticipo',
               fuente: 'recibo',
+              letra:  'A',
               responsable: window._respSeleccionado || empNombre()
             };
             if(typeof _registrarMovimiento === 'function') _registrarMovimiento(mov);
@@ -13070,7 +13073,12 @@ function renderContab() {
     if (m.fuente === 'recibo') {
       const n = m.folio != null ? m.folio : parseInt((m.id||'').replace('R-',''));
       const _rFol = (typeof appData !== 'undefined' ? appData.recibos||[] : []).find(function(r){ return r.folio === n && !r.esComplemento; });
-      const _letraF = _rFol ? (_rFol.letra || letraVersion(_rFol) || 'A') : 'A';
+      let _letraF = m.letra || null;
+      if(!_letraF && m.cat){
+        const _catMatch = (m.cat||'').match(/#\d{2}-\d{3,}([A-Z])\b/);
+        _letraF = _catMatch ? _catMatch[1] : null;
+      }
+      if(!_letraF) _letraF = _rFol ? (_rFol.letra || letraVersion(_rFol) || 'A') : 'A';
       const str = folioConLetra(n, _rFol ? _rFol.anio_folio : null, _letraF);
       folioTxt  = `<span onclick="abrirPreviaDesdeContab(${n})" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--azul);" title="Ver recibo #${str}">${str}</span>`;
       folioColor = '';

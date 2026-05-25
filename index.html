@@ -7443,6 +7443,20 @@ function folioFormato(num, anioFolio){
   return anio + '-' + String(n).padStart(3, '0');
 }
 
+// Devuelve la letra de versión de un recibo: A (original), B (1ra actualización), etc.
+// Cuenta solo entradas que NO son 'Original' para derivar la versión correctamente.
+function letraVersion(recibo){
+  if(!recibo) return 'A';
+  const n = (recibo.fechasImpresion || []).filter(f => f.etiqueta !== 'Original').length;
+  return String.fromCharCode(65 + n); // 0=A, 1=B, 2=C...
+}
+
+// Devuelve el folio con su letra de versión: "26-001A", "26-001B", etc.
+// Si letra es null/undefined asume 'A' (recibos existentes sin versión).
+function folioConLetra(num, anioFolio, letra){
+  return folioFormato(num, anioFolio) + (letra || 'A');
+}
+
 // Detecta cambio de año y reinicia el contador anual
 function verificarReinicioAnual(){
   const anioActual = new Date().getFullYear();
@@ -7862,7 +7876,7 @@ function getLogoDataURL(){
 }
 
 // ── Helper: dibuja el encabezado en el PDF ───────────────────────
-function dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj){
+function dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj, letra){
   const GOLD  = [154,110,24];
   const GBORD = [200,160,60];
   const DARK  = [60, 45, 20];
@@ -7935,8 +7949,8 @@ function dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj){
   doc.rect(rX, rY, rW, rH, 'FD');
 
   // Número dentro del rect — Courier bold, rojo — formato AÑO-NÚMERO (ej. 26-001)
-  const folioTexto = folioFormato(folio); // ya incluye año: 26-001
-  // Font adaptable: 6 caracteres (26-001) caben bien a 16pt
+  const folioTexto = folioConLetra(folio, null, letra || 'A'); // ej. 26-001A
+  // Font adaptable: 7 caracteres (26-001A) — ajuste por letra extra
   const folioFontSize = folioTexto.length <= 6 ? 16 : folioTexto.length <= 7 ? 14 : 12;
   doc.setFontSize(folioFontSize); doc.setFont('courier','bold'); doc.setTextColor(...RED);
   doc.text(folioTexto, folioMidX, rY + 8.5, {align:'center', charSpace:0.5});
@@ -8005,7 +8019,7 @@ async function generarPDF(datos,folio,qrDataURL){
   const logoObj = await getLogoDataURL();
 
   // ── ENCABEZADO ──
-  const hBot = dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj);
+  const hBot = dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj, datos.letra);
   const yAfterH = hBot + 3;
 
   // ── RECIBO OFICIAL / COMPROBANTE DE ABONO + fecha ──
@@ -9685,6 +9699,8 @@ async function _imprimirActualizacionReal(){
     hora:  _horaActualizacion,
     etiqueta: 'Actualizaci\u00f3n'
   });
+  // Letra de esta versi\u00f3n: B=1ra actualizaci\u00f3n, C=2da, etc.
+  const letraActual = String.fromCharCode(65 + fechasImpresion.filter(f => f.etiqueta !== 'Original').length);
 
   // Inyectar autorización en pagos NUEVOS (no bloqueados). Usamos guiones -fecha-
   // para no chocar con los corchetes [fechaHora] que el PDF agrega automáticamente.
@@ -9727,17 +9743,20 @@ async function _imprimirActualizacionReal(){
     placasEntregadas: _placasCapturadas.placas,
     estadoPlacas:     _placasCapturadas.estado,
     autorizacion: autorizacion,
-    timestamp: ahoraCDMX().toISOString()
+    timestamp: ahoraCDMX().toISOString(),
+    letra: letraActual,
+    anio_folio: recibo.anio_folio || new Date().getFullYear()
   };
 
   try {
     const primerNombre = datos.clientes[0].nombre || recibo.nombre;
-    const qrTexto = 'LEX-MEXICO|Folio:'+folioFormato(recibo.folio, recibo.anio_folio)+'|'+primerNombre+'|ACTUALIZADO|'+datos.timestamp;
+    const qrTexto = 'LEX-MEXICO|Folio:'+folioConLetra(recibo.folio, recibo.anio_folio, letraActual)+'|'+primerNombre+'|ACTUALIZADO|'+datos.timestamp;
     const qrDataURL = await qrToDataURL(qrTexto);
     const doc = await generarPDF(datos, recibo.folio, qrDataURL);
-    const nombreArchivo = 'Recibo_'+folioFormato(recibo.folio, recibo.anio_folio)+'_'+primerNombre.replace(/\s+/g,'_')+'.pdf';
+    const nombreArchivo = folioConLetra(recibo.folio, recibo.anio_folio, letraActual) + '.pdf';
 
-    reemplazarPDFenDrive(doc.output('blob'), nombreArchivo).catch(e=>console.warn('SB update:',e));
+    // Subir como archivo nuevo (no sobrescribir la versión anterior)
+    subirPDFaDrive(doc.output('blob'), nombreArchivo).catch(e=>console.warn('SB upload version:',e));
 
     const idx = appData.recibos.findIndex(r=>r.folio===recibo.folio && !r.esComplemento);
     if(idx >= 0){
@@ -9755,6 +9774,7 @@ async function _imprimirActualizacionReal(){
       appData.recibos[idx].totalAbonado = totalAbonado;
       appData.recibos[idx].pdfBase64 = doc.output('datauristring');
       appData.recibos[idx].archivo = nombreArchivo;
+      appData.recibos[idx].letra = letraActual;
       appData.recibos[idx].placasEntregadas = _placasCapturadas.placas;
       appData.recibos[idx].estadoPlacas     = _placasCapturadas.estado;
     }
@@ -10738,7 +10758,8 @@ async function guardarRecibo(){
     totalGeneral: total,
     totalAbonado: anticipo,
     saldoNuevo: Math.max(0, total - anticipo),
-    descripcionVehicular: tipoTramite === 'vehicular' ? _descripcionVehicular : ''
+    descripcionVehicular: tipoTramite === 'vehicular' ? _descripcionVehicular : '',
+    letra: 'A'
   };
 
   // ── Seleccionar responsable (solo admin ve el modal) ──
@@ -10758,9 +10779,9 @@ async function guardarRecibo(){
     const qrTexto='LEX-MEXICO|Folio:'+folioFormato(folio)+'|'+primerNombre+'|'+datos.fecha_recibo+' '+datos.hora_recibo;
     const qrDataURL=await qrToDataURL(qrTexto);
     const doc=await generarPDF(datos,folio,qrDataURL);
-    const nombreArchivo='Recibo_'+folioFormato(folio)+'_'+primerNombre.replace(/\s+/g,'_')+'.pdf';
+    const nombreArchivo = folioConLetra(folio, appData.anioFolioActual || new Date().getFullYear(), 'A') + '.pdf';
 
-    setStatus('loading','Generando PDF · Folio #'+folioFormato(folio)+'...','loading');
+    setStatus('loading','Generando PDF · Folio #'+folioConLetra(folio, appData.anioFolioActual, 'A')+'...','loading');
     // Subir PDF a Supabase Storage
     subirPDFaDrive(doc.output('blob'), nombreArchivo).catch(e=>console.warn('SB upload:',e));
     guardarEnDirectorio(datos).catch(e=>console.warn('Directorio:',e));

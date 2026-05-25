@@ -24127,26 +24127,52 @@ function confirmarVincularRecibo() {
 
       <!-- RENUMERACIÓN DE FOLIOS -->
       <div class="card" style="margin-bottom:20px;border:1.5px solid rgba(26,74,138,0.3);">
-        <div class="card-header" style="background:linear-gradient(90deg,var(--azul-l),#fdfaf4);display:flex;align-items:center;justify-content:space-between;">
+        <div class="card-header" style="background:linear-gradient(90deg,var(--azul-l),#fdfaf4);display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="cfgToggleRenum()">
           <h2>🔄 Renumerar Folios del Año</h2>
-          <span class="card-header-sub">Reordena toda la secuencia desde 001</span>
+          <span style="display:flex;align-items:center;gap:10px;">
+            <span class="card-header-sub">Edita manualmente o aplica secuencia automática</span>
+            <span id="cfg-renum-arrow" style="font-size:0.9rem;color:var(--azul);transition:transform 0.2s;">▸</span>
+          </span>
         </div>
-        <div class="card-body" style="padding:16px;">
-          <div style="background:#f0f5ff;border:1px solid #b8ccf0;border-radius:8px;padding:10px 13px;font-size:0.78rem;color:#1a4a8a;margin-bottom:12px;line-height:1.7;">
-            Renombra todos los recibos del año en orden cronológico: el más antiguo pasa a ser <strong>001</strong>,
-            el siguiente <strong>002</strong>, y así sucesivamente. También actualiza pendientes,
-            contabilidad e historial de pagos. <strong>No modifica los PDFs ya subidos</strong> (los existentes
-            siguen accesibles, los nuevos se generarán con el folio correcto).
+
+        <!-- Cuerpo colapsable -->
+        <div id="cfg-renum-body" style="display:none;">
+          <div class="card-body" style="padding:14px 16px 10px;">
+            <div style="background:#f0f5ff;border:1px solid #b8ccf0;border-radius:8px;padding:9px 13px;font-size:0.76rem;color:#1a4a8a;margin-bottom:12px;line-height:1.6;">
+              Edita los nuevos números en la columna <strong>NUEVO</strong> o usa
+              <strong>"Auto 1,2,3…"</strong> para rellenarlos en orden.
+              Los PDFs ya subidos no se modifican; los nuevos usarán el folio correcto.
+            </div>
+
+            <!-- Barra de acciones -->
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center;">
+              <button onclick="cfgRenumCargar()"
+                style="padding:7px 14px;border-radius:6px;border:1.5px solid #4a7cd4;background:#f0f5ff;color:#1a4a8a;font-family:'DM Mono',monospace;font-size:0.72rem;font-weight:700;cursor:pointer;">
+                ↺ Cargar lista
+              </button>
+              <button onclick="cfgRenumAuto()"
+                style="padding:7px 14px;border-radius:6px;border:1.5px solid #2a8a3a;background:#f0fff4;color:#1a5a24;font-family:'DM Mono',monospace;font-size:0.72rem;font-weight:700;cursor:pointer;">
+                ⚡ Auto 1,2,3…
+              </button>
+              <button onclick="cfgRenumAplicar()"
+                style="padding:7px 18px;border-radius:6px;border:1.5px solid #1a4a8a;background:linear-gradient(135deg,#2a6ad4,#1a4a8a);color:#fff;font-family:'DM Mono',monospace;font-size:0.72rem;font-weight:700;cursor:pointer;">
+                ✔ Aplicar cambios
+              </button>
+              <span id="cfg-renum-status" style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--muted);"></span>
+            </div>
+
+            <!-- Cabecera de la tabla -->
+            <div style="display:grid;grid-template-columns:90px 90px 1fr 80px 70px;gap:4px;padding:5px 8px;background:#e8eef8;border-radius:5px 5px 0 0;font-family:'DM Mono',monospace;font-size:0.64rem;font-weight:700;color:#1a4a8a;letter-spacing:0.08em;">
+              <div>ACTUAL</div><div>NUEVO</div><div>CLIENTE</div><div>FECHA</div><div>ESTADO</div>
+            </div>
+
+            <!-- Lista de recibos -->
+            <div id="cfg-renum-lista" style="max-height:380px;overflow-y:auto;border:1px solid #c8d8f0;border-top:none;border-radius:0 0 5px 5px;">
+              <div style="padding:20px;text-align:center;font-size:0.76rem;color:var(--muted);">
+                Clic en "↺ Cargar lista" para ver los recibos del año.
+              </div>
+            </div>
           </div>
-          <div id="cfg-renum-preview" style="font-family:'DM Mono',monospace;font-size:0.74rem;color:var(--muted);margin-bottom:12px;min-height:18px;"></div>
-          <button onclick="previsualizarRenumeracion()"
-            style="padding:9px 18px;border-radius:8px;border:1.5px solid #4a7cd4;background:#f0f5ff;color:#1a4a8a;font-family:'DM Mono',monospace;font-size:0.78rem;font-weight:700;cursor:pointer;margin-right:8px;">
-            Ver previsualización
-          </button>
-          <button onclick="ejecutarRenumeracionFolios()"
-            style="padding:9px 20px;border-radius:8px;border:1.5px solid #1a4a8a;background:linear-gradient(135deg,#2a6ad4,#1a4a8a);color:#fff;font-family:'DM Mono',monospace;font-size:0.78rem;font-weight:700;cursor:pointer;">
-            Ejecutar Renumeración
-          </button>
         </div>
       </div>
 
@@ -34668,141 +34694,171 @@ async function resetearContadorFolios(valor){
 }
 
 // ─── Renumeración de folios ───────────────────────────────────────────────────
-function _buildMapaRenumeracion(){
+
+function cfgToggleRenum(){
+  const body  = document.getElementById('cfg-renum-body');
+  const arrow = document.getElementById('cfg-renum-arrow');
+  if(!body) return;
+  const abierto = body.style.display !== 'none';
+  body.style.display  = abierto ? 'none' : 'block';
+  if(arrow) arrow.style.transform = abierto ? '' : 'rotate(90deg)';
+}
+
+function cfgRenumCargar(){
   const anioActual = appData?.anioFolioActual || new Date().getFullYear();
-  // Todos los recibos del año (principales + complementos) ordenados por folio actual
   const todos = (appData.recibos || [])
     .filter(r => r.anio_folio === anioActual || (!r.anio_folio && r.folio > 0))
     .sort((a, b) => a.folio - b.folio);
-  const mapa = new Map(); // oldFolio → newFolio
-  todos.forEach((r, i) => mapa.set(r.folio, i + 1));
-  return { mapa, todos, anioActual };
-}
-
-function previsualizarRenumeracion(){
-  const { mapa, todos, anioActual } = _buildMapaRenumeracion();
-  const el = document.getElementById('cfg-renum-preview');
-  if(!el) return;
-  if(!todos.length){ el.textContent = 'Sin recibos del año '+anioActual+'.'; return; }
-  const anio2 = String(anioActual).slice(-2);
-  const lineas = todos.slice(0, 8).map(r =>
-    folioFormato(r.folio, r.anio_folio) + (r.letra||'A') +
-    ' → ' + anio2+'-'+String(mapa.get(r.folio)).padStart(3,'0')+(r.letra||'A') +
-    (r.esComplemento ? ' (complemento)' : '') +
-    ' · ' + (r.nombre||'').split(' ')[0]
-  );
-  if(todos.length > 8) lineas.push('... (' + (todos.length - 8) + ' más)');
-  lineas.push('');
-  lineas.push('Próximo folio después: ' + anio2+'-'+String(todos.length+1).padStart(3,'0')+'A');
-  el.innerHTML = lineas.map(l=>'<div>'+l+'</div>').join('');
-}
-
-async function ejecutarRenumeracionFolios(){
-  const { mapa, todos, anioActual } = _buildMapaRenumeracion();
+  const lista = document.getElementById('cfg-renum-lista');
+  const st    = document.getElementById('cfg-renum-status');
+  if(!lista) return;
   if(!todos.length){
-    if(typeof showModal==='function') showModal('Sin recibos','No hay recibos del año '+anioActual+' para renumerar.');
+    lista.innerHTML = '<div style="padding:20px;text-align:center;font-size:0.76rem;color:var(--muted);">Sin recibos del año '+anioActual+'.</div>';
     return;
   }
+  if(st) st.textContent = todos.length + ' recibos';
+  lista.innerHTML = todos.map((r, i) => {
+    const estado = r.cancelado ? 'Anulado' : (r.saldoPendiente > 0 ? 'Pendiente' : 'Liquidado');
+    const colorEst = r.cancelado ? '#c0160a' : (r.saldoPendiente > 0 ? '#b07a00' : '#1a7a3a');
+    const bg = i % 2 === 0 ? '#ffffff' : '#f5f8ff';
+    return `<div style="display:grid;grid-template-columns:90px 90px 1fr 80px 70px;gap:4px;padding:5px 8px;background:${bg};align-items:center;border-bottom:1px solid #dde6f5;">
+      <div style="font-family:'DM Mono',monospace;font-size:0.72rem;color:var(--ink);font-weight:600;">${folioFormato(r.folio, r.anio_folio)}${r.letra||'A'}${r.esComplemento?'<span style="color:#999;font-size:0.6rem;"> comp</span>':''}</div>
+      <div><input type="number" min="1" step="1"
+        id="renum-inp-${i}" data-idx="${i}" data-oldfolio="${r.folio}"
+        value="${r.folio}"
+        style="width:70px;padding:3px 6px;border:1.5px solid #b8ccf0;border-radius:4px;font-family:'DM Mono',monospace;font-size:0.76rem;color:var(--azul);font-weight:700;outline:none;"
+        onfocus="this.style.borderColor='var(--azul)'" onblur="this.style.borderColor='#b8ccf0'"></div>
+      <div style="font-size:0.72rem;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${r.nombre||''}">${(r.nombre||'—').split(' ').slice(0,3).join(' ')}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:0.68rem;color:var(--muted);">${r.fecha_recibo||r.fecha||'—'}</div>
+      <div style="font-size:0.68rem;font-weight:600;color:${colorEst};">${estado}</div>
+    </div>`;
+  }).join('');
+  // guardar lista en variable para acceso posterior
+  window._cfgRenumTodos = todos;
+}
+
+function cfgRenumAuto(){
+  const todos = window._cfgRenumTodos;
+  if(!todos || !todos.length){ if(typeof toast==='function') toast('Carga la lista primero','err'); return; }
+  todos.forEach((r, i) => {
+    const inp = document.getElementById('renum-inp-'+i);
+    if(inp) inp.value = i + 1;
+  });
+  const st = document.getElementById('cfg-renum-status');
+  if(st) st.textContent = todos.length+' recibos · listo para aplicar';
+}
+
+async function cfgRenumAplicar(){
+  const todos = window._cfgRenumTodos;
+  if(!todos || !todos.length){ if(typeof toast==='function') toast('Carga la lista primero','err'); return; }
+  const anioActual = appData?.anioFolioActual || new Date().getFullYear();
   const anio2 = String(anioActual).slice(-2);
-  const siguiente = todos.length + 1;
+
+  // Leer valores de los inputs y construir mapa
+  const mapa = new Map(); // oldFolio → newFolio
+  const nuevosVistos = new Set();
+  let hayError = false;
+  todos.forEach((r, i) => {
+    const inp = document.getElementById('renum-inp-'+i);
+    const nF  = inp ? parseInt(inp.value) : NaN;
+    if(!nF || nF < 1){ hayError = true; if(inp) inp.style.borderColor='#c0160a'; return; }
+    if(inp) inp.style.borderColor = '#b8ccf0';
+    if(nuevosVistos.has(nF)){
+      hayError = true;
+      if(typeof toast==='function') toast('Folio duplicado: '+nF+' — corrige antes de aplicar','err');
+      if(inp) inp.style.borderColor='#c0160a';
+    }
+    nuevosVistos.add(nF);
+    mapa.set(r.folio, nF);
+  });
+  if(hayError){ if(typeof toast==='function') toast('Corrige los errores marcados en rojo','err'); return; }
+
+  const maxNuevo = Math.max(...nuevosVistos);
+  const siguiente = maxNuevo + 1;
   const proximoStr = anio2+'-'+String(siguiente).padStart(3,'0')+'A';
+
   const resumen = todos.slice(0,6).map(r =>
     '  '+folioFormato(r.folio, r.anio_folio)+(r.letra||'A')+' → '+anio2+'-'+String(mapa.get(r.folio)).padStart(3,'0')+(r.letra||'A')
-  ).join('\n') + (todos.length > 6 ? '\n  ...' : '');
+  ).join('\n')+(todos.length > 6 ? '\n  ...' : '');
 
-  if(!confirm(
-    'Renumerar '+todos.length+' recibos de '+anioActual+':\n\n'+resumen+'\n\n'+
-    'Próximo folio: '+proximoStr+'\n\n'+
-    'Pendientes, contabilidad e historial también se actualizarán.\n\n¿Confirmar?'
-  )) return;
+  if(!confirm('Aplicar renumeración a '+todos.length+' recibos:\n\n'+resumen+'\n\nPróximo folio: '+proximoStr+'\n\n¿Confirmar?')) return;
 
   try {
-    // 1 — Recibos: folio, archivo, folioAnterior, folioRef
-    (appData.recibos || []).forEach(r => {
-      const nF = mapa.get(r.folio);
-      if(nF !== undefined){
-        r.folio   = nF;
-        r.archivo = folioConLetra(nF, anioActual, r.letra||'A') + '.pdf';
-      }
-      if(r.folioAnterior != null && mapa.has(r.folioAnterior))
-        r.folioAnterior = mapa.get(r.folioAnterior);
-      if(r.folioRef != null && mapa.has(r.folioRef))
-        r.folioRef = mapa.get(r.folioRef);
-    });
-
-    // 2 — Pendientes de placas
-    (D.pendientes || []).forEach(p => {
-      if(p.reciboVinculadoFolio != null && mapa.has(p.reciboVinculadoFolio)){
-        const nF = mapa.get(p.reciboVinculadoFolio);
-        p.reciboVinculadoFolio = nF;
-        if(p.id && p.id.startsWith('PEND-REC-')) p.id = 'PEND-REC-'+nF;
-      }
-    });
-
-    // 3 — Movimientos contables
-    (D.movimientos || []).forEach(m => {
-      if(m.folio != null && mapa.has(m.folio)) m.folio = mapa.get(m.folio);
-    });
-
-    // 4 — Gestiones: recibosOficiales y movimientos internos
-    (D.gestiones || []).forEach(g => {
-      (g.recibosOficiales || []).forEach(r => {
-        if(r.folio != null && mapa.has(r.folio)){
-          const nF = mapa.get(r.folio);
-          r.folio   = nF;
-          r.archivo = folioConLetra(nF, anioActual, 'A') + '.pdf';
-        }
-      });
-      (g.movimientos || []).forEach(m => {
-        if(m.folioRecibo != null && mapa.has(m.folioRecibo)) m.folioRecibo = mapa.get(m.folioRecibo);
-      });
-    });
-
-    // 5 — Historial de pagos (clave = folio)
-    if(appData.historialPagos){
-      const nuevoHP = {};
-      Object.entries(appData.historialPagos).forEach(([k, v]) => {
-        const oldF = parseInt(k);
-        const newF = mapa.has(oldF) ? mapa.get(oldF) : oldF;
-        nuevoHP[newF] = (v||[]).map(p => ({
-          ...p,
-          folio: p.folio != null && mapa.has(p.folio) ? mapa.get(p.folio) : p.folio
-        }));
-      });
-      appData.historialPagos = nuevoHP;
-    }
-
-    // 6 — Historial de versiones locales (clave = folio)
-    if(appData.historialVersiones){
-      const nuevoHV = {};
-      Object.entries(appData.historialVersiones).forEach(([k, v]) => {
-        const oldF = parseInt(k);
-        nuevoHV[mapa.has(oldF) ? mapa.get(oldF) : oldF] = v;
-      });
-      appData.historialVersiones = nuevoHV;
-    }
-
-    // 7 — Actualizar folioActual (próximo después del último renumerado)
-    appData.folioActual = siguiente;
-    if(typeof REC !== 'undefined' && REC) REC.folioActual = siguiente;
-
-    // 8 — Persistir
-    if(typeof save==='function') save();
-    await actualizarArchivoControl();
-
-    if(typeof renderHistorial==='function') renderHistorial();
-    if(typeof renderPend==='function') renderPend();
-    if(typeof badges==='function') badges();
-    cfgMostrarFolioActual();
-    previsualizarRenumeracion();
-
+    await _aplicarMapaRenumeracion(mapa, anioActual, siguiente);
+    cfgRenumCargar(); // refrescar lista con nuevos folios
     if(typeof showModal==='function')
-      showModal('Renumeración completada',
-        todos.length+' recibos renumerados.\nEl próximo folio será '+proximoStr+'.');
+      showModal('Renumeración completada', todos.length+' recibos renumerados.\nPróximo folio: '+proximoStr+'.');
   } catch(e){
-    if(typeof toast==='function') toast('Error en renumeración: '+e.message,'err');
+    if(typeof toast==='function') toast('Error: '+e.message,'err');
     console.error('[renumerar]', e);
   }
+}
+
+async function _aplicarMapaRenumeracion(mapa, anioActual, siguiente){
+  // 1 — Recibos
+  (appData.recibos || []).forEach(r => {
+    const nF = mapa.get(r.folio);
+    if(nF !== undefined){
+      r.folio   = nF;
+      r.archivo = folioConLetra(nF, anioActual, r.letra||'A') + '.pdf';
+    }
+    if(r.folioAnterior != null && mapa.has(r.folioAnterior)) r.folioAnterior = mapa.get(r.folioAnterior);
+    if(r.folioRef      != null && mapa.has(r.folioRef))      r.folioRef      = mapa.get(r.folioRef);
+  });
+  // 2 — Pendientes
+  (D.pendientes || []).forEach(p => {
+    if(p.reciboVinculadoFolio != null && mapa.has(p.reciboVinculadoFolio)){
+      const nF = mapa.get(p.reciboVinculadoFolio);
+      p.reciboVinculadoFolio = nF;
+      if(p.id && p.id.startsWith('PEND-REC-')) p.id = 'PEND-REC-'+nF;
+    }
+  });
+  // 3 — Movimientos contables
+  (D.movimientos || []).forEach(m => {
+    if(m.folio != null && mapa.has(m.folio)) m.folio = mapa.get(m.folio);
+  });
+  // 4 — Gestiones
+  (D.gestiones || []).forEach(g => {
+    (g.recibosOficiales || []).forEach(r => {
+      if(r.folio != null && mapa.has(r.folio)){
+        const nF = mapa.get(r.folio);
+        r.folio   = nF;
+        r.archivo = folioConLetra(nF, anioActual, 'A') + '.pdf';
+      }
+    });
+    (g.movimientos || []).forEach(m => {
+      if(m.folioRecibo != null && mapa.has(m.folioRecibo)) m.folioRecibo = mapa.get(m.folioRecibo);
+    });
+  });
+  // 5 — Historial de pagos
+  if(appData.historialPagos){
+    const nuevoHP = {};
+    Object.entries(appData.historialPagos).forEach(([k, v]) => {
+      const oldF = parseInt(k);
+      const newF = mapa.has(oldF) ? mapa.get(oldF) : oldF;
+      nuevoHP[newF] = (v||[]).map(p => ({...p, folio: p.folio != null && mapa.has(p.folio) ? mapa.get(p.folio) : p.folio}));
+    });
+    appData.historialPagos = nuevoHP;
+  }
+  // 6 — Historial de versiones
+  if(appData.historialVersiones){
+    const nuevoHV = {};
+    Object.entries(appData.historialVersiones).forEach(([k, v]) => {
+      const oldF = parseInt(k);
+      nuevoHV[mapa.has(oldF) ? mapa.get(oldF) : oldF] = v;
+    });
+    appData.historialVersiones = nuevoHV;
+  }
+  // 7 — folioActual
+  appData.folioActual = siguiente;
+  if(typeof REC !== 'undefined' && REC) REC.folioActual = siguiente;
+  // 8 — Persistir
+  if(typeof save==='function') save();
+  await actualizarArchivoControl();
+  if(typeof renderHistorial==='function') renderHistorial();
+  if(typeof renderPend==='function') renderPend();
+  if(typeof badges==='function') badges();
+  cfgMostrarFolioActual();
 }
 
 // ─── Toggle ojo contraseña en sección Cambiar Contraseña ─────────────────────

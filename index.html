@@ -9898,26 +9898,35 @@ async function _imprimirActualizacionReal(){
     // Subir como archivo nuevo (no sobrescribir la versión anterior)
     subirPDFaDrive(doc.output('blob'), nombreArchivo).catch(e=>console.warn('SB upload version:',e));
 
-    const idx = appData.recibos.findIndex(r=>r.folio===recibo.folio && !r.esComplemento);
+    // Buscar el registro de la versión que se está actualizando (por folio + letra exacta)
+    const letraOriginal = recibo.letra || letraVersion(recibo) || 'A';
+    const idx = appData.recibos.findIndex(r => r.folio === recibo.folio && !r.esComplemento && (r.letra || letraVersion(r) || 'A') === letraOriginal);
     if(idx >= 0){
-      // ── Snapshot ANTES de mutar — historial de versiones ─────────
+      // ── Snapshot del registro anterior antes de crear la nueva versión ─────
       _guardarSnapshotRecibo(appData.recibos[idx], saldoNuevo<=0 ? 'Liquidación' : 'Abono parcial');
-      // Todo lo que acabamos de imprimir queda locked para futuras actualizaciones.
-      // CRÍTICO: guardar pagosParciales_conAuth (NO pagosParciales sin auth) para que
-      // la autorización del abono actual permanezca FIJA en próximas actualizaciones.
-      appData.recibos[idx].costosExtra = costosExtra.map(c => Object.assign({}, c, {locked:true, folioLetra: c.folioLetra || letraActual}));
-      appData.recibos[idx].pagosParciales = pagosParciales_conAuth.map(p => Object.assign({}, p, {locked:true}));
-      appData.recibos[idx].fechasImpresion = fechasImpresion;
-      appData.recibos[idx].total = totalGeneral;
-      appData.recibos[idx].saldoPendiente = saldoNuevo;
-      appData.recibos[idx].saldoNuevo = saldoNuevo;
-      appData.recibos[idx].totalAbonado = totalAbonado;
-      appData.recibos[idx].pdfBase64 = doc.output('datauristring');
-      appData.recibos[idx].archivo = nombreArchivo;
-      appData.recibos[idx].letra = letraActual;
-      appData.recibos[idx].placasEntregadas = _placasCapturadas.placas;
-      appData.recibos[idx].estadoPlacas     = _placasCapturadas.estado;
-      _guardarVersionEnSupabase(appData.recibos[idx], letraActual, nombreArchivo).catch(e=>console.warn('[SB versiones] actualizacion:',e));
+      // Crear un NUEVO registro independiente con la letra nueva (B, C, D…).
+      // El registro original (A, B anterior, etc.) queda INTACTO en el historial.
+      // CRÍTICO: usar pagosParciales_conAuth para que la autorización quede fija.
+      const nuevoRegistro = Object.assign({}, appData.recibos[idx], {
+        costosExtra:      costosExtra.map(c => Object.assign({}, c, {locked:true, folioLetra: c.folioLetra || letraActual})),
+        pagosParciales:   pagosParciales_conAuth.map(p => Object.assign({}, p, {locked:true})),
+        fechasImpresion:  fechasImpresion,
+        total:            totalGeneral,
+        saldoPendiente:   saldoNuevo,
+        saldoNuevo:       saldoNuevo,
+        totalAbonado:     totalAbonado,
+        pdfBase64:        doc.output('datauristring'),
+        archivo:          nombreArchivo,
+        letra:            letraActual,
+        placasEntregadas: _placasCapturadas.placas,
+        estadoPlacas:     _placasCapturadas.estado,
+        esActualizacion:  true,
+        fechaActualizacion: _fechaActualizacion,
+        horaActualizacion:  _horaActualizacion
+      });
+      // Insertar el nuevo registro al inicio (más reciente primero); el original queda intacto
+      appData.recibos.unshift(nuevoRegistro);
+      _guardarVersionEnSupabase(nuevoRegistro, letraActual, nombreArchivo).catch(e=>console.warn('[SB versiones] actualizacion:',e));
     }
 
     if(!appData.historialPagos) appData.historialPagos = {};

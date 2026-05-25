@@ -7232,7 +7232,7 @@ async function abrirComplemento(folioOrig){
   const recibo = appData.recibos.find(r=>r.folio===folioOrig);
   if(!recibo){ showModal('No encontrado','Recibo no encontrado en historial.'); return; }
   const saldo = recibo.saldoPendiente!==undefined ? recibo.saldoPendiente : 0;
-  if(saldo<=0){ showModal('Sin saldo','El recibo #'+folioFormato(folioOrig)+' ya está liquidado.'); return; }
+  if(saldo<=0){ showModal('Sin saldo','El recibo #'+folioConLetra(folioOrig, recibo.anio_folio, recibo.letra||letraVersion(recibo)||'A')+' ya está liquidado.'); return; }
   // Modal propio en lugar de prompt() nativo (que bloquea el hilo y causa estados inconsistentes)
   _abrirModalMontoComplemento(recibo, saldo, folioOrig);
 }
@@ -7247,7 +7247,7 @@ function _abrirModalMontoComplemento(recibo, saldo, folioOrig){
     <div style="background:#1a1208;border:2px solid rgba(200,149,42,0.5);border-radius:10px;max-width:400px;width:100%;padding:22px;color:#e8d4a8;">
       <h3 style="margin:0 0 4px;color:#c8952a;font-family:serif;font-size:1rem;">💰 Registrar Abono</h3>
       <p style="font-size:0.68rem;color:rgba(200,149,42,0.5);margin-bottom:14px;font-family:monospace;">
-        Recibo <strong style="color:#c8952a;">#${folioFormato(folioOrig)}</strong> ·
+        Recibo <strong style="color:#c8952a;">#${folioConLetra(folioOrig, recibo.anio_folio, recibo.letra||letraVersion(recibo)||'A')}</strong> ·
         ${recibo.nombre}<br>
         Saldo pendiente: <strong style="color:#ff6060;">$${fmtMXN(saldo)}</strong>
       </p>
@@ -7511,6 +7511,14 @@ function folioConLetra(num, anioFolio, letra){
   return folioFormato(num, anioFolio) + (letra || 'A');
 }
 
+// Busca un recibo en appData por número de folio y devuelve su letra actual.
+// Usa recibo.letra (campo guardado) o lo computa con letraVersion(); default 'A'.
+function letraDeRecibo(folio) {
+  const r = (typeof appData !== 'undefined' ? appData.recibos||[] : [])
+    .find(function(r){ return r.folio === folio && !r.esComplemento; });
+  return r ? (r.letra || letraVersion(r) || 'A') : 'A';
+}
+
 // Detecta cambio de año y reinicia el contador anual
 function verificarReinicioAnual(){
   const anioActual = new Date().getFullYear();
@@ -7524,7 +7532,7 @@ function verificarReinicioAnual(){
 
 function actualizarFolioDisplay(){
   verificarReinicioAnual();
-  $('folio-display').textContent = folioFormato(appData.folioActual);
+  $('folio-display').textContent = folioConLetra(appData.folioActual, null, 'A');
   if(typeof actualizarBadgeArchivoDesdeRecibo==='function') actualizarBadgeArchivoDesdeRecibo(appData.folioActual);
 }
 
@@ -8769,7 +8777,7 @@ function cargarHistorialFolio(){
       : '';
     const cellGray = recibo.cancelado ? 'color:#999;text-decoration:line-through;' : '';
     histBody.innerHTML = hist.map(h=>'<tr'+trStyle+'>'
-      +'<td style="font-family:\'DM Mono\',monospace;white-space:nowrap;'+cellGray+'">#'+folioFormato(h.folio, h.anio_folio)+'</td>'
+      +'<td style="font-family:\'DM Mono\',monospace;white-space:nowrap;'+cellGray+'">#'+folioConLetra(h.folio, h.anio_folio, letraDeRecibo(h.folio))+'</td>'
       +'<td style="white-space:nowrap;'+cellGray+'">'+(h.fecha||'\u2014')+'</td>'
       +'<td style="white-space:nowrap;'+cellGray+'">'+h.tipo+'</td>'
       +'<td style="text-align:right;white-space:nowrap;font-family:\'DM Mono\',monospace;'+cellGray+'">$'+fmtMXN(h.pago||0)+'</td>'
@@ -9903,7 +9911,7 @@ async function _imprimirActualizacionReal(){
     }
 
     // ── ESCRITURA BLOQUEANTE en Drive antes de imprimir ──────────────
-    setStatus('loading','Guardando actualización del folio #'+folioFormato(recibo.folio, recibo.anio_folio)+'...','loading');
+    setStatus('loading','Guardando actualización del folio #'+folioConLetra(recibo.folio, recibo.anio_folio, letraActual)+'...','loading');
     try {
       await actualizarArchivoControl();
     } catch(eCtrl) {
@@ -9912,7 +9920,7 @@ async function _imprimirActualizacionReal(){
     }
     renderHistorial();
 
-    setStatus('ok','Folio #'+folioFormato(recibo.folio, recibo.anio_folio)+' actualizado e impreso \u2014 puedes seguir agregando','ok');
+    setStatus('ok','Folio #'+folioConLetra(recibo.folio, recibo.anio_folio, letraActual)+' actualizado e impreso \u2014 puedes seguir agregando','ok');
 
     const pdfBlob = doc.output('blob');
     lastActualizacionBlob = pdfBlob;
@@ -9936,7 +9944,7 @@ async function _imprimirActualizacionReal(){
         const tipoFlujo = (saldoNuevo <= 0) ? 'liquidado completamente' : 'actualizado';
         // Si se liquidó completamente, eliminar pendiente de placas vinculado
         if (saldoNuevo <= 0) _eliminarPendientePorFolio(recibo.folio);
-        setStatus('ok', 'Folio #'+folioFormato(recibo.folio, recibo.anio_folio)+' '+tipoFlujo+' · Listo para el siguiente recibo', 'ok');
+        setStatus('ok', 'Folio #'+folioConLetra(recibo.folio, recibo.anio_folio, letraActual)+' '+tipoFlujo+' · Listo para el siguiente recibo', 'ok');
       } catch(e){
         console.error('[post-imprimir-actualizacion]', e);
       }
@@ -10043,7 +10051,7 @@ async function confirmarCancelacion(){
 async function _confirmarCancelacionReal(recibo, motivo, auth){
   window._autorizacionCancelacion = null;
 
-  const folio = folioFormato(recibo.folio, recibo.anio_folio);
+  const folio = folioConLetra(recibo.folio, recibo.anio_folio, recibo.letra||letraVersion(recibo)||'A');
   // Restaurar status-bar antes de operar
   const _sbCanR = document.querySelector('.status-bar');
   if(_sbCanR) _sbCanR.removeAttribute('style');
@@ -10790,8 +10798,8 @@ async function guardarRecibo(){
   // el segundo automáticamente obtiene el N+1.
   setStatus('loading','Reservando folio único...','loading');
   const folio = await reservarFolioEnDrive();
-  // Actualizar el display con el folio reservado (formato 26-0001)
-  $('folio-display').textContent = folioFormato(folio);
+  // Actualizar el display con el folio reservado (siempre versión A al crear)
+  $('folio-display').textContent = folioConLetra(folio, null, 'A');
 
   const primerNombre=clientes[0].nombre;
   const saldoPendiente=Math.max(0,total-anticipo);
@@ -10937,8 +10945,8 @@ async function guardarRecibo(){
     }
 
     // Mostrar el folio del recibo impreso (no el siguiente)
-    $('folio-display').textContent = folioFormato(folio);
-    setStatus('ok','Recibo #'+folioFormato(folio)+' guardado — abriendo impresora...','ok');
+    $('folio-display').textContent = folioConLetra(folio, null, 'A');
+    setStatus('ok','Recibo #'+folioConLetra(folio, null, 'A')+' guardado — abriendo impresora...','ok');
 
     // Guardar blob para reimprimir sin cambiar folio
     lastPdfBlob = new Blob([doc.output('arraybuffer')], {type:'application/pdf'});
@@ -12854,8 +12862,10 @@ function renderContab() {
   function _fila(m, bgBody) {
     let folioTxt, folioColor;
     if (m.fuente === 'recibo') {
-      const n = m.folio != null ? m.folio : (m.id||'').replace('R-','');
-      const str = folioFormato(n);
+      const n = m.folio != null ? m.folio : parseInt((m.id||'').replace('R-',''));
+      const _rFol = (typeof appData !== 'undefined' ? appData.recibos||[] : []).find(function(r){ return r.folio === n && !r.esComplemento; });
+      const _letraF = _rFol ? (_rFol.letra || letraVersion(_rFol) || 'A') : 'A';
+      const str = folioConLetra(n, _rFol ? _rFol.anio_folio : null, _letraF);
       folioTxt  = `<span onclick="abrirPreviaDesdeContab(${n})" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--azul);" title="Ver recibo #${str}">${str}</span>`;
       folioColor = '';
     } else {
@@ -13112,7 +13122,7 @@ function exportCSV() {
     (m.nombre||'').toLowerCase().includes(q) ||
     (m.cat||'').toLowerCase().includes(q) ||
     (m.folioCaja||'').toLowerCase().includes(q) ||
-    (m.folio!=null && folioFormato(m.folio, m.anio_folio).includes(q)) ||
+    (m.folio!=null && folioConLetra(m.folio, m.anio_folio, letraDeRecibo(m.folio)).includes(q)) ||
     (m.responsable||'').toLowerCase().includes(q)
   );
 
@@ -13249,7 +13259,7 @@ function renderRec(){
     const saldo=x.saldoPendiente??Math.max(0,total-ant);
     const tag=x.cancelado?'<span class="tag tag-r">Cancelado</span>':saldo>0?'<span class="tag tag-a">Pendiente</span>':'<span class="tag tag-v">Liquidado</span>';
     return `<tr>
-      <td class="mono" style="font-weight:700;color:var(--gold-d)">#${folioFormato(x.folio, x.anio_folio)}</td>
+      <td class="mono" style="font-weight:700;color:var(--gold-d)">#${folioConLetra(x.folio, x.anio_folio, x.letra||letraVersion(x)||'A')}</td>
       <td>${esc(x.nombre)}</td><td style="font-size:0.7rem">${x.fecha||'—'}</td>
       <td class="monto">$${fmt(total)}</td>
       <td class="monto ing">$${fmt(ant)}</td>
@@ -13566,7 +13576,7 @@ function _perfilRenderRecibos(c){
       return `<div class="perfil-row" onclick="cerrar('mPerfilContacto');abrirPreviaDesdeContab(${r.folio})">
         <div class="perfil-row-icon">🧾</div>
         <div class="perfil-row-main">
-          <div class="perfil-row-title">#${folioFormato(r.folio, r.anio_folio)} — ${esc(concepto)}</div>
+          <div class="perfil-row-title">#${folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A')} — ${esc(concepto)}</div>
           <div class="perfil-row-sub">${r.fecha||''} · $${fmt(r.total||0)} total · $${fmt(r.anticipo||0)} cobrado</div>
         </div>
         ${badge}
@@ -16305,7 +16315,7 @@ function pEscCompradorInput(){
       style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border-l);font-size:0.8rem;transition:background 0.1s;"
       onmouseover="this.style.background='var(--gold-pale)'" onmouseout="this.style.background=''">
       <span style="font-weight:600;color:var(--ink);">${esc(r.nombre)}</span>
-      <span style="font-family:monospace;font-size:0.6rem;color:#7a4a00;margin-left:8px;">Folio #${folioFormato(r.folio, r.anio_folio)}</span>
+      <span style="font-family:monospace;font-size:0.6rem;color:#7a4a00;margin-left:8px;">Folio #${folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A')}</span>
     </div>`;
   }).join('');
   sug.style.display = 'block';
@@ -16550,7 +16560,7 @@ function pPersonaInput(){
       style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border-l);font-size:0.8rem;transition:background 0.1s;"
       onmouseover="this.style.background='var(--gold-pale)'" onmouseout="this.style.background=''">
       <span style="font-weight:600;color:var(--ink);">${r.nombre}</span>
-      <span style="font-family:monospace;font-size:0.6rem;color:var(--gold-d);margin-left:8px;">Folio #${folioFormato(r.folio, r.anio_folio)}</span>
+      <span style="font-family:monospace;font-size:0.6rem;color:var(--gold-d);margin-left:8px;">Folio #${folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A')}</span>
       <div style="font-size:0.65rem;color:var(--muted);margin-top:2px;">${r.fecha||''} · ${(r.tramites||'')}</div>
     </div>`).join('');
   sug.style.display='block';
@@ -16603,7 +16613,7 @@ function pPlacasNombreInput(){
       style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border-l);font-size:0.8rem;transition:background 0.1s;"
       onmouseover="this.style.background='var(--gold-pale)'" onmouseout="this.style.background=''">
       <span style="font-weight:600;color:var(--ink);">${esc(r.nombre)}</span>
-      <span style="font-family:monospace;font-size:0.6rem;color:#1a4a8a;margin-left:8px;">Folio #${folioFormato(r.folio, r.anio_folio)}</span>
+      <span style="font-family:monospace;font-size:0.6rem;color:#1a4a8a;margin-left:8px;">Folio #${folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A')}</span>
       <div style="font-size:0.65rem;color:var(--muted);margin-top:2px;">${esc(r.fecha||'')}${placa ? ' · 🔢 '+esc(placa) : ''}</div>
     </div>`;
   }).join('');
@@ -16643,7 +16653,7 @@ function globalSearch(q){
       resultados.push({
         tipo:'recibo', icono:'🧾',
         titulo: r.nombre||'—',
-        sub: '#'+folioFormato(r.folio, r.anio_folio)+' · '+r.fecha+' · $'+fmt(r.anticipo||0),
+        sub: '#'+folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A')+' · '+r.fecha+' · $'+fmt(r.anticipo||0),
         badge: saldo>0?{txt:'$'+fmt(saldo)+' pendiente',color:'#e8c875',bg:'rgba(200,149,42,0.15)'}:{txt:'Liquidado',color:'#4dca6a',bg:'rgba(40,180,80,0.12)'},
         accion:()=>{ abrirPreviaDesdeContab(r.folio); }
       });
@@ -18361,7 +18371,7 @@ function renderRecibosRecientes() {
     var saldo=r.saldoPendiente!=null?r.saldoPendiente:Math.max(0,(r.total||0)-(r.anticipo||0));
     return '<div style="padding:10px 14px;border-bottom:1px solid var(--border-l);cursor:pointer;" onclick="abrirComplementoR('+r.folio+')">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-      '<span style="font-family:JetBrains Mono,monospace;font-size:0.65rem;font-weight:700;color:var(--gold-d);">#'+folioFormato(r.folio, r.anio_folio)+'</span>' +
+      '<span style="font-family:JetBrains Mono,monospace;font-size:0.65rem;font-weight:700;color:var(--gold-d);">#'+folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A')+'</span>' +
       '<span class="tag '+(saldo>0?'tag-a':'tag-v')+'" style="font-size:0.55rem;">'+(saldo>0?'Pendiente':'Liquidado')+'</span>' +
       '</div><div style="font-size:0.75rem;margin-top:2px;">'+esc(r.nombre)+'</div>' +
       '<div style="font-family:JetBrains Mono,monospace;font-size:0.62rem;color:var(--muted);">'+(r.fecha||'')+(saldo>0?' · $'+fmt(saldo)+' restante':' · Saldado')+'</div>' +
@@ -21218,7 +21228,7 @@ async function abrirPreviaDesdeContab(numFolio){
   overlay.style.display='flex';
   loading.style.display='flex';
   embed.setAttribute('src','');
-  folioEl.textContent = 'FOLIO #'+folioFormato(r.folio, r.anio_folio);
+  folioEl.textContent = 'FOLIO #'+folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A');
   nombreEl.textContent = r.nombre||'—';
   const saldo = r.saldoPendiente||0;
   estadoEl.innerHTML = saldo>0
@@ -22234,7 +22244,7 @@ function adminRenderRecibos(q) {
   var qn = (q||'').toLowerCase().trim();
   var filtrados = recibos.filter(function(r) {
     if (!qn) return true;
-    var folio = folioFormato(r.folio||0);
+    var folio = folioConLetra(r.folio||0, r.anio_folio, r.letra||letraVersion(r)||'A');
     var nombre = (r.nombre||'').toLowerCase();
     var fecha = (r.fecha||'').toLowerCase();
     return folio.includes(qn) || nombre.includes(qn) || fecha.includes(qn);
@@ -22247,7 +22257,7 @@ function adminRenderRecibos(q) {
   }
   lista.innerHTML = filtrados.slice(0,30).map(function(r) {
     var idx = recibos.indexOf(r);
-    var folio = '#' + folioFormato(r.folio||0);
+    var folio = '#' + folioConLetra(r.folio||0, r.anio_folio, r.letra||letraVersion(r)||'A');
     var estado = r.cancelado ? '🚫 Cancelado' : (r.saldoPendiente > 0 ? '⚠️ Pendiente' : '✅ Liquidado');
     var colorEst = r.cancelado ? '#888' : (r.saldoPendiente > 0 ? '#c8952a' : '#2a9a4a');
     return [
@@ -22309,7 +22319,7 @@ function _abrirModalEliminarRecibo(folio){
   _delRecFolioObjetivo = folio;
   var info = document.getElementById('del-rec-info');
   if(info){
-    info.textContent = 'Folio #' + folioFormato(r.folio, r.anio_folio) +
+    info.textContent = 'Folio #' + folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A') +
                        ' · ' + (r.nombre || 'Sin nombre') +
                        (r.fecha ? ' · ' + r.fecha : '');
   }
@@ -22823,7 +22833,7 @@ function adminAbrirEditarRecibo(idx) {
   // Llenar campos
   document.getElementById('adminEditIdx').value = idx;
   var _fRef = document.getElementById('adminEditFolioRef'); if(_fRef) _fRef.value = r.folio != null ? r.folio : '';
-  document.getElementById('adminEditFolioLabel').textContent = '#' + folioFormato(r.folio||0);
+  document.getElementById('adminEditFolioLabel').textContent = '#' + folioConLetra(r.folio||0, r.anio_folio, r.letra||letraVersion(r)||'A');
   document.getElementById('adminEditNombre').value = r.nombre || '';
   document.getElementById('adminEditFecha').value = r.fecha || r.fecha_recibo || '';
   document.getElementById('adminEditHora').value = r.hora || r.hora_recibo || '';
@@ -22899,7 +22909,7 @@ function adminEdicionFiltrar() {
   const recibos = ((appData || {}).recibos || []).filter(r => !r.esComplemento);
   const filtrados = q
     ? recibos.filter(r => {
-        const fs = (folioFormato(r.folio, r.anio_folio) || '') + '';
+        const fs = folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A');
         return fs.includes(q) || (r.nombre || '').toLowerCase().includes(q) || (r.fecha || '').includes(q) || (r.fecha_recibo || '').includes(q);
       })
     : recibos;
@@ -22909,7 +22919,7 @@ function adminEdicionFiltrar() {
     return;
   }
   lista.innerHTML = filtrados.slice(0, 40).map(r => {
-    const fs   = folioFormato(r.folio, r.anio_folio);
+    const fs   = folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A');
     const saldo = parseFloat(r.saldoPendiente || 0);
     const cancelado = r.cancelado || r.estatus === 'CANCELADO';
     const saldoTag = cancelado
@@ -23718,7 +23728,7 @@ function verVistaPrevia(idx) {
       modal.innerHTML = h;
       document.body.appendChild(modal);
     }
-    var folio = '#' + folioFormato(r.folio||0);
+    var folio = '#' + folioConLetra(r.folio||0, r.anio_folio, r.letra||letraVersion(r)||'A');
     document.getElementById('vp-titulo').textContent = 'Recibo ' + folio + ' — ' + (r.nombre||'');
     document.getElementById('vp-iframe').src = r.pdfBase64;
     modal.classList.add('show');
@@ -23778,7 +23788,7 @@ function abrirVincularRecibo(idx) {
     modal.innerHTML = mh;
     document.body.appendChild(modal);
   }
-  document.getElementById('vinc-rec-info').textContent = '#' + folioFormato(r.folio||0) + ' — ' + (r.nombre||'') + ' · ' + (r.fecha||'');
+  document.getElementById('vinc-rec-info').textContent = '#' + folioConLetra(r.folio||0, r.anio_folio, r.letra||letraVersion(r)||'A') + ' — ' + (r.nombre||'') + ' · ' + (r.fecha||'');
   var selCarp = document.getElementById('vinc-carpeta');
   selCarp.innerHTML = '<option value="">&#8212; Sin carpeta &#8212;</option>';
   if (typeof D !== 'undefined' && D.carpetas && D.carpetas.length) {
@@ -31658,7 +31668,7 @@ function _gestRenderHistorial(g){
     const tipoColor={'anticipo':'#e8c875','parcial':'#f08030','liquidacion':'#4dca6a'}[r.tipo]||'rgba(200,149,42,0.5)';
     return `<div class="gest-rec-row">
       <span style="font-family:monospace;font-size:0.68rem;">${_gestFecha(r.fecha)}</span>
-      <span class="gest-rec-folio" onclick="abrirPreviaDesdeContab(${r.folio})">#${typeof folioFormato==='function'?folioFormato(r.folio):r.folio}</span>
+      <span class="gest-rec-folio" onclick="abrirPreviaDesdeContab(${r.folio})">#${typeof folioConLetra==='function'?folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A'):r.folio}</span>
       <span style="font-size:0.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.concepto||'—'}</span>
       <span style="text-align:right;font-family:monospace;font-size:0.78rem;font-weight:700;color:#4dca6a;">$${_gestFmt(r.monto)}</span>
       <span style="font-size:0.65rem;font-weight:700;color:${tipoColor};">${(r.tipo||'').toUpperCase()}</span>

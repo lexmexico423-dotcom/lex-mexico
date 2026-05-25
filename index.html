@@ -2684,8 +2684,9 @@ window.console.info = function(){};
     pointer-events: auto !important; opacity: 1 !important;
   }
   body.modo-edicion-completa #btn-guardar { display: none !important; }
-  /* El folio NO se puede editar */
-  body.modo-edicion-completa #folio-display { pointer-events: none !important; cursor: not-allowed; }
+  /* En edición completa el folio SÍ se puede cambiar */
+  body.modo-edicion-completa #folio-display { display: none !important; }
+  body.modo-edicion-completa #folio-edit-input { display: block !important; }
 
   /* BOTONES DE PAGO EN HEADER */
   #header-pago-btns {
@@ -2964,6 +2965,18 @@ window.addEventListener('offline', ()=>{
     <div id="barra-secretaria-btns" style="display:flex;flex-direction:column;gap:4px;"></div>
   </div>
   <!-- ═══ FIN BARRA CAPTURA ═══ -->
+
+  <!-- ═══ BOTÓN EDITAR RECIBO COMPLETO ═══ -->
+  <div style="padding:8px 10px 6px;border-top:1px solid rgba(100,160,255,0.18);">
+    <div style="font-family:monospace;font-size:0.44rem;letter-spacing:0.14em;text-transform:uppercase;color:rgba(150,190,255,0.4);padding:0 4px 5px;">✏️ Edición</div>
+    <button onclick="abrirEdicionCompletaSidebar()"
+      style="width:100%;background:linear-gradient(135deg,#1a4a8a,#0f2f5a);border:1px solid rgba(100,160,255,0.35);border-radius:8px;color:#c8e0ff;padding:9px 8px;cursor:pointer;font-family:monospace;font-size:0.62rem;font-weight:700;letter-spacing:0.04em;text-align:center;transition:all 0.18s;"
+      onmouseover="this.style.borderColor='#60a5fa';this.style.background='linear-gradient(135deg,#2a5aaa,#1a3f7a)'"
+      onmouseout="this.style.borderColor='rgba(100,160,255,0.35)';this.style.background='linear-gradient(135deg,#1a4a8a,#0f2f5a)'">
+      ✏️ Editar Recibo Completo
+    </button>
+  </div>
+  <!-- ═══ FIN BOTÓN EDICIÓN ═══ -->
 
   <div class="sidebar-footer">
     <div class="sidebar-time" id="sHora">--:--</div>
@@ -3269,6 +3282,16 @@ window.addEventListener('offline', ()=>{
             <div style="font-family:monospace;font-size:0.5rem;color:rgba(160,192,255,0.55);text-align:center;line-height:1.4;padding:0 4px;">Tablero de progreso por mes. Habilita meses para que la secretaria capture recibos y movimientos.</div>
           </div>
 
+          <!-- ✏️ Editar Recibo Completo -->
+          <div onclick="adminAbrirEdicionCompletaZona()" style="position:relative;background:rgba(26,74,138,0.2);border:2px solid rgba(100,160,255,0.5);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#60a5fa';this.style.boxShadow='0 8px 20px rgba(26,74,138,0.4)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(100,160,255,0.5)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:linear-gradient(135deg,#1a4a8a,#0f2f5a);display:flex;align-items:center;justify-content:center;font-size:1.7rem;">✏️</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#c8e0ff;text-align:center;line-height:1.3;">Editar Recibo<br>Completo</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(160,192,255,0.55);text-align:center;line-height:1.4;padding:0 4px;">Edita folio, nombre, conceptos, costos extra, abonos, fecha, vehiculo y más. Regenera el PDF al guardar.</div>
+          </div>
+
         </div><!-- /grid -->
       </div><!-- /admin-modal-body -->
 
@@ -3483,6 +3506,26 @@ window.addEventListener('offline', ()=>{
         <input type="text" id="adminBuscarRecibo" placeholder="🔍 Buscar por folio, nombre o fecha..." oninput="adminFiltrarRecibos()"
           style="width:100%;background:rgba(200,149,42,0.05);border:1.5px solid rgba(200,149,42,0.18);border-radius:var(--radius-sm);padding:8px 12px;font-family:monospace;font-size:0.76rem;color:var(--gold-l);outline:none;margin-bottom:10px;">
         <div id="adminReciboList" style="max-height:300px;overflow-y:auto;"></div>
+      </div>
+      <div class="admin-modal-ftr">
+        <button class="btn btn-ghost btn-sm" onclick="adminVolverPanel()">← Volver</button>
+      </div>
+    </div>
+
+    <!-- ZONA: EDICIÓN COMPLETA DE RECIBO -->
+    <div id="adminEdicionCompletaZone" class="admin-panel">
+      <div class="admin-modal-body">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+          <button onclick="adminVolverPanel()" style="background:none;border:none;cursor:pointer;color:var(--gold-l);font-size:0.85rem;padding:4px 8px;border-radius:4px;">← Volver</button>
+          <div style="font-family:serif;font-size:0.9rem;color:#c8e0ff;">✏️ Editar Recibo Completo</div>
+        </div>
+        <div style="font-size:0.7rem;color:rgba(160,192,255,0.7);margin-bottom:12px;line-height:1.5;">
+          Selecciona el recibo. Podrás cambiar folio, nombre, conceptos, costos extra, abonos, fecha, hora, datos vehiculares y más. El PDF se regenera al guardar.
+        </div>
+        <input type="text" id="adminEdicionBuscar" placeholder="🔍 Buscar por folio, nombre o fecha..."
+          oninput="adminEdicionFiltrar()"
+          style="width:100%;background:rgba(200,149,42,0.05);border:1.5px solid rgba(200,149,42,0.18);border-radius:6px;padding:8px 12px;font-family:monospace;font-size:0.76rem;color:var(--gold-l);outline:none;margin-bottom:10px;box-sizing:border-box;">
+        <div id="adminEdicionLista" style="max-height:340px;overflow-y:auto;"></div>
       </div>
       <div class="admin-modal-ftr">
         <button class="btn btn-ghost btn-sm" onclick="adminVolverPanel()">← Volver</button>
@@ -5287,6 +5330,8 @@ window.addEventListener('offline', ()=>{
       <div class="folio-label">No. Recibo</div>
       <div class="folio-num-box">
         <span class="folio-num" id="folio-display">—</span>
+        <input type="number" id="folio-edit-input" min="1" step="1" value="1"
+          style="display:none;width:100%;text-align:center;font-family:'DM Mono',monospace;font-size:1.3rem;font-weight:700;background:var(--bg-mid,#1e1a14);border:1.5px solid var(--gold-dark,#c89a2a);color:var(--gold-dark,#c89a2a);border-radius:4px;padding:4px 6px;box-sizing:border-box;">
       </div>
       <div class="folio-recibo">Folio oficial</div>
     </div>
@@ -8994,6 +9039,20 @@ function cargarReciboEnFormulario(recibo){
   // Mostrar bloque de placas si el recibo ya tiene capturadas
   mostrarPlacasEnPantalla(recibo.placasEntregadas, recibo.estadoPlacas);
 
+  // En modo edición completa: folio editable + costosExtra y pagosParciales desbloqueados
+  if(document.body.classList.contains('modo-edicion-completa')){
+    const folioInput = document.getElementById('folio-edit-input');
+    if(folioInput) folioInput.value = recibo.folio;
+
+    const tbodyCE = document.getElementById('costos-extra-tbody');
+    if(tbodyCE){ tbodyCE.innerHTML = ''; costoExtraCount = 0; }
+    (recibo.costosExtra||[]).forEach(ce => agregarCostoExtra(Object.assign({}, ce, {locked: false})));
+
+    const tbodyPP = document.getElementById('pagos-parciales-tbody');
+    if(tbodyPP){ tbodyPP.innerHTML = ''; pagoParcialCount = 0; }
+    (recibo.pagosParciales||[]).forEach(pp => agregarPagoParcial(Object.assign({}, pp, {locked: false})));
+  }
+
   calcTotales();
 }
 
@@ -11113,6 +11172,10 @@ async function verHistorialVersiones(folio){
   const esAdmin = typeof ADMIN_EMAIL!=='undefined'
     ? emailActual === ADMIN_EMAIL.toLowerCase()
     : false;
+
+  // Mostrar botón de edición completa (siempre visible; la función verifica el contexto)
+  const footer = document.getElementById('modal-versiones-footer');
+  if(footer) footer.style.display = 'flex';
 
   body.innerHTML = '<p style="color:var(--muted);font-size:0.8rem;text-align:center;padding:20px;">⏳ Cargando versiones...</p>';
   el.classList.add('show');
@@ -21248,6 +21311,19 @@ function adminLogin() {
       }
     }, 300);
   }
+
+  // ── HOOK SIDEBAR: ir a edición completa si vino del botón del sidebar ──
+  if(window._adminAccionPendiente === 'edicionCompleta'){
+    window._adminAccionPendiente = null;
+    setTimeout(function(){
+      document.querySelectorAll('#adminModal .admin-panel').forEach(p => p.classList.remove('show'));
+      const zona = document.getElementById('adminEdicionCompletaZone');
+      if(zona) zona.classList.add('show');
+      const inp = document.getElementById('adminEdicionBuscar');
+      if(inp) inp.value = '';
+      if(typeof adminEdicionFiltrar === 'function') adminEdicionFiltrar();
+    }, 350);
+  }
 }
 
 function adminMostrarPanel() {
@@ -22779,6 +22855,140 @@ function adminEditRecalcSaldo() {
 
 let _reciboEnEdicionCompleta = null; // índice en appData.recibos del recibo que se está editando
 
+// Llamada desde el botón del sidebar — abre modal admin en zona de edición completa
+function abrirEdicionCompletaSidebar() {
+  // Si ya hay sesión activa, ir directo a la zona de edición
+  if(typeof adminSesionActiva !== 'undefined' && adminSesionActiva){
+    // Mostrar el modal si no está visible
+    const ov = document.getElementById('adminModalOv');
+    if(ov) ov.classList.add('show');
+    // Ocultar todas las zonas y mostrar la de edición completa
+    document.querySelectorAll('#adminModal .admin-panel').forEach(p => p.classList.remove('show'));
+    const zona = document.getElementById('adminEdicionCompletaZone');
+    if(zona) zona.classList.add('show');
+    const inp = document.getElementById('adminEdicionBuscar');
+    if(inp) inp.value = '';
+    adminEdicionFiltrar();
+  } else {
+    // Necesita autenticarse primero; guardar acción pendiente
+    window._adminAccionPendiente = 'edicionCompleta';
+    if(typeof abrirAdminModal === 'function') abrirAdminModal();
+  }
+}
+
+// Abre la zona de búsqueda para edición completa desde el panel admin
+function adminAbrirEdicionCompletaZona() {
+  document.querySelectorAll('#adminModal .admin-panel').forEach(p => p.classList.remove('show'));
+  const zona = document.getElementById('adminEdicionCompletaZone');
+  if(zona) zona.classList.add('show');
+  const inp = document.getElementById('adminEdicionBuscar');
+  if(inp) inp.value = '';
+  adminEdicionFiltrar();
+}
+
+function adminEdicionFiltrar() {
+  const q = ((document.getElementById('adminEdicionBuscar') || {}).value || '').toLowerCase();
+  const lista = document.getElementById('adminEdicionLista');
+  if(!lista) return;
+  const recibos = ((appData || {}).recibos || []).filter(r => !r.esComplemento);
+  const filtrados = q
+    ? recibos.filter(r => {
+        const fs = (folioFormato(r.folio, r.anio_folio) || '') + '';
+        return fs.includes(q) || (r.nombre || '').toLowerCase().includes(q) || (r.fecha || '').includes(q) || (r.fecha_recibo || '').includes(q);
+      })
+    : recibos;
+
+  if(!filtrados.length) {
+    lista.innerHTML = '<p style="color:var(--muted);font-size:0.78rem;text-align:center;padding:20px;">No se encontraron recibos.</p>';
+    return;
+  }
+  lista.innerHTML = filtrados.slice(0, 40).map(r => {
+    const fs   = folioFormato(r.folio, r.anio_folio);
+    const saldo = parseFloat(r.saldoPendiente || 0);
+    const cancelado = r.cancelado || r.estatus === 'CANCELADO';
+    const saldoTag = cancelado
+      ? '<span style="font-family:monospace;font-size:0.62rem;color:#c0161a;background:#ffe8e8;padding:1px 6px;border-radius:3px;">Cancelado</span>'
+      : saldo > 0
+        ? '<span style="font-family:monospace;font-size:0.62rem;color:#c07a10;background:#fff4e0;padding:1px 6px;border-radius:3px;">$' + saldo.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</span>'
+        : '<span style="font-family:monospace;font-size:0.62rem;color:#1a7a3a;background:#e8f5e9;padding:1px 6px;border-radius:3px;">Liquidado</span>';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid rgba(200,149,42,0.15);border-radius:6px;margin-bottom:6px;background:rgba(200,149,42,0.04);">
+      <div style="min-width:0;flex:1;">
+        <span style="font-family:'DM Mono',monospace;font-size:0.8rem;font-weight:700;color:var(--gold-l);">#${fs}</span>
+        <span style="font-size:0.74rem;color:var(--muted);margin-left:8px;">${escHTML(r.nombre||'')}</span>
+        <span style="font-size:0.62rem;color:rgba(150,130,100,0.7);margin-left:6px;">${r.fecha||r.fecha_recibo||''}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+        ${saldoTag}
+        <button onclick="adminSeleccionarParaEditar(${r.folio})"
+          style="background:linear-gradient(135deg,#1a4a8a,#0f2f5a);border:1px solid rgba(100,160,255,0.3);border-radius:4px;color:#c8e0ff;padding:5px 12px;cursor:pointer;font-family:monospace;font-size:0.68rem;font-weight:600;white-space:nowrap;">
+          ✏️ Editar
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function adminSeleccionarParaEditar(folio) {
+  const r = ((appData || {}).recibos || []).find(x => x.folio === folio && !x.esComplemento);
+  if(!r){ if(typeof toast === 'function') toast('Recibo no encontrado', 'err'); return; }
+  if(typeof cerrarAdminModal === 'function') cerrarAdminModal();
+  editarReciboEnConsulta(r);
+}
+
+// Llamada desde el botón ⚙ → modal versiones → "Editar este recibo"
+// También llamada desde adminSeleccionarParaEditar con el recibo como parámetro
+function editarReciboEnConsulta(rParam) {
+  const r = rParam || reciboEnConsulta;
+  if (!r) { if (typeof toast === 'function') toast('No hay recibo en consulta', 'err'); return; }
+
+  document.getElementById('modal-versiones').classList.remove('show');
+
+  _reciboEnEdicionCompleta  = r.folio;
+  window._reciboEdicionBackup = r.folio;
+
+  function _cargar() {
+    ['modo-actualizacion','recibo-frozen','desde-liquidacion','actualizacion-impresa',
+     'modo-consulta','folio-liquidado','folio-cancelado','modo-edicion-completa',
+     'paneles-busqueda-abiertos']
+      .forEach(cl => document.body.classList.remove(cl));
+
+    _panelesBusquedaAbiertos = false;
+    var cuerpo = document.getElementById('paneles-busqueda-cuerpo');
+    if (cuerpo) cuerpo.setAttribute('style','display:none;padding:0 20px 14px;');
+
+    var rb = document.getElementById('recibo-body');
+    if (rb) { rb.style.cssText = ''; rb.style.removeProperty('display'); }
+
+    if (typeof ir === 'function') ir('nuevo-recibo');
+
+    const _folioEdicion = r.folio;
+    const _anioFolio    = r.anio_folio;
+    setTimeout(function() {
+      var _r2 = ((appData||{}).recibos||[]).find(x => x.folio === _folioEdicion) || r;
+      if (typeof cargarReciboEnFormulario === 'function') cargarReciboEnFormulario(_r2);
+
+      var fd = document.getElementById('folio-display');
+      if (fd) fd.textContent = folioFormato(_folioEdicion, _anioFolio);
+
+      document.body.classList.add('modo-edicion-completa');
+
+      var lbl = document.getElementById('edicion-folio-label');
+      if (lbl) lbl.textContent = 'EDITANDO FOLIO #' + folioFormato(_folioEdicion, _anioFolio);
+
+      var banner = document.getElementById('edicion-completa-banner');
+      if (banner) banner.style.display = 'flex';
+
+      var btnGE = document.getElementById('btn-guardar-edicion-completa');
+      if (btnGE) btnGE.style.display = '';
+
+      if (typeof syncFormVisibility === 'function') syncFormVisibility();
+      if (typeof calcTotales === 'function') calcTotales();
+    }, 300);
+  }
+
+  setTimeout(_cargar, 100);
+}
+
 function adminAbrirEdicionCompleta() {
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
   // Buscar por folio (más seguro) con respaldo por índice
@@ -22884,18 +23094,26 @@ async function guardarEdicionCompleta() {
     return;
   }
 
+  // ─── Leer folio nuevo desde el input de edición ─────────────────
+  const folioInputEl  = document.getElementById('folio-edit-input');
+  const folioOriginal = _reciboEnEdicionCompleta;
+  const folioFinal    = folioInputEl ? (parseInt(folioInputEl.value) || folioOriginal) : folioOriginal;
+  const folioChanged  = folioFinal !== folioOriginal;
+
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
-  var idx = recibos.findIndex(function(r){ return r.folio === _reciboEnEdicionCompleta; });
+  var idx = recibos.findIndex(function(r){ return r.folio === folioOriginal; });
   if (idx < 0) { if (typeof toast === 'function') toast('Error: recibo no encontrado en memoria', 'err'); return; }
   var r = recibos[idx];
 
-  // Recoger datos del formulario igual que guardarRecibo() pero SIN reservar nuevo folio
+  // ─── Recoger datos del formulario ───────────────────────────────
   var clientes = typeof getClientes === 'function' ? getClientes() : [];
   if (!clientes.length || !clientes[0].nombre) {
     if (typeof setStatus === 'function') setStatus('err','Ingresa el nombre del cliente','err'); return;
   }
-  var conceptos  = typeof getConceptos === 'function' ? getConceptos() : [];
-  var anticipo   = typeof parsePrecio  === 'function' ? parsePrecio(document.getElementById('anticipo').value) : 0;
+  var conceptos      = typeof getConceptos      === 'function' ? getConceptos()      : [];
+  var costosExtra    = typeof getCostosExtra    === 'function' ? getCostosExtra()    : [];
+  var pagosParciales = typeof getPagosParciales === 'function' ? getPagosParciales() : [];
+  var anticipo   = typeof parsePrecio === 'function' ? parsePrecio(document.getElementById('anticipo').value) : 0;
   var total      = conceptos.reduce(function(s,c){ return s + (parseFloat(c.precio)||0); }, 0);
   var saldo      = Math.max(0, total - anticipo);
   var primerNombre = clientes[0].nombre;
@@ -22908,126 +23126,155 @@ async function guardarEdicionCompleta() {
     if (el) datosVeh[fid] = el.value;
   });
 
-  var tipoTramite = (document.getElementById('tipo-tramite-select') || {}).value || r.tipoTramite || '';
+  var tipoTramiteVal = (document.getElementById('tipo-tramite-select') || {}).value || r.tipoTramite || '';
   var tipo_doc    = (document.getElementById('tipo_doc') || {}).value || r.tipo_doc || 'copia';
   var responsable = (document.getElementById('responsable') || {}).value || r.responsable || '';
   var fechaRecibo = (document.getElementById('fecha_recibo') || {}).value || r.fecha_recibo || '';
   var horaRecibo  = (document.getElementById('hora_recibo')  || {}).value || r.hora_recibo  || '';
   var nombreFirma = (document.getElementById('nombre_cliente_firma') || {}).value || primerNombre;
+  var copias      = typeof getDocumentosSeleccionados === 'function' ? getDocumentosSeleccionados() : '';
+  var descripVeh  = tipoTramiteVal === 'vehicular' ? (_descripcionVehicular || r.descripcionVehicular || '') : '';
+  var anioFolio   = r.anio_folio || (typeof appData !== 'undefined' ? (appData.anioFolioActual || new Date().getFullYear()) : new Date().getFullYear());
+  var letraRecibo = r.letra || 'A';
 
-  // Copias/documentos
-  var copiasParsed = [];
-  try {
-    var datos = typeof getDatosFormulario === 'function' ? getDatosFormulario() : {};
-    copiasParsed = typeof datos.copias === 'string' ? JSON.parse(datos.copias||'{}').docs||[] : (datos.copias||[]);
-  } catch(e){ registrarError('catch vacio', e); }
+  // ─── Validar que el folio nuevo no exista ya ────────────────────
+  if (folioChanged) {
+    const yaExiste = recibos.some(function(x){ return x.folio === folioFinal; });
+    if (yaExiste) {
+      if (typeof toast === 'function') toast('❌ El folio ' + folioFinal + ' ya existe. Elige otro número.', 'err');
+      return;
+    }
+  }
 
-  // Guardar snapshot ANTES de mutar
-  if (typeof _guardarSnapshotRecibo === 'function')
-    _guardarSnapshotRecibo(r, 'Antes de edición completa');
-
-  // Actualizar el objeto del recibo — el folio NO cambia
-  r.nombre               = primerNombre;
-  r.clientes             = clientes;
-  r.conceptos            = conceptos;
-  r.total                = total;
-  r.anticipo             = String(anticipo);
-  r.saldoPendiente       = saldo;
-  r.fecha                = fechaRecibo;
-  r.fecha_recibo         = fechaRecibo;
-  r.hora                 = horaRecibo;
-  r.hora_recibo          = horaRecibo;
-  r.tipoTramite          = tipoTramite;
-  r.tipo_doc             = tipo_doc;
-  r.copias               = copiasParsed;
-  r.responsable          = responsable;
-  r.generadoPor          = responsable;
-  r.nombre_cliente_firma = nombreFirma;
-  Object.assign(r, datosVeh);
-  r.pdfBase64            = null; // forzar regeneración
-
-  // Actualizar arrays en memoria
-  if (typeof REC !== 'undefined') { REC.recibos = recibos; }
-  if (typeof appData !== 'undefined') appData.recibos = recibos;
-
-  var folioStr = folioFormato(r.folio, r.anio_folio);
   var btn = document.getElementById('btn-guardar-edicion-completa');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Guardando…'; }
-
-  if (typeof setStatus === 'function') setStatus('loading','Guardando edición del Folio #'+folioStr+'…','loading');
+  if (typeof setStatus === 'function') setStatus('loading','Guardando edición…','loading');
 
   try {
-    // Generar nuevo PDF con los datos editados
-    var nombreArchivo = 'Recibo_' + folioStr + '_' + primerNombre.replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf';
-
-    // Usar jsPDF igual que guardarRecibo para regenerar el PDF
-    var pdfBase64 = null;
-    if (typeof generarPDFRecibo === 'function') {
-      pdfBase64 = await generarPDFRecibo(r);
-    } else if (typeof window.jspdf !== 'undefined' || typeof jspdf !== 'undefined') {
-      // Intentar generar con el formulario actual (igual que guardarRecibo)
-      // Si no hay función dedicada, marcar como pendiente de regeneración
-      pdfBase64 = null;
+    // ─── Si el folio cambió: renombrar en todas las estructuras ───
+    if (folioChanged) {
+      const mapa = new Map([[folioOriginal, folioFinal]]);
+      await _aplicarMapaRenumeracion(mapa, anioFolio, appData.folioActual);
+      // Renombrar en versiones_recibo de Supabase
+      if (window.SB && window.SB_DESPACHO_ID) {
+        window.SB.from('versiones_recibo')
+          .update({ folio_base: folioFinal })
+          .eq('despacho_id', window.SB_DESPACHO_ID)
+          .eq('folio_base', folioOriginal)
+          .then(({error}) => { if(error) console.warn('[versiones_recibo rename]', error); });
+      }
+      // Re-encontrar el recibo con el nuevo folio
+      idx = appData.recibos.findIndex(function(x){ return x.folio === folioFinal; });
+      if (idx < 0) { if (typeof toast === 'function') toast('Error interno: recibo no encontrado tras renombrar', 'err'); return; }
+      r = appData.recibos[idx];
+      _reciboEnEdicionCompleta = folioFinal;
     }
 
-    if (pdfBase64) {
-      r.pdfBase64  = pdfBase64;
-      r.archivo    = nombreArchivo;
+    // ─── Snapshot ANTES de mutar ────────────────────────────────────
+    if (typeof _guardarSnapshotRecibo === 'function')
+      _guardarSnapshotRecibo(r, 'Antes de edición completa');
+
+    // ─── Actualizar el objeto del recibo ────────────────────────────
+    const copiasParsed = (()=>{ try{ return JSON.parse(copias||'{}').docs||[]; }catch(e){ return []; } })();
+    r.nombre               = primerNombre;
+    r.clientes             = clientes;
+    r.conceptos            = conceptos;
+    r.costosExtra          = costosExtra;
+    r.pagosParciales       = pagosParciales;
+    r.total                = total;
+    r.anticipo             = String(anticipo);
+    r.saldoPendiente       = saldo;
+    r.fecha                = fechaRecibo;
+    r.fecha_recibo         = fechaRecibo;
+    r.hora                 = horaRecibo;
+    r.hora_recibo          = horaRecibo;
+    r.tipoTramite          = tipoTramiteVal;
+    r.tipo_doc             = tipo_doc;
+    r.copias               = copiasParsed;
+    r.responsable          = responsable;
+    r.generadoPor          = responsable;
+    r.nombre_cliente_firma = nombreFirma;
+    r.descripcionVehicular = descripVeh;
+    Object.assign(r, datosVeh);
+    r.pdfBase64            = null;
+
+    if (typeof REC !== 'undefined') REC.recibos = appData.recibos;
+
+    // ─── Generar PDF con generarPDF() igual que guardarRecibo ───────
+    const anioFolioN = r.anio_folio || anioFolio;
+    const datos = {
+      folio: r.folio,
+      clientes,
+      tramites: datosVeh.tramites||'', clase: datosVeh.clase||'',
+      marca: datosVeh.marca||'', serie: datosVeh.serie||'', motor: datosVeh.motor||'',
+      anio: datosVeh.anio||'', puertas: datosVeh.puertas||'', color_veh: datosVeh.color_veh||'',
+      transmision: datosVeh.transmision||'', cilindros: datosVeh.cilindros||'',
+      placa: datosVeh.placa||'', ultima_tenencia: datosVeh.ultima_tenencia||'',
+      origen: datosVeh.origen||'', combustible: datosVeh.combustible||'',
+      copias,
+      tipoTramite: tipoTramiteVal,
+      fecha_recibo: fechaRecibo,
+      hora_recibo: horaRecibo,
+      anticipo: String(anticipo),
+      responsable,
+      nombre_cliente_firma: nombreFirma,
+      conceptos,
+      costosExtra,
+      pagosParciales,
+      timestamp: (typeof ahoraCDMX === 'function' ? ahoraCDMX() : new Date()).toISOString(),
+      folioAnterior: r.folioAnterior || null,
+      historialPagosRef: r.historialPagosRef || [],
+      totalGeneral: total,
+      totalAbonado: anticipo,
+      saldoNuevo: saldo,
+      descripcionVehicular: descripVeh,
+      letra: letraRecibo,
+      anio_folio: anioFolioN
+    };
+
+    const qrTexto  = 'LEX-MEXICO|Folio:' + folioConLetra(r.folio, anioFolioN, letraRecibo) + '|' + primerNombre + '|' + fechaRecibo + ' ' + horaRecibo;
+    const qrDataURL = typeof qrToDataURL === 'function' ? await qrToDataURL(qrTexto) : null;
+    const doc = await generarPDF(datos, r.folio, qrDataURL);
+    const nombreArchivo = folioConLetra(r.folio, anioFolioN, letraRecibo) + '.pdf';
+
+    r.pdfBase64 = doc.output('datauristring');
+    r.archivo   = nombreArchivo;
+
+    // ─── Subir PDF a Storage ────────────────────────────────────────
+    if (typeof borrarPDFdeDrive === 'function') {
+      try { await borrarPDFdeDrive(nombreArchivo); } catch(e){ registrarError('catch vacio', e); }
+    }
+    if (typeof subirPDFaDrive === 'function') {
+      subirPDFaDrive(doc.output('blob'), nombreArchivo).catch(e => console.warn('SB upload edicion:', e));
     }
 
-    // Guardar JSON en Drive
+    // ─── Guardar versión en Supabase ────────────────────────────────
+    if (typeof _guardarVersionEnSupabase === 'function') {
+      _guardarVersionEnSupabase(r, letraRecibo, nombreArchivo).catch(e => console.warn('[versiones] edicion:', e));
+    }
+
+    // ─── Persistir JSON ─────────────────────────────────────────────
+    if (typeof save === 'function') save();
     await actualizarArchivoControl();
 
-    // Borrar PDF viejo de Drive para forzar subida del nuevo
-    if (r.archivo && typeof borrarPDFdeDrive === 'function') {
-      try { await borrarPDFdeDrive(r.archivo); } catch(e){ registrarError('catch vacio', e); }
-    }
-
-    // Si tenemos pdfBase64, subir a Drive
-    if (pdfBase64 && typeof subirPDFaDrive === 'function') {
-      try { await subirPDFaDrive(nombreArchivo, pdfBase64); } catch(e){ registrarError('catch vacio', e); }
-    }
-
-    if (typeof save === 'function') save();
-
-    // ── Actualizar movimiento en contabilidad si existe, o crearlo ──
+    // ─── Actualizar movimiento en contabilidad ──────────────────────
     if (typeof D !== 'undefined' && Array.isArray(D.movimientos)) {
-      const idMov = 'M-REC-' + r.folio;
+      const folioStr2 = folioConLetra(r.folio, anioFolioN, letraRecibo);
+      const idMov  = 'M-REC-' + r.folio;
       const idxMov = D.movimientos.findIndex(function(m){ return m.id === idMov || m.folio === r.folio; });
-      const conceptos2 = r.conceptos || [];
-      const c0 = conceptos2[0];
-      const conc = c0 ? (c0.concepto||'') : '';
-      const desc = c0 ? (c0.descripcion||'') : '';
-      const txtConc = conc + (desc ? ' — ' + desc : '');
-      const movDesc = 'Recibo #' + folioStr + ' · ' + primerNombre + (txtConc ? ' · ' + txtConc : '');
+      const c0     = (r.conceptos || [])[0];
+      const txtConc = c0 ? ((c0.concepto||'') + (c0.descripcion ? ' — ' + c0.descripcion : '')) : '';
+      const movDesc = 'Recibo #' + folioStr2 + ' · ' + primerNombre + (txtConc ? ' · ' + txtConc : '');
       if (idxMov >= 0) {
-        // Actualizar movimiento existente
         D.movimientos[idxMov].nombre      = primerNombre;
         D.movimientos[idxMov].descripcion = movDesc;
         D.movimientos[idxMov].fecha       = fechaRecibo;
         D.movimientos[idxMov].monto       = anticipo || total;
         D.movimientos[idxMov].responsable = responsable;
-      } else if (anticipo > 0 || total > 0) {
-        // Crear movimiento si no existía
-        D.movimientos.unshift({
-          id:          idMov,
-          folioCaja:   '',
-          fecha:       fechaRecibo,
-          hora:        horaRecibo,
-          descripcion: movDesc,
-          nombre:      primerNombre,
-          folio:       r.folio,
-          monto:       anticipo || total,
-          tipo:        'ingreso',
-          cat:         'Anticipo · #' + folioStr,
-          estatus:     anticipo < total ? 'Anticipo' : 'Liquidado',
-          fuente:      'recibo',
-          responsable: responsable
-        });
       }
     }
 
-    // ── Sincronizar a Supabase y notificar a otros usuarios ──
+    // ─── Sincronizar a Supabase ─────────────────────────────────────
     try { await syncEstadoSupabase(); } catch(e) { console.warn('sync error:', e); }
 
     if (typeof renderHistorial === 'function') renderHistorial();
@@ -23036,15 +23283,16 @@ async function guardarEdicionCompleta() {
     if (typeof renderContab === 'function') renderContab();
     if (typeof badges === 'function') badges();
 
+    const folioStrFinal = folioConLetra(r.folio, anioFolioN, letraRecibo);
     if (typeof toast === 'function')
-      toast('✅ Recibo #' + folioStr + ' editado y guardado en Drive. El PDF se regenerará al consultarlo.');
+      toast('✅ Recibo #' + folioStrFinal + ' editado y PDF regenerado.');
     if (typeof setStatus === 'function')
-      setStatus('ok','Recibo #'+folioStr+' actualizado correctamente','ok');
+      setStatus('ok','Recibo #' + folioStrFinal + ' actualizado correctamente','ok');
 
-    // Salir del modo edición
+    // ─── Salir del modo edición ─────────────────────────────────────
     _reciboEnEdicionCompleta = null;
     window._reciboEdicionBackup = null;
-    ['modo-edicion-completa'].forEach(function(c){ document.body.classList.remove(c); });
+    document.body.classList.remove('modo-edicion-completa');
     var btnG = document.getElementById('btn-guardar');
     if (btnG) btnG.style.display = '';
     if (typeof limpiarFormCompleto === 'function') limpiarFormCompleto();
@@ -25768,6 +26016,13 @@ function confirmarVincularRecibo() {
     </div>
     <p style="font-size:0.76rem;color:var(--muted);margin:0 0 12px;line-height:1.5;">Cada vez que se registra un abono, liquidación o restauración, el sistema guarda automáticamente el estado anterior del recibo aquí.</p>
     <div id="modal-versiones-body" style="overflow-y:auto;flex:1;padding-right:4px;"></div>
+    <!-- Pie: editar recibo (siempre visible) -->
+    <div style="margin-top:14px;padding-top:11px;border-top:1px solid var(--border-light);display:flex;justify-content:flex-end;">
+      <button onclick="editarReciboEnConsulta()"
+        style="background:linear-gradient(135deg,#1a4a8a,#0f2f5a);border:1px solid rgba(100,160,255,0.4);border-radius:6px;color:#c8e0ff;padding:9px 20px;cursor:pointer;font-family:monospace;font-size:0.73rem;letter-spacing:0.06em;font-weight:600;">
+        ✏️ Editar este recibo
+      </button>
+    </div>
   </div>
 </div>
 

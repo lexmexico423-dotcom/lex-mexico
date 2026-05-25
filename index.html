@@ -3713,6 +3713,22 @@ window.addEventListener('offline', ()=>{
           Activa el toggle <strong style="color:#c8e0ff;">👩‍💼 Secretaria</strong> para que Antonieta pueda trabajar en ese mes desde su pantalla.
         </div>
 
+        <!-- Toggle Captura Retroactiva global -->
+        <div style="background:rgba(90,58,138,0.12);border:1.5px solid rgba(90,58,138,0.35);border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#c8b0ff;margin-bottom:3px;">⏰ Captura Retroactiva</div>
+            <div style="font-family:monospace;font-size:0.55rem;color:rgba(180,150,255,0.6);line-height:1.4;">Habilita o deshabilita el botón RETRO en el formulario de recibo para <strong style="color:#c8b0ff;">todos</strong> los usuarios.</div>
+          </div>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex-shrink:0;">
+            <span id="retro-global-label" style="font-family:monospace;font-size:0.6rem;color:rgba(139,92,246,0.5);">INACTIVO</span>
+            <div style="position:relative;width:44px;height:24px;" onclick="adminToggleRetroGlobal()">
+              <input type="checkbox" id="retro-global-chk" style="opacity:0;width:0;height:0;position:absolute;">
+              <div id="retro-global-track" style="position:absolute;inset:0;border-radius:12px;background:rgba(90,58,138,0.25);border:1.5px solid rgba(90,58,138,0.4);transition:background 0.2s,border-color 0.2s;"></div>
+              <div id="retro-global-thumb" style="position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#5a3a8a;opacity:0.35;transition:left 0.2s,opacity 0.2s;"></div>
+            </div>
+          </label>
+        </div>
+
         <!-- Tablero de meses -->
         <div id="captura-mes-grid" style="display:flex;flex-direction:column;gap:8px;"></div>
 
@@ -31223,20 +31239,38 @@ async function adminToggleRetroGlobal(){
 }
 
 function adminRenderCardRetroGlobal(activo){
+  // Tarjeta en la grilla principal
   const card  = document.getElementById('card-retro-global');
   const badge = document.getElementById('retro-global-badge');
   const icon  = document.getElementById('retro-global-icon');
-  if(!card) return;
+  if(card){
+    if(activo){
+      card.style.background   = 'rgba(90,58,138,0.28)';
+      card.style.borderColor  = 'rgba(139,92,246,0.7)';
+      if(badge){ badge.textContent = '⏰ ACTIVO'; badge.style.color = '#8b5cf6'; }
+      if(icon)  icon.style.background = '#5a3a8a';
+    } else {
+      card.style.background   = 'rgba(90,58,138,0.08)';
+      card.style.borderColor  = 'rgba(90,58,138,0.3)';
+      if(badge){ badge.textContent = '○ INACTIVO'; badge.style.color = 'rgba(139,92,246,0.4)'; }
+      if(icon)  icon.style.background = '#2a1a4a';
+    }
+  }
+  // Toggle dentro del panel Captura Retroactiva
+  const track = document.getElementById('retro-global-track');
+  const thumb = document.getElementById('retro-global-thumb');
+  const label = document.getElementById('retro-global-label');
+  const chk   = document.getElementById('retro-global-chk');
   if(activo){
-    card.style.background   = 'rgba(90,58,138,0.28)';
-    card.style.borderColor  = 'rgba(139,92,246,0.7)';
-    if(badge){ badge.textContent = '⏰ ACTIVO'; badge.style.color = '#8b5cf6'; }
-    if(icon)  icon.style.background = '#5a3a8a';
+    if(track){ track.style.background='rgba(139,92,246,0.55)'; track.style.borderColor='#8b5cf6'; }
+    if(thumb){ thumb.style.left='23px'; thumb.style.opacity='1'; thumb.style.background='#fff'; }
+    if(label){ label.textContent='ACTIVO'; label.style.color='#8b5cf6'; }
+    if(chk)   chk.checked = true;
   } else {
-    card.style.background   = 'rgba(90,58,138,0.08)';
-    card.style.borderColor  = 'rgba(90,58,138,0.3)';
-    if(badge){ badge.textContent = '○ INACTIVO'; badge.style.color = 'rgba(139,92,246,0.4)'; }
-    if(icon)  icon.style.background = '#2a1a4a';
+    if(track){ track.style.background='rgba(90,58,138,0.25)'; track.style.borderColor='rgba(90,58,138,0.4)'; }
+    if(thumb){ thumb.style.left='3px'; thumb.style.opacity='0.35'; thumb.style.background='#5a3a8a'; }
+    if(label){ label.textContent='INACTIVO'; label.style.color='rgba(139,92,246,0.5)'; }
+    if(chk)   chk.checked = false;
   }
 }
 

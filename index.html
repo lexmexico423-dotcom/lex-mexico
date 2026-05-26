@@ -7404,6 +7404,7 @@ async function generarComplemento(reciboOrig, pago){
     hora:datos.hora_recibo, archivo:nombreArchivo, esComplemento:true,
     folioRef:reciboOrig.folio, saldoPendiente:saldoNuevo,
     pago, pdfBase64: doc.output('datauristring'),
+    letra: 'A',
     generadoPor: empleadoActual ? empleadoActual.nombre : NOMBRE_TITULAR
   });
   // ── ESCRITURA BLOQUEANTE: esperar que Supabase confirme el guardado ──
@@ -9024,7 +9025,7 @@ async function activarModoConsulta(recibo){
   }
 
   // Actualizar folio display con el folio consultado (formato completo: año-número-letra)
-  document.getElementById('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo));
+  document.getElementById('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, recibo.letra || 'A');
 
   // Actualizar banner
   const bannerTxt = document.getElementById('banner-saldo-txt');
@@ -9076,8 +9077,8 @@ function salirModoConsulta(){
 }
 
 function cargarReciboEnFormulario(recibo){
-  // Mostrar folio del recibo consultado (con letra de versión)
-  $('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo));
+  // Mostrar folio del recibo consultado (con letra de versión almacenada)
+  $('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, recibo.letra || 'A');
 
   // Cargar clientes
   const wrap = $('clientes-wrapper');
@@ -9363,8 +9364,8 @@ function abrirModoActualizacion(recibo){
   // Cargar todos los datos del recibo en el formulario
   cargarReciboEnFormulario(recibo);
 
-  // Asegurar que el folio mostrado sea el ORIGINAL con su letra de versión
-  document.getElementById('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo));
+  // Asegurar que el folio mostrado sea el ORIGINAL con su letra de versión almacenada
+  document.getElementById('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, recibo.letra || 'A');
 
   // Congelar el formulario (todos los campos originales bloqueados)
   document.body.classList.add('recibo-frozen');
@@ -9387,7 +9388,7 @@ function abrirModoActualizacion(recibo){
   pintarCostosExtra(recibo.costosExtra || []);
   pintarPagosParciales(recibo.pagosParciales || []);
 
-  setStatus('ok','Modo actualización: folio #'+folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo))+' — agrega costos extra o pagos parciales','ok');
+  setStatus('ok','Modo actualización: folio #'+folioConLetra(recibo.folio, recibo.anio_folio, recibo.letra || 'A')+' — agrega costos extra o pagos parciales','ok');
 
   setTimeout(()=>{ document.getElementById('seccion-pagos-parciales').scrollIntoView({behavior:'smooth',block:'center'}); }, 200);
 }
@@ -9944,8 +9945,13 @@ async function _imprimirActualizacionReal(){
     hora:  _horaActualizacion,
     etiqueta: 'Actualizaci\u00f3n'
   });
-  // Letra de esta versi\u00f3n: B=1ra actualizaci\u00f3n, C=2da, etc.
-  const letraActual = String.fromCharCode(65 + fechasImpresion.filter(f => f.etiqueta !== 'Original').length);
+  // Letra de esta versi\u00f3n: se toma la letra m\u00e1s alta ya existente y se avanza una posici\u00f3n.
+  // Usar r.letra (campo inmutable guardado) como fuente de verdad, nunca fechasImpresion.
+  const _letrasUsadas = (appData.recibos || [])
+    .filter(_r => _r.folio === recibo.folio && !_r.esComplemento)
+    .map(_r => (_r.letra || 'A').toUpperCase().charCodeAt(0));
+  const _maxLetraCode = _letrasUsadas.length > 0 ? Math.max(..._letrasUsadas) : 64;
+  const letraActual = String.fromCharCode(_maxLetraCode + 1);
 
   // Inyectar autorización en pagos NUEVOS (no bloqueados). Usamos guiones -fecha-
   // para no chocar con los corchetes [fechaHora] que el PDF agrega automáticamente.
@@ -10062,7 +10068,6 @@ async function _imprimirActualizacionReal(){
       const montoNuevosAbonos = abonosNuevos.reduce((s,p)=>s+(parseFloat(p.cantidad)||0),0);
       if(montoNuevosAbonos > 0){
         const tipoMov = saldoNuevo<=0 ? 'Liquidación' : 'Abono parcial';
-        const letraActual = letraVersion(recibo);
         const mov = {
           id: 'M-REC-' + recibo.folio + '-' + Date.now(),
           folioCaja: '',
@@ -11829,7 +11834,7 @@ function filtrarHistorial(){
     if(filtro==='pagado'    && (r.cancelado || r.saldoPendiente>0)) return false;
     // Filtro por texto
     if(q){
-      const folioStr = folioConLetra(r.folio, r.anio_folio, letraVersion(r));
+      const folioStr = folioConLetra(r.folio, r.anio_folio, r.letra || 'A');
       const nombre   = (r.nombre||'').toLowerCase();
       // Buscar en teléfonos de todos los clientes del recibo
       const telefonos = (r.clientes||[]).map(c=>(c.telefono||'').toLowerCase()).join(' ');
@@ -11848,7 +11853,7 @@ function filtrarHistorial(){
   }
   list.innerHTML = lista.map(r=>{
     const i = appData.recibos.indexOf(r);
-    const folioStr='#'+folioConLetra(r.folio, r.anio_folio, letraVersion(r));
+    const folioStr='#'+folioConLetra(r.folio, r.anio_folio, r.letra || 'A');
     const compTag=r.esComplemento?'<span style="color:#b07f1e;font-size:0.58rem;margin-left:3px">↳ ref #'+folioFormato(r.folioRef)+'</span>':'';
     const cancelTag=r.cancelado?'<span style="color:#8a1a1a;font-size:0.58rem;margin-left:5px;background:#fff0f0;border:1px solid #c04040;border-radius:3px;padding:1px 5px;font-family:DM Mono,monospace;letter-spacing:0.06em;">🚫 CANCELADO</span>':'';
     const saldoColor=r.saldoPendiente>0?'#b01010':'#2a7a3a';
@@ -11973,7 +11978,7 @@ function buscarClientePBC(){
     const prioridad = r => r.cancelado?3:(r.esComplemento?2:(r.saldoPendiente>0?0:1));
     const sorted = [...g.recibos].sort((a,b)=>prioridad(a)-prioridad(b)||b.folio-a.folio);
     const chips = sorted.map(r=>{
-      const fs='#'+folioConLetra(r.folio, r.anio_folio, letraVersion(r));
+      const fs='#'+folioConLetra(r.folio, r.anio_folio, r.letra || 'A');
       let clase,ico;
       if(r.cancelado)            { clase='cancelado';   ico='🚫'; }
       else if(r.esComplemento)   { clase='complemento'; ico='↳';  }

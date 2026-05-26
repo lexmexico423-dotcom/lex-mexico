@@ -8226,7 +8226,7 @@ async function generarPDF(datos,folio,qrDataURL){
   doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(100,80,40);
   doc.text('DOCUMENTOS QUE DEJA EL INTERESADO:',margin,y); y+=3.5;
   let docsData = null;
-  try { if(datos.copias) docsData = JSON.parse(datos.copias); } catch(e){ registrarError('catch vacio', e); }
+  try { if(datos.copias) docsData = typeof datos.copias==='object' ? datos.copias : JSON.parse(datos.copias); } catch(e){ /* copias guardadas en formato anterior, ignorar */ }
   if (docsData && docsData.docs && docsData.docs.length) {
     // Subtítulo: tipo de documento (Copia Simple / Escaneado) — resaltado
     doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(42,100,42);

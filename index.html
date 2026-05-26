@@ -8197,14 +8197,25 @@ async function generarPDF(datos,folio,qrDataURL){
   const hBot = dibujarEncabezadoPDF(doc, margin, cW, folio, logoObj, datos.letra, datos.anio_folio);
   const yAfterH = hBot + 3;
 
-  // ── RECIBO OFICIAL / COMPROBANTE DE ABONO + fecha ──
+  // ── RECIBO OFICIAL / RECIBO DE LIQUIDACIÓN / RECIBO DE ABONO PARCIAL ──
+  const _fps = datos.fechasImpresion || [];
+  const _esUpdate = _fps.length > 1;
+  const _esFinalLiq = _esUpdate && (parseFloat(datos.saldoNuevo)<=0 || parseFloat(datos.saldoPendiente)<=0);
+  const _esParcial  = _esUpdate && !_esFinalLiq;
+  const _tituloRecibo = _esFinalLiq ? 'RECIBO DE LIQUIDACIÓN'
+                      : _esParcial  ? 'RECIBO DE ABONO PARCIAL'
+                      :               'RECIBO OFICIAL';
   doc.setTextColor(154,110,24); doc.setFontSize(10); doc.setFont('times','bold');
-  doc.text('RECIBO OFICIAL', margin, yAfterH);
+  doc.text(_tituloRecibo, margin, yAfterH);
+  // Referencia al folio original (solo en versiones B+)
+  if(_esUpdate){
+    const _folioOrigRef = folioConLetra(datos.folio, datos.anio_folio, 'A');
+    doc.setFontSize(6.5); doc.setFont('helvetica','italic'); doc.setTextColor(130,100,50);
+    doc.text('Referencia Folio Original: #'+_folioOrigRef, margin, yAfterH+4);
+  }
   // Para actualizaciones (B, C, D…): la fecha principal es la de ESTA versión
   // (última entrada de fechasImpresion). La original aparece pequeña como referencia.
   // Para la versión original (A): la fecha principal es datos.fecha_recibo.
-  const _fps = datos.fechasImpresion || [];
-  const _esUpdate = _fps.length > 1;
   const _fpPrincipal = _esUpdate ? _fps[_fps.length - 1] : null;
   const fechaRec = _esUpdate
     ? (_fpPrincipal.fecha ? new Date(_fpPrincipal.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}) : '')
@@ -8582,6 +8593,80 @@ async function generarPDF(datos,folio,qrDataURL){
   if(y + 62 > 262){
     doc.addPage();
     y = 18;
+  }
+
+  // ── RESUMEN DE PAGO (solo en versiones B+: liquidación o abono parcial) ──
+  if(_esUpdate){
+    const _saldoAnteriorResumen = (()=>{
+      // El saldo anterior es el saldo del recibo ORIGINAL (versión A) o el de la versión previa
+      const _prevRecibos = (appData && appData.recibos) ? appData.recibos : [];
+      const _letraActualNum = (datos.letra||'A').charCodeAt(0);
+      const _letraPrevia = String.fromCharCode(_letraActualNum - 1);
+      const _prevRec = _prevRecibos.find(function(r){
+        return r.folio === datos.folio && (r.letra||'A') === _letraPrevia && !r.esComplemento;
+      });
+      if(_prevRec) return parseFloat(_prevRec.saldoPendiente)||0;
+      // Fallback: calcular desde el anticipo original
+      const _recOrig = _prevRecibos.find(function(r){
+        return r.folio === datos.folio && (r.letra||'A') === 'A' && !r.esComplemento;
+      });
+      if(_recOrig) return parseFloat(_recOrig.saldoPendiente)||0;
+      // Último fallback: saldo anterior = total - anticipo original
+      return Math.max(0, (parseFloat(datos.totalGeneral)||0) - (parseFloat(datos.anticipo)||0));
+    })();
+    const _pagoEstaVersion = (datos.pagosParciales||[])
+      .filter(function(p){ return !p._esAnticipoOriginal; })
+      .reduce(function(s,p){ return s + (parseFloat(p.cantidad)||0); }, 0);
+    const _saldoRestante = Math.max(0, saldoFinal);
+    const _esLiqTotal = _saldoRestante <= 0;
+
+    // Verificar espacio
+    if(y + 52 > 262){ doc.addPage(); y = 18; }
+
+    y += 3;
+    const rX = margin + cW * 0.38;
+    const rW = cW * 0.62;
+
+    // Título de la sección
+    doc.setFillColor(248,244,232);
+    doc.rect(margin, y-3, cW, 5, 'F');
+    doc.setTextColor(154,110,24); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+    doc.text(_esLiqTotal ? 'RESUMEN DE LIQUIDACIÓN' : 'RESUMEN DE PAGO', margin+1, y);
+    y += 5;
+
+    // Caja del resumen
+    doc.setDrawColor(200,160,60); doc.setLineWidth(0.4);
+    doc.rect(rX, y, rW, 38, 'S');
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
+
+    // Saldo anterior
+    doc.text('Saldo anterior:', rX+3, y+8);
+    doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
+    doc.text('$'+fmtMXN(_saldoAnteriorResumen), rX+rW-3, y+8, {align:'right'}); // negro
+
+    // Pago recibido
+    doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
+    doc.text('Pago recibido:', rX+3, y+17);
+    doc.setFont('helvetica','bold'); doc.setTextColor(139,90,43);
+    doc.text('$'+fmtMXN(_pagoEstaVersion), rX+rW-3, y+17, {align:'right'}); // café
+
+    // Línea divisoria
+    doc.setDrawColor(200,160,60); doc.setLineWidth(0.3);
+    doc.line(rX+2, y+22, rX+rW-2, y+22);
+
+    // Saldo restante
+    doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
+    doc.text('Saldo restante:', rX+3, y+28);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(42,122,58); // siempre verde
+    doc.text('$'+fmtMXN(_saldoRestante), rX+rW-3, y+28, {align:'right'});
+
+    // LIQUIDADO / PENDIENTE
+    doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.setTextColor(_esLiqTotal ? 42 : 176, _esLiqTotal ? 122 : 16, _esLiqTotal ? 58 : 16);
+    doc.text(_esLiqTotal ? 'LIQUIDADO' : 'PENDIENTE', rX+3, y+36);
+
+    y += 44;
   }
 
   y += 0.5;

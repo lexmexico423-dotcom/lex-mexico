@@ -10025,8 +10025,13 @@ async function _imprimirActualizacionReal(){
       const nuevoRegistro = Object.assign({}, appData.recibos[idx], {
         costosExtra:      costosExtra.map(c => Object.assign({}, c, {locked:true, folioLetra: c.folioLetra || letraActual})),
         pagosParciales:   pagosParciales_conAuth.map(p => Object.assign({}, p, {locked:true})),
+        // Copias profundas de arrays de referencia para que B sea independiente de A
+        clientes:         (appData.recibos[idx].clientes||[]).map(c => Object.assign({}, c)),
+        conceptos:        (appData.recibos[idx].conceptos||[]).map(c => Object.assign({}, c)),
+        copias:           (appData.recibos[idx].copias||[]).slice(),
         fechasImpresion:  fechasImpresion,
         total:            totalGeneral,
+        anticipo:         String(totalAbonado),   // lo realmente abonado en esta versión
         saldoPendiente:   saldoNuevo,
         saldoNuevo:       saldoNuevo,
         totalAbonado:     totalAbonado,

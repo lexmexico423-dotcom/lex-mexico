@@ -12128,6 +12128,63 @@ const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 const empNombre=()=>localStorage.getItem('empleado_nombre')||'Usuario';
 const empEmail=()=>localStorage.getItem('empleado_email')||'';
 
+// ═══ R2 CLOUDFLARE — configuración y helpers ═══
+const R2_WORKER = 'https://lex-mexico-worker.fcolex0.workers.dev';
+const R2_TOKEN  = 'LexMx2026-R2-7kP9nQvT';
+
+async function subirR2(file, path, bucket) {
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('path', path);
+    fd.append('bucket', bucket || 'recibos');
+    const res = await fetch(R2_WORKER + '/r2/upload', {
+      method: 'POST',
+      headers: { 'X-Auth-Token': R2_TOKEN },
+      body: fd
+    });
+    if (!res.ok) { console.error('subirR2 error', res.status, await res.text()); return false; }
+    return true;
+  } catch(e) { console.error('subirR2 excepcion', e); return false; }
+}
+
+async function descargarR2(path, bucket) {
+  try {
+    const url = R2_WORKER + '/r2/file?path=' + encodeURIComponent(path)
+              + '&bucket=' + (bucket || 'recibos')
+              + '&token=' + R2_TOKEN;
+    const res = await fetch(url);
+    if (!res.ok) { console.error('descargarR2 error', res.status); return null; }
+    return await res.blob();
+  } catch(e) { console.error('descargarR2 excepcion', e); return null; }
+}
+
+async function listarR2(prefix, bucket) {
+  try {
+    const url = R2_WORKER + '/r2/list?prefix=' + encodeURIComponent(prefix || '')
+              + '&bucket=' + (bucket || 'recibos')
+              + '&token=' + R2_TOKEN;
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.objects || [];
+  } catch(e) { console.error('listarR2 excepcion', e); return []; }
+}
+
+async function borrarR2(path, bucket) {
+  try {
+    const url = R2_WORKER + '/r2/file?path=' + encodeURIComponent(path)
+              + '&bucket=' + (bucket || 'recibos');
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: { 'X-Auth-Token': R2_TOKEN }
+    });
+    return res.ok;
+  } catch(e) { console.error('borrarR2 excepcion', e); return false; }
+}
+// ═══ FIN R2 ═══
+
+
 function toast(msg,t='ok'){
   const el=$('toast');el.className='toast '+t;el.textContent=msg;el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'),3200);

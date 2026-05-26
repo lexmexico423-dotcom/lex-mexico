@@ -15869,7 +15869,7 @@ function renderPend(){
         const nm=d.nombre||d||'doc'; const lbl=nm.length>18?nm.substring(0,18)+'…':nm;
         return `<span style="font-size:9.5px;background:#f7f0dc;border:1px solid #d4b870;border-radius:4px;padding:2px 7px;color:#633806;cursor:pointer;display:inline-flex;align-items:center;gap:3px;" onclick="event.stopPropagation();_placasVerDocFromCard(${idx},${di})" title="${esc(nm)}">📄 ${esc(lbl)}</span>`;
       }).join('');
-      const adjuntarBtn = `<span style="font-size:9.5px;border:1px dashed #c8952a;border-radius:4px;padding:2px 7px;color:#8c6518;cursor:pointer;display:inline-flex;align-items:center;gap:3px;" onclick="event.stopPropagation();_placasAdjuntarDoc(${idx})">+ Adjuntar</span>`;
+      const adjuntarBtn = `<span style="font-size:11px;border:1.5px solid #a07848;border-radius:4px;padding:3px 10px;color:#fff;background:#c4955a;cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-weight:600;" onclick="event.stopPropagation();_placasAdjuntarDoc(${idx})">+ Adjuntar</span>`;
       placasInfoHtml = `<div style="margin-top:6px;">${chips.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;">${chips.join('')}</div>`:''}<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;align-items:center;"><span style="font-size:9px;font-family:monospace;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8c6518;margin-right:2px;">Docs:</span>${docsHtml}${adjuntarBtn}</div></div>`;
     }
 

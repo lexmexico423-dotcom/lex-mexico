@@ -16546,6 +16546,50 @@ function pPlacasVerDoc(i){
   _pVerDoc(d, undefined, i);
 }
 
+async function _pPlacasVerExpediente(){
+  const nombre = document.getElementById('pPlacasNombre')?.value.trim();
+  const cont = document.getElementById('pPlacasExpedienteList');
+  if (!cont) return;
+  if (!nombre) { toast('Ingresa el nombre del cliente primero','err'); return; }
+  if (!window.SB_DESPACHO_ID || typeof window.listarR2 !== 'function') { toast('Sin conexión R2','err'); return; }
+
+  cont.style.display = 'block';
+  cont.innerHTML = '<div style="padding:12px;text-align:center;font-size:0.78rem;color:var(--muted);">Cargando...</div>';
+
+  const nombreSafe = nombre.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40);
+  const prefix = window.SB_DESPACHO_ID + '/placas/' + nombreSafe + '/';
+  const archivos = await window.listarR2(prefix, 'placas');
+
+  if (!archivos.length) {
+    cont.innerHTML = '<div style="padding:12px;text-align:center;font-size:0.78rem;color:var(--muted);">Sin archivos en R2 para este cliente.</div>';
+    return;
+  }
+
+  const fmtSize = b => b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(1)+'KB' : (b/1048576).toFixed(1)+'MB';
+  cont.innerHTML =
+    '<div style="padding:8px 12px;background:var(--gold-pale);font-size:0.65rem;font-family:monospace;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--gold-d);border-bottom:1px solid var(--border);">🗂 Expediente R2 — '+esc(nombre)+' ('+archivos.length+' archivo'+(archivos.length===1?'':'s')+')</div>' +
+    archivos.map(function(a){
+      const ico = /\.pdf$/i.test(a.name) ? '📄' : '🖼';
+      const fecha = a.uploaded ? new Date(a.uploaded).toLocaleDateString('es-MX') : '';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--border);font-size:0.78rem;">' +
+        '<span>'+ico+'</span>' +
+        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+esc(a.key)+'">'+esc(a.name)+'</span>' +
+        '<span style="font-size:0.65rem;color:var(--muted);white-space:nowrap;">'+fmtSize(a.size||0)+(fecha?' · '+fecha:'')+'</span>' +
+        '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:0.7rem;" onclick="_pPlacasAbrirR2(\''+esc(a.key)+'\',\''+esc(a.name)+'\')">👁 Ver</button>' +
+      '</div>';
+    }).join('');
+}
+
+function _pPlacasAbrirR2(key, nombre){
+  if (typeof window.descargarR2 !== 'function') return;
+  const ext = nombre.split('.').pop().toLowerCase();
+  const tipo = ext==='pdf' ? 'application/pdf' : 'image/'+ext;
+  window.descargarR2(key, 'placas').then(blob => {
+    if (!blob) { toast('No se pudo cargar el archivo','err'); return; }
+    _pVerDoc({nombre:nombre, tipo:tipo, r2path:key, bucket:'placas'});
+  });
+}
+
 function pPlacasEliminarDoc(i){
   const d = _pPlacasState.documentos[i];
   if (!d) return;
@@ -25652,10 +25696,12 @@ function confirmarVincularRecibo() {
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <input id="pPlacasFileInput" type="file" accept="image/png,image/jpeg,image/jpg,application/pdf" multiple style="display:none;" onchange="pPlacasAdjuntar(event)">
           <button type="button" class="btn btn-ghost" onclick="document.getElementById('pPlacasFileInput').click()">📤 Adjuntar archivos</button>
+          <button type="button" class="btn btn-ghost" onclick="_pPlacasVerExpediente()" title="Ver todos los archivos de este cliente en R2">🗂 Ver expediente</button>
           <span id="pPlacasFilesCount" style="font-size:0.7rem;color:var(--muted);">Ninguno adjunto</span>
         </div>
         <div id="pPlacasFilesList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
-        <div style="font-size:0.62rem;color:var(--muted);margin-top:4px;font-style:italic;">Tamaño máximo recomendado: 5 MB por archivo. Los documentos se sincronizan junto al pendiente en Drive.</div>
+        <div id="pPlacasExpedienteList" style="display:none;margin-top:10px;border:1px solid var(--border);border-radius:6px;overflow:hidden;"></div>
+        <div style="font-size:0.62rem;color:var(--muted);margin-top:4px;font-style:italic;">Tamaño máximo recomendado: 5 MB por archivo.</div>
       </div>
     </div>
     <!-- ═══ FIN BLOQUE PLACAS ═══ -->

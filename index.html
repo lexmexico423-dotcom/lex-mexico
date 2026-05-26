@@ -5490,6 +5490,11 @@ window.addEventListener('offline', ()=>{
             <label style="font-family:'DM Mono',monospace;font-size:0.58rem;color:#3a6a48;letter-spacing:0.08em;text-transform:uppercase;">🔢 Por Número de Folio</label>
             <input type="number" id="folio_anterior" placeholder="Ej: 0100" min="1" oninput="cargarHistorialFolio()" style="max-width:180px;border-color:#2a7a3a !important;">
           </div>
+          <!-- Folios relacionados (misma base, distintas letras) -->
+          <div id="folios-relacionados" style="display:none;margin-top:5px;">
+            <label style="font-family:'DM Mono',monospace;font-size:0.55rem;color:#3a6a48;letter-spacing:0.08em;text-transform:uppercase;display:block;margin-bottom:4px;">Versiones del folio</label>
+            <div id="folios-relacionados-chips" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+          </div>
           <!-- Botón regresar — movido al footer del recibo-body -->
           <div id="btn-regresar-placeholder" style="display:none;"></div>
           <!-- Divisor -->
@@ -7431,13 +7436,13 @@ async function generarComplemento(reciboOrig, pago){
         const conc = c0 ? (c0.concepto||'') : '';
         const desc = c0 ? (c0.descripcion||'') : '';
         const txt  = conc + (desc ? ' — ' + desc : '');
-        return tipoMov + ' · Recibo #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, reciboOrig.letra||'A') + ' · ' + (reciboOrig.nombre||'') + (txt ? ' · ' + txt : '');
+        return tipoMov + ' · Recibo #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, letraVersion(reciboOrig)) + ' · ' + (reciboOrig.nombre||'') + (txt ? ' · ' + txt : '');
       })(),
       nombre: reciboOrig.nombre || '',
       folio: reciboOrig.folio,
       monto: pago,
       tipo: 'ingreso',
-      cat: (liquidado ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, reciboOrig.letra||'A'),
+      cat: (liquidado ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, letraVersion(reciboOrig)),
       estatus: liquidado ? 'Liquidado' : 'Abono parcial',
       fuente: 'recibo',
       responsable: typeof empNombre === 'function' ? empNombre() : (reciboOrig.responsable||'')
@@ -8764,11 +8769,49 @@ function cargarHistorialFolio(){
     infoBox.style.display='none';
     infoBox.classList.remove('cancelado-box');
     histDiv.style.display='none';
+    var _chipsDiv = document.getElementById('folios-relacionados');
+    if(_chipsDiv) _chipsDiv.style.display='none';
     salirModoConsulta();
     return;
   }
 
-  const recibo = appData.recibos.find(r=>r.folio===val && !r.esComplemento);
+  // Buscar TODOS los recibos con ese número base (distintas letras: A, B, C...)
+  const todosConFolio = (appData.recibos||[]).filter(r => r.folio===val && !r.esComplemento);
+  const chipsDiv  = document.getElementById('folios-relacionados');
+  const chipsBody = document.getElementById('folios-relacionados-chips');
+  if(todosConFolio.length > 1){
+    // Ordenar: A primero, Z último — el más reciente es el último
+    const ordenados = todosConFolio.slice().sort(function(a,b){
+      const la = (a.letra||letraVersion(a)||'A');
+      const lb = (b.letra||letraVersion(b)||'A');
+      return la < lb ? -1 : la > lb ? 1 : 0;
+    });
+    chipsBody.innerHTML = ordenados.map(function(r){
+      const ltr  = r.letra || letraVersion(r) || 'A';
+      const fstr = folioConLetra(r.folio, r.anio_folio, ltr);
+      const esMasReciente = r === ordenados[ordenados.length-1];
+      const bg   = esMasReciente ? '#c8952a' : '#e8e0cc';
+      const col  = esMasReciente ? '#fff'    : '#5a4a20';
+      const brd  = esMasReciente ? '#c8952a' : '#c8b870';
+      return '<span style="font-family:\'DM Mono\',monospace;font-size:0.7rem;font-weight:700;'
+           + 'padding:2px 8px;border-radius:12px;border:1px solid '+brd+';'
+           + 'background:'+bg+';color:'+col+';letter-spacing:0.05em;cursor:default;pointer-events:none;user-select:none;"'
+           + ' title="'+(esMasReciente?'Más reciente':'Versión anterior')+'">'
+           + '#'+fstr+'</span>';
+    }).join('');
+    chipsDiv.style.display = '';
+  } else {
+    if(chipsDiv) chipsDiv.style.display = 'none';
+  }
+
+  // Usar el más reciente para mostrar en el visualizador
+  const recibo = todosConFolio.length
+    ? todosConFolio.slice().sort(function(a,b){
+        const la=(a.letra||letraVersion(a)||'A'), lb=(b.letra||letraVersion(b)||'A');
+        return la<lb?-1:la>lb?1:0;
+      })[todosConFolio.length-1]
+    : null;
+
   if(!recibo){
     resumen.innerHTML='<span style="color:#b01010">Folio #'+folioFormato(val)+' no encontrado en historial.</span>';
     infoBox.style.display='';
@@ -21982,48 +22025,19 @@ async function abrirPreviaDesdeContab(numFolio){
     ? '<span style="background:rgba(200,149,42,0.15);color:#e8c875;border:1px solid rgba(200,149,42,0.3);border-radius:4px;padding:2px 8px;font-family:JetBrains Mono,monospace;font-size:0.6rem;">PENDIENTE $'+fmt(saldo)+'</span>'
     : '<span style="background:rgba(40,180,80,0.15);color:#4dca6a;border:1px solid rgba(40,180,80,0.3);border-radius:4px;padding:2px 8px;font-family:JetBrains Mono,monospace;font-size:0.6rem;">&#10003; LIQUIDADO</span>';
 
+  // SIEMPRE regenerar desde los datos actuales en memoria
+  // Igual que rec_regenerarPDFDesdeRecibo: recalcular saldos desde pagosParciales
+  msg.textContent='Generando PDF actualizado...';
   try{
     if(!r.clientes && !r.nombre){ msg.textContent='Sin datos suficientes para generar el PDF'; loading.style.display='none'; return; }
 
-    // ── PDF inmutable: si ya existe en memoria, mostrarlo sin regenerar ──
-    if(r.pdfBase64){
-      embed.setAttribute('src', r.pdfBase64);
-      loading.style.display='none';
-      return;
-    }
-
-    // ── Intentar cargar desde Supabase Storage por nombre de archivo ──
-    if(window.SB && window.SB_DESPACHO_ID && r.archivo){
-      try{
-        msg.textContent='Cargando PDF desde servidor...';
-        const _sbPath = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
-        const { data: _sbData, error: _sbErr } = await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_sbPath, 120);
-        if(!_sbErr && _sbData && _sbData.signedUrl){
-          const _resp = await fetch(_sbData.signedUrl);
-          if(_resp.ok){
-            const _blob = await _resp.blob();
-            const _blobUrl = URL.createObjectURL(_blob);
-            embed.setAttribute('src', _blobUrl + '#toolbar=0&navpanes=0');
-            loading.style.display='none';
-            // Cachear para no volver a descargar en esta sesión
-            const _rd = new FileReader();
-            _rd.onload = () => { r.pdfBase64 = _rd.result; };
-            _rd.readAsDataURL(_blob);
-            return;
-          }
-        }
-      } catch(_eSB){ console.warn('[contabPDF] SB Storage:', _eSB); }
-    }
-
-    // ── Último recurso: regenerar SIN mutar el recibo original ──
-    msg.textContent='Generando PDF...';
-    // Trabajar sobre una copia — NUNCA mutar el objeto r original
-    const _rCopy = Object.assign({}, r);
+    // ── Validar y corregir saldos en memoria ──
     (function _validarSaldos(rec){
       const totalReal = parseFloat(rec.total) || 0;
       const anticipo  = parseFloat(rec.anticipo) || 0;
       const pagos     = rec.pagosParciales || [];
       const sumaPagos = pagos.reduce((s,p) => s + (parseFloat(p.cantidad)||0), 0);
+      // Si hay pagosParciales usar su suma; si no, usar anticipo (o totalAbonado guardado)
       const abonadoGuardado = (rec.totalAbonado != null && Number(rec.totalAbonado) > 0) ? Number(rec.totalAbonado) : 0;
       const totalAbonadoReal = sumaPagos > 0
         ? Math.min(sumaPagos, totalReal)
@@ -22032,32 +22046,33 @@ async function abrirPreviaDesdeContab(numFolio){
       rec.totalAbonado  = totalAbonadoReal;
       rec.saldoNuevo    = saldoReal;
       rec.saldoPendiente = saldoReal;
-    })(_rCopy);
+    })(r);
+    // ─────────────────────────────────────────────────────────────────────────
 
     const datos = {
-      folio: _rCopy.folio,
-      clientes: _rCopy.clientes||[{nombre:_rCopy.nombre||'',movil:'',tel:'',domicilio:''}],
-      conceptos: _rCopy.conceptos||[], tipoTramite: _rCopy.tipoTramite||'normal',
-      fecha_recibo: _rCopy.fecha_recibo||_rCopy.fecha, hora_recibo: _rCopy.hora_recibo||_rCopy.hora,
-      anticipo: _rCopy.anticipo||'0', responsable: _rCopy.responsable||'',
-      nombre_cliente_firma: _rCopy.nombre_cliente_firma||_rCopy.nombre||'',
-      tramites: _rCopy.tramites||'', clase:_rCopy.clase||'', marca:_rCopy.marca||'',
-      serie:_rCopy.serie||'', motor:_rCopy.motor||'', anio:_rCopy.anio||'', puertas:_rCopy.puertas||'',
-      color_veh:_rCopy.color_veh||'', transmision:_rCopy.transmision||'',
-      cilindros:_rCopy.cilindros||'', placa:_rCopy.placa||'',
-      ultima_tenencia:_rCopy.ultima_tenencia||'', origen:_rCopy.origen||'', combustible:_rCopy.combustible||'',
-      copias:_rCopy.copias||[], costosExtra:_rCopy.costosExtra||[],
-      pagosParciales:_rCopy.pagosParciales||[], fechasImpresion:_rCopy.fechasImpresion||[],
-      totalGeneral: _rCopy.total||0,
-      totalAbonado: _rCopy.totalAbonado,
-      saldoNuevo:   _rCopy.saldoNuevo
+      folio: r.folio,
+      clientes: r.clientes||[{nombre:r.nombre||'',movil:'',tel:'',domicilio:''}],
+      conceptos: r.conceptos||[], tipoTramite: r.tipoTramite||'normal',
+      fecha_recibo: r.fecha_recibo||r.fecha, hora_recibo: r.hora_recibo||r.hora,
+      anticipo: r.anticipo||'0', responsable: r.responsable||'',
+      nombre_cliente_firma: r.nombre_cliente_firma||r.nombre||'',
+      tramites: r.tramites||'', clase:r.clase||'', marca:r.marca||'',
+      serie:r.serie||'', motor:r.motor||'', anio:r.anio||'', puertas:r.puertas||'',
+      color_veh:r.color_veh||'', transmision:r.transmision||'',
+      cilindros:r.cilindros||'', placa:r.placa||'',
+      ultima_tenencia:r.ultima_tenencia||'', origen:r.origen||'', combustible:r.combustible||'',
+      copias:r.copias||[], costosExtra:r.costosExtra||[],
+      pagosParciales:r.pagosParciales||[], fechasImpresion:r.fechasImpresion||[],
+      totalGeneral: r.total||0,
+      totalAbonado: r.totalAbonado,
+      saldoNuevo:   r.saldoNuevo
     };
 
-    const qrTexto='LEX-MEXICO|Folio:'+folioFormato(_rCopy.folio, _rCopy.anio_folio)+'|'+(_rCopy.nombre||'')+'|'+(datos.fecha_recibo||'')+' '+(datos.hora_recibo||'');
+    const qrTexto='LEX-MEXICO|Folio:'+folioFormato(r.folio, r.anio_folio)+'|'+(r.nombre||'')+'|'+(datos.fecha_recibo||'')+' '+(datos.hora_recibo||'');
     const qrDataURL=await qrToDataURL(qrTexto);
-    const doc=await generarPDF(datos,_rCopy.folio,qrDataURL);
+    const doc=await generarPDF(datos,r.folio,qrDataURL);
     const pdfUri=doc.output('datauristring');
-    // NO sobreescribir r.pdfBase64 — el regenerado no es el PDF original impreso
+    r.pdfBase64=pdfUri;
     embed.setAttribute('src',pdfUri);
     loading.style.display='none';
   }catch(e){
@@ -23249,7 +23264,7 @@ async function adminEliminarRecibo(idx) {
   var folioStr = folioFormato(r.folio||0, r.anio_folio);
   var nombre = r.nombre || 'Sin nombre';
 
-  if (!confirm('☢️ ELIMINAR RECIBO #' + folioStr + '\n\nCliente: ' + nombre + '\nFecha: ' + (r.fecha||'') + '\n\nSe eliminará de:\n• Recibos\n• Contabilidad y movimientos\n• Historial de pagos\n• PDF en Supabase Storage\n• PDF en Cloudflare R2\n• Backups de localStorage\n\n⚠️ Esta acción NO se puede deshacer.')) return;
+  if (!confirm('☢️ ELIMINAR RECIBO #' + folioStr + '\n\nCliente: ' + nombre + '\nFecha: ' + (r.fecha||'') + '\n\nSe eliminará de:\n• Recibos\n• Contabilidad y movimientos\n• Historial de pagos\n• PDF en Supabase Storage\n• Backups de localStorage\n\n⚠️ Esta acción NO se puede deshacer.')) return;
 
   // 1. Eliminar recibo del array
   recibos.splice(idx, 1);
@@ -23310,31 +23325,6 @@ async function adminEliminarRecibo(idx) {
     await borrarPDFdeDrive(nombrePDF);
   } catch(e){ registrarError('catch vacio', e); }
 
-  // 7b. Eliminar archivos de Cloudflare R2
-  if (typeof window.borrarR2 === 'function') {
-    var _nombreBase = 'Recibo_' + folioStr + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf';
-    var _rutasR2 = [
-      _nombreBase,
-      'recibos/' + _nombreBase,
-      'recibos/' + folioStr + '.pdf',
-      folioStr + '.pdf'
-    ];
-    if (r.archivo) {
-      _rutasR2.push(r.archivo);
-      _rutasR2.push('recibos/' + r.archivo);
-    }
-    var _bucketsR2 = ['recibos', 'lex-mexico'];
-    for (var _bi = 0; _bi < _bucketsR2.length; _bi++) {
-      for (var _ri = 0; _ri < _rutasR2.length; _ri++) {
-        try {
-          var _ok = await window.borrarR2(_rutasR2[_ri], _bucketsR2[_bi]);
-          if (_ok) console.log('[R2] Eliminado:', _rutasR2[_ri], 'bucket:', _bucketsR2[_bi]);
-        } catch(e) { /* intentar siguiente ruta */ }
-      }
-    }
-    console.log('[adminEliminarRecibo] Limpieza R2 completada para folio #' + folioStr);
-  }
-
   // 8. Limpiar backups de localStorage que contengan este recibo
   try {
     ['D','appData'].forEach(function(tipo) {
@@ -23378,7 +23368,7 @@ async function adminEliminarRecibo(idx) {
   if (typeof renderContab    === 'function') renderContab();
   if (typeof badges          === 'function') badges();
 
-  if (typeof toast === 'function') toast('✅ Recibo #' + folioStr + ' eliminado de todos lados — recibos, contabilidad, PDF, R2 y backups.', 'ok');
+  if (typeof toast === 'function') toast('✅ Recibo #' + folioStr + ' eliminado de todos lados — recibos, contabilidad, PDF y backups.', 'ok');
 }
 
 // ── CAMBIAR FECHA DE RECIBO v2 (con checkboxes individuales por movimiento) ──
@@ -28182,14 +28172,11 @@ async function guardarRestauracion(){
 
     if(typeof toast==='function') toast('✅ Recibo #'+fs+' restaurado');
     if(typeof setStatus==='function') setStatus('ok','Recibo #'+fs+' restaurado — PDF regenerado','ok');
+    try{ if(typeof verReciboDesdeHistorial==='function') verReciboDesdeHistorial(rec); }catch(e){ registrarError('catch vacio', e); }
 
     alert('✅ Recibo #'+fs+' restaurado.\n\n📋 '+primerNombre+'\n📅 '+fechaOrig
       +'\n💰 $'+total.toFixed(2)+' | Abonado: $'+anticipo.toFixed(2)+' | Saldo: $'+saldoPendiente.toFixed(2)
       +'\n\nAparece en Contabilidad con fecha '+fechaOrig+'.');
-
-    // Limpiar formulario y avanzar al siguiente folio
-    if(typeof limpiarFormCompleto==='function') limpiarFormCompleto();
-    if(typeof actualizarFolioDisplay==='function') actualizarFolioDisplay();
 
   }catch(e){
     console.error('[RESTAURAR]',e);

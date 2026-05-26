@@ -16003,7 +16003,7 @@ function _pendEstatus(idx, btn){
 }
 function _placasVerDocFromCard(pendIdx, docIdx){
   const d = (D.pendientes[pendIdx]||{}).documentos?.[docIdx];
-  if(d) _pVerDoc(d);
+  if(d) _pVerDoc(d, idx, undefined);
 }
 function _placasAdjuntarDoc(idx){
   const p=D.pendientes[idx];if(!p)return;
@@ -16016,7 +16016,7 @@ function _placasAdjuntarDoc(idx){
     for(const file of Array.from(inp.files)){
       if(typeof window.subirR2==='function' && window.SB_DESPACHO_ID){
         try{
-          const path=window.SB_DESPACHO_ID+'/placas/'+(p.id||idx)+'/'+Date.now()+'_'+file.name;
+          const nombreCliente=(p.persona||p.nombre||'cliente').replace(/[^a-zA-Z0-9_\-]/g,'_').substring(0,40); const path=window.SB_DESPACHO_ID+'/placas/'+nombreCliente+'/'+Date.now()+'_'+file.name;
           const ok=await window.subirR2(file,path,'placas');
           if(ok){
             p.documentos.push({nombre:file.name,tipo:file.type,r2path:path,bucket:'placas'});
@@ -16912,29 +16912,81 @@ function _pAdjuntarArchivos(event, lista, renderFn){
   event.target.value = '';
 }
 
-function _pVerDoc(d){
+// Contexto actual del visor de documentos
+window._docPreviewCtx = null;
+
+function _pVerDoc(d, pendienteIdx, docIdx){
   if (!d) return;
+  window._docPreviewCtx = { d: d, pendienteIdx: pendienteIdx, docIdx: docIdx };
   const titulo = document.getElementById('docPreviewTitulo');
   const cont   = document.getElementById('docPreviewContenido');
-  if (titulo) titulo.textContent = (d.tipo === 'application/pdf' ? '📄 ' : '🖼 ') + d.nombre;
+  const btnDl  = document.getElementById('docPreviewBtnDescargar');
+  const btnEl  = document.getElementById('docPreviewBtnEliminar');
+  if (titulo) titulo.textContent = (d.tipo === 'application/pdf' ? '?? ' : '?? ') + d.nombre;
+  if (btnDl) btnDl.style.display = 'inline-flex';
+  if (btnEl && pendienteIdx !== undefined) btnEl.style.display = 'inline-flex';
   document.getElementById('mDocPreview').classList.add('show');
   const src = d.dataURL || d.base64;
-  if (d.r2path && typeof descargarR2==='function') {
+  if (d.r2path && typeof window.descargarR2 === 'function') {
     if (cont) cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Cargando...</div>';
-    descargarR2(d.r2path, 'placas').then(blob => {
-      if (!blob) { if(cont) cont.innerHTML = '<p style="color:red;padding:20px;">No se pudo cargar desde R2.</p>'; return; }
+    const bucket = d.bucket || 'placas';
+    window.descargarR2(d.r2path, bucket).then(blob => {
+      if (!blob) {
+        if(cont) cont.innerHTML = '<p style="color:#c0161a;padding:20px;text-align:center;">No se pudo cargar el archivo.<br><small>Verifica tu conexión.</small></p>';
+        return;
+      }
       const url = URL.createObjectURL(blob);
       if (cont) {
         if (d.tipo==='application/pdf') cont.innerHTML = '<embed src="'+url+'" type="application/pdf" style="width:100%;height:60vh;border:none;background:#fff;">';
-        else cont.innerHTML = '<img src="'+url+'" style="max-width:100%;max-height:65vh;border-radius:4px;" alt="'+esc(d.nombre)+'">';
+        else cont.innerHTML = '<img src="'+url+'" style="max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;" alt="'+d.nombre+'">';
       }
+    }).catch(e => {
+      if(cont) cont.innerHTML = '<p style="color:#c0161a;padding:20px;text-align:center;">Error al cargar desde R2.</p>';
+      console.error('_pVerDoc R2:', e);
     });
   } else if (src) {
     if (cont) {
       if (d.tipo==='application/pdf') cont.innerHTML = '<embed src="'+src+'" type="application/pdf" style="width:100%;height:60vh;border:none;background:#fff;">';
-      else cont.innerHTML = '<img src="'+src+'" style="max-width:100%;max-height:65vh;border-radius:4px;" alt="'+esc(d.nombre)+'">';
+      else cont.innerHTML = '<img src="'+src+'" style="max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;" alt="'+d.nombre+'">';
     }
   }
+}
+
+async function _pVerDocDescargar(){
+  const ctx = window._docPreviewCtx;
+  if (!ctx || !ctx.d) return;
+  const d = ctx.d;
+  try {
+    let blob;
+    if (d.r2path && typeof window.descargarR2 === 'function') {
+      blob = await window.descargarR2(d.r2path, d.bucket || 'placas');
+    } else if (d.dataURL || d.base64) {
+      const res = await fetch(d.dataURL || d.base64);
+      blob = await res.blob();
+    }
+    if (blob) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = d.nombre; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+  } catch(e) { toast('Error al descargar', 'err'); }
+}
+
+async function _pVerDocEliminar(){
+  const ctx = window._docPreviewCtx;
+  if (!ctx || ctx.pendienteIdx === undefined) return;
+  if (!confirm('¿Eliminar este archivo? Esta acción no se puede deshacer.')) return;
+  const d = ctx.d;
+  const p = D.pendientes[ctx.pendienteIdx];
+  if (!p || !p.documentos) return;
+  if (d.r2path && typeof window.borrarR2 === 'function') {
+    await window.borrarR2(d.r2path, d.bucket || 'placas').catch(e => console.warn('R2 borrar:', e));
+  }
+  p.documentos.splice(ctx.docIdx, 1);
+  save(); renderPend();
+  cerrar('mDocPreview');
+  toast('Archivo eliminado', 'ok');
 }
 
 // ═══ PENDIENTE — autocompletado de nombre con folios ═══
@@ -25867,7 +25919,15 @@ function confirmarVincularRecibo() {
   <div class="modal-body" style="text-align:center;background:#2a2a2a;border-radius:6px;padding:8px;">
     <div id="docPreviewContenido" style="min-height:400px;display:flex;align-items:center;justify-content:center;"></div>
   </div>
-  <div class="modal-ftr">
+  <div class="modal-ftr" style="display:flex;gap:8px;justify-content:space-between;align-items:center;">
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-secondary" id="docPreviewBtnDescargar" onclick="_pVerDocDescargar()" style="display:none;">
+        ⭳ Descargar
+      </button>
+      <button class="btn" id="docPreviewBtnEliminar" onclick="_pVerDocEliminar()" style="display:none;background:#c0161a;color:#fff;border-color:#c0161a;">
+        ?? Eliminar
+      </button>
+    </div>
     <button class="btn btn-ghost" onclick="cerrar('mDocPreview')">Cerrar</button>
   </div>
 </div></div>

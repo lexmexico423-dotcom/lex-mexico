@@ -7323,280 +7323,6 @@ async function guardarEnDirectorio(datos){
   }
 }
 
-// ── PARTE 3: PAGOS COMPLEMENTARIOS ──────────────────────────────
-async function abrirComplemento(folioOrig){
-  // ── GUARDIA DE SESIÓN ─────────────────────────────────────────────
-  if(!sbSession || Date.now() >= sbExpiry){
-    mostrarDriveOverlay('abrirComplemento_'+folioOrig);
-    return;
-  }
-  // Limpiar cualquier estado residual de modos anteriores
-  document.body.classList.remove('modo-actualizacion','desde-liquidacion','recibo-frozen',
-    'modo-consulta','folio-liquidado','folio-cancelado','en-accion-pago','paneles-busqueda-abiertos');
-  _cerrarPanelesBusqueda();
-
-  const recibo = appData.recibos.find(r=>r.folio===folioOrig);
-  if(!recibo){ showModal('No encontrado','Recibo no encontrado en historial.'); return; }
-  const saldo = recibo.saldoPendiente!==undefined ? recibo.saldoPendiente : 0;
-  if(saldo<=0){ showModal('Sin saldo','El recibo #'+folioConLetra(folioOrig, recibo.anio_folio, recibo.letra||letraVersion(recibo)||'A')+' ya está liquidado.'); return; }
-  // Modal propio en lugar de prompt() nativo (que bloquea el hilo y causa estados inconsistentes)
-  _abrirModalMontoComplemento(recibo, saldo, folioOrig);
-}
-
-function _abrirModalMontoComplemento(recibo, saldo, folioOrig){
-  const ovId = 'modal-monto-complemento';
-  document.getElementById(ovId)?.remove();
-  const ov = document.createElement('div');
-  ov.id = ovId;
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
-  ov.innerHTML = `
-    <div style="background:#1a1208;border:2px solid rgba(200,149,42,0.5);border-radius:10px;max-width:400px;width:100%;padding:22px;color:#e8d4a8;">
-      <h3 style="margin:0 0 4px;color:#c8952a;font-family:serif;font-size:1rem;">💰 Registrar Abono</h3>
-      <p style="font-size:0.68rem;color:rgba(200,149,42,0.5);margin-bottom:14px;font-family:monospace;">
-        Recibo <strong style="color:#c8952a;">#${folioConLetra(folioOrig, recibo.anio_folio, recibo.letra||letraVersion(recibo)||'A')}</strong> ·
-        ${recibo.nombre}<br>
-        Saldo pendiente: <strong style="color:#ff6060;">$${fmtMXN(saldo)}</strong>
-      </p>
-      <label style="font-family:monospace;font-size:0.58rem;text-transform:uppercase;color:rgba(200,149,42,0.5);display:block;margin-bottom:5px;">Monto del abono *</label>
-      <input id="comp-monto-input" type="number" min="0.01" step="0.01" max="${saldo}"
-        value="${saldo.toFixed(2)}" autofocus
-        style="width:100%;background:#110d06;border:1.5px solid rgba(200,149,42,0.3);border-radius:6px;padding:10px 12px;color:#fdfaf4;font-family:monospace;font-size:1.1rem;font-weight:700;outline:none;box-sizing:border-box;">
-      <div style="font-size:0.6rem;color:rgba(200,149,42,0.35);margin-top:3px;font-family:monospace;">Máximo: $${fmtMXN(saldo)}</div>
-      <div style="display:flex;gap:10px;margin-top:16px;">
-        <button id="comp-cancel-btn" style="flex:1;padding:9px;border-radius:7px;border:1px solid rgba(200,149,42,0.2);background:none;color:rgba(200,149,42,0.5);cursor:pointer;font-size:0.85rem;">Cancelar</button>
-        <button id="comp-ok-btn" style="flex:2;padding:9px;border-radius:7px;border:none;background:linear-gradient(135deg,#c8952a,#8c6518);color:#fff;font-weight:700;cursor:pointer;font-size:0.9rem;">Continuar →</button>
-      </div>
-    </div>`;
-  document.body.appendChild(ov);
-  document.getElementById('comp-cancel-btn').onclick = () => { ov.remove(); };
-  ov.addEventListener('click', e => { if(e.target===ov) ov.remove(); });
-  document.getElementById('comp-ok-btn').onclick = async function(){
-    const pago = parseFloat(document.getElementById('comp-monto-input').value)||0;
-    if(isNaN(pago)||pago<=0){ if(typeof toast==='function') toast('Ingresa un monto válido','err'); return; }
-    ov.remove();
-    const auth = await pedirAutorizacion();
-    if(auth === null){ setStatus('ok','Complemento cancelado — autorización no proporcionada','ok'); return; }
-    window._autorizacionActual = auth;
-    generarComplemento(recibo, Math.min(pago, saldo));
-  };
-  setTimeout(()=>{ document.getElementById('comp-monto-input')?.select(); }, 100);
-}
-
-async function generarComplemento(reciboOrig, pago){
-  const saldoAnterior  = reciboOrig.saldoPendiente !== undefined ? reciboOrig.saldoPendiente : 0;
-  const saldoNuevo     = Math.max(0, saldoAnterior - pago);
-  const liquidado      = pago >= saldoAnterior;
-
-  const autorizacion = window._autorizacionActual || null;
-  window._autorizacionActual = null;
-
-  // Reservar folio atómico (igual que en recibo normal)
-  const folioComp = await reservarFolioEnDrive();
-
-  const datos = {
-    folio:folioComp, folioRef:reciboOrig.folio, esComplemento:true,
-    nombre:reciboOrig.nombre,
-    fecha_recibo:new Date().toISOString().split('T')[0],
-    hora_recibo:new Date().toTimeString().slice(0,5),
-    pago, saldoAnterior, saldoNuevo, liquidado,
-    responsable: reciboOrig.responsable || $('responsable')?.value || '',
-    nombre_cliente_firma: reciboOrig.nombre_cliente_firma || reciboOrig.nombre || '',
-    autorizacion: autorizacion
-  };
-
-  const doc = await generarPDFComplemento(datos);
-  const prefijo = liquidado ? 'LIQUIDADO' : 'COMPLEMENTO';
-  const nombreArchivo = 'Recibo_'+folioFormato(folioComp)+'_'+prefijo
-    +'_ref'+folioFormato(reciboOrig.folio, reciboOrig.anio_folio)
-    +'_'+reciboOrig.nombre.replace(/\s+/g,'_')+'.pdf';
-
-  // Guardar en la nube silenciosamente
-  subirPDFaDrive(doc.output('blob'), nombreArchivo).catch(e=>console.warn('SB:',e));
-
-  // Actualizar saldo del recibo original — copia inmutable, nunca mutar directamente
-  const idx = appData.recibos.findIndex(r=>r.folio===reciboOrig.folio);
-  if(idx>=0){
-    _guardarSnapshotRecibo(appData.recibos[idx], 'Complemento de pago · Folio #'+folioFormato(folioComp));
-    const recOrig = appData.recibos[idx];
-    const nuevoAbonado = (parseFloat(recOrig.totalAbonado)||parseFloat(recOrig.anticipo)||0) + pago;
-    appData.recibos[idx] = Object.assign({}, recOrig, {
-      totalAbonado:   nuevoAbonado,
-      saldoPendiente: saldoNuevo,
-      saldoNuevo:     saldoNuevo,
-      liquidado:      saldoNuevo <= 0 ? true : (recOrig.liquidado||false)
-    });
-  }
-
-  // Agregar al historial con generadoPor
-  appData.recibos.unshift({
-    folio:folioComp, nombre:reciboOrig.nombre, fecha:datos.fecha_recibo,
-    hora:datos.hora_recibo, archivo:nombreArchivo, esComplemento:true,
-    folioRef:reciboOrig.folio, saldoPendiente:saldoNuevo,
-    pago, pdfBase64: doc.output('datauristring'),
-    letra: 'A',
-    generadoPor: empleadoActual ? empleadoActual.nombre : NOMBRE_TITULAR
-  });
-  // ── ESCRITURA BLOQUEANTE: esperar que Supabase confirme el guardado ──
-  // Evita que una impresión siguiente lea el JSON antes de que este complemento quede registrado.
-  try {
-    await actualizarArchivoControl();
-  } catch(eCtrl) {
-    console.error('❌ Error guardando complemento:', eCtrl);
-    try { await actualizarArchivoControl(); } catch(e2){ console.error('❌ Segundo intento fallido:', e2); }
-  }
-  actualizarFolioDisplay(); renderHistorial();
-  // Si se liquidó, eliminar el pendiente de placas vinculado
-  if (liquidado) _eliminarPendientePorFolio(reciboOrig.folio);
-  // Limpiar estados residuales al terminar
-  document.body.classList.remove('modo-actualizacion','desde-liquidacion','recibo-frozen','en-accion-pago');
-  setStatus('ok', liquidado ? 'Recibo #'+folioFormato(reciboOrig.folio, reciboOrig.anio_folio)+' LIQUIDADO ✓'
-    : 'Complemento #'+folioFormato(folioComp)+' generado','ok');
-
-  // Abrir en nueva pestaña para ver con opciones de descargar/imprimir
-  const pdfBlob2 = doc.output('blob');
-  const nombreComp = 'Complemento_'+folioFormato(folioComp)+'.pdf';
-  imprimirDesdeBlob(pdfBlob2, nombreComp);
-
-  // ── REGISTRAR INGRESO EN CAJA/CONTABILIDAD ──────────────────────
-  if(typeof D !== 'undefined' && Array.isArray(D.movimientos)){
-    const tipoMov = liquidado ? 'Liquidación' : 'Abono parcial';
-    const mov = {
-      id: 'M-COMP-' + folioComp + '-' + Date.now(),
-      folioCaja: '',
-      fecha: reciboOrig.fecha_recibo || reciboOrig.fecha || (typeof hoy === 'function' ? hoy() : new Date().toISOString().split('T')[0]),
-      hora: reciboOrig.hora_recibo || reciboOrig.hora || (typeof hora === 'function' ? hora() : new Date().toTimeString().slice(0,5)),
-      descripcion: (function(){
-        const c0 = reciboOrig.conceptos && reciboOrig.conceptos[0];
-        const conc = c0 ? (c0.concepto||'') : '';
-        const desc = c0 ? (c0.descripcion||'') : '';
-        const txt  = conc + (desc ? ' — ' + desc : '');
-        return tipoMov + ' · Recibo #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, reciboOrig.letra||'A') + ' · ' + (reciboOrig.nombre||'') + (txt ? ' · ' + txt : '');
-      })(),
-      nombre: reciboOrig.nombre || '',
-      folio: reciboOrig.folio,
-      monto: pago,
-      tipo: 'ingreso',
-      cat: (liquidado ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, reciboOrig.letra||'A'),
-      estatus: liquidado ? 'Liquidado' : 'Abono parcial',
-      fuente: 'recibo',
-      responsable: typeof empNombre === 'function' ? empNombre() : (reciboOrig.responsable||'')
-    };
-    _registrarMovimiento(mov);
-    if(typeof save === 'function') save();
-    if(typeof renderCaja === 'function') renderCaja();
-    if(typeof renderContab === 'function') renderContab();
-    syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); });
-  }
-}
-
-// ── PDF COMPLEMENTO ──────────────────────────────────────────────
-async function generarPDFComplemento(datos){
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'letter'});
-  const margin=14,pageW=215.9,cW=pageW-margin*2;
-  const logoObj = await getLogoDataURL();
-
-  // ── ENCABEZADO (idéntico al recibo normal) ──
-  const hBotC = dibujarEncabezadoPDF(doc, margin, cW, datos.folio, logoObj);
-  const yAftC = hBotC + 7;
-
-  // Titulo
-  const tipo = datos.liquidado ? 'RECIBO DE LIQUIDACIÓN' : 'RECIBO COMPLEMENTARIO';
-  doc.setTextColor(154,110,24); doc.setFontSize(10); doc.setFont('times','bold');
-  doc.text(tipo,margin,yAftC);
-  doc.setFontSize(7.5); doc.setFont('helvetica','italic'); doc.setTextColor(80,65,40);
-  doc.text('Referencia Folio Original: #'+folioFormato(datos.folioRef),margin,yAftC+5);
-  const fechaStr=datos.fecha_recibo?new Date(datos.fecha_recibo+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):'';
-  doc.setFont('helvetica','normal');
-  doc.text(fechaStr+' — '+datos.hora_recibo+' hrs.',pageW-margin,yAftC,{align:'right'});
-  doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.line(margin,yAftC+8,pageW-margin,yAftC+8);
-
-  let y=yAftC+16;
-  // Cliente
-  doc.setFillColor(248,244,232); doc.rect(margin,y-4,cW,5.5,'F');
-  doc.setTextColor(154,110,24); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
-  doc.text('DATOS DEL CLIENTE',margin+1,y); y+=6;
-  doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(20,10,5);
-  doc.text(datos.nombre,margin,y); y+=12;
-
-  // Resumen
-  doc.setFillColor(248,244,232); doc.rect(margin,y-4,cW,5.5,'F');
-  doc.setTextColor(154,110,24); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
-  doc.text('RESUMEN DE PAGO',margin+1,y); y+=6;
-
-  const rW=90, rX=margin+cW-rW;
-  doc.setFillColor(248,244,232); doc.rect(rX-2,y,rW+2,38,'F');
-  doc.setDrawColor(200,160,60); doc.rect(rX-2,y,rW+2,38);
-  doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
-  doc.text('Saldo anterior:',rX,y+7);
-  doc.text('Pago recibido:',rX,y+15);
-  doc.text('Saldo restante:',rX,y+23);
-  doc.setFont('helvetica','bold');
-  doc.setTextColor(datos.liquidado?30:176, datos.liquidado?140:16, datos.liquidado?60:16);
-  doc.text(datos.liquidado?'LIQUIDADO':'PENDIENTE',rX,y+32);
-  doc.setFont('helvetica','normal'); doc.setTextColor(20,10,5);
-  doc.text('$'+fmtMXN(datos.saldoAnterior),margin+cW-1,y+7,{align:'right'});
-  doc.setTextColor(30,120,50);
-  doc.text('$'+fmtMXN(datos.pago),margin+cW-1,y+15,{align:'right'});
-  doc.setTextColor(datos.saldoNuevo>0?176:30, datos.saldoNuevo>0?16:120, datos.saldoNuevo>0?16:50);
-  doc.text('$'+fmtMXN(datos.saldoNuevo),margin+cW-1,y+23,{align:'right'}); y+=48;
-
-  // ── FIRMAS con lógica de autorización ──
-  doc.setDrawColor(80,65,40); doc.setLineWidth(0.3);
-  const fw=cW*0.38, fS=margin+28;
-  const _limpAuth = s => String(s||'').toUpperCase()
-    .replace(/\b(LIC\.?|LICENCIADO|LICENCIADA|MTRO\.?|MTRA\.?|DR\.?|DRA\.?|ING\.?|ARQ\.?|C\.?|SR\.?|SRA\.?|SRTA\.?)\b/g,'')
-    .replace(/\s+/g,' ').trim();
-  const _tieneAuth    = datos.autorizacion && datos.autorizacion.nombre;
-  const _mismaPersona = _tieneAuth ? (_limpAuth(datos.responsable) === _limpAuth(datos.autorizacion.nombre)) : false;
-
-  doc.line(fS, y+8, fS+fw, y+8);
-  doc.line(fS+fw+14, y+8, fS+fw*2+14, y+8);
-
-  if(_mismaPersona){
-    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(154,110,24);
-    doc.text('AUTORIZÓ', fS+fw/2, y+4, {align:'center'});
-  }
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(40,30,15);
-  doc.text((datos.responsable||'Responsable del Trámite').toUpperCase(), fS+fw/2, y+12, {align:'center'});
-  doc.text('C. '+(datos.nombre_cliente_firma || datos.nombre || 'Cliente'), fS+fw+14+fw/2, y+12, {align:'center'});
-  doc.setFontSize(6); doc.setTextColor(120,100,60);
-  doc.text('Responsable del trámite', fS+fw/2, y+15.5, {align:'center'});
-  doc.text('Cliente', fS+fw+14+fw/2, y+15.5, {align:'center'});
-
-  if(_tieneAuth && !_mismaPersona){
-    const yAuth = y + 22;
-    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(154,110,24);
-    doc.text('AUTORIZÓ', fS+fw/2, yAuth, {align:'center'});
-    doc.setDrawColor(80,65,40); doc.setLineWidth(0.3);
-    doc.line(fS, yAuth+6, fS+fw, yAuth+6);
-    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(40,30,15);
-    doc.text(String(datos.autorizacion.nombre).toUpperCase(), fS+fw/2, yAuth+10, {align:'center'});
-    doc.setFontSize(6); doc.setTextColor(120,100,60);
-    doc.text('Firma de quien autorizó', fS+fw/2, yAuth+13.5, {align:'center'});
-    y += 16;
-  }
-
-  // Footer
-  doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.line(margin,271,pageW-margin,271);
-  doc.setTextColor(154,110,24); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
-  doc.text('LEX-MÉXICO DESPACHO JURÍDICO · CALLE MIGUEL HIDALGO ESQ. MÉXICO NO. 200, LOCAL B · TEL: 953 128 7511',pageW/2,275,{align:'center'});
-
-  // ── MARCA DE AGUA ──
-  // PAGADO: cuando saldo final es 0 (recibo normal) o cuando es un complemento liquidado
-  const _saldoFinalWM = (datos.saldoNuevo !== undefined) ? datos.saldoNuevo
-    : Math.max(0, ((datos.totalGeneral !== undefined ? datos.totalGeneral : 0) - (datos.totalAbonado !== undefined ? datos.totalAbonado : (parseFloat(datos.anticipo)||0))));
-  if((_saldoFinalWM <= 0 && datos.totalGeneral > 0) || datos.liquidado === true){
-    dibujarMarcaAgua(doc, 'PAGADO', [30, 140, 60]);
-  }
-  // CANCELADO: si se pasa el flag
-  if(datos.cancelado){
-    dibujarMarcaAgua(doc, 'CANCELADO', [120, 120, 120]);
-  }
-
-  return doc;
-}
-
 // ── FOLIO DISPLAY ────────────────────────────────────────────────
 // Formato: AA-NN (año 2 dígitos + número sin padding fijo, mínimo 2 dígitos)
 // Ejemplos: 26-01, 26-10, 26-100, 26-1000
@@ -10478,10 +10204,6 @@ async function conectarDriveDesdeOverlay(){
         _pendingActionAfterDrive = null;
         if(acc === 'guardarRecibo')          { setTimeout(guardarRecibo, 400); }
         else if(acc === 'imprimirActualizacion') { setTimeout(imprimirActualizacion, 400); }
-        else if(acc && acc.startsWith('abrirComplemento_')){
-          const folioRef = parseInt(acc.split('_')[1]);
-          if(!isNaN(folioRef)) setTimeout(()=>abrirComplemento(folioRef), 400);
-        }
       }
       return;
     }
@@ -11973,14 +11695,12 @@ function filtrarHistorial(){
     const saldoColor=r.saldoPendiente>0?'#b01010':'#2a7a3a';
     const saldoTag=(!r.cancelado && r.saldoPendiente!==undefined)
       ?'<span style="color:'+saldoColor+';font-family:DM Mono,monospace;font-size:0.65rem;margin-left:6px">$'+r.saldoPendiente.toFixed(2)+'</span>':'';
-    const btnPago=(!r.cancelado && !r.esComplemento && !r.esVersionAnterior && r.saldoPendiente>0)
-      ?'<button class="download-btn" style="color:#9a6e18;border-color:#c8952a" onclick="abrirComplemento('+r.folio+')">＋ Pago</button>':'';
     return '<div class="historial-item"'+(r.cancelado?' style="opacity:0.65;"':'')+' >'
       +'<span class="folio-num">'+folioStr+'</span>'+compTag+cancelTag
       +'<span class="client-name">'+escHTML(r.nombre||'')+'</span>'
       +'<span class="fecha-item">'+(r.fecha||'—')+' '+(r.hora||'')+'</span>'
       +(r.generadoPor?'<span style="font-family:\'DM Mono\',monospace;font-size:0.58rem;color:#7a6040;white-space:nowrap;margin-left:4px;" title="Generado por">👤 '+escHTML(r.generadoPor)+'</span>':'')
-      +saldoTag+btnPago
+      +saldoTag
       +'<button class="download-btn" onclick="reDescargar('+i+')">⬇ PDF</button>'
       +'</div>';
   }).join('');
@@ -19318,7 +19038,7 @@ function renderRecibosRecientes() {
   if (!recent.length) { el.innerHTML='<div style="padding:14px;text-align:center;font-size:0.7rem;color:var(--muted);">Sin recibos aun</div>'; return; }
   el.innerHTML=recent.map(function(r) {
     var saldo=r.saldoPendiente!=null?r.saldoPendiente:Math.max(0,(r.total||0)-(r.anticipo||0));
-    return '<div style="padding:10px 14px;border-bottom:1px solid var(--border-l);cursor:pointer;" onclick="abrirComplementoR('+r.folio+')">' +
+    return '<div style="padding:10px 14px;border-bottom:1px solid var(--border-l);">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;">' +
       '<span style="font-family:JetBrains Mono,monospace;font-size:0.65rem;font-weight:700;color:var(--gold-d);">#'+folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A')+'</span>' +
       '<span class="tag '+(saldo>0?'tag-a':'tag-v')+'" style="font-size:0.55rem;">'+(saldo>0?'Pendiente':'Liquidado')+'</span>' +
@@ -19326,47 +19046,6 @@ function renderRecibosRecientes() {
       '<div style="font-family:JetBrains Mono,monospace;font-size:0.62rem;color:var(--muted);">'+(r.fecha||'')+(saldo>0?' · $'+fmt(saldo)+' restante':' · Saldado')+'</div>' +
       '</div>';
   }).join('');
-}
-
-function abrirComplementoR(folioNum) {
-  var rec=(REC.recibos||[]).find(function(r){return r.folio===folioNum;});
-  if (!rec) { toast('Recibo no encontrado','err'); return; }
-  var saldo=rec.saldoPendiente!=null?rec.saldoPendiente:Math.max(0,(rec.total||0)-(rec.anticipo||0));
-  if (saldo<=0) { toast('Este recibo ya esta liquidado'); return; }
-  var montoStr=prompt('Recibo #'+folioFormato(folioNum)+' - '+rec.nombre+'\nSaldo pendiente: $'+fmt(saldo)+'\n\nMonto del pago/abono:');
-  if (!montoStr) return;
-  var monto=parseFloat(montoStr);
-  if (!monto||monto<=0) return;
-  var nuevoSaldo=Math.max(0,saldo-monto);
-  rec.saldoPendiente=nuevoSaldo;
-  if (!rec.complementos) rec.complementos=[];
-  rec.complementos.push({fecha:hoy(),hora:hora(),monto:monto,saldoAntes:saldo,saldoDespues:nuevoSaldo});
-  // ── REGISTRAR EN CAJA/CONTABILIDAD ──────────────────────────────
-  if(typeof D !== 'undefined' && Array.isArray(D.movimientos)){
-    var tipoMov = nuevoSaldo<=0 ? 'Liquidación' : 'Abono parcial';
-    var mov = {
-      id: 'M-RECR-' + rec.folio + '-' + Date.now(),
-      folioCaja: typeof generarFolioMovCaja === 'function' ? generarFolioMovCaja() : '',
-      fecha: typeof hoy === 'function' ? hoy() : new Date().toISOString().split('T')[0],
-      hora: typeof hora === 'function' ? hora() : '',
-      descripcion: tipoMov + ' — Recibo #' + folioFormato(folioNum) + ' · ' + rec.nombre + ((rec.conceptos&&rec.conceptos[0]) ? ' · ' + (rec.conceptos[0].concepto||'') : ''),
-      nombre: rec.nombre,
-      folio: folioNum,
-      monto: monto,
-      tipo: 'ingreso',
-      cat: (nuevoSaldo<=0 ? 'Liquidación' : 'Abono parcial') + ' · #' + folioFormato(folioNum),
-      estatus: nuevoSaldo<=0 ? 'Liquidado' : 'Abono parcial',
-      fuente: 'recibo',
-      responsable: typeof empNombre === 'function' ? empNombre() : ''
-    };
-    _registrarMovimiento(mov);
-    if(typeof renderCaja === 'function') renderCaja();
-    setTimeout(()=>syncEstadoSupabaseDebounced(),100);
-  }
-  save();
-  renderRecibosRecientes();
-  renderRec();
-  toast('Pago $'+fmt(monto)+' registrado. Saldo: $'+fmt(nuevoSaldo)+(nuevoSaldo===0?' LIQUIDADO':''));
 }
 
 // ═══ CONFIGURACION ═══

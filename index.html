@@ -23221,7 +23221,7 @@ async function adminEliminarRecibo(idx) {
   var folioStr = folioFormato(r.folio||0, r.anio_folio);
   var nombre = r.nombre || 'Sin nombre';
 
-  if (!confirm('☢️ ELIMINAR RECIBO #' + folioStr + '\n\nCliente: ' + nombre + '\nFecha: ' + (r.fecha||'') + '\n\nSe eliminará de:\n• Recibos\n• Contabilidad y movimientos\n• Movimientos del día\n• Historial de pagos\n• PDF en Supabase Storage\n• PDF en Cloudflare R2\n• Backups de localStorage\n\n⚠️ Esta acción NO se puede deshacer.')) return;
+  if (!confirm('☢️ ELIMINAR RECIBO #' + folioStr + '\n\nCliente: ' + nombre + '\nFecha: ' + (r.fecha||'') + '\n\nSe eliminará de:\n• Recibos\n• Contabilidad y movimientos\n• Historial de pagos\n• PDF en Supabase Storage\n• Backups de localStorage\n\n⚠️ Esta acción NO se puede deshacer.')) return;
 
   // 1. Eliminar recibo del array
   recibos.splice(idx, 1);
@@ -23282,34 +23282,6 @@ async function adminEliminarRecibo(idx) {
     await borrarPDFdeDrive(nombrePDF);
   } catch(e){ registrarError('catch vacio', e); }
 
-  // 7b. Eliminar archivos de Cloudflare R2
-  if (typeof window.borrarR2 === 'function') {
-    // Posibles rutas donde puede estar el PDF en R2
-    var _nombreBase = 'Recibo_' + folioStr + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf';
-    var _rutasR2 = [
-      _nombreBase,
-      'recibos/' + _nombreBase,
-      'recibos/' + folioStr + '.pdf',
-      folioStr + '.pdf'
-    ];
-    // Si el recibo tiene campo archivo, agregar también esa ruta
-    if (r.archivo) {
-      _rutasR2.push(r.archivo);
-      _rutasR2.push('recibos/' + r.archivo);
-    }
-    // Borrar en todos los buckets posibles
-    var _bucketsR2 = ['recibos', 'lex-mexico'];
-    for (var _bi = 0; _bi < _bucketsR2.length; _bi++) {
-      for (var _ri = 0; _ri < _rutasR2.length; _ri++) {
-        try {
-          var _ok = await window.borrarR2(_rutasR2[_ri], _bucketsR2[_bi]);
-          if (_ok) console.log('[R2] Eliminado:', _rutasR2[_ri], 'bucket:', _bucketsR2[_bi]);
-        } catch(e) { /* intentar siguiente ruta */ }
-      }
-    }
-    console.log('[adminEliminarRecibo] Limpieza R2 completada para folio #' + folioStr);
-  }
-
   // 8. Limpiar backups de localStorage que contengan este recibo
   try {
     ['D','appData'].forEach(function(tipo) {
@@ -23353,7 +23325,7 @@ async function adminEliminarRecibo(idx) {
   if (typeof renderContab    === 'function') renderContab();
   if (typeof badges          === 'function') badges();
 
-  if (typeof toast === 'function') toast('✅ Recibo #' + folioStr + ' eliminado de todos lados — recibos, contabilidad, movimientos del día, PDF, R2 y backups.', 'ok');
+  if (typeof toast === 'function') toast('✅ Recibo #' + folioStr + ' eliminado de todos lados — recibos, contabilidad, PDF y backups.', 'ok');
 }
 
 // ── CAMBIAR FECHA DE RECIBO v2 (con checkboxes individuales por movimiento) ──
@@ -28157,11 +28129,14 @@ async function guardarRestauracion(){
 
     if(typeof toast==='function') toast('✅ Recibo #'+fs+' restaurado');
     if(typeof setStatus==='function') setStatus('ok','Recibo #'+fs+' restaurado — PDF regenerado','ok');
-    try{ if(typeof verReciboDesdeHistorial==='function') verReciboDesdeHistorial(rec); }catch(e){ registrarError('catch vacio', e); }
 
     alert('✅ Recibo #'+fs+' restaurado.\n\n📋 '+primerNombre+'\n📅 '+fechaOrig
       +'\n💰 $'+total.toFixed(2)+' | Abonado: $'+anticipo.toFixed(2)+' | Saldo: $'+saldoPendiente.toFixed(2)
       +'\n\nAparece en Contabilidad con fecha '+fechaOrig+'.');
+
+    // Limpiar formulario y avanzar al siguiente folio
+    if(typeof limpiarFormCompleto==='function') limpiarFormCompleto();
+    if(typeof actualizarFolioDisplay==='function') actualizarFolioDisplay();
 
   }catch(e){
     console.error('[RESTAURAR]',e);

@@ -16002,8 +16002,9 @@ function _pendEstatus(idx, btn){
   setTimeout(()=>document.addEventListener('click',close),50);
 }
 function _placasVerDocFromCard(pendIdx, docIdx){
-  const d = (D.pendientes[pendIdx]||{}).documentos?.[docIdx];
-  if(d) _pVerDoc(d, pendIdx, docIdx);
+  const docs = (D.pendientes[pendIdx]||{}).documentos;
+  const d = docs?.[docIdx];
+  if(d) _pVerDoc(d, pendIdx, docIdx, docs);
 }
 function _placasAdjuntarDoc(idx){
   const p=D.pendientes[idx];if(!p)return;
@@ -16541,9 +16542,10 @@ function _pPlacasRenderDocs(){
 }
 
 function pPlacasVerDoc(i){
-  const d = _pPlacasState.documentos[i];
+  const docs = _pPlacasState.documentos;
+  const d = docs[i];
   if (!d) return;
-  _pVerDoc(d, undefined, i);
+  _pVerDoc(d, undefined, i, docs);
 }
 
 async function _pPlacasVerExpediente(){
@@ -16718,7 +16720,7 @@ function _pEscRenderDocs(){
   }).join('');
 }
 
-function pEscVerDoc(i){ _pVerDoc(_pEscState.documentos[i]); }
+function pEscVerDoc(i){ _pVerDoc(_pEscState.documentos[i], undefined, i, _pEscState.documentos); }
 function pEscEliminarDoc(i){
   const d = _pEscState.documentos[i];
   if (!d) return;
@@ -16959,42 +16961,102 @@ function _pAdjuntarArchivos(event, lista, renderFn){
 // Contexto actual del visor de documentos
 window._docPreviewCtx = null;
 
-function _pVerDoc(d, pendienteIdx, docIdx){
+// Abre el modal con soporte de navegación entre documentos del mismo grupo
+// lista: array de documentos (opcional). Si se pasa, se activan las flechas.
+function _pVerDoc(d, pendienteIdx, docIdx, lista){
   if (!d) return;
-  window._docPreviewCtx = { d: d, pendienteIdx: pendienteIdx, docIdx: docIdx };
+  // Resolver lista de docs según contexto
+  let docList = lista || null;
+  if (!docList && pendienteIdx !== undefined) {
+    const p = (typeof D !== 'undefined' && D.pendientes) ? D.pendientes[pendienteIdx] : null;
+    if (p && p.documentos && p.documentos.length > 1) docList = p.documentos;
+  }
+  window._docPreviewCtx = { d, pendienteIdx, docIdx, lista: docList };
+  _pVerDocRender();
+  document.getElementById('mDocPreview').classList.add('show');
+}
+
+function _pVerDocRender(){
+  const ctx  = window._docPreviewCtx;
+  if (!ctx || !ctx.d) return;
+  const d    = ctx.d;
   const titulo = document.getElementById('docPreviewTitulo');
   const cont   = document.getElementById('docPreviewContenido');
   const btnDl  = document.getElementById('docPreviewBtnDescargar');
   const btnEl  = document.getElementById('docPreviewBtnEliminar');
-  if (titulo) titulo.textContent = (d.tipo === 'application/pdf' ? '?? ' : '?? ') + d.nombre;
+  const counter= document.getElementById('docPreviewCounter');
+  const btnPrev= document.getElementById('docPrevBtnPrev');
+  const btnNext= document.getElementById('docPrevBtnNext');
+
+  const esPDF = d.tipo === 'application/pdf';
+  if (titulo) titulo.textContent = (esPDF ? '📄 ' : '🖼 ') + d.nombre;
   if (btnDl) btnDl.style.display = 'inline-flex';
-  if (btnEl && pendienteIdx !== undefined) btnEl.style.display = 'inline-flex';
-  document.getElementById('mDocPreview').classList.add('show');
+  if (btnEl) btnEl.style.display = ctx.pendienteIdx !== undefined ? 'inline-flex' : 'none';
+
+  // Contador y flechas
+  const lista = ctx.lista;
+  const idx   = ctx.docIdx;
+  if (lista && lista.length > 1 && idx !== undefined) {
+    if (counter) { counter.style.display = 'inline-block'; counter.textContent = (idx+1) + ' / ' + lista.length; }
+    if (btnPrev) { btnPrev.style.display = 'flex'; btnPrev.disabled = idx <= 0; }
+    if (btnNext) { btnNext.style.display = 'flex'; btnNext.disabled = idx >= lista.length - 1; }
+  } else {
+    if (counter) counter.style.display = 'none';
+    if (btnPrev) btnPrev.style.display = 'none';
+    if (btnNext) btnNext.style.display = 'none';
+  }
+
+  // Renderizar contenido
+  if (cont) cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Cargando…</div>';
   const src = d.dataURL || d.base64;
+
+  function mostrarContenido(url){
+    if (!cont) return;
+    if (esPDF) {
+      // iframe con scroll nativo para PDFs multipágina
+      cont.innerHTML = '<iframe src="'+url+'#toolbar=1&navpanes=1&scrollbar=1" title="'+d.nombre+'" allowfullscreen></iframe>';
+    } else {
+      cont.innerHTML = '<img src="'+url+'" alt="'+d.nombre+'" style="max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;">';
+    }
+  }
+
   if (d.r2path && typeof window.descargarR2 === 'function') {
-    if (cont) cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Cargando...</div>';
-    const bucket = d.bucket || 'placas';
-    window.descargarR2(d.r2path, bucket).then(blob => {
+    window.descargarR2(d.r2path, d.bucket || 'placas').then(blob => {
       if (!blob) {
         if(cont) cont.innerHTML = '<p style="color:#c0161a;padding:20px;text-align:center;">No se pudo cargar el archivo.<br><small>Verifica tu conexión.</small></p>';
         return;
       }
-      const url = URL.createObjectURL(blob);
-      if (cont) {
-        if (d.tipo==='application/pdf') cont.innerHTML = '<embed src="'+url+'" type="application/pdf" style="width:100%;height:60vh;border:none;background:#fff;">';
-        else cont.innerHTML = '<img src="'+url+'" style="max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;" alt="'+d.nombre+'">';
-      }
+      mostrarContenido(URL.createObjectURL(blob));
     }).catch(e => {
       if(cont) cont.innerHTML = '<p style="color:#c0161a;padding:20px;text-align:center;">Error al cargar desde R2.</p>';
       console.error('_pVerDoc R2:', e);
     });
   } else if (src) {
-    if (cont) {
-      if (d.tipo==='application/pdf') cont.innerHTML = '<embed src="'+src+'" type="application/pdf" style="width:100%;height:60vh;border:none;background:#fff;">';
-      else cont.innerHTML = '<img src="'+src+'" style="max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;" alt="'+d.nombre+'">';
-    }
+    mostrarContenido(src);
+  } else {
+    if(cont) cont.innerHTML = '<p style="color:#c0161a;padding:20px;text-align:center;">Sin fuente de datos.</p>';
   }
 }
+
+// Navegación ◀ ▶
+function _pVerDocNav(dir){
+  const ctx = window._docPreviewCtx;
+  if (!ctx || !ctx.lista) return;
+  const newIdx = (ctx.docIdx || 0) + dir;
+  if (newIdx < 0 || newIdx >= ctx.lista.length) return;
+  ctx.docIdx = newIdx;
+  ctx.d = ctx.lista[newIdx];
+  _pVerDocRender();
+}
+
+// Keyboard arrows support
+document.addEventListener('keydown', function(e){
+  const m = document.getElementById('mDocPreview');
+  if (!m || !m.classList.contains('show')) return;
+  if (e.key === 'ArrowLeft')  _pVerDocNav(-1);
+  if (e.key === 'ArrowRight') _pVerDocNav(1);
+  if (e.key === 'Escape')     cerrar('mDocPreview');
+});
 
 async function _pVerDocDescargar(){
   const ctx = window._docPreviewCtx;
@@ -25957,23 +26019,58 @@ function confirmarVincularRecibo() {
 </div></div>
 
 <!-- ═══ MODAL: Vista previa de documento adjunto ═══ -->
-<div class="modal-ov" id="mDocPreview"><div class="modal" style="max-width:780px;">
+<style>
+/* ── Nav flechas del visor ── */
+#mDocPreview .modal { position:relative; }
+.docprev-nav-btn {
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:42px;height:42px;border-radius:50%;
+  background:rgba(200,149,42,0.18);border:1.5px solid rgba(200,149,42,0.4);
+  color:var(--gold-l);font-size:1.3rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  z-index:10;transition:all 0.18s;user-select:none;
+}
+.docprev-nav-btn:hover { background:rgba(200,149,42,0.38);border-color:var(--gold); }
+.docprev-nav-btn:disabled { opacity:0.2;cursor:default; }
+.docprev-nav-btn.prev { left:-22px; }
+.docprev-nav-btn.next { right:-22px; }
+#docPreviewCounter {
+  font-family:monospace;font-size:0.72rem;color:rgba(200,149,42,0.7);
+  background:rgba(200,149,42,0.08);border:1px solid rgba(200,149,42,0.18);
+  border-radius:20px;padding:3px 12px;letter-spacing:0.06em;
+  flex-shrink:0;
+}
+#docPreviewContenido img {
+  max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;
+}
+#docPreviewContenido iframe {
+  width:100%;height:65vh;border:none;background:#fff;border-radius:4px;
+  display:block;
+}
+</style>
+
+<div class="modal-ov" id="mDocPreview"><div class="modal" style="max-width:800px;overflow:visible;">
+  <!-- Flechas de navegación -->
+  <button class="docprev-nav-btn prev" id="docPrevBtnPrev" onclick="_pVerDocNav(-1)" title="Anterior">‹</button>
+  <button class="docprev-nav-btn next" id="docPrevBtnNext" onclick="_pVerDocNav(1)"  title="Siguiente">›</button>
+
   <div class="modal-hdr">
     <h3 id="docPreviewTitulo">📄 Documento</h3>
     <button class="modal-x" onclick="cerrar('mDocPreview')">✕</button>
   </div>
-  <div class="modal-body" style="text-align:center;background:#2a2a2a;border-radius:6px;padding:8px;">
-    <div id="docPreviewContenido" style="min-height:400px;display:flex;align-items:center;justify-content:center;"></div>
+  <div class="modal-body" style="text-align:center;background:#2a2a2a;border-radius:6px;padding:8px;overflow:hidden;">
+    <div id="docPreviewContenido" style="min-height:400px;display:flex;align-items:center;justify-content:center;overflow:auto;"></div>
   </div>
   <div class="modal-ftr" style="display:flex;gap:8px;justify-content:space-between;align-items:center;">
-    <div style="display:flex;gap:8px;">
+    <div style="display:flex;gap:8px;align-items:center;">
       <button class="btn btn-secondary" id="docPreviewBtnDescargar" onclick="_pVerDocDescargar()" style="display:none;">
         ⭳ Descargar
       </button>
       <button class="btn" id="docPreviewBtnEliminar" onclick="_pVerDocEliminar()" style="display:none;background:#c0161a;color:#fff;border-color:#c0161a;">
-        ?? Eliminar
+        🗑 Eliminar
       </button>
     </div>
+    <span id="docPreviewCounter" style="display:none;"></span>
     <button class="btn btn-ghost" onclick="cerrar('mDocPreview')">Cerrar</button>
   </div>
 </div></div>

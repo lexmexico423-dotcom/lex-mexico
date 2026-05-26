@@ -16003,7 +16003,7 @@ function _pendEstatus(idx, btn){
 }
 function _placasVerDocFromCard(pendIdx, docIdx){
   const d = (D.pendientes[pendIdx]||{}).documentos?.[docIdx];
-  if(d) _pVerDoc(d, idx, undefined);
+  if(d) _pVerDoc(d, pendIdx, docIdx);
 }
 function _placasAdjuntarDoc(idx){
   const p=D.pendientes[idx];if(!p)return;
@@ -16543,7 +16543,7 @@ function _pPlacasRenderDocs(){
 function pPlacasVerDoc(i){
   const d = _pPlacasState.documentos[i];
   if (!d) return;
-  _pVerDoc(d);
+  _pVerDoc(d, undefined, i);
 }
 
 function pPlacasEliminarDoc(i){

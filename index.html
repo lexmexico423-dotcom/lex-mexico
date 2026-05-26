@@ -13224,7 +13224,7 @@ function renderContab() {
         const _catMatch = (m.cat||'').match(/#\d{2}-\d{3,}([A-Z])\b/);
         _letraF = _catMatch ? _catMatch[1] : null;
       }
-      if(!_letraF) _letraF = _rFol ? (_rFol.letra || letraVersion(_rFol) || 'A') : 'A';
+      if(!_letraF) _letraF = 'A';
       const str = folioConLetra(n, _rFol ? _rFol.anio_folio : null, _letraF);
       folioTxt  = `<span onclick="abrirPreviaDesdeContab(${n})" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--azul);" title="Ver recibo #${str}">${str}</span>`;
       folioColor = '';
@@ -17711,6 +17711,7 @@ function _registrarMovimiento(mov) {
       !m.borrado &&
       m.fuente === "recibo" &&
       m.folio == mov.folio &&
+      (m.letra || 'A') === (mov.letra || 'A') &&
       m.fecha === mov.fecha &&
       parseFloat(m.monto) === parseFloat(mov.monto) &&
       (m.estatus || "") === (mov.estatus || "")
@@ -18775,6 +18776,7 @@ async function guardarReciboInterno() {
         cat: (_esLiq ? 'Liquidado · #' : 'Anticipo · #') + _folioStr,
         estatus: _esLiq ? 'Liquidado' : 'Anticipo',
         fuente: 'recibo',
+        letra: 'A',
         responsable: datos.generadoPor || (typeof empNombre === 'function' ? empNombre() : '')
       };
       _registrarMovimiento(mov);

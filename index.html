@@ -9003,8 +9003,8 @@ async function activarModoConsulta(recibo){
     saldoBadge.style.textDecoration = '';
   }
 
-  // Actualizar folio display con el folio consultado
-  document.getElementById('folio-display').textContent = folioStr;
+  // Actualizar folio display con el folio consultado (formato completo: año-número-letra)
+  document.getElementById('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, letraVersion(recibo));
 
   // Actualizar banner
   const bannerTxt = document.getElementById('banner-saldo-txt');

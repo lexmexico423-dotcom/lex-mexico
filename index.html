@@ -15865,9 +15865,9 @@ function renderPend(){
       if (p.reciboVinculadoFolio) chips.push(`<span style="font-size:9.5px;background:rgba(26,122,58,0.08);color:#27500a;border-radius:3px;padding:1px 6px;font-family:monospace;cursor:pointer;" onclick="event.stopPropagation();_irAReciboVinculado('${esc(String(p.reciboVinculadoFolio))}')" title="Abrir recibo">🧾 #${esc(folioFormato(p.reciboVinculadoFolio))}</span>`);
       if (p.vehMarca||p.vehClase) chips.push(`<span style="font-size:9.5px;background:#f1efe8;color:#444441;border-radius:3px;padding:1px 6px;font-family:monospace;">${esc(((p.vehMarca||'')+' '+(p.vehClase||'')).trim())}</span>`);
       const docsArr = p.documentos||[];
-      const docsHtml = docsArr.map(d=>{
+      const docsHtml = docsArr.map((d,di)=>{
         const nm=d.nombre||d||'doc'; const lbl=nm.length>18?nm.substring(0,18)+'…':nm;
-        return `<span style="font-size:9.5px;background:#f7f0dc;border:1px solid #d4b870;border-radius:4px;padding:2px 7px;color:#633806;cursor:pointer;display:inline-flex;align-items:center;gap:3px;" onclick="event.stopPropagation();abrirPendiente(${idx})" title="${esc(nm)}">📄 ${esc(lbl)}</span>`;
+        return `<span style="font-size:9.5px;background:#f7f0dc;border:1px solid #d4b870;border-radius:4px;padding:2px 7px;color:#633806;cursor:pointer;display:inline-flex;align-items:center;gap:3px;" onclick="event.stopPropagation();_placasVerDocFromCard(${idx},${di})" title="${esc(nm)}">📄 ${esc(lbl)}</span>`;
       }).join('');
       const adjuntarBtn = `<span style="font-size:9.5px;border:1px dashed #c8952a;border-radius:4px;padding:2px 7px;color:#8c6518;cursor:pointer;display:inline-flex;align-items:center;gap:3px;" onclick="event.stopPropagation();_placasAdjuntarDoc(${idx})">+ Adjuntar</span>`;
       placasInfoHtml = `<div style="margin-top:6px;">${chips.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;">${chips.join('')}</div>`:''}<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;align-items:center;"><span style="font-size:9px;font-family:monospace;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8c6518;margin-right:2px;">Docs:</span>${docsHtml}${adjuntarBtn}</div></div>`;
@@ -16000,6 +16000,10 @@ function _pendEstatus(idx, btn){
   menu.style.right = (window.innerWidth-r.right)+'px';
   const close = (e)=>{ if(!menu.contains(e.target)&&e.target!==btn){ menu.remove(); document.removeEventListener('click',close); } };
   setTimeout(()=>document.addEventListener('click',close),50);
+}
+function _placasVerDocFromCard(pendIdx, docIdx){
+  const d = (D.pendientes[pendIdx]||{}).documentos?.[docIdx];
+  if(d) _pVerDoc(d);
 }
 function _placasAdjuntarDoc(idx){
   const p=D.pendientes[idx];if(!p)return;
@@ -16529,7 +16533,7 @@ function _pPlacasRenderDocs(){
         '<div class="placas-doc-chip-meta">'+_pPlacasFormatearTamano(d.tamano||0)+' · '+esc(d.fechaSubida||'')+'</div>' +
       '</div>' +
       '<div class="placas-doc-chip-acciones">' +
-        '<button type="button" class="placas-doc-chip-btn" onclick="pPlacasVerDoc('+i+')" title="Ver">👁</button>' +
+        '<button type="button" class="placas-doc-chip-btn" onclick="event.stopPropagation();pPlacasVerDoc('+i+')" title="Ver">👁</button>' +
         '<button type="button" class="placas-doc-chip-btn danger" onclick="pPlacasEliminarDoc('+i+')" title="Quitar">✕</button>' +
       '</div>' +
     '</div>';

@@ -7426,8 +7426,6 @@ async function generarComplemento(reciboOrig, pago){
   const pdfBlob2 = doc.output('blob');
   const nombreComp = 'Complemento_'+folioFormato(folioComp)+'.pdf';
   imprimirDesdeBlob(pdfBlob2, nombreComp);
-}
-
 
   // ── REGISTRAR INGRESO EN CAJA/CONTABILIDAD ──────────────────────
   if(typeof D !== 'undefined' && Array.isArray(D.movimientos)){
@@ -7459,6 +7457,8 @@ async function generarComplemento(reciboOrig, pago){
     if(typeof renderContab === 'function') renderContab();
     syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); });
   }
+}
+
 // ── PDF COMPLEMENTO ──────────────────────────────────────────────
 async function generarPDFComplemento(datos){
   const {jsPDF}=window.jspdf;

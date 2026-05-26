@@ -18418,6 +18418,12 @@ async function guardarReciboInterno() {
     var qrDataURL = await getQRDataURL();
     var blob = await generarPDFRecibo(datos, folio, qrDataURL);
     lastPdfBlob = blob;
+    // ── Guardar PDF en R2 (fire-and-forget, no bloquea el flujo) ──
+    if (typeof subirR2 === 'function' && window.SB_DESPACHO_ID) {
+      const r2Path = window.SB_DESPACHO_ID + '/recibos/' + folio + '.pdf';
+      subirR2(new File([blob], folio + '.pdf', {type:'application/pdf'}), r2Path, 'recibos')
+        .then(ok => { if(ok) console.log('PDF guardado en R2:', r2Path); });
+    }
     if (!REC.recibos) REC.recibos = [];
     REC.recibos.unshift(datos);
     // ── Sincronizar con appData.recibos para que Contabilidad lo vea ──

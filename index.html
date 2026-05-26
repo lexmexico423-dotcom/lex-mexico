@@ -8350,63 +8350,70 @@ async function generarPDF(datos,folio,qrDataURL){
     if(y + 52 > 262){ doc.addPage(); y = 18; }
 
     y += 3;
-    // Título sección — fondo beige ancho completo
+    // QR a la izquierda del resumen
+    if(qrDataURL){ try{doc.addImage(qrDataURL,'PNG',margin,y,18,18);}catch(e){ registrarError('catch vacio', e); } }
+    const rX = margin + cW * 0.38;
+    const rW = cW * 0.62;
+
+    // Título de la sección
     doc.setFillColor(248,244,232);
     doc.rect(margin, y-3, cW, 5, 'F');
     doc.setTextColor(154,110,24); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
     doc.text(_esLiqTotal ? 'RESUMEN DE LIQUIDACIÓN' : 'RESUMEN DE PAGO', margin+1, y);
-    y += 8;
+    y += 5;
 
-    // Cuadro compacto alineado a la derecha — igual al modelo
-    const _bW = 62; // mismo ancho que el cuadro TOTAL original
-    const _bX = margin + cW - _bW;
-    const _bH = 30;
-    doc.setFillColor(248,244,232);
-    doc.rect(_bX, y, _bW, _bH, 'F');
+    // Caja del resumen
     doc.setDrawColor(200,160,60); doc.setLineWidth(0.4);
-    doc.rect(_bX, y, _bW, _bH, 'S');
+    doc.rect(rX, y, rW, 38, 'S');
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
 
-    // SALDO ANTERIOR — negro
-    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
-    doc.text('SALDO ANTERIOR:', _bX+3, y+7);
+    // Saldo anterior
+    doc.text('Saldo anterior:', rX+3, y+8);
     doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
-    doc.text('$'+fmtMXN(_saldoAnteriorResumen), _bX+_bW-2, y+7, {align:'right'});
+    doc.text('$'+fmtMXN(_saldoAnteriorResumen), rX+rW-3, y+8, {align:'right'}); // negro
 
-    // PAGO RECIBIDO — café
-    doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
-    doc.text('PAGO RECIBIDO:', _bX+3, y+14);
+    // Pago recibido
+    doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
+    doc.text('Pago recibido:', rX+3, y+17);
     doc.setFont('helvetica','bold'); doc.setTextColor(139,90,43);
-    doc.text('$'+fmtMXN(_pagoEstaVersion), _bX+_bW-2, y+14, {align:'right'});
+    doc.text('$'+fmtMXN(_pagoEstaVersion), rX+rW-3, y+17, {align:'right'}); // café
 
     // Línea divisoria
     doc.setDrawColor(200,160,60); doc.setLineWidth(0.3);
-    doc.line(_bX+2, y+18, _bX+_bW-2, y+18);
+    doc.line(rX+2, y+22, rX+rW-2, y+22);
 
-    // SALDO RESTANTE — verde
-    doc.setFont('helvetica','bold'); doc.setTextColor(154,110,24);
-    doc.text('SALDO RESTANTE:', _bX+3, y+25);
-    doc.setFontSize(10); doc.setTextColor(42,122,58);
-    doc.text('$'+fmtMXN(_saldoRestante), _bX+_bW-2, y+25, {align:'right'});
+    // Saldo restante
+    doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
+    doc.text('Saldo restante:', rX+3, y+28);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(42,122,58); // siempre verde
+    doc.text('$'+fmtMXN(_saldoRestante), rX+rW-3, y+28, {align:'right'});
 
-    y += _bH + 6;
+    // LIQUIDADO / PENDIENTE
+    doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.setTextColor(_esLiqTotal ? 42 : 176, _esLiqTotal ? 122 : 16, _esLiqTotal ? 58 : 16);
+    doc.text(_esLiqTotal ? 'LIQUIDADO' : 'PENDIENTE', rX+3, y+36);
+
+    y += 44;
   }
 
   y += 0.5;
-  // QR a la izquierda, alineado con el inicio del cuadro de totales
-  if(qrDataURL){ try{doc.addImage(qrDataURL,'PNG',margin,y,18,18);}catch(e){ registrarError('catch vacio', e); } }
-  // Cuadro de totales a la derecha (mismo nivel que el QR)
-  doc.setFillColor(248,244,232); doc.rect(margin+cW-62,y,62,22,'F');
-  doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.rect(margin+cW-62,y,62,22);
-  doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
-  doc.text('TOTAL:',margin+cW-60,y+5);
-  doc.text('ABONADO:',margin+cW-60,y+11);
-  doc.setFont('helvetica','bold'); doc.setTextColor(154,110,24);
-  doc.text('RESTA:',margin+cW-60,y+18);
-  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
-  doc.text('$'+fmtMXN(totalGeneral),margin+cW-1.5,y+5,{align:'right'});
-  doc.text('$'+fmtMXN(totalAbonado),margin+cW-1.5,y+11,{align:'right'});
-  doc.setFontSize(11.5); doc.setTextColor(saldoFinal>0?154:42, saldoFinal>0?110:122, saldoFinal>0?24:58);
-  doc.text('$'+fmtMXN(Math.max(0,saldoFinal)),margin+cW-1.5,y+18.5,{align:'right'}); y+=24;
+  // Cuadro TOTAL/ABONADO/RESTA solo en versión A — B+ ya tienen el bloque resumen
+  if(!_esUpdate){
+    if(qrDataURL){ try{doc.addImage(qrDataURL,'PNG',margin,y,18,18);}catch(e){ registrarError('catch vacio', e); } }
+    doc.setFillColor(248,244,232); doc.rect(margin+cW-62,y,62,22,'F');
+    doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.rect(margin+cW-62,y,62,22);
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
+    doc.text('TOTAL:',margin+cW-60,y+5);
+    doc.text('ABONADO:',margin+cW-60,y+11);
+    doc.setFont('helvetica','bold'); doc.setTextColor(154,110,24);
+    doc.text('RESTA:',margin+cW-60,y+18);
+    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
+    doc.text('$'+fmtMXN(totalGeneral),margin+cW-1.5,y+5,{align:'right'});
+    doc.text('$'+fmtMXN(totalAbonado),margin+cW-1.5,y+11,{align:'right'});
+    doc.setFontSize(11.5); doc.setTextColor(saldoFinal>0?154:42, saldoFinal>0?110:122, saldoFinal>0?24:58);
+    doc.text('$'+fmtMXN(Math.max(0,saldoFinal)),margin+cW-1.5,y+18.5,{align:'right'}); y+=24;
+  }
 
   // Historial de pagos (si hay folio anterior)
   if(datos.folioAnterior && datos.historialPagosRef && datos.historialPagosRef.length){
@@ -13222,7 +13229,7 @@ function renderContab() {
       }
       if(!_letraF) _letraF = 'A';
       const str = folioConLetra(n, _rFol ? _rFol.anio_folio : null, _letraF);
-      folioTxt  = `<span onclick="abrirPreviaDesdeContab(${n},'${_letraF}')" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--azul);" title="Ver recibo #${str}">${str}</span>`;
+      folioTxt  = `<span onclick="abrirPreviaDesdeContab(${n})" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--azul);" title="Ver recibo #${str}">${str}</span>`;
       folioColor = '';
     } else {
       folioTxt  = `<span style="color:var(--gold-d);">${esc(m.folioCaja||'—')}</span>`;
@@ -21839,7 +21846,7 @@ function adminDelFolioBtnClick(){
 }
 
 // Abrir preview de recibo desde la tabla de Contabilidad — overlay flotante
-async function abrirPreviaDesdeContab(numFolio, letra){
+async function abrirPreviaDesdeContab(numFolio){
   const overlay = document.getElementById('contab-pdf-overlay');
   const embed   = document.getElementById('cpdf-embed');
   const loading = document.getElementById('cpdf-loading');
@@ -21848,14 +21855,9 @@ async function abrirPreviaDesdeContab(numFolio, letra){
   const nombreEl= document.getElementById('cpdf-nombre');
   const estadoEl= document.getElementById('cpdf-estado');
 
-  // Buscar la versión exacta (letra A, B, C…) para mostrar su PDF propio
+  // Buscar el recibo
   const recibos = (typeof appData!=='undefined'&&appData.recibos)?appData.recibos:(REC.recibos||[]);
-  const letraBuscar = letra || 'A';
-  const r = recibos.find(x=>
-    (x.folio===numFolio||x.folio===parseInt(numFolio)) &&
-    !x.esComplemento &&
-    (x.letra || letraVersion(x) || 'A') === letraBuscar
-  );
+  const r = recibos.find(x=>x.folio===numFolio||x.folio===parseInt(numFolio));
   if(!r){ toast('Recibo #'+folioFormato(numFolio)+' no encontrado','err'); return; }
 
   // Mostrar overlay con estado de carga
@@ -21879,25 +21881,7 @@ async function abrirPreviaDesdeContab(numFolio, letra){
       return;
     }
 
-    // ── 2. Intentar R2 ──
-    if(window.SB_DESPACHO_ID && r.archivo && typeof window.descargarR2 === 'function'){
-      try{
-        msg.textContent='Cargando PDF desde R2...';
-        const _r2Path = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
-        const _r2Blob = await window.descargarR2(_r2Path, 'recibos');
-        if(_r2Blob && _r2Blob.size > 0){
-          const _r2Url = URL.createObjectURL(_r2Blob);
-          embed.setAttribute('src', _r2Url + '#toolbar=0&navpanes=0');
-          loading.style.display='none';
-          const _r2Rd = new FileReader();
-          _r2Rd.onload = () => { if(!r.pdfBase64) r.pdfBase64 = _r2Rd.result; };
-          _r2Rd.readAsDataURL(_r2Blob);
-          return;
-        }
-      }catch(_eR2){ console.warn('[contabPDF] R2:', _eR2); }
-    }
-
-    // ── 3. Intentar Supabase Storage por nombre de archivo ──
+    // ── 2. Intentar Supabase Storage por nombre de archivo ──
     if(window.SB && window.SB_DESPACHO_ID && r.archivo){
       try{
         msg.textContent='Cargando PDF desde servidor...';
@@ -21921,7 +21905,7 @@ async function abrirPreviaDesdeContab(numFolio, letra){
       }catch(_eSB){ console.warn('[contabPDF] Storage:', _eSB); }
     }
 
-    // ── 4. Último recurso: regenerar sobre COPIA — NUNCA mutar el recibo original ──
+    // ── 3. Último recurso: regenerar sobre COPIA — NUNCA mutar el recibo original ──
     msg.textContent='Generando PDF...';
     const _rC = Object.assign({}, r);
     (function _calcSaldos(rec){

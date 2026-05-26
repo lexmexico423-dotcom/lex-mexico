@@ -2,9 +2,9 @@
  * lex-mexico-worker — Cloudflare Worker
  *
  * BINDINGS requeridos (Dashboard → Worker → Settings → Bindings):
- *   R2 Bucket  LEX_RECIBOS     → lex-recibos-pdf
- *   R2 Bucket  LEX_PLACAS      → lex-placas
- *   R2 Bucket  LEX_EXPEDIENTES → lex-expedientes
+ *   R2 Bucket  RECIBOS     → lex-recibos-pdf
+ *   R2 Bucket  PLACAS      → lex-placas
+ *   R2 Bucket  EXPEDIENTES → lex-expedientes
  *
  * Variable de entorno (Settings → Variables):
  *   AUTH_TOKEN  → LexMx2026-R2-7kP9nQvT
@@ -24,9 +24,9 @@ const CORS = {
 };
 
 function getBucket(env, name) {
-  if (name === 'recibos')     return env.LEX_RECIBOS;
-  if (name === 'placas')      return env.LEX_PLACAS;
-  if (name === 'expedientes') return env.LEX_EXPEDIENTES;
+  if (name === 'recibos')     return env.RECIBOS;
+  if (name === 'placas')      return env.PLACAS;
+  if (name === 'expedientes') return env.EXPEDIENTES;
   return null;
 }
 

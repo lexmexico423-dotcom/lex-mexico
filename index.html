@@ -12132,7 +12132,7 @@ const empEmail=()=>localStorage.getItem('empleado_email')||'';
 const R2_WORKER = 'https://lex-mexico-worker.fcolex0.workers.dev';
 const R2_TOKEN  = 'LexMx2026-R2-7kP9nQvT';
 
-async function subirR2(file, path, bucket) {
+window.subirR2 = async function(file, path, bucket) {
   try {
     const fd = new FormData();
     fd.append('file', file);
@@ -12148,7 +12148,7 @@ async function subirR2(file, path, bucket) {
   } catch(e) { console.error('subirR2 excepcion', e); return false; }
 }
 
-async function descargarR2(path, bucket) {
+window.descargarR2 = async function(path, bucket) {
   try {
     const url = R2_WORKER + '/r2/file?path=' + encodeURIComponent(path)
               + '&bucket=' + (bucket || 'recibos')
@@ -12159,7 +12159,7 @@ async function descargarR2(path, bucket) {
   } catch(e) { console.error('descargarR2 excepcion', e); return null; }
 }
 
-async function listarR2(prefix, bucket) {
+window.listarR2 = async function(prefix, bucket) {
   try {
     const url = R2_WORKER + '/r2/list?prefix=' + encodeURIComponent(prefix || '')
               + '&bucket=' + (bucket || 'recibos')
@@ -12171,7 +12171,7 @@ async function listarR2(prefix, bucket) {
   } catch(e) { console.error('listarR2 excepcion', e); return []; }
 }
 
-async function borrarR2(path, bucket) {
+window.borrarR2 = async function(path, bucket) {
   try {
     const url = R2_WORKER + '/r2/file?path=' + encodeURIComponent(path)
               + '&bucket=' + (bucket || 'recibos');

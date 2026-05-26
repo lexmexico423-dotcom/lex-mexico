@@ -6188,7 +6188,7 @@ async function subirR2(blob, path, bucket) {
     fd.append('file', blob instanceof Blob ? blob : new Blob([blob]), path.split('/').pop());
     fd.append('path', path);
     fd.append('bucket', bucket || 'recibos');
-    const res = await fetch(R2_WORKER + '/r2/upload?bucket=' + encodeURIComponent(bucket || 'recibos'), {
+    const res = await fetch(R2_WORKER + '/r2/upload', {
       method: 'POST',
       headers: { 'X-Auth-Token': R2_TOKEN },
       body: fd

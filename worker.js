@@ -66,9 +66,7 @@ export default {
         const filePath = fd.get('path');
         if (!file || !filePath) return json({ error: 'Falta file o path' }, 400);
 
-        // arrayBuffer() es más confiable que stream() en Workers con FormData
-        const buffer = await file.arrayBuffer();
-        await r2.put(filePath, buffer, {
+        await r2.put(filePath, file.stream(), {
           httpMetadata: { contentType: file.type || 'application/octet-stream' }
         });
         return json({ ok: true, path: filePath });

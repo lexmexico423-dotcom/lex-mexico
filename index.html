@@ -7190,6 +7190,19 @@ async function actualizarArchivoControl(){
 
 // ── PARTE 2: SUBIR PDF A SUPABASE STORAGE ────────────────────────
 async function subirPDFaDrive(pdfBlob, nombreArchivo){
+  // Intentar subir a R2 primero
+  if(typeof window.subirR2 === 'function' && window.SB_DESPACHO_ID){
+    try {
+      const path = window.SB_DESPACHO_ID + '/recibos/' + nombreArchivo;
+      const file = new File([pdfBlob], nombreArchivo, {type:'application/pdf'});
+      const ok = await window.subirR2(file, path, 'recibos');
+      if(ok){
+        console.log('✓ PDF guardado en R2:', nombreArchivo);
+        return true;
+      }
+    } catch(e){ console.warn('R2 upload falló, intentando Supabase:', e); }
+  }
+  // Fallback a Supabase Storage
   if(!window.SB || !window.SB_DESPACHO_ID) return false;
   try {
     const path = window.SB_DESPACHO_ID + '/recibos/' + nombreArchivo;
@@ -7198,14 +7211,13 @@ async function subirPDFaDrive(pdfBlob, nombreArchivo){
       upsert: true
     });
     if(error){ console.error('subirPDFaDrive:', error); return false; }
-    console.log('✓ PDF subido a Supabase:', nombreArchivo);
+    console.log('✓ PDF subido a Supabase (fallback):', nombreArchivo);
     return true;
   } catch(e){ console.error('subirPDFaDrive:', e); return false; }
 }
 
 // Reemplaza un PDF existente (mismo nombre) o lo sube si no existe
 async function reemplazarPDFenDrive(pdfBlob, nombreArchivo){
-  // En Supabase Storage upsert:true ya cubre ambos casos
   return await subirPDFaDrive(pdfBlob, nombreArchivo);
 }
 

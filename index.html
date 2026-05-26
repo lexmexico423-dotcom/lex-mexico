@@ -16004,19 +16004,31 @@ function _pendEstatus(idx, btn){
 function _placasAdjuntarDoc(idx){
   const p=D.pendientes[idx];if(!p)return;
   const inp=document.createElement('input');
-  inp.type='file';inp.accept='.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx';inp.multiple=true;
+  inp.type='file';inp.accept='.pdf,.jpg,.jpeg,.png,.webp';inp.multiple=true;
   inp.onchange=function(){
     if(!inp.files||!inp.files.length)return;
     if(!p.documentos)p.documentos=[];
     let pending=inp.files.length;
+    const total=pending;
+    const nombreSafe=(p.nombre||'sin_nombre').replace(/[^a-zA-Z0-9]/g,'_').substring(0,40);
+    toast('Subiendo '+pending+' archivo(s)...','ok');
     Array.from(inp.files).forEach(file=>{
-      const reader=new FileReader();
-      reader.onloadend=function(){
-        p.documentos.push({nombre:file.name,tipo:file.type,base64:reader.result});
-        pending--;
-        if(!pending){save();renderPend();toast('📎 Archivo'+(inp.files.length===1?'':'s')+' adjuntado'+(inp.files.length===1?'':'s'),'ok');}
-      };
-      reader.readAsDataURL(file);
+      if(typeof subirR2==='function' && window.SB_DESPACHO_ID){
+        const r2path=window.SB_DESPACHO_ID+'/placas/'+nombreSafe+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+        subirR2(file,r2path,'placas').then(ok=>{
+          if(ok) p.documentos.push({nombre:file.name,tipo:file.type,tamano:file.size,fechaSubida:hoy(),r2path:r2path});
+          pending--;
+          if(!pending){save();renderPend();toast('📎 Archivo'+(total===1?'':'s')+' adjuntado'+(total===1?'':'s')+(ok?'':' (error R2)'),'ok');}
+        });
+      } else {
+        const reader=new FileReader();
+        reader.onloadend=function(){
+          p.documentos.push({nombre:file.name,tipo:file.type,tamano:file.size,fechaSubida:hoy(),dataURL:reader.result});
+          pending--;
+          if(!pending){save();renderPend();toast('📎 Archivo'+(total===1?'':'s')+' adjuntado'+(total===1?'':'s'),'ok');}
+        };
+        reader.readAsDataURL(file);
+      }
     });
   };
   inp.click();
@@ -16444,48 +16456,40 @@ function _pPlacasActualizarInfoRecibo(){
 function pPlacasAdjuntar(event){
   const files = event.target.files;
   if (!files || !files.length) return;
-  const MAX_BYTES = 5 * 1024 * 1024;  // 5 MB por archivo
+  const MAX_BYTES = 10 * 1024 * 1024;
   let agregados = 0, rechazados = 0;
   let pendientes = files.length;
+  const nombre = document.getElementById('pPlacasNombre')?.value.trim() || 'sin_nombre';
+  const nombreSafe = nombre.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40);
+
+  toast('Subiendo '+pendientes+' archivo(s)...','ok');
 
   Array.from(files).forEach(file => {
-    if (file.size > MAX_BYTES) {
-      rechazados++;
-      pendientes--;
-      if (pendientes === 0) _pPlacasMostrarResultadoSubida(agregados, rechazados);
-      return;
-    }
-    // Validar tipo
+    if (file.size > MAX_BYTES) { rechazados++; pendientes--; if(pendientes===0)_pPlacasMostrarResultadoSubida(agregados,rechazados); return; }
     const tiposValidos = ['image/png','image/jpeg','image/jpg','application/pdf'];
-    if (!tiposValidos.includes(file.type)) {
-      rechazados++;
-      pendientes--;
-      if (pendientes === 0) _pPlacasMostrarResultadoSubida(agregados, rechazados);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      _pPlacasState.documentos.push({
-        nombre: file.name,
-        tipo: file.type,
-        tamano: file.size,
-        fechaSubida: hoy(),
-        dataURL: e.target.result
-      });
-      agregados++;
-      pendientes--;
-      _pPlacasRenderDocs();
-      if (pendientes === 0) _pPlacasMostrarResultadoSubida(agregados, rechazados);
-    };
-    reader.onerror = () => {
-      rechazados++;
-      pendientes--;
-      if (pendientes === 0) _pPlacasMostrarResultadoSubida(agregados, rechazados);
-    };
-    reader.readAsDataURL(file);
-  });
+    if (!tiposValidos.includes(file.type)) { rechazados++; pendientes--; if(pendientes===0)_pPlacasMostrarResultadoSubida(agregados,rechazados); return; }
 
-  // Limpiar input para permitir re-subir el mismo archivo si el usuario lo borra y vuelve
+    if (typeof subirR2==='function' && window.SB_DESPACHO_ID) {
+      const r2path = window.SB_DESPACHO_ID+'/placas/'+nombreSafe+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      subirR2(file, r2path, 'placas').then(ok => {
+        if (ok) { _pPlacasState.documentos.push({nombre:file.name,tipo:file.type,tamano:file.size,fechaSubida:hoy(),r2path:r2path}); agregados++; }
+        else rechazados++;
+        pendientes--;
+        _pPlacasRenderDocs();
+        if (pendientes===0) _pPlacasMostrarResultadoSubida(agregados,rechazados);
+      });
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        _pPlacasState.documentos.push({nombre:file.name,tipo:file.type,tamano:file.size,fechaSubida:hoy(),dataURL:e.target.result});
+        agregados++; pendientes--;
+        _pPlacasRenderDocs();
+        if (pendientes===0) _pPlacasMostrarResultadoSubida(agregados,rechazados);
+      };
+      reader.onerror = () => { rechazados++; pendientes--; if(pendientes===0)_pPlacasMostrarResultadoSubida(agregados,rechazados); };
+      reader.readAsDataURL(file);
+    }
+  });
   event.target.value = '';
 }
 
@@ -16535,17 +16539,7 @@ function _pPlacasRenderDocs(){
 function pPlacasVerDoc(i){
   const d = _pPlacasState.documentos[i];
   if (!d) return;
-  const titulo = document.getElementById('docPreviewTitulo');
-  const cont   = document.getElementById('docPreviewContenido');
-  if (titulo) titulo.textContent = (d.tipo === 'application/pdf' ? '📄 ' : '🖼 ') + d.nombre;
-  if (cont) {
-    if (d.tipo === 'application/pdf') {
-      cont.innerHTML = '<embed src="'+d.dataURL+'" type="application/pdf" style="width:100%;height:60vh;border:none;background:#fff;">';
-    } else {
-      cont.innerHTML = '<img src="'+d.dataURL+'" style="max-width:100%;max-height:65vh;border-radius:4px;background:#fff;" alt="'+esc(d.nombre)+'">';
-    }
-  }
-  document.getElementById('mDocPreview').classList.add('show');
+  _pVerDoc(d);
 }
 
 function pPlacasEliminarDoc(i){
@@ -16554,6 +16548,7 @@ function pPlacasEliminarDoc(i){
   if (!confirm('¿Quitar el archivo "'+d.nombre+'" de este pendiente?')) return;
   _pPlacasState.documentos.splice(i,1);
   _pPlacasRenderDocs();
+  if (d.r2path && typeof borrarR2==='function') borrarR2(d.r2path,'placas');
 }
 
 // Abrir el recibo vinculado en su panel (modo consulta)
@@ -16918,14 +16913,24 @@ function _pVerDoc(d){
   const titulo = document.getElementById('docPreviewTitulo');
   const cont   = document.getElementById('docPreviewContenido');
   if (titulo) titulo.textContent = (d.tipo === 'application/pdf' ? '📄 ' : '🖼 ') + d.nombre;
-  if (cont) {
-    if (d.tipo === 'application/pdf') {
-      cont.innerHTML = '<embed src="'+d.dataURL+'" type="application/pdf" style="width:100%;height:60vh;border:none;background:#fff;">';
-    } else {
-      cont.innerHTML = '<img src="'+d.dataURL+'" style="max-width:100%;max-height:65vh;border-radius:4px;background:#fff;" alt="'+esc(d.nombre)+'">';
+  document.getElementById('mDocPreview').classList.add('show');
+  const src = d.dataURL || d.base64;
+  if (d.r2path && typeof descargarR2==='function') {
+    if (cont) cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Cargando...</div>';
+    descargarR2(d.r2path, 'placas').then(blob => {
+      if (!blob) { if(cont) cont.innerHTML = '<p style="color:red;padding:20px;">No se pudo cargar desde R2.</p>'; return; }
+      const url = URL.createObjectURL(blob);
+      if (cont) {
+        if (d.tipo==='application/pdf') cont.innerHTML = '<embed src="'+url+'" type="application/pdf" style="width:100%;height:60vh;border:none;background:#fff;">';
+        else cont.innerHTML = '<img src="'+url+'" style="max-width:100%;max-height:65vh;border-radius:4px;" alt="'+esc(d.nombre)+'">';
+      }
+    });
+  } else if (src) {
+    if (cont) {
+      if (d.tipo==='application/pdf') cont.innerHTML = '<embed src="'+src+'" type="application/pdf" style="width:100%;height:60vh;border:none;background:#fff;">';
+      else cont.innerHTML = '<img src="'+src+'" style="max-width:100%;max-height:65vh;border-radius:4px;" alt="'+esc(d.nombre)+'">';
     }
   }
-  document.getElementById('mDocPreview').classList.add('show');
 }
 
 // ═══ PENDIENTE — autocompletado de nombre con folios ═══

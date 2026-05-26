@@ -15869,7 +15869,7 @@ function renderPend(){
         const nm=d.nombre||d||'doc'; const lbl=nm.length>18?nm.substring(0,18)+'…':nm;
         return `<span style="font-size:9.5px;background:#f7f0dc;border:1px solid #d4b870;border-radius:4px;padding:2px 7px;color:#633806;cursor:pointer;display:inline-flex;align-items:center;gap:3px;" onclick="event.stopPropagation();_placasVerDocFromCard(${idx},${di})" title="${esc(nm)}">📄 ${esc(lbl)}</span>`;
       }).join('');
-      const adjuntarBtn = `<span style="font-size:11px;border:1.5px solid #1a6abf;border-radius:4px;padding:3px 10px;color:#fff;background:#1a6abf;cursor:pointer;display:inline-flex;align-items:center;gap:3px;font-weight:600;" onclick="event.stopPropagation();_placasAdjuntarDoc(${idx})">+ Adjuntar</span>`;
+      const adjuntarBtn = `<span style="font-size:9.5px;border:1px dashed #c8952a;border-radius:4px;padding:2px 7px;color:#8c6518;cursor:pointer;display:inline-flex;align-items:center;gap:3px;" onclick="event.stopPropagation();_placasAdjuntarDoc(${idx})">+ Adjuntar</span>`;
       placasInfoHtml = `<div style="margin-top:6px;">${chips.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:5px;">${chips.join('')}</div>`:''}<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;align-items:center;"><span style="font-size:9px;font-family:monospace;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#8c6518;margin-right:2px;">Docs:</span>${docsHtml}${adjuntarBtn}</div></div>`;
     }
 
@@ -16548,6 +16548,49 @@ function pPlacasVerDoc(i){
   _pVerDoc(d, undefined, i, docs);
 }
 
+async function _pPlacasVerExpediente(){
+  const nombre = document.getElementById('pPlacasNombre')?.value.trim();
+  const cont = document.getElementById('pPlacasExpedienteList');
+  if (!cont) return;
+  if (!nombre) { toast('Ingresa el nombre del cliente primero','err'); return; }
+  if (!window.SB_DESPACHO_ID || typeof window.listarR2 !== 'function') { toast('Sin conexión R2','err'); return; }
+
+  cont.style.display = 'block';
+  cont.innerHTML = '<div style="padding:12px;text-align:center;font-size:0.78rem;color:var(--muted);">Cargando...</div>';
+
+  const nombreSafe = nombre.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40);
+  const prefix = window.SB_DESPACHO_ID + '/placas/' + nombreSafe + '/';
+  const archivos = await window.listarR2(prefix, 'placas');
+
+  if (!archivos.length) {
+    cont.innerHTML = '<div style="padding:12px;text-align:center;font-size:0.78rem;color:var(--muted);">Sin archivos en R2 para este cliente.</div>';
+    return;
+  }
+
+  const fmtSize = b => b < 1024 ? b+'B' : b < 1048576 ? (b/1024).toFixed(1)+'KB' : (b/1048576).toFixed(1)+'MB';
+  cont.innerHTML =
+    '<div style="padding:8px 12px;background:var(--gold-pale);font-size:0.65rem;font-family:monospace;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--gold-d);border-bottom:1px solid var(--border);">🗂 Expediente R2 — '+esc(nombre)+' ('+archivos.length+' archivo'+(archivos.length===1?'':'s')+')</div>' +
+    archivos.map(function(a){
+      const ico = /\.pdf$/i.test(a.name) ? '📄' : '🖼';
+      const fecha = a.uploaded ? new Date(a.uploaded).toLocaleDateString('es-MX') : '';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--border);font-size:0.78rem;">' +
+        '<span>'+ico+'</span>' +
+        '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+esc(a.key)+'">'+esc(a.name)+'</span>' +
+        '<span style="font-size:0.65rem;color:var(--muted);white-space:nowrap;">'+fmtSize(a.size||0)+(fecha?' · '+fecha:'')+'</span>' +
+        '<button type="button" class="btn btn-ghost" style="padding:2px 8px;font-size:0.7rem;" onclick="_pPlacasAbrirR2(\''+esc(a.key)+'\',\''+esc(a.name)+'\')">👁 Ver</button>' +
+      '</div>';
+    }).join('');
+}
+
+function _pPlacasAbrirR2(key, nombre){
+  if (typeof window.descargarR2 !== 'function') return;
+  const ext = nombre.split('.').pop().toLowerCase();
+  const tipo = ext==='pdf' ? 'application/pdf' : 'image/'+ext;
+  window.descargarR2(key, 'placas').then(blob => {
+    if (!blob) { toast('No se pudo cargar el archivo','err'); return; }
+    _pVerDoc({nombre:nombre, tipo:tipo, r2path:key, bucket:'placas'});
+  });
+}
 
 function pPlacasEliminarDoc(i){
   const d = _pPlacasState.documentos[i];
@@ -16917,6 +16960,8 @@ function _pAdjuntarArchivos(event, lista, renderFn){
 
 // Contexto actual del visor de documentos
 window._docPreviewCtx = null;
+window._docZoomLevel  = 1;
+const _DOC_ZOOM_STEPS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3];
 
 // Abre el modal con soporte de navegación entre documentos del mismo grupo
 // lista: array de documentos (opcional). Si se pasa, se activan las flechas.
@@ -16929,6 +16974,7 @@ function _pVerDoc(d, pendienteIdx, docIdx, lista){
     if (p && p.documentos && p.documentos.length > 1) docList = p.documentos;
   }
   window._docPreviewCtx = { d, pendienteIdx, docIdx, lista: docList };
+  window._docZoomLevel  = 1;
   _pVerDocRender();
   document.getElementById('mDocPreview').classList.add('show');
 }
@@ -16944,11 +16990,17 @@ function _pVerDocRender(){
   const counter= document.getElementById('docPreviewCounter');
   const btnPrev= document.getElementById('docPrevBtnPrev');
   const btnNext= document.getElementById('docPrevBtnNext');
+  const zoomBar= document.getElementById('docZoomBar');
 
   const esPDF = d.tipo === 'application/pdf';
   if (titulo) titulo.textContent = (esPDF ? '📄 ' : '🖼 ') + d.nombre;
   if (btnDl) btnDl.style.display = 'inline-flex';
   if (btnEl) btnEl.style.display = ctx.pendienteIdx !== undefined ? 'inline-flex' : 'none';
+
+  // Zoom: solo para imágenes
+  if (zoomBar) zoomBar.style.display = esPDF ? 'none' : 'flex';
+  window._docZoomLevel = 1;
+  _docZoomUpdateLabel();
 
   // Contador y flechas
   const lista = ctx.lista;
@@ -16970,10 +17022,14 @@ function _pVerDocRender(){
   function mostrarContenido(url){
     if (!cont) return;
     if (esPDF) {
-      // iframe con scroll nativo para PDFs multipágina
       cont.innerHTML = '<iframe src="'+url+'#toolbar=1&navpanes=1&scrollbar=1" title="'+d.nombre+'" allowfullscreen></iframe>';
     } else {
-      cont.innerHTML = '<img src="'+url+'" alt="'+d.nombre+'" style="max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;">';
+      cont.innerHTML = '<img src="'+url+'" id="docPreviewImg" alt="'+d.nombre+'" style="max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;">';
+      // Wheel zoom en imagen
+      cont.onwheel = function(e){
+        e.preventDefault();
+        _docZoom(e.deltaY < 0 ? 1 : -1);
+      };
     }
   }
 
@@ -16995,6 +17051,33 @@ function _pVerDocRender(){
   }
 }
 
+// ── Zoom ──────────────────────────────────────────────────────
+function _docZoom(dir){
+  const steps = _DOC_ZOOM_STEPS;
+  let i = steps.indexOf(window._docZoomLevel);
+  if (i === -1) i = steps.indexOf(1);
+  i = Math.max(0, Math.min(steps.length - 1, i + dir));
+  window._docZoomLevel = steps[i];
+  _docZoomApply();
+}
+function _docZoomReset(){
+  window._docZoomLevel = 1;
+  _docZoomApply();
+}
+function _docZoomApply(){
+  const img = document.getElementById('docPreviewImg');
+  if (img) {
+    img.style.transform   = 'scale('+window._docZoomLevel+')';
+    img.style.maxWidth    = window._docZoomLevel > 1 ? 'none' : '100%';
+    img.style.maxHeight   = window._docZoomLevel > 1 ? 'none' : '65vh';
+  }
+  _docZoomUpdateLabel();
+}
+function _docZoomUpdateLabel(){
+  const lbl = document.getElementById('docZoomLabel');
+  if (lbl) lbl.textContent = Math.round(window._docZoomLevel * 100) + '%';
+}
+
 // Navegación ◀ ▶
 function _pVerDocNav(dir){
   const ctx = window._docPreviewCtx;
@@ -17003,16 +17086,20 @@ function _pVerDocNav(dir){
   if (newIdx < 0 || newIdx >= ctx.lista.length) return;
   ctx.docIdx = newIdx;
   ctx.d = ctx.lista[newIdx];
+  window._docZoomLevel = 1;
   _pVerDocRender();
 }
 
-// Keyboard arrows support
+// Teclado: flechas, +/-, Escape
 document.addEventListener('keydown', function(e){
   const m = document.getElementById('mDocPreview');
   if (!m || !m.classList.contains('show')) return;
   if (e.key === 'ArrowLeft')  _pVerDocNav(-1);
   if (e.key === 'ArrowRight') _pVerDocNav(1);
-  if (e.key === 'Escape')     cerrar('mDocPreview');
+  if (e.key === '+'||e.key==='=') _docZoom(1);
+  if (e.key === '-')           _docZoom(-1);
+  if (e.key === '0')           _docZoomReset();
+  if (e.key === 'Escape')      cerrar('mDocPreview');
 });
 
 async function _pVerDocDescargar(){
@@ -25715,9 +25802,11 @@ function confirmarVincularRecibo() {
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <input id="pPlacasFileInput" type="file" accept="image/png,image/jpeg,image/jpg,application/pdf" multiple style="display:none;" onchange="pPlacasAdjuntar(event)">
           <button type="button" class="btn btn-ghost" onclick="document.getElementById('pPlacasFileInput').click()">📤 Adjuntar archivos</button>
+          <button type="button" class="btn btn-ghost" onclick="_pPlacasVerExpediente()" title="Ver todos los archivos de este cliente en R2">🗂 Ver expediente</button>
           <span id="pPlacasFilesCount" style="font-size:0.7rem;color:var(--muted);">Ninguno adjunto</span>
         </div>
         <div id="pPlacasFilesList" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
+        <div id="pPlacasExpedienteList" style="display:none;margin-top:10px;border:1px solid var(--border);border-radius:6px;overflow:hidden;"></div>
         <div style="font-size:0.62rem;color:var(--muted);margin-top:4px;font-style:italic;">Tamaño máximo recomendado: 5 MB por archivo.</div>
       </div>
     </div>
@@ -25977,46 +26066,101 @@ function confirmarVincularRecibo() {
 <style>
 /* ── Nav flechas del visor ── */
 #mDocPreview .modal { position:relative; }
+
 .docprev-nav-btn {
-  position:absolute;top:50%;transform:translateY(-50%);
-  width:42px;height:42px;border-radius:50%;
-  background:rgba(200,149,42,0.18);border:1.5px solid rgba(200,149,42,0.4);
-  color:var(--gold-l);font-size:1.3rem;cursor:pointer;
+  position:absolute;
+  top:50%;transform:translateY(-50%);
+  width:54px;height:54px;border-radius:50%;
+  background:linear-gradient(135deg,#c8952a,#e8c875);
+  border:2.5px solid #fff;
+  color:#1a1008;
+  font-size:1.8rem;font-weight:900;
+  cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  z-index:10;transition:all 0.18s;user-select:none;
+  z-index:20;
+  transition:all 0.18s;
+  user-select:none;
+  box-shadow:0 0 0 3px rgba(200,149,42,0.45), 0 4px 18px rgba(0,0,0,0.55);
+  line-height:1;
 }
-.docprev-nav-btn:hover { background:rgba(200,149,42,0.38);border-color:var(--gold); }
-.docprev-nav-btn:disabled { opacity:0.2;cursor:default; }
-.docprev-nav-btn.prev { left:-22px; }
-.docprev-nav-btn.next { right:-22px; }
+.docprev-nav-btn:hover {
+  background:linear-gradient(135deg,#e8c875,#fff);
+  box-shadow:0 0 0 4px rgba(232,200,117,0.7), 0 6px 24px rgba(0,0,0,0.65);
+  transform:translateY(-50%) scale(1.12);
+}
+.docprev-nav-btn:active { transform:translateY(-50%) scale(0.96); }
+.docprev-nav-btn:disabled {
+  background:rgba(80,70,50,0.35);border-color:rgba(255,255,255,0.15);
+  color:rgba(255,255,255,0.2);box-shadow:none;cursor:default;
+  transform:translateY(-50%);
+}
+.docprev-nav-btn.prev { left:-30px; }
+.docprev-nav-btn.next { right:-30px; }
+
+/* Etiqueta bajo la flecha */
+.docprev-nav-btn::after {
+  content:attr(data-label);
+  position:absolute;bottom:-18px;
+  font-size:0.55rem;font-family:monospace;font-weight:700;
+  color:rgba(232,200,117,0.8);letter-spacing:0.08em;
+  white-space:nowrap;
+}
+
+/* ── Contador ── */
 #docPreviewCounter {
-  font-family:monospace;font-size:0.72rem;color:rgba(200,149,42,0.7);
-  background:rgba(200,149,42,0.08);border:1px solid rgba(200,149,42,0.18);
-  border-radius:20px;padding:3px 12px;letter-spacing:0.06em;
+  font-family:monospace;font-size:0.78rem;font-weight:700;
+  color:#e8c875;
+  background:rgba(200,149,42,0.18);border:1.5px solid rgba(200,149,42,0.45);
+  border-radius:20px;padding:4px 14px;letter-spacing:0.08em;
   flex-shrink:0;
 }
+
+/* ── Zoom barra ── */
+#docZoomBar {
+  display:none;align-items:center;gap:6px;
+  background:rgba(200,149,42,0.1);border:1px solid rgba(200,149,42,0.25);
+  border-radius:20px;padding:4px 10px;
+}
+#docZoomBar button {
+  width:26px;height:26px;border-radius:50%;
+  background:rgba(200,149,42,0.18);border:1px solid rgba(200,149,42,0.4);
+  color:var(--gold-l);font-size:1rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;flex-shrink:0;line-height:1;
+}
+#docZoomBar button:hover { background:rgba(200,149,42,0.38);color:#fff; }
+#docZoomLabel {
+  font-family:monospace;font-size:0.68rem;color:rgba(232,200,117,0.8);
+  min-width:36px;text-align:center;
+}
+
+/* ── Imagen con zoom ── */
+#docPreviewContenido {
+  overflow:auto;cursor:grab;
+}
+#docPreviewContenido:active { cursor:grabbing; }
 #docPreviewContenido img {
-  max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;
+  border-radius:4px;display:block;margin:0 auto;
+  transform-origin:center center;transition:transform 0.2s ease;
 }
 #docPreviewContenido iframe {
-  width:100%;height:65vh;border:none;background:#fff;border-radius:4px;
-  display:block;
+  width:100%;height:65vh;border:none;background:#fff;border-radius:4px;display:block;
 }
 </style>
 
-<div class="modal-ov" id="mDocPreview"><div class="modal" style="max-width:800px;overflow:visible;">
+<div class="modal-ov" id="mDocPreview"><div class="modal" style="max-width:820px;overflow:visible;">
   <!-- Flechas de navegación -->
-  <button class="docprev-nav-btn prev" id="docPrevBtnPrev" onclick="_pVerDocNav(-1)" title="Anterior">‹</button>
-  <button class="docprev-nav-btn next" id="docPrevBtnNext" onclick="_pVerDocNav(1)"  title="Siguiente">›</button>
+  <button class="docprev-nav-btn prev" id="docPrevBtnPrev" onclick="_pVerDocNav(-1)" title="Anterior" data-label="ANTERIOR">‹</button>
+  <button class="docprev-nav-btn next" id="docPrevBtnNext" onclick="_pVerDocNav(1)"  title="Siguiente" data-label="SIGUIENTE">›</button>
 
   <div class="modal-hdr">
     <h3 id="docPreviewTitulo">📄 Documento</h3>
     <button class="modal-x" onclick="cerrar('mDocPreview')">✕</button>
   </div>
-  <div class="modal-body" style="text-align:center;background:#2a2a2a;border-radius:6px;padding:8px;overflow:hidden;">
-    <div id="docPreviewContenido" style="min-height:400px;display:flex;align-items:center;justify-content:center;overflow:auto;"></div>
+  <div class="modal-body" style="text-align:center;background:#1e1e1e;border-radius:6px;padding:8px;overflow:hidden;">
+    <div id="docPreviewContenido" style="min-height:400px;display:flex;align-items:center;justify-content:center;max-height:68vh;"></div>
   </div>
-  <div class="modal-ftr" style="display:flex;gap:8px;justify-content:space-between;align-items:center;">
+  <div class="modal-ftr" style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;">
     <div style="display:flex;gap:8px;align-items:center;">
       <button class="btn btn-secondary" id="docPreviewBtnDescargar" onclick="_pVerDocDescargar()" style="display:none;">
         ⭳ Descargar
@@ -26024,6 +26168,13 @@ function confirmarVincularRecibo() {
       <button class="btn" id="docPreviewBtnEliminar" onclick="_pVerDocEliminar()" style="display:none;background:#c0161a;color:#fff;border-color:#c0161a;">
         🗑 Eliminar
       </button>
+    </div>
+    <!-- Zoom controls (solo para imágenes) -->
+    <div id="docZoomBar">
+      <button onclick="_docZoom(-1)" title="Alejar">−</button>
+      <span id="docZoomLabel">100%</span>
+      <button onclick="_docZoom(1)"  title="Acercar">+</button>
+      <button onclick="_docZoomReset()" title="Restablecer" style="font-size:0.7rem;width:auto;padding:0 8px;border-radius:10px;">↺</button>
     </div>
     <span id="docPreviewCounter" style="display:none;"></span>
     <button class="btn btn-ghost" onclick="cerrar('mDocPreview')">Cerrar</button>

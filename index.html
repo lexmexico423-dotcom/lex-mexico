@@ -8951,48 +8951,57 @@ async function activarModoConsulta(recibo){
   if(recibo.pdfBase64){
     // Sesión actual: ya tenemos el PDF en memoria
     await mostrarBlobEnIframe(recibo.pdfBase64);
-  } else if(window.driveToken && Date.now() < (window.tokenExpiry||0) && recibo.archivo){
-    // Nueva sesión: descargar el PDF directamente desde Google Drive
-    try {
-      setStatus('loading','Cargando PDF desde Drive…','loading');
-      const q = encodeURIComponent(
-        "name='" + recibo.archivo.replace(/'/g,"\\'") +
-        "' and '" + DRIVE_FOLDER_ID + "' in parents and trashed=false"
-      );
-      const searchRes = await fetch(
-        'https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=files(id,name)',
-        { headers:{ Authorization:'Bearer '+window.driveToken } }
-      );
-      if(!searchRes.ok) throw new Error('Drive search HTTP '+searchRes.status);
-      const searchData = await searchRes.json();
-      const file = searchData.files && searchData.files[0];
-      if(file && file.id){
-        const pdfRes = await fetch(
-          'https://www.googleapis.com/drive/v3/files/' + file.id + '?alt=media',
-          { headers:{ Authorization:'Bearer '+window.driveToken } }
-        );
-        if(pdfRes.ok){
-          const pdfBlob = await pdfRes.blob();
-          const blobUrl = URL.createObjectURL(pdfBlob);
-          iframe._blobUrl = blobUrl;
-          iframe.src = blobUrl + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
-          // Cachear en memoria para no volver a descargar en esta sesión
-          const reader = new FileReader();
-          reader.onload = () => { recibo.pdfBase64 = reader.result; };
-          reader.readAsDataURL(pdfBlob);
-          setStatus('ok','PDF cargado desde Drive','ok');
-        } else {
-          setStatus('err','No se pudo descargar el PDF desde Drive (HTTP '+pdfRes.status+')','err');
+  } else if(recibo.archivo && window.SB_DESPACHO_ID){
+    // Nueva sesión: buscar PDF en R2 y luego en Supabase Storage
+    const _path = window.SB_DESPACHO_ID + '/recibos/' + recibo.archivo;
+    let _cargado = false;
+
+    // 1) Intentar R2
+    if(!_cargado && typeof window.descargarR2 === 'function'){
+      try {
+        setStatus('loading','Cargando PDF…','loading');
+        const _blob = await window.descargarR2(_path, 'recibos');
+        if(_blob && _blob.size > 0){
+          const _url = URL.createObjectURL(_blob);
+          iframe._blobUrl = _url;
+          iframe.src = _url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
+          const _rd = new FileReader();
+          _rd.onload = () => { recibo.pdfBase64 = _rd.result; };
+          _rd.readAsDataURL(_blob);
+          setStatus('ok','PDF cargado','ok');
+          _cargado = true;
         }
-      } else {
-        setStatus('err','PDF no encontrado en Drive para folio #'+String(recibo.folio).padStart(4,'0'),'err');
-      }
-    } catch(e){
-      console.error('activarModoConsulta Drive fetch:', e);
-      setStatus('err','Error al cargar PDF desde Drive: '+e.message,'err');
+      } catch(_e){ console.warn('[activarModoConsulta] R2:', _e); }
     }
-  } else if(!window.driveToken){
-    setStatus('err','Conecta Google Drive para ver el PDF del folio','err');
+
+    // 2) Intentar Supabase Storage
+    if(!_cargado && window.SB){
+      try {
+        setStatus('loading','Cargando PDF…','loading');
+        const { data: _sd, error: _se } = await window.SB.storage
+          .from(STORAGE_BUCKET).createSignedUrl(_path, 120);
+        if(!_se && _sd && _sd.signedUrl){
+          const _res = await fetch(_sd.signedUrl);
+          if(_res.ok){
+            const _blob = await _res.blob();
+            const _url = URL.createObjectURL(_blob);
+            iframe._blobUrl = _url;
+            iframe.src = _url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
+            const _rd = new FileReader();
+            _rd.onload = () => { recibo.pdfBase64 = _rd.result; };
+            _rd.readAsDataURL(_blob);
+            setStatus('ok','PDF cargado','ok');
+            _cargado = true;
+          }
+        }
+      } catch(_e){ console.warn('[activarModoConsulta] SB Storage:', _e); }
+    }
+
+    if(!_cargado){
+      setStatus('err','No se encontró el PDF del folio #'+String(recibo.folio).padStart(4,'0'),'err');
+    }
+  } else if(!recibo.archivo){
+    setStatus('err','Este folio no tiene PDF generado','err');
   }
 
   // Actualizar toolbar

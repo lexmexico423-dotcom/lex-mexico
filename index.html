@@ -16688,9 +16688,44 @@ function pEscActualizarResto(){
   }
 }
 
-// Adjuntar archivos a Escritura — reusa la misma lógica de validación que Placas
-function pEscAdjuntar(event){
-  _pAdjuntarArchivos(event, _pEscState.documentos, _pEscRenderDocs);
+// Adjuntar archivos a Escritura — sube a R2 bajo escrituras/{comprador}/
+async function pEscAdjuntar(event){
+  const files = event.target.files;
+  if (!files || !files.length) return;
+  const MAX_BYTES = 10 * 1024 * 1024;
+  const tiposValidos = ['image/png','image/jpeg','image/jpg','application/pdf'];
+  const comprador = document.getElementById('pEscComprador')?.value.trim() || 'sin_nombre';
+  const nombreSafe = comprador.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40);
+  let agregados = 0, rechazados = 0, pendientes = files.length;
+
+  toast('Subiendo '+pendientes+' archivo(s)...','ok');
+
+  for (const file of Array.from(files)) {
+    if (file.size > MAX_BYTES || !tiposValidos.includes(file.type)) {
+      rechazados++; pendientes--;
+      if (!pendientes) _pPlacasMostrarResultadoSubida(agregados, rechazados);
+      continue;
+    }
+    if (typeof window.subirR2 === 'function' && window.SB_DESPACHO_ID) {
+      try {
+        const r2path = window.SB_DESPACHO_ID+'/escrituras/'+nombreSafe+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+        const ok = await window.subirR2(file, r2path, 'expedientes');
+        if (ok) { _pEscState.documentos.push({nombre:file.name,tipo:file.type,tamano:file.size,fechaSubida:hoy(),r2path:r2path,bucket:'expedientes'}); agregados++; }
+        else rechazados++;
+      } catch(e) { console.warn('R2 escrituras:', e); rechazados++; }
+    } else {
+      await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = e => { _pEscState.documentos.push({nombre:file.name,tipo:file.type,tamano:file.size,fechaSubida:hoy(),dataURL:e.target.result}); agregados++; resolve(); };
+        reader.onerror = () => { rechazados++; resolve(); };
+        reader.readAsDataURL(file);
+      });
+    }
+    pendientes--;
+    _pEscRenderDocs();
+    if (!pendientes) _pPlacasMostrarResultadoSubida(agregados, rechazados);
+  }
+  event.target.value = '';
 }
 
 function _pEscRenderDocs(){
@@ -16727,6 +16762,7 @@ function pEscEliminarDoc(i){
   if (!confirm('¿Quitar el archivo "'+d.nombre+'" de este pendiente?')) return;
   _pEscState.documentos.splice(i,1);
   _pEscRenderDocs();
+  if (d.r2path && typeof window.borrarR2 === 'function') borrarR2(d.r2path, d.bucket||'expedientes');
 }
 
 // Autocompletado nombre comprador (busca clientes en cualquier recibo)

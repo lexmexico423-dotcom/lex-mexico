@@ -8205,24 +8205,32 @@ async function generarPDF(datos,folio,qrDataURL){
   // ── RECIBO OFICIAL / COMPROBANTE DE ABONO + fecha ──
   doc.setTextColor(154,110,24); doc.setFontSize(10); doc.setFont('times','bold');
   doc.text('RECIBO OFICIAL', margin, yAfterH);
-  const fechaRec=datos.fecha_recibo?new Date(datos.fecha_recibo+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}):'';
+  // Para actualizaciones (B, C, D…): la fecha principal es la de ESTA versión
+  // (última entrada de fechasImpresion). La original aparece pequeña como referencia.
+  // Para la versión original (A): la fecha principal es datos.fecha_recibo.
+  const _fps = datos.fechasImpresion || [];
+  const _esUpdate = _fps.length > 1;
+  const _fpPrincipal = _esUpdate ? _fps[_fps.length - 1] : null;
+  const fechaRec = _esUpdate
+    ? (_fpPrincipal.fecha ? new Date(_fpPrincipal.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}) : '')
+    : (datos.fecha_recibo ? new Date(datos.fecha_recibo+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}) : '');
+  const horaRec = _esUpdate ? (_fpPrincipal.hora || datos.hora_recibo || '') : (datos.hora_recibo || '');
   doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(80,65,40);
-  doc.text('Santiago Juxtlahuaca, Oaxaca \u2014 '+fechaRec+' '+datos.hora_recibo+' hrs.',pageW-margin,yAfterH,{align:'right'});
+  doc.text('Santiago Juxtlahuaca, Oaxaca — '+fechaRec+' '+horaRec+' hrs.',pageW-margin,yAfterH,{align:'right'});
 
-  // Fechas adicionales de reimpresión (acumuladas, debajo de la original)
+  // Versiones anteriores: aparecen en letra chica como referencia discreta
   let yLineaFechas = yAfterH;
-  if(datos.fechasImpresion && datos.fechasImpresion.length > 1){
+  if(_esUpdate){
     doc.setFontSize(6.5); doc.setFont('helvetica','italic'); doc.setTextColor(154,110,24);
-    // Saltar la primera (original ya impresa arriba) y pintar las demás
-    for(let i=1; i<datos.fechasImpresion.length; i++){
-      const f = datos.fechasImpresion[i];
+    // Mostrar todas las versiones anteriores (índice 0 hasta penúltima) como referencia
+    for(let i=0; i<_fps.length-1; i++){
+      const f = _fps[i];
       const fStr = f.fecha ? new Date(f.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'}) : '';
       yLineaFechas += 3;
-      doc.text((f.etiqueta||'Reimpresi\u00f3n')+': '+fStr+' '+(f.hora||'')+' hrs.', pageW-margin, yLineaFechas, {align:'right'});
+      doc.text('Ref. '+(f.etiqueta||'Original')+': '+fStr+' '+(f.hora||'')+' hrs.', pageW-margin, yLineaFechas, {align:'right'});
     }
     doc.setFont('helvetica','normal'); doc.setTextColor(80,65,40);
-  }
-  doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.line(margin,yLineaFechas+1.5,pageW-margin,yLineaFechas+1.5);
+  }  doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.line(margin,yLineaFechas+1.5,pageW-margin,yLineaFechas+1.5);
 
   let y=yLineaFechas+4.5;
   const campo=(label,val,x,cy,w)=>{

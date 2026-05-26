@@ -7220,7 +7220,12 @@ async function actualizarArchivoControl(){
         estadoPlacas: r.estadoPlacas||null,
         cancelado: r.cancelado||false,
         motivoCancelacion: r.motivoCancelacion||'',
-        fechaCancelacion: r.fechaCancelacion||''
+        fechaCancelacion: r.fechaCancelacion||'',
+        letra: r.letra||null,
+        esVersionAnterior: r.esVersionAnterior||false,
+        esActualizacion: r.esActualizacion||false,
+        fechaActualizacion: r.fechaActualizacion||null,
+        horaActualizacion: r.horaActualizacion||null
       }))
     };
 
@@ -32789,6 +32794,12 @@ function repararFoliosDuplicados() {
   Object.keys(porFolio).forEach(function(f) {
     const grupo = porFolio[f];
     if(grupo.length <= 1) return;
+    // Ignorar grupos donde todos los registros son versiones A/B/C del mismo folio
+    // (misma numeración, distintas letras = versioning legítimo, no son duplicados)
+    const letrasUnicas = new Set(grupo.map(function(r){
+      return r.letra || letraVersion(r) || 'A';
+    }));
+    if(letrasUnicas.size === grupo.length) return; // cada registro tiene letra distinta → no son duplicados
     // Ordenar por fecha+hora ascendente — el primero conserva el folio
     grupo.sort(function(a, b) {
       const tsA = (a.fecha||'') + 'T' + (a.hora||'00:00');

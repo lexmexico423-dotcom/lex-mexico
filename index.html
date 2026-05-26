@@ -16975,6 +16975,7 @@ function _pVerDoc(d, pendienteIdx, docIdx, lista){
   }
   window._docPreviewCtx = { d, pendienteIdx, docIdx, lista: docList };
   window._docZoomLevel  = 1;
+  window._docPanOffset  = { x:0, y:0 };
   _pVerDocRender();
   document.getElementById('mDocPreview').classList.add('show');
 }
@@ -17024,12 +17025,11 @@ function _pVerDocRender(){
     if (esPDF) {
       cont.innerHTML = '<iframe src="'+url+'#toolbar=1&navpanes=1&scrollbar=1" title="'+d.nombre+'" allowfullscreen></iframe>';
     } else {
-      cont.innerHTML = '<img src="'+url+'" id="docPreviewImg" alt="'+d.nombre+'" style="max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;">';
-      // Wheel zoom en imagen
-      cont.onwheel = function(e){
-        e.preventDefault();
-        _docZoom(e.deltaY < 0 ? 1 : -1);
-      };
+      cont.innerHTML = '<img src="'+url+'" id="docPreviewImg" alt="'+d.nombre+'" style="max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;transform-origin:center center;">';
+      // Wheel zoom
+      cont.onwheel = function(e){ e.preventDefault(); _docZoom(e.deltaY < 0 ? 1 : -1); };
+      // Pan / drag
+      _docPanInit(cont);
     }
   }
 
@@ -17051,31 +17051,91 @@ function _pVerDocRender(){
   }
 }
 
-// ── Zoom ──────────────────────────────────────────────────────
+// ── Zoom + Pan ────────────────────────────────────────────────
+window._docPanOffset = { x:0, y:0 };
+
 function _docZoom(dir){
   const steps = _DOC_ZOOM_STEPS;
   let i = steps.indexOf(window._docZoomLevel);
   if (i === -1) i = steps.indexOf(1);
   i = Math.max(0, Math.min(steps.length - 1, i + dir));
   window._docZoomLevel = steps[i];
+  // Reset pan cuando vuelve a 100%
+  if (window._docZoomLevel === 1) window._docPanOffset = { x:0, y:0 };
   _docZoomApply();
 }
 function _docZoomReset(){
-  window._docZoomLevel = 1;
+  window._docZoomLevel  = 1;
+  window._docPanOffset  = { x:0, y:0 };
   _docZoomApply();
 }
 function _docZoomApply(){
-  const img = document.getElementById('docPreviewImg');
+  const img  = document.getElementById('docPreviewImg');
+  const cont = document.getElementById('docPreviewContenido');
+  const z    = window._docZoomLevel;
+  const { x, y } = window._docPanOffset;
   if (img) {
-    img.style.transform   = 'scale('+window._docZoomLevel+')';
-    img.style.maxWidth    = window._docZoomLevel > 1 ? 'none' : '100%';
-    img.style.maxHeight   = window._docZoomLevel > 1 ? 'none' : '65vh';
+    img.style.transform  = 'translate('+x+'px,'+y+'px) scale('+z+')';
+    img.style.maxWidth   = z > 1 ? 'none' : '100%';
+    img.style.maxHeight  = z > 1 ? 'none' : '65vh';
+    img.style.transition = 'transform 0.15s ease';
   }
+  // Cursor: manita cuando hay zoom, normal cuando es 1:1
+  if (cont) cont.style.cursor = z > 1 ? 'grab' : 'default';
   _docZoomUpdateLabel();
 }
 function _docZoomUpdateLabel(){
   const lbl = document.getElementById('docZoomLabel');
   if (lbl) lbl.textContent = Math.round(window._docZoomLevel * 100) + '%';
+}
+
+// ── Pan (arrastrar imagen con zoom) ──────────────────────────
+function _docPanInit(cont){
+  let dragging = false, startX, startY, originX, originY;
+
+  cont.addEventListener('mousedown', function(e){
+    if (window._docZoomLevel <= 1) return;
+    dragging = true;
+    startX = e.clientX; startY = e.clientY;
+    originX = window._docPanOffset.x; originY = window._docPanOffset.y;
+    cont.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', function(e){
+    if (!dragging) return;
+    window._docPanOffset.x = originX + (e.clientX - startX);
+    window._docPanOffset.y = originY + (e.clientY - startY);
+    const img = document.getElementById('docPreviewImg');
+    if (img) {
+      const z = window._docZoomLevel;
+      img.style.transition = 'none';
+      img.style.transform  = 'translate('+window._docPanOffset.x+'px,'+window._docPanOffset.y+'px) scale('+z+')';
+    }
+  });
+  window.addEventListener('mouseup', function(){
+    if (!dragging) return;
+    dragging = false;
+    const cont2 = document.getElementById('docPreviewContenido');
+    if (cont2) cont2.style.cursor = window._docZoomLevel > 1 ? 'grab' : 'default';
+  });
+
+  // Touch (móvil)
+  let touchStart = null, touchOrigin = null;
+  cont.addEventListener('touchstart', function(e){
+    if (window._docZoomLevel <= 1 || e.touches.length !== 1) return;
+    touchStart  = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    touchOrigin = { x: window._docPanOffset.x, y: window._docPanOffset.y };
+  }, { passive:true });
+  cont.addEventListener('touchmove', function(e){
+    if (!touchStart || e.touches.length !== 1) return;
+    window._docPanOffset.x = touchOrigin.x + (e.touches[0].clientX - touchStart.x);
+    window._docPanOffset.y = touchOrigin.y + (e.touches[0].clientY - touchStart.y);
+    const img = document.getElementById('docPreviewImg');
+    const z   = window._docZoomLevel;
+    if (img) { img.style.transition='none'; img.style.transform='translate('+window._docPanOffset.x+'px,'+window._docPanOffset.y+'px) scale('+z+')'; }
+    e.preventDefault();
+  }, { passive:false });
+  cont.addEventListener('touchend', function(){ touchStart = null; });
 }
 
 // Navegación ◀ ▶
@@ -17087,6 +17147,7 @@ function _pVerDocNav(dir){
   ctx.docIdx = newIdx;
   ctx.d = ctx.lista[newIdx];
   window._docZoomLevel = 1;
+  window._docPanOffset = { x:0, y:0 };
   _pVerDocRender();
 }
 

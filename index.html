@@ -7431,13 +7431,13 @@ async function generarComplemento(reciboOrig, pago){
         const conc = c0 ? (c0.concepto||'') : '';
         const desc = c0 ? (c0.descripcion||'') : '';
         const txt  = conc + (desc ? ' — ' + desc : '');
-        return tipoMov + ' · Recibo #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, letraVersion(reciboOrig)) + ' · ' + (reciboOrig.nombre||'') + (txt ? ' · ' + txt : '');
+        return tipoMov + ' · Recibo #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, reciboOrig.letra||'A') + ' · ' + (reciboOrig.nombre||'') + (txt ? ' · ' + txt : '');
       })(),
       nombre: reciboOrig.nombre || '',
       folio: reciboOrig.folio,
       monto: pago,
       tipo: 'ingreso',
-      cat: (liquidado ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, letraVersion(reciboOrig)),
+      cat: (liquidado ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, reciboOrig.letra||'A'),
       estatus: liquidado ? 'Liquidado' : 'Abono parcial',
       fuente: 'recibo',
       responsable: typeof empNombre === 'function' ? empNombre() : (reciboOrig.responsable||'')
@@ -21982,19 +21982,48 @@ async function abrirPreviaDesdeContab(numFolio){
     ? '<span style="background:rgba(200,149,42,0.15);color:#e8c875;border:1px solid rgba(200,149,42,0.3);border-radius:4px;padding:2px 8px;font-family:JetBrains Mono,monospace;font-size:0.6rem;">PENDIENTE $'+fmt(saldo)+'</span>'
     : '<span style="background:rgba(40,180,80,0.15);color:#4dca6a;border:1px solid rgba(40,180,80,0.3);border-radius:4px;padding:2px 8px;font-family:JetBrains Mono,monospace;font-size:0.6rem;">&#10003; LIQUIDADO</span>';
 
-  // SIEMPRE regenerar desde los datos actuales en memoria
-  // Igual que rec_regenerarPDFDesdeRecibo: recalcular saldos desde pagosParciales
-  msg.textContent='Generando PDF actualizado...';
   try{
     if(!r.clientes && !r.nombre){ msg.textContent='Sin datos suficientes para generar el PDF'; loading.style.display='none'; return; }
 
-    // ── Validar y corregir saldos en memoria ──
+    // ── PDF inmutable: si ya existe en memoria, mostrarlo sin regenerar ──
+    if(r.pdfBase64){
+      embed.setAttribute('src', r.pdfBase64);
+      loading.style.display='none';
+      return;
+    }
+
+    // ── Intentar cargar desde Supabase Storage por nombre de archivo ──
+    if(window.SB && window.SB_DESPACHO_ID && r.archivo){
+      try{
+        msg.textContent='Cargando PDF desde servidor...';
+        const _sbPath = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
+        const { data: _sbData, error: _sbErr } = await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_sbPath, 120);
+        if(!_sbErr && _sbData && _sbData.signedUrl){
+          const _resp = await fetch(_sbData.signedUrl);
+          if(_resp.ok){
+            const _blob = await _resp.blob();
+            const _blobUrl = URL.createObjectURL(_blob);
+            embed.setAttribute('src', _blobUrl + '#toolbar=0&navpanes=0');
+            loading.style.display='none';
+            // Cachear para no volver a descargar en esta sesión
+            const _rd = new FileReader();
+            _rd.onload = () => { r.pdfBase64 = _rd.result; };
+            _rd.readAsDataURL(_blob);
+            return;
+          }
+        }
+      } catch(_eSB){ console.warn('[contabPDF] SB Storage:', _eSB); }
+    }
+
+    // ── Último recurso: regenerar SIN mutar el recibo original ──
+    msg.textContent='Generando PDF...';
+    // Trabajar sobre una copia — NUNCA mutar el objeto r original
+    const _rCopy = Object.assign({}, r);
     (function _validarSaldos(rec){
       const totalReal = parseFloat(rec.total) || 0;
       const anticipo  = parseFloat(rec.anticipo) || 0;
       const pagos     = rec.pagosParciales || [];
       const sumaPagos = pagos.reduce((s,p) => s + (parseFloat(p.cantidad)||0), 0);
-      // Si hay pagosParciales usar su suma; si no, usar anticipo (o totalAbonado guardado)
       const abonadoGuardado = (rec.totalAbonado != null && Number(rec.totalAbonado) > 0) ? Number(rec.totalAbonado) : 0;
       const totalAbonadoReal = sumaPagos > 0
         ? Math.min(sumaPagos, totalReal)
@@ -22003,33 +22032,32 @@ async function abrirPreviaDesdeContab(numFolio){
       rec.totalAbonado  = totalAbonadoReal;
       rec.saldoNuevo    = saldoReal;
       rec.saldoPendiente = saldoReal;
-    })(r);
-    // ─────────────────────────────────────────────────────────────────────────
+    })(_rCopy);
 
     const datos = {
-      folio: r.folio,
-      clientes: r.clientes||[{nombre:r.nombre||'',movil:'',tel:'',domicilio:''}],
-      conceptos: r.conceptos||[], tipoTramite: r.tipoTramite||'normal',
-      fecha_recibo: r.fecha_recibo||r.fecha, hora_recibo: r.hora_recibo||r.hora,
-      anticipo: r.anticipo||'0', responsable: r.responsable||'',
-      nombre_cliente_firma: r.nombre_cliente_firma||r.nombre||'',
-      tramites: r.tramites||'', clase:r.clase||'', marca:r.marca||'',
-      serie:r.serie||'', motor:r.motor||'', anio:r.anio||'', puertas:r.puertas||'',
-      color_veh:r.color_veh||'', transmision:r.transmision||'',
-      cilindros:r.cilindros||'', placa:r.placa||'',
-      ultima_tenencia:r.ultima_tenencia||'', origen:r.origen||'', combustible:r.combustible||'',
-      copias:r.copias||[], costosExtra:r.costosExtra||[],
-      pagosParciales:r.pagosParciales||[], fechasImpresion:r.fechasImpresion||[],
-      totalGeneral: r.total||0,
-      totalAbonado: r.totalAbonado,
-      saldoNuevo:   r.saldoNuevo
+      folio: _rCopy.folio,
+      clientes: _rCopy.clientes||[{nombre:_rCopy.nombre||'',movil:'',tel:'',domicilio:''}],
+      conceptos: _rCopy.conceptos||[], tipoTramite: _rCopy.tipoTramite||'normal',
+      fecha_recibo: _rCopy.fecha_recibo||_rCopy.fecha, hora_recibo: _rCopy.hora_recibo||_rCopy.hora,
+      anticipo: _rCopy.anticipo||'0', responsable: _rCopy.responsable||'',
+      nombre_cliente_firma: _rCopy.nombre_cliente_firma||_rCopy.nombre||'',
+      tramites: _rCopy.tramites||'', clase:_rCopy.clase||'', marca:_rCopy.marca||'',
+      serie:_rCopy.serie||'', motor:_rCopy.motor||'', anio:_rCopy.anio||'', puertas:_rCopy.puertas||'',
+      color_veh:_rCopy.color_veh||'', transmision:_rCopy.transmision||'',
+      cilindros:_rCopy.cilindros||'', placa:_rCopy.placa||'',
+      ultima_tenencia:_rCopy.ultima_tenencia||'', origen:_rCopy.origen||'', combustible:_rCopy.combustible||'',
+      copias:_rCopy.copias||[], costosExtra:_rCopy.costosExtra||[],
+      pagosParciales:_rCopy.pagosParciales||[], fechasImpresion:_rCopy.fechasImpresion||[],
+      totalGeneral: _rCopy.total||0,
+      totalAbonado: _rCopy.totalAbonado,
+      saldoNuevo:   _rCopy.saldoNuevo
     };
 
-    const qrTexto='LEX-MEXICO|Folio:'+folioFormato(r.folio, r.anio_folio)+'|'+(r.nombre||'')+'|'+(datos.fecha_recibo||'')+' '+(datos.hora_recibo||'');
+    const qrTexto='LEX-MEXICO|Folio:'+folioFormato(_rCopy.folio, _rCopy.anio_folio)+'|'+(_rCopy.nombre||'')+'|'+(datos.fecha_recibo||'')+' '+(datos.hora_recibo||'');
     const qrDataURL=await qrToDataURL(qrTexto);
-    const doc=await generarPDF(datos,r.folio,qrDataURL);
+    const doc=await generarPDF(datos,_rCopy.folio,qrDataURL);
     const pdfUri=doc.output('datauristring');
-    r.pdfBase64=pdfUri;
+    // NO sobreescribir r.pdfBase64 — el regenerado no es el PDF original impreso
     embed.setAttribute('src',pdfUri);
     loading.style.display='none';
   }catch(e){

@@ -7240,7 +7240,7 @@ async function guardarEnDirectorio(datos){
   if(typeof D === 'undefined') return false;
   try {
     if(!Array.isArray(D.directorio)) D.directorio = [];
-    const folioStr = folioFormato(dados_folio_tmp);
+    const folioStr = folioFormato(datos.folio);
     (datos.clientes || []).forEach(c => {
       const nombre = (c.nombre || '').trim();
       if(!nombre) return;

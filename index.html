@@ -35837,8 +35837,7 @@ function regresarAlFormulario(){
   }
 }
 </script>
-</body>
-</html>// ─── Documentos del expediente en R2 ──────────────────────────────
+<script>// ─── Documentos del expediente en R2 ──────────────────────────────
 
 function abrirDocsJuicio(){
   if(jdetIdx < 0) return;
@@ -36650,6 +36649,78 @@ function guardarPend(){
   const p = _construirPendienteBase(prevP, especifico);
   _persistirPendiente(p, sec==='placas'?'Pendiente de placas guardado ✓':'Pendiente guardado ✓');
 }
+
+// ─── DETALLE DE PENDIENTE (clic en la card) ─────────────────────────────────
+function _verDetallePendiente(idx){
+  const p = D.pendientes[idx];
+  if(!p) return;
+  const _tipoLbl = {
+    'alta':'Alta de placas','baja':'Baja de placas',
+    'cambio_propietario':'Cambio de propietario',
+    'tarjeta_circulacion':'Tarjeta de circulación',
+    'reemplacamiento':'Reemplacamiento'
+  };
+  const priColor={'urgente':'#c0161a','medio':'#b07010','normal':'#1a7a3a'};
+  const priDot={'urgente':'#c0161a','medio':'#d4900a','normal':'#1a9a4a'};
+  const col = priColor[p.prioridad]||'#888';
+  const dot = priDot[p.prioridad]||'#888';
+  const priLabel={'urgente':'🔴 Urgente','medio':'🟡 Medio','normal':'🟢 Normal'}[p.prioridad]||p.prioridad;
+
+  const filaHtml = (ico,lbl,val) => val ? `<div style="display:flex;gap:8px;padding:7px 0;border-bottom:1px solid rgba(212,184,112,0.18);align-items:flex-start;">
+    <span style="font-size:0.75rem;flex-shrink:0;">${ico}</span>
+    <span style="font-family:monospace;font-size:0.6rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;min-width:90px;flex-shrink:0;padding-top:2px;">${lbl}</span>
+    <span style="font-size:0.78rem;color:#1a1008;line-height:1.45;white-space:pre-line;">${esc(String(val))}</span>
+  </div>` : '';
+
+  // Guardar resultado IA previo si existía
+  const iaResEl = document.getElementById('ia-veh-res-'+idx);
+  const iaPrev = iaResEl ? iaResEl.textContent : '';
+
+  const html = `
+  <div style="position:fixed;inset:0;background:rgba(10,8,4,0.65);z-index:8000;display:flex;align-items:center;justify-content:center;padding:16px;" id="_det-pend-ov" onclick="if(event.target===this)this.remove()">
+    <div style="background:#fdfaf4;border:2px solid #d4b870;border-radius:14px;max-width:540px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 16px 48px rgba(140,101,24,0.22);">
+      <!-- Header -->
+      <div style="padding:16px 20px 12px;border-bottom:1.5px solid #ecdfa8;background:linear-gradient(135deg,#fdfaf4,#f7f0dc);border-radius:12px 12px 0 0;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:1;">
+        <div>
+          <div style="font-family:monospace;font-size:0.55rem;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#8c6518;margin-bottom:4px;">📌 Detalle del Pendiente</div>
+          <div style="font-family:serif;font-size:1.05rem;color:#1a1008;font-weight:500;line-height:1.3;">${esc(p.texto)}</div>
+        </div>
+        <button onclick="document.getElementById('_det-pend-ov').remove()" style="background:none;border:1.5px solid #d4b870;border-radius:8px;width:30px;height:30px;cursor:pointer;color:#8c6518;font-size:1rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;" onmouseover="this.style.background='rgba(200,149,42,0.1)'" onmouseout="this.style.background='none'">✕</button>
+      </div>
+      <!-- Body -->
+      <div style="padding:16px 20px;">
+        <!-- Prioridad badge -->
+        <div style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,0.04);border-radius:20px;padding:4px 12px;margin-bottom:14px;">
+          <div style="width:8px;height:8px;border-radius:50%;background:${dot};"></div>
+          <span style="font-size:0.68rem;font-weight:700;color:${col};letter-spacing:0.04em;">${priLabel}</span>
+        </div>
+        <!-- Datos -->
+        <div style="background:#fff;border:1.5px solid rgba(212,184,112,0.4);border-radius:10px;padding:4px 14px;">
+          ${filaHtml('👤','Persona',p.persona)}
+          ${filaHtml('📂','Categoría',p.categoria||p.seccion)}
+          ${p.tipoVehicular?filaHtml('🚗','Tipo',_tipoLbl[p.tipoVehicular]||p.tipoVehicular):''}
+          ${p.placasEstado?filaHtml('🗺','Estado',p.placasEstado):''}
+          ${p.placasNumero?filaHtml('🔢','Placa',p.placasNumero):''}
+          ${p.reciboVinculadoFolio?filaHtml('🧾','Recibo','#'+folioFormato(p.reciboVinculadoFolio)):''}
+          ${p.resp?filaHtml('👤','Responsable',p.resp):''}
+          ${p.fechaCreacion?filaHtml('📅','Creado',p.fechaCreacion):''}
+          ${p.fechaLimite?filaHtml('⏰','Límite',p.fechaLimite):''}
+          ${p.carpeta?filaHtml('🗂','Carpeta','#'+p.carpeta):''}
+          ${p.descripcionPlacas?filaHtml('📝','Descripción',p.descripcionPlacas):''}
+          ${p.obs?filaHtml('💬','Notas',p.obs):''}
+        </div>
+
+      </div>
+      <!-- Footer -->
+      <div style="padding:12px 20px 16px;border-top:1.5px solid #ecdfa8;display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('_det-pend-ov').remove()" style="background:none;border:1.5px solid #d4b870;border-radius:8px;padding:8px 18px;cursor:pointer;font-family:monospace;font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;color:#8c6518;font-weight:700;" onmouseover="this.style.background='rgba(200,149,42,0.08)'" onmouseout="this.style.background='none'">Cerrar</button>
+        <button onclick="document.getElementById('_det-pend-ov').remove();abrirPendiente(${idx})" style="background:linear-gradient(135deg,#8c6518,#c8952a);border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-family:monospace;font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;color:#fff;font-weight:700;" onmouseover="this.style.opacity='0.88'" onmouseout="this.style.opacity='1'">✏ Editar</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
 
 // Construir el objeto base preservando metadatos previos (resuelto, fechas, etc.)
 function _construirPendienteBase(prevP, especifico){

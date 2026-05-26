@@ -7384,12 +7384,18 @@ async function generarComplemento(reciboOrig, pago){
   // Guardar en la nube silenciosamente
   subirPDFaDrive(doc.output('blob'), nombreArchivo).catch(e=>console.warn('SB:',e));
 
-  // Actualizar saldo del recibo original
+  // Actualizar saldo del recibo original — copia inmutable, nunca mutar directamente
   const idx = appData.recibos.findIndex(r=>r.folio===reciboOrig.folio);
   if(idx>=0){
-    // ── Snapshot ANTES de mutar — historial de versiones ─────────
     _guardarSnapshotRecibo(appData.recibos[idx], 'Complemento de pago · Folio #'+folioFormato(folioComp));
-    appData.recibos[idx].saldoPendiente = saldoNuevo;
+    const recOrig = appData.recibos[idx];
+    const nuevoAbonado = (parseFloat(recOrig.totalAbonado)||parseFloat(recOrig.anticipo)||0) + pago;
+    appData.recibos[idx] = Object.assign({}, recOrig, {
+      totalAbonado:   nuevoAbonado,
+      saldoPendiente: saldoNuevo,
+      saldoNuevo:     saldoNuevo,
+      liquidado:      saldoNuevo <= 0 ? true : (recOrig.liquidado||false)
+    });
   }
 
   // Agregar al historial con generadoPor
@@ -7436,13 +7442,13 @@ async function generarComplemento(reciboOrig, pago){
         const conc = c0 ? (c0.concepto||'') : '';
         const desc = c0 ? (c0.descripcion||'') : '';
         const txt  = conc + (desc ? ' — ' + desc : '');
-        return tipoMov + ' · Recibo #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, letraVersion(reciboOrig)) + ' · ' + (reciboOrig.nombre||'') + (txt ? ' · ' + txt : '');
+        return tipoMov + ' · Recibo #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, reciboOrig.letra||'A') + ' · ' + (reciboOrig.nombre||'') + (txt ? ' · ' + txt : '');
       })(),
       nombre: reciboOrig.nombre || '',
       folio: reciboOrig.folio,
       monto: pago,
       tipo: 'ingreso',
-      cat: (liquidado ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, letraVersion(reciboOrig)),
+      cat: (liquidado ? 'Liquidación' : 'Abono parcial') + ' · #' + folioConLetra(reciboOrig.folio, reciboOrig.anio_folio, reciboOrig.letra||'A'),
       estatus: liquidado ? 'Liquidado' : 'Abono parcial',
       fuente: 'recibo',
       responsable: typeof empNombre === 'function' ? empNombre() : (reciboOrig.responsable||'')
@@ -12979,7 +12985,9 @@ function _foliosYaEnCaja(movsCaja) {
 function _reciboAMovSintetico(r) {
   const anticipo     = parseFloat(r.anticipo || 0);
   const totalAbonado = parseFloat(r.totalAbonado || 0);
-  const monto = totalAbonado > 0 ? totalAbonado : anticipo;
+  // Usar anticipo (pago registrado en ESTE folio) como monto del movimiento.
+  // totalAbonado es acumulado histórico — usarlo causaría doble conteo en folios de abono.
+  const monto = anticipo > 0 ? anticipo : (totalAbonado > 0 ? totalAbonado : 0);
   const liq   = r.saldoPendiente === 0;
   const fechaRec = (r.fecha && /^\d{4}-\d{2}-\d{2}/.test(r.fecha))
     ? r.fecha.substring(0, 10) : (r.fecha || '—');
@@ -22025,54 +22033,78 @@ async function abrirPreviaDesdeContab(numFolio){
     ? '<span style="background:rgba(200,149,42,0.15);color:#e8c875;border:1px solid rgba(200,149,42,0.3);border-radius:4px;padding:2px 8px;font-family:JetBrains Mono,monospace;font-size:0.6rem;">PENDIENTE $'+fmt(saldo)+'</span>'
     : '<span style="background:rgba(40,180,80,0.15);color:#4dca6a;border:1px solid rgba(40,180,80,0.3);border-radius:4px;padding:2px 8px;font-family:JetBrains Mono,monospace;font-size:0.6rem;">&#10003; LIQUIDADO</span>';
 
-  // SIEMPRE regenerar desde los datos actuales en memoria
-  // Igual que rec_regenerarPDFDesdeRecibo: recalcular saldos desde pagosParciales
-  msg.textContent='Generando PDF actualizado...';
   try{
     if(!r.clientes && !r.nombre){ msg.textContent='Sin datos suficientes para generar el PDF'; loading.style.display='none'; return; }
 
-    // ── Validar y corregir saldos en memoria ──
-    (function _validarSaldos(rec){
-      const totalReal = parseFloat(rec.total) || 0;
-      const anticipo  = parseFloat(rec.anticipo) || 0;
-      const pagos     = rec.pagosParciales || [];
-      const sumaPagos = pagos.reduce((s,p) => s + (parseFloat(p.cantidad)||0), 0);
-      // Si hay pagosParciales usar su suma; si no, usar anticipo (o totalAbonado guardado)
-      const abonadoGuardado = (rec.totalAbonado != null && Number(rec.totalAbonado) > 0) ? Number(rec.totalAbonado) : 0;
-      const totalAbonadoReal = sumaPagos > 0
-        ? Math.min(sumaPagos, totalReal)
-        : (abonadoGuardado > 0 ? Math.min(abonadoGuardado, totalReal) : Math.min(anticipo, totalReal));
-      const saldoReal = Math.max(0, totalReal - totalAbonadoReal);
-      rec.totalAbonado  = totalAbonadoReal;
-      rec.saldoNuevo    = saldoReal;
-      rec.saldoPendiente = saldoReal;
-    })(r);
-    // ─────────────────────────────────────────────────────────────────────────
+    // ── 1. PDF original en sesión — mostrarlo directamente sin regenerar ──
+    if(r.pdfBase64){
+      embed.setAttribute('src', r.pdfBase64);
+      loading.style.display='none';
+      return;
+    }
+
+    // ── 2. Intentar Supabase Storage por nombre de archivo ──
+    if(window.SB && window.SB_DESPACHO_ID && r.archivo){
+      try{
+        msg.textContent='Cargando PDF desde servidor...';
+        const _sbPath = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
+        const { data: _sd, error: _se } = await window.SB.storage
+          .from(STORAGE_BUCKET).createSignedUrl(_sbPath, 120);
+        if(!_se && _sd && _sd.signedUrl){
+          const _res = await fetch(_sd.signedUrl);
+          if(_res.ok){
+            const _blob = await _res.blob();
+            const _url  = URL.createObjectURL(_blob);
+            embed.setAttribute('src', _url + '#toolbar=0&navpanes=0');
+            loading.style.display='none';
+            // Cachear en sesión sin sobrescribir el original
+            const _rd = new FileReader();
+            _rd.onload = () => { if(!r.pdfBase64) r.pdfBase64 = _rd.result; };
+            _rd.readAsDataURL(_blob);
+            return;
+          }
+        }
+      }catch(_eSB){ console.warn('[contabPDF] Storage:', _eSB); }
+    }
+
+    // ── 3. Último recurso: regenerar sobre COPIA — NUNCA mutar el recibo original ──
+    msg.textContent='Generando PDF...';
+    const _rC = Object.assign({}, r);
+    (function _calcSaldos(rec){
+      const t  = parseFloat(rec.total)||0;
+      const a  = parseFloat(rec.anticipo)||0;
+      const sp = (rec.pagosParciales||[]).reduce((s,p)=>s+(parseFloat(p.cantidad)||0),0);
+      const ab = Number(rec.totalAbonado)||0;
+      const pagado = sp > 0 ? Math.min(sp,t) : (ab > 0 ? Math.min(ab,t) : Math.min(a,t));
+      rec.totalAbonado   = pagado;
+      rec.saldoNuevo     = Math.max(0, t - pagado);
+      rec.saldoPendiente = rec.saldoNuevo;
+    })(_rC);
 
     const datos = {
-      folio: r.folio,
-      clientes: r.clientes||[{nombre:r.nombre||'',movil:'',tel:'',domicilio:''}],
-      conceptos: r.conceptos||[], tipoTramite: r.tipoTramite||'normal',
-      fecha_recibo: r.fecha_recibo||r.fecha, hora_recibo: r.hora_recibo||r.hora,
-      anticipo: r.anticipo||'0', responsable: r.responsable||'',
-      nombre_cliente_firma: r.nombre_cliente_firma||r.nombre||'',
-      tramites: r.tramites||'', clase:r.clase||'', marca:r.marca||'',
-      serie:r.serie||'', motor:r.motor||'', anio:r.anio||'', puertas:r.puertas||'',
-      color_veh:r.color_veh||'', transmision:r.transmision||'',
-      cilindros:r.cilindros||'', placa:r.placa||'',
-      ultima_tenencia:r.ultima_tenencia||'', origen:r.origen||'', combustible:r.combustible||'',
-      copias:r.copias||[], costosExtra:r.costosExtra||[],
-      pagosParciales:r.pagosParciales||[], fechasImpresion:r.fechasImpresion||[],
-      totalGeneral: r.total||0,
-      totalAbonado: r.totalAbonado,
-      saldoNuevo:   r.saldoNuevo
+      folio: _rC.folio,
+      clientes: _rC.clientes||[{nombre:_rC.nombre||'',movil:'',tel:'',domicilio:''}],
+      conceptos: _rC.conceptos||[], tipoTramite: _rC.tipoTramite||'normal',
+      fecha_recibo: _rC.fecha_recibo||_rC.fecha, hora_recibo: _rC.hora_recibo||_rC.hora,
+      anticipo: _rC.anticipo||'0', responsable: _rC.responsable||'',
+      nombre_cliente_firma: _rC.nombre_cliente_firma||_rC.nombre||'',
+      tramites: _rC.tramites||'', clase:_rC.clase||'', marca:_rC.marca||'',
+      serie:_rC.serie||'', motor:_rC.motor||'', anio:_rC.anio||'', puertas:_rC.puertas||'',
+      color_veh:_rC.color_veh||'', transmision:_rC.transmision||'',
+      cilindros:_rC.cilindros||'', placa:_rC.placa||'',
+      ultima_tenencia:_rC.ultima_tenencia||'', origen:_rC.origen||'', combustible:_rC.combustible||'',
+      copias:_rC.copias||[], costosExtra:_rC.costosExtra||[],
+      pagosParciales:_rC.pagosParciales||[], fechasImpresion:_rC.fechasImpresion||[],
+      totalGeneral: _rC.total||0,
+      totalAbonado: _rC.totalAbonado,
+      saldoNuevo:   _rC.saldoNuevo
     };
 
-    const qrTexto='LEX-MEXICO|Folio:'+folioFormato(r.folio, r.anio_folio)+'|'+(r.nombre||'')+'|'+(datos.fecha_recibo||'')+' '+(datos.hora_recibo||'');
+    const qrTexto='LEX-MEXICO|Folio:'+folioFormato(_rC.folio,_rC.anio_folio)+'|'+(_rC.nombre||'')+'|'+(datos.fecha_recibo||'')+' '+(datos.hora_recibo||'');
     const qrDataURL=await qrToDataURL(qrTexto);
-    const doc=await generarPDF(datos,r.folio,qrDataURL);
+    const doc=await generarPDF(datos,_rC.folio,qrDataURL);
     const pdfUri=doc.output('datauristring');
-    r.pdfBase64=pdfUri;
+    if(!r.pdfBase64) r.pdfBase64 = pdfUri; // cachear solo si no había original
     embed.setAttribute('src',pdfUri);
     loading.style.display='none';
   }catch(e){

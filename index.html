@@ -8350,70 +8350,63 @@ async function generarPDF(datos,folio,qrDataURL){
     if(y + 52 > 262){ doc.addPage(); y = 18; }
 
     y += 3;
-    // QR a la izquierda del resumen
-    if(qrDataURL){ try{doc.addImage(qrDataURL,'PNG',margin,y,18,18);}catch(e){ registrarError('catch vacio', e); } }
-    const rX = margin + cW * 0.38;
-    const rW = cW * 0.62;
-
-    // Título de la sección
+    // Título sección — fondo beige ancho completo
     doc.setFillColor(248,244,232);
     doc.rect(margin, y-3, cW, 5, 'F');
     doc.setTextColor(154,110,24); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
     doc.text(_esLiqTotal ? 'RESUMEN DE LIQUIDACIÓN' : 'RESUMEN DE PAGO', margin+1, y);
-    y += 5;
+    y += 8;
 
-    // Caja del resumen
+    // Cuadro compacto alineado a la derecha — igual al modelo
+    const _bW = 62; // mismo ancho que el cuadro TOTAL original
+    const _bX = margin + cW - _bW;
+    const _bH = 30;
+    doc.setFillColor(248,244,232);
+    doc.rect(_bX, y, _bW, _bH, 'F');
     doc.setDrawColor(200,160,60); doc.setLineWidth(0.4);
-    doc.rect(rX, y, rW, 38, 'S');
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
+    doc.rect(_bX, y, _bW, _bH, 'S');
 
-    // Saldo anterior
-    doc.text('Saldo anterior:', rX+3, y+8);
+    // SALDO ANTERIOR — negro
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
+    doc.text('SALDO ANTERIOR:', _bX+3, y+7);
     doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
-    doc.text('$'+fmtMXN(_saldoAnteriorResumen), rX+rW-3, y+8, {align:'right'}); // negro
+    doc.text('$'+fmtMXN(_saldoAnteriorResumen), _bX+_bW-2, y+7, {align:'right'});
 
-    // Pago recibido
-    doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
-    doc.text('Pago recibido:', rX+3, y+17);
+    // PAGO RECIBIDO — café
+    doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
+    doc.text('PAGO RECIBIDO:', _bX+3, y+14);
     doc.setFont('helvetica','bold'); doc.setTextColor(139,90,43);
-    doc.text('$'+fmtMXN(_pagoEstaVersion), rX+rW-3, y+17, {align:'right'}); // café
+    doc.text('$'+fmtMXN(_pagoEstaVersion), _bX+_bW-2, y+14, {align:'right'});
 
     // Línea divisoria
     doc.setDrawColor(200,160,60); doc.setLineWidth(0.3);
-    doc.line(rX+2, y+22, rX+rW-2, y+22);
+    doc.line(_bX+2, y+18, _bX+_bW-2, y+18);
 
-    // Saldo restante
-    doc.setFont('helvetica','normal'); doc.setTextColor(80,60,30);
-    doc.text('Saldo restante:', rX+3, y+28);
-    doc.setFont('helvetica','bold');
-    doc.setTextColor(42,122,58); // siempre verde
-    doc.text('$'+fmtMXN(_saldoRestante), rX+rW-3, y+28, {align:'right'});
+    // SALDO RESTANTE — verde
+    doc.setFont('helvetica','bold'); doc.setTextColor(154,110,24);
+    doc.text('SALDO RESTANTE:', _bX+3, y+25);
+    doc.setFontSize(10); doc.setTextColor(42,122,58);
+    doc.text('$'+fmtMXN(_saldoRestante), _bX+_bW-2, y+25, {align:'right'});
 
-    // LIQUIDADO / PENDIENTE
-    doc.setFontSize(9); doc.setFont('helvetica','bold');
-    doc.setTextColor(_esLiqTotal ? 42 : 176, _esLiqTotal ? 122 : 16, _esLiqTotal ? 58 : 16);
-    doc.text(_esLiqTotal ? 'LIQUIDADO' : 'PENDIENTE', rX+3, y+36);
-
-    y += 44;
+    y += _bH + 6;
   }
 
   y += 0.5;
-  // Cuadro TOTAL/ABONADO/RESTA — solo en versión original A (B+ ya tienen el bloque resumen)
-  if(!_esUpdate){
-    if(qrDataURL){ try{doc.addImage(qrDataURL,'PNG',margin,y,18,18);}catch(e){ registrarError('catch vacio', e); } }
-    doc.setFillColor(248,244,232); doc.rect(margin+cW-62,y,62,22,'F');
-    doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.rect(margin+cW-62,y,62,22);
-    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
-    doc.text('TOTAL:',margin+cW-60,y+5);
-    doc.text('ABONADO:',margin+cW-60,y+11);
-    doc.setFont('helvetica','bold'); doc.setTextColor(154,110,24);
-    doc.text('RESTA:',margin+cW-60,y+18);
-    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
-    doc.text('$'+fmtMXN(totalGeneral),margin+cW-1.5,y+5,{align:'right'});
-    doc.text('$'+fmtMXN(totalAbonado),margin+cW-1.5,y+11,{align:'right'});
-    doc.setFontSize(11.5); doc.setTextColor(saldoFinal>0?154:42, saldoFinal>0?110:122, saldoFinal>0?24:58);
-    doc.text('$'+fmtMXN(Math.max(0,saldoFinal)),margin+cW-1.5,y+18.5,{align:'right'}); y+=24;
-  }
+  // QR a la izquierda, alineado con el inicio del cuadro de totales
+  if(qrDataURL){ try{doc.addImage(qrDataURL,'PNG',margin,y,18,18);}catch(e){ registrarError('catch vacio', e); } }
+  // Cuadro de totales a la derecha (mismo nivel que el QR)
+  doc.setFillColor(248,244,232); doc.rect(margin+cW-62,y,62,22,'F');
+  doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.rect(margin+cW-62,y,62,22);
+  doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
+  doc.text('TOTAL:',margin+cW-60,y+5);
+  doc.text('ABONADO:',margin+cW-60,y+11);
+  doc.setFont('helvetica','bold'); doc.setTextColor(154,110,24);
+  doc.text('RESTA:',margin+cW-60,y+18);
+  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
+  doc.text('$'+fmtMXN(totalGeneral),margin+cW-1.5,y+5,{align:'right'});
+  doc.text('$'+fmtMXN(totalAbonado),margin+cW-1.5,y+11,{align:'right'});
+  doc.setFontSize(11.5); doc.setTextColor(saldoFinal>0?154:42, saldoFinal>0?110:122, saldoFinal>0?24:58);
+  doc.text('$'+fmtMXN(Math.max(0,saldoFinal)),margin+cW-1.5,y+18.5,{align:'right'}); y+=24;
 
   // Historial de pagos (si hay folio anterior)
   if(datos.folioAnterior && datos.historialPagosRef && datos.historialPagosRef.length){

@@ -13222,7 +13222,7 @@ function renderContab() {
       }
       if(!_letraF) _letraF = 'A';
       const str = folioConLetra(n, _rFol ? _rFol.anio_folio : null, _letraF);
-      folioTxt  = `<span onclick="abrirPreviaDesdeContab(${n})" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--azul);" title="Ver recibo #${str}">${str}</span>`;
+      folioTxt  = `<span onclick="abrirPreviaDesdeContab(${n},'${_letraF}')" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--azul);" title="Ver recibo #${str}">${str}</span>`;
       folioColor = '';
     } else {
       folioTxt  = `<span style="color:var(--gold-d);">${esc(m.folioCaja||'—')}</span>`;
@@ -21839,7 +21839,7 @@ function adminDelFolioBtnClick(){
 }
 
 // Abrir preview de recibo desde la tabla de Contabilidad — overlay flotante
-async function abrirPreviaDesdeContab(numFolio){
+async function abrirPreviaDesdeContab(numFolio, letra){
   const overlay = document.getElementById('contab-pdf-overlay');
   const embed   = document.getElementById('cpdf-embed');
   const loading = document.getElementById('cpdf-loading');
@@ -21848,9 +21848,14 @@ async function abrirPreviaDesdeContab(numFolio){
   const nombreEl= document.getElementById('cpdf-nombre');
   const estadoEl= document.getElementById('cpdf-estado');
 
-  // Buscar el recibo
+  // Buscar la versión exacta (letra A, B, C…) para mostrar su PDF propio
   const recibos = (typeof appData!=='undefined'&&appData.recibos)?appData.recibos:(REC.recibos||[]);
-  const r = recibos.find(x=>x.folio===numFolio||x.folio===parseInt(numFolio));
+  const letraBuscar = letra || 'A';
+  const r = recibos.find(x=>
+    (x.folio===numFolio||x.folio===parseInt(numFolio)) &&
+    !x.esComplemento &&
+    (x.letra || letraVersion(x) || 'A') === letraBuscar
+  );
   if(!r){ toast('Recibo #'+folioFormato(numFolio)+' no encontrado','err'); return; }
 
   // Mostrar overlay con estado de carga

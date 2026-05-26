@@ -24918,6 +24918,23 @@ function confirmarVincularRecibo() {
         </div>
       </div>
 
+      <!-- MIGRACIÓN DRIVE → R2 -->
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header"><h2>🚚 Migrar documentos de Drive a R2</h2></div>
+        <div class="card-body" style="padding:16px;">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:14px;line-height:1.6;">
+            Copia los documentos almacenados en Google Drive (carpetas vinculadas a juicios) hacia el almacenamiento R2 del sistema.<br>
+            Solo se migran juicios que tengan una carpeta Drive vinculada (<code>driveFolderId</code>).
+          </div>
+          <div id="migra-progress" style="display:none;background:var(--surface2);border:1px solid var(--border-l);border-radius:var(--radius);padding:14px;margin-bottom:14px;font-family:monospace;font-size:0.74rem;line-height:1.8;max-height:260px;overflow-y:auto;"></div>
+          <div id="migra-resumen" style="display:none;background:rgba(var(--verde-rgb,34,139,34),0.08);border:1px solid var(--verde,#22a846);border-radius:var(--radius);padding:12px 14px;font-size:0.78rem;margin-bottom:14px;"></div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button id="btn-migrar-drive" class="btn btn-primary btn-sm" onclick="migrarDriveAR2()">🚀 Iniciar migración</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('migra-progress').style.display='none';document.getElementById('migra-resumen').style.display='none';">🗑 Limpiar log</button>
+          </div>
+        </div>
+      </div>
+
       <!-- PANELES OCULTOS QUE SE EXPANDEN -->
       <div id="cfg-cierres-panel" style="display:none;" class="card">
         <div class="card-header"><h2>📅 Historial de Cierres de Caja</h2><button class="btn btn-ghost btn-sm" onclick="document.getElementById('cfg-cierres-panel').style.display='none'">✕ Cerrar</button></div>
@@ -35807,6 +35824,143 @@ async function desvincularCarpetaDrive(){
   saveJuicios();
   toast('Carpeta Drive desvinculada','ok');
   abrirDetalle(jdetIdx);
+}
+
+// ═══ MIGRACIÓN GOOGLE DRIVE → R2 ═══════════════════════════════════
+async function migrarDriveAR2(){
+  const btn = document.getElementById('btn-migrar-drive');
+  const logEl = document.getElementById('migra-progress');
+  const resEl = document.getElementById('migra-resumen');
+  if(btn) btn.disabled = true;
+  logEl.style.display = 'block';
+  logEl.innerHTML = '';
+  resEl.style.display = 'none';
+
+  function log(msg, color){
+    const span = document.createElement('div');
+    span.style.color = color || 'inherit';
+    span.textContent = msg;
+    logEl.appendChild(span);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  const juiciosConDrive = (D.juicios || []).filter(function(j){
+    return j && j.driveFolderId;
+  });
+
+  if(!juiciosConDrive.length){
+    log('⚠ No hay juicios con carpeta Drive vinculada.', 'var(--amarillo)');
+    if(btn) btn.disabled = false;
+    return;
+  }
+
+  log('Obteniendo token de Google Drive...');
+  let token;
+  try {
+    token = await driveGetAccessToken();
+  } catch(e){
+    log('✗ Error al obtener token Drive: ' + e.message, 'var(--rojo,#e53)');
+    if(btn) btn.disabled = false;
+    return;
+  }
+  if(!token){
+    log('✗ No hay token válido. Configura Drive en Ajustes → Integraciones.', 'var(--rojo,#e53)');
+    if(btn) btn.disabled = false;
+    return;
+  }
+  log('✓ Token obtenido');
+
+  const despachoId = window.SB_DESPACHO_ID || 'sin-despacho';
+  let totalArchivos = 0, exitosos = 0, fallidos = 0;
+
+  for(let i = 0; i < juiciosConDrive.length; i++){
+    const j = juiciosConDrive[i];
+    const folderId = j.driveFolderId;
+    const titulo = j.expediente || j.actor || ('Juicio ' + (i+1));
+    const expId = j.expedienteId || ('EXP-' + Date.now() + '-' + i);
+
+    // Asegurarse de que el juicio tiene expedienteId guardado
+    if(!j.expedienteId){
+      j.expedienteId = expId;
+      saveJuicios();
+    }
+
+    log('');
+    log('── Juicio ' + (i+1) + '/' + juiciosConDrive.length + ': ' + titulo);
+    log('   Drive folder: ' + folderId);
+    log('   R2 destino:   juicios/' + expId + '/');
+
+    // Listar archivos de la carpeta Drive
+    let archivos = [];
+    try {
+      const url = 'https://www.googleapis.com/drive/v3/files'
+        + '?q=' + encodeURIComponent("'" + folderId + "' in parents and trashed=false")
+        + '&fields=files(id,name,mimeType,size)&pageSize=100';
+      const resp = await fetch(url, {
+        headers: { 'Authorization': 'Bearer ' + token }
+      });
+      if(!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      archivos = data.files || [];
+    } catch(e){
+      log('   ✗ No se pudo listar carpeta: ' + e.message, 'var(--rojo,#e53)');
+      fallidos++;
+      continue;
+    }
+
+    if(!archivos.length){
+      log('   (sin archivos en esta carpeta)');
+      continue;
+    }
+
+    log('   ' + archivos.length + ' archivo(s) encontrado(s)');
+
+    for(let k = 0; k < archivos.length; k++){
+      const arch = archivos[k];
+      totalArchivos++;
+      const safe = (arch.name || 'doc').replace(/[^a-zA-Z0-9._-]/g, '_');
+      const r2path = despachoId + '/juicios/' + expId + '/' + Date.now() + '_' + safe;
+
+      log('   [' + (k+1) + '/' + archivos.length + '] ' + arch.name + ' ...');
+
+      try {
+        // Descargar desde Drive
+        const dlResp = await fetch(
+          'https://www.googleapis.com/drive/v3/files/' + arch.id + '?alt=media',
+          { headers: { 'Authorization': 'Bearer ' + token } }
+        );
+        if(!dlResp.ok) throw new Error('Descarga HTTP ' + dlResp.status);
+        const blob = await dlResp.blob();
+        const file = new File([blob], safe, { type: arch.mimeType || blob.type || 'application/octet-stream' });
+
+        // Subir a R2
+        const ok = await subirR2(file, r2path, 'expedientes');
+        if(!ok) throw new Error('subirR2 devolvió falso');
+
+        exitosos++;
+        log('        ✓ subido → ' + r2path, 'var(--verde,#22a846)');
+      } catch(e){
+        fallidos++;
+        log('        ✗ error: ' + e.message, 'var(--rojo,#e53)');
+      }
+    }
+  }
+
+  // Resumen final
+  log('');
+  log('══════════════════════════════════');
+  log('Migración completada');
+  log('Juicios procesados: ' + juiciosConDrive.length);
+  log('Archivos subidos:   ' + exitosos + ' / ' + totalArchivos);
+  if(fallidos) log('Archivos fallidos:  ' + fallidos, 'var(--rojo,#e53)');
+
+  resEl.innerHTML = '<strong>Migración completada</strong><br>'
+    + 'Juicios: ' + juiciosConDrive.length
+    + ' · Archivos subidos: <strong>' + exitosos + '</strong>/' + totalArchivos
+    + (fallidos ? ' · <span style="color:var(--rojo,#e53)">Fallidos: ' + fallidos + '</span>' : '');
+  resEl.style.display = 'block';
+
+  if(btn) btn.disabled = false;
 }
 
 // ─── Vincular Folio de Recibo ─────────────────────────────────────

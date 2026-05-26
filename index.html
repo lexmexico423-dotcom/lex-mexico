@@ -3605,6 +3605,35 @@ window.addEventListener('offline', ()=>{
 
         <input type="hidden" id="adminEditIdx">
         <input type="hidden" id="adminEditFolioRef">
+
+        <!-- Contexto de versión — solo visible en folios secundarios (B, C...) -->
+        <div id="adminEditVersionCtx" style="display:none;margin-top:12px;border-top:1px solid rgba(200,149,42,0.15);padding-top:12px;">
+          <div style="font-family:monospace;font-size:0.55rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(200,149,42,0.5);margin-bottom:8px;">📊 Contexto de esta versión</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div style="background:rgba(200,149,42,0.04);border:1px solid rgba(200,149,42,0.12);border-radius:4px;padding:6px 10px;">
+              <div style="font-family:monospace;font-size:0.52rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:3px;">Versión original</div>
+              <div id="adminEditCtxFolioOrig" style="font-family:monospace;font-size:0.78rem;font-weight:700;color:var(--gold-l);">—</div>
+            </div>
+            <div style="background:rgba(200,149,42,0.04);border:1px solid rgba(200,149,42,0.12);border-radius:4px;padding:6px 10px;">
+              <div style="font-family:monospace;font-size:0.52rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:3px;">Anticipo inicial (ver. A)</div>
+              <div id="adminEditCtxAnticipoOrig" style="font-family:monospace;font-size:0.78rem;font-weight:700;color:#c8952a;">—</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div style="background:rgba(42,154,74,0.06);border:1px solid rgba(42,154,74,0.2);border-radius:4px;padding:6px 10px;">
+              <div style="font-family:monospace;font-size:0.52rem;color:rgba(42,154,74,0.6);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:3px;">Total abonado acumulado</div>
+              <div id="adminEditCtxTotalAbonado" style="font-family:monospace;font-size:0.78rem;font-weight:700;color:#2a9a4a;">—</div>
+            </div>
+            <div style="background:rgba(200,149,42,0.04);border:1px solid rgba(200,149,42,0.12);border-radius:4px;padding:6px 10px;">
+              <div style="font-family:monospace;font-size:0.52rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:3px;">Fecha de esta actualización</div>
+              <div id="adminEditCtxFechaAct" style="font-family:monospace;font-size:0.78rem;font-weight:700;color:var(--gold-l);">—</div>
+            </div>
+          </div>
+          <div style="background:rgba(200,149,42,0.04);border:1px solid rgba(200,149,42,0.12);border-radius:4px;padding:6px 10px;">
+            <div style="font-family:monospace;font-size:0.52rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;">Pagos registrados en esta versión</div>
+            <div id="adminEditCtxPagos" style="font-size:0.72rem;color:var(--gold-l);">—</div>
+          </div>
+        </div>
       </div>
       <div class="admin-modal-ftr" style="gap:8px;">
         <button class="btn btn-ghost btn-sm" onclick="adminVolverGestion()">Cancelar</button>
@@ -10025,13 +10054,8 @@ async function _imprimirActualizacionReal(){
       const nuevoRegistro = Object.assign({}, appData.recibos[idx], {
         costosExtra:      costosExtra.map(c => Object.assign({}, c, {locked:true, folioLetra: c.folioLetra || letraActual})),
         pagosParciales:   pagosParciales_conAuth.map(p => Object.assign({}, p, {locked:true})),
-        // Copias profundas de arrays de referencia para que B sea independiente de A
-        clientes:         (appData.recibos[idx].clientes||[]).map(c => Object.assign({}, c)),
-        conceptos:        (appData.recibos[idx].conceptos||[]).map(c => Object.assign({}, c)),
-        copias:           (appData.recibos[idx].copias||[]).slice(),
         fechasImpresion:  fechasImpresion,
         total:            totalGeneral,
-        anticipo:         String(totalAbonado),   // lo realmente abonado en esta versión
         saldoPendiente:   saldoNuevo,
         saldoNuevo:       saldoNuevo,
         totalAbonado:     totalAbonado,
@@ -10247,7 +10271,7 @@ async function confirmarCancelacion(){
       nombre_cliente_firma: recibo.nombre_cliente_firma || ''
     });
     const docCan = await generarPDF(datosCancelado, recibo.folio, qrDataURL);
-    const nombreArch = (typeof folioConLetra==='function' ? folioConLetra(recibo.folio, recibo.anio_folio||new Date().getFullYear(), recibo.letra||letraVersion(recibo)||'A') : folio) + '.pdf';
+    const nombreArch = 'Recibo_'+folio+'_'+primerNombre.replace(/\s+/g,'_')+'.pdf';
     recibo.pdfBase64 = docCan.output('datauristring');
     reemplazarPDFenDrive(docCan.output('blob'), nombreArch).catch(e=>console.warn('Drive cancel:',e));
   } catch(e){ console.warn('PDF cancelado no regenerado:', e); }
@@ -10296,7 +10320,7 @@ async function _confirmarCancelacionReal(recibo, motivo, auth){
       nombre_cliente_firma: recibo.nombre_cliente_firma || ''
     });
     const docCan = await generarPDF(datosCancelado, recibo.folio, qrDataURL);
-    const nombreArch = (typeof folioConLetra==='function' ? folioConLetra(recibo.folio, recibo.anio_folio||new Date().getFullYear(), recibo.letra||letraVersion(recibo)||'A') : folio) + '.pdf';
+    const nombreArch = 'Recibo_'+folio+'_'+primerNombre.replace(/\s+/g,'_')+'.pdf';
     recibo.pdfBase64 = docCan.output('datauristring');
     reemplazarPDFenDrive(docCan.output('blob'), nombreArch).catch(e=>console.warn('SB cancel:',e));
   } catch(e){ console.warn('PDF cancelado no regenerado:', e); }
@@ -23439,7 +23463,7 @@ async function adminEliminarRecibo(idx) {
   }
   // También intentar por nombre construido
   try {
-    var nombrePDF = folioStr + '.pdf';
+    var nombrePDF = 'Recibo_' + folioStr + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf';
     if (typeof window.borrarR2 === 'function' && window.SB_DESPACHO_ID) {
       await window.borrarR2(window.SB_DESPACHO_ID + '/recibos/' + nombrePDF, 'recibos');
     }
@@ -23767,6 +23791,57 @@ function adminAbrirEditarRecibo(idx) {
   document.getElementById('adminEditTramites').value = r.tramites || '';
   document.getElementById('adminEditResponsable').value = (r.responsable || r.generadoPor || 'LIC ANTONIETA CHAVEZ MONTAR').toUpperCase();
   adminEditRecalcSaldo();
+
+  // ── Contexto de versión (solo para folios secundarios B, C...) ──
+  var _letraEdit = r.letra || (typeof letraVersion==='function' ? letraVersion(r) : 'A') || 'A';
+  var ctxDiv = document.getElementById('adminEditVersionCtx');
+  if(ctxDiv){
+    var esSecundario = _letraEdit !== 'A';
+    ctxDiv.style.display = esSecundario ? '' : 'none';
+    if(esSecundario){
+      var folioOrigStr = typeof folioConLetra==='function'
+        ? '#' + folioConLetra(r.folio, r.anio_folio, 'A')
+        : '#' + String(r.folio).padStart(4,'0') + 'A';
+      var elFolioOrig = document.getElementById('adminEditCtxFolioOrig');
+      if(elFolioOrig) elFolioOrig.textContent = folioOrigStr;
+
+      var reciboA = (appData.recibos||[]).find(function(_r){
+        return _r.folio === r.folio && (_r.letra||'A') === 'A' && !_r.esComplemento;
+      });
+      var anticipoOrig = reciboA ? (parseFloat(reciboA.anticipo)||0) : null;
+      var elAntOrig = document.getElementById('adminEditCtxAnticipoOrig');
+      if(elAntOrig) elAntOrig.textContent = anticipoOrig !== null
+        ? '$' + anticipoOrig.toLocaleString('es-MX',{minimumFractionDigits:2})
+        : '—';
+
+      var totalAbonado = parseFloat(r.totalAbonado) || (parseFloat(r.total||0) - parseFloat(r.saldoPendiente||0));
+      var elTotAbon = document.getElementById('adminEditCtxTotalAbonado');
+      if(elTotAbon) elTotAbon.textContent = '$' + totalAbonado.toLocaleString('es-MX',{minimumFractionDigits:2});
+
+      var fechaAct = r.fechaActualizacion || r.fecha || r.fecha_recibo || '—';
+      var horaAct  = r.horaActualizacion  || r.hora || r.hora_recibo  || '';
+      var elFechaAct = document.getElementById('adminEditCtxFechaAct');
+      if(elFechaAct) elFechaAct.textContent = fechaAct + (horaAct ? ' · ' + horaAct : '');
+
+      var pagos = (r.pagosParciales||[]).filter(function(p){ return !p._esAnticipoOriginal; });
+      var elPagos = document.getElementById('adminEditCtxPagos');
+      if(elPagos){
+        if(pagos.length){
+          elPagos.innerHTML = pagos.map(function(p){
+            var monto = '$' + (parseFloat(p.cantidad)||0).toLocaleString('es-MX',{minimumFractionDigits:2});
+            var desc  = (p.concepto || p.descripcion || '').replace(/\s*\[.*?\].*$/,'').substring(0,50);
+            return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(200,149,42,0.08);">'
+              + '<span style="color:rgba(200,149,42,0.6);">' + desc + '</span>'
+              + '<span style="font-weight:700;color:#2a9a4a;">' + monto + '</span>'
+              + '</div>';
+          }).join('');
+        } else {
+          elPagos.textContent = 'Sin pagos parciales registrados';
+        }
+      }
+    }
+  }
+
   // Mostrar zona de edición
   document.getElementById('adminGestionRecibosZone').classList.remove('show');
   document.getElementById('adminEditarReciboZone').classList.add('show');
@@ -24273,9 +24348,9 @@ async function adminGuardarEdicionRecibo() {
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
   var _folioRef2 = document.getElementById('adminEditFolioRef');
   var _folioVal2 = _folioRef2 ? parseInt(_folioRef2.value) : NaN;
-  var idx = (!isNaN(_folioVal2) && _folioVal2 !== 0)
-    ? recibos.findIndex(function(x){ return x.folio === _folioVal2; })
-    : parseInt(document.getElementById('adminEditIdx').value);
+  // Siempre usar el idx directo — es el único que distingue letra (A vs B vs C)
+  // _folioVal2 busca solo por número y siempre encontraría la versión A primero
+  var idx = parseInt(document.getElementById('adminEditIdx').value);
   var r = recibos[idx];
   if (!r) { if (typeof toast === 'function') toast('Error: recibo no encontrado','err'); return; }
 
@@ -24321,7 +24396,7 @@ async function adminGuardarEdicionRecibo() {
     await actualizarArchivoControl();
 
     // 2. Borrar PDF de Drive para que se regenere fresco al consultar
-    var nombrePDF = r.archivo || (folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A') + '.pdf');
+    var nombrePDF = r.archivo || ('Recibo_' + folioFormato(r.folio, r.anio_folio) + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf');
     await borrarPDFdeDrive(nombrePDF);
 
     // 3. Actualizar o crear movimiento en contabilidad
@@ -24371,7 +24446,7 @@ async function adminGuardarEdicionRecibo() {
     try {
       const _qrTxt = 'LEX-MEXICO|Folio:' + folioFormato(r.folio, r.anio_folio) + '|' + r.nombre + '|' + (r.fecha_recibo||r.fecha||'') + ' ' + (r.hora_recibo||r.hora||'');
       const _qrURL = typeof qrToDataURL === 'function' ? await qrToDataURL(_qrTxt) : null;
-      const _nombrePDF = folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A') + '.pdf';
+      const _nombrePDF = 'Recibo_' + folioFormato(r.folio, r.anio_folio) + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf';
       var _blob = null;
       if (typeof generarPDFRecibo === 'function') {
         // Retorna Blob directamente
@@ -28258,7 +28333,7 @@ async function guardarRestauracion(){
     const qrDataURL= typeof qrToDataURL==='function'?await qrToDataURL(qrTexto).catch(()=>null):null;
     const doc      = await generarPDF(datos, folio, qrDataURL);
     const pdfBase64= doc.output('datauristring');
-    const nombreArchivo= fs + '.pdf';
+    const nombreArchivo='Recibo_'+fs+'_'+primerNombre.replace(/\s+/g,'_')+'.pdf';
 
     if(typeof subirPDFaDrive==='function') try{ subirPDFaDrive(doc.output('blob'),nombreArchivo); }catch(e){ registrarError('catch vacio', e); }
     // guardarEnDirectorio puede fallar si save() no retorna promesa — envolver en try
@@ -33228,7 +33303,7 @@ async function gestConfirmarRecibo(gid){
     const pdfBlob=await generarPDFRecibo(datosRec,folio,qrURL);
     if(statusEl) statusEl.textContent='⏳ Subiendo a Storage...';
     // Subir PDF
-    const nombrePDF= folioConLetra(folio, g.anio_folio||new Date().getFullYear(), g.letra||'A') + '.pdf';
+    const nombrePDF='Recibo_'+folioFormato(folio)+'_'+g.cliente.replace(/[^a-zA-Z0-9]/g,'_').substring(0,30)+'.pdf';
     datosRec.archivo=nombrePDF;
     await subirPDFaDrive(pdfBlob,nombrePDF);
     // Guardar en appData.recibos

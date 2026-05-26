@@ -11871,9 +11871,35 @@ function renderHistorial(){
   filtrarHistorial();
 }
 
-function reDescargar(i){
+async function reDescargar(i){
   const r=appData.recibos[i];
-  if(r.pdfBase64){ const a=document.createElement('a'); a.href=r.pdfBase64; a.download=r.archivo; a.click(); }
+  if(!r) return;
+  // Misma sesión: usar pdfBase64 en memoria
+  if(r.pdfBase64){
+    const a=document.createElement('a'); a.href=r.pdfBase64; a.download=r.archivo||'recibo.pdf'; a.click(); return;
+  }
+  if(!r.archivo || !window.SB_DESPACHO_ID){ setStatus('err','No hay PDF disponible para este folio','err'); return; }
+  const _path = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
+  let _blob = null;
+  // Intentar R2
+  if(typeof window.descargarR2 === 'function'){
+    try { const b = await window.descargarR2(_path,'recibos'); if(b&&b.size>0) _blob=b; } catch(e){ console.warn('[reDescargar] R2:',e); }
+  }
+  // Intentar Supabase Storage
+  if(!_blob && window.SB){
+    try {
+      const {data:sd,error:se}=await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_path,120);
+      if(!se&&sd&&sd.signedUrl){ const res=await fetch(sd.signedUrl); if(res.ok) _blob=await res.blob(); }
+    } catch(e){ console.warn('[reDescargar] SB:',e); }
+  }
+  if(_blob){
+    const url=URL.createObjectURL(_blob);
+    const a=document.createElement('a'); a.href=url; a.download=r.archivo||'recibo.pdf'; a.click();
+    setTimeout(()=>URL.revokeObjectURL(url),5000);
+    const rd=new FileReader(); rd.onload=()=>{ r.pdfBase64=rd.result; }; rd.readAsDataURL(_blob);
+  } else {
+    setStatus('err','No se pudo descargar el PDF del folio #'+String(r.folio).padStart(4,'0'),'err');
+  }
 }
 
 // ── MODALES ──────────────────────────────────────────────────────
@@ -24547,33 +24573,63 @@ function renderHistorial2026() {
 }
 
 // ─── VISTA PREVIA RECIBO ────────────────────────────────────────
-function verVistaPrevia(idx) {
+async function verVistaPrevia(idx) {
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : (REC.recibos || []);
   var r = recibos[idx];
   if (!r) return;
-  if (r.pdfBase64) {
-    var modal = document.getElementById('modal-vista-previa-recibo');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'modal-vista-previa-recibo';
-      modal.className = 'modal-ov';
-      var h = '<div class="modal" style="max-width:900px;width:96vw;max-height:92vh;display:flex;flex-direction:column;">';
-      h += '<div class="modal-hdr" style="flex-shrink:0;">';
-      h += '<h3 id="vp-titulo" style="font-size:0.9rem;"></h3>';
-      h += '<button class="modal-x" onclick="document.getElementById(\"modal-vista-previa-recibo\").classList.remove(\"show\")">&#10005;</button>';
-      h += '</div>';
-      h += '<iframe id="vp-iframe" style="flex:1;border:none;min-height:70vh;" src=""></iframe>';
-      h += '</div>';
-      modal.innerHTML = h;
-      document.body.appendChild(modal);
-    }
-    var folio = '#' + folioConLetra(r.folio||0, r.anio_folio, r.letra||letraVersion(r)||'A');
-    document.getElementById('vp-titulo').textContent = 'Recibo ' + folio + ' — ' + (r.nombre||'');
-    document.getElementById('vp-iframe').src = r.pdfBase64;
-    modal.classList.add('show');
+
+  // Crear/reutilizar modal
+  var modal = document.getElementById('modal-vista-previa-recibo');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-vista-previa-recibo';
+    modal.className = 'modal-ov';
+    var h = '<div class="modal" style="max-width:900px;width:96vw;max-height:92vh;display:flex;flex-direction:column;">';
+    h += '<div class="modal-hdr" style="flex-shrink:0;">';
+    h += '<h3 id="vp-titulo" style="font-size:0.9rem;"></h3>';
+    h += '<button class="modal-x" onclick="document.getElementById(\"modal-vista-previa-recibo\").classList.remove(\"show\")">&#10005;</button>';
+    h += '</div>';
+    h += '<iframe id="vp-iframe" style="flex:1;border:none;min-height:70vh;" src=""></iframe>';
+    h += '</div>';
+    modal.innerHTML = h;
+    document.body.appendChild(modal);
+  }
+  var folio = '#' + folioConLetra(r.folio||0, r.anio_folio, r.letra||letraVersion(r)||'A');
+  document.getElementById('vp-titulo').textContent = 'Recibo ' + folio + ' — ' + (r.nombre||'');
+  modal.classList.add('show');
+  var iframe = document.getElementById('vp-iframe');
+
+  function _mostrarEnIframe(src){
+    if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){} iframe._blobUrl=null; }
+    if(src.startsWith('data:')){
+      const b64=src.split(',')[1], bin=atob(b64), arr=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+      const bUrl=URL.createObjectURL(new Blob([arr],{type:'application/pdf'}));
+      iframe._blobUrl=bUrl; iframe.src=bUrl+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
+    } else { iframe.src=src; }
+  }
+
+  if(r.pdfBase64){ _mostrarEnIframe(r.pdfBase64); return; }
+  if(!r.archivo || !window.SB_DESPACHO_ID){ setStatus('err','Sin PDF para este folio','err'); return; }
+
+  const _path = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
+  let _blob = null;
+  if(typeof window.descargarR2 === 'function'){
+    try { const b=await window.descargarR2(_path,'recibos'); if(b&&b.size>0) _blob=b; } catch(e){ console.warn('[verVistaPrevia] R2:',e); }
+  }
+  if(!_blob && window.SB){
+    try {
+      const {data:sd,error:se}=await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_path,120);
+      if(!se&&sd&&sd.signedUrl){ const res=await fetch(sd.signedUrl); if(res.ok) _blob=await res.blob(); }
+    } catch(e){ console.warn('[verVistaPrevia] SB:',e); }
+  }
+  if(_blob){
+    const bUrl=URL.createObjectURL(_blob);
+    if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){} } iframe._blobUrl=bUrl;
+    iframe.src=bUrl+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
+    const rd=new FileReader(); rd.onload=()=>{ r.pdfBase64=rd.result; }; rd.readAsDataURL(_blob);
   } else {
-    if (typeof reDescargar === 'function') reDescargar(idx);
-    else if (typeof toast === 'function') toast('Sin PDF guardado para este recibo','err');
+    setStatus('err','No se pudo cargar el PDF del folio '+folio,'err');
   }
 }
 

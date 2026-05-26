@@ -6175,7 +6175,71 @@ function debounce(fn, ms = 200) {
 // Configuración Supabase:
 const SUPABASE_URL      = 'https://zrmpawigjufgsuamqflv.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpybXBhd2lnanVmZ3N1YW1xZmx2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTQ2NjgsImV4cCI6MjA5NDE5MDY2OH0.rRV6vbNImhyAxfFPsje5QgEg6M35bojX2vDlLaTb3K4';  // ⬅ PEGA TU ANON KEY DE SUPABASE AQUÍ
-const STORAGE_BUCKET    = 'lex-files';
+const STORAGE_BUCKET    = 'lex-files'; // conservado por compatibilidad; ya no se usa para Storage
+
+// ── Cloudflare R2 — reemplaza Supabase Storage ──────────────────────────────
+const R2_WORKER = 'https://lex-mexico-worker.fcolex0.workers.dev';
+const R2_TOKEN  = 'LexMx2026-R2-7kP9nQvT'; // mismo valor que AUTH_TOKEN en el Worker
+
+/** Sube un Blob/File a R2. bucket: 'recibos' | 'placas' | 'expedientes' */
+async function subirR2(blob, path, bucket) {
+  try {
+    const fd = new FormData();
+    fd.append('file', blob instanceof Blob ? blob : new Blob([blob]), path.split('/').pop());
+    fd.append('path', path);
+    fd.append('bucket', bucket || 'recibos');
+    const res = await fetch(R2_WORKER + '/r2/upload', {
+      method: 'POST',
+      headers: { 'X-Auth-Token': R2_TOKEN },
+      body: fd
+    });
+    if (!res.ok) { console.warn('subirR2 error:', await res.text()); return false; }
+    return true;
+  } catch(e) { console.warn('subirR2:', e); return false; }
+}
+
+/** Descarga un archivo de R2 y lo devuelve como Blob. */
+async function descargarR2(path, bucket) {
+  try {
+    const res = await fetch(urlR2(path, bucket));
+    if (!res.ok) return null;
+    return await res.blob();
+  } catch(e) { console.warn('descargarR2:', e); return null; }
+}
+
+/** Borra un archivo de R2. */
+async function borrarR2(path, bucket) {
+  try {
+    await fetch(
+      R2_WORKER + '/r2/file?bucket=' + encodeURIComponent(bucket||'recibos') + '&path=' + encodeURIComponent(path),
+      { method: 'DELETE', headers: { 'X-Auth-Token': R2_TOKEN } }
+    );
+  } catch(e) { console.warn('borrarR2:', e); }
+}
+
+/** Lista archivos en R2. Devuelve array de objetos { name, key, size, created_at }. */
+async function listarR2(prefix, bucket, limit) {
+  try {
+    const res = await fetch(
+      R2_WORKER + '/r2/list?bucket=' + encodeURIComponent(bucket||'recibos')
+               + '&prefix=' + encodeURIComponent(prefix||'')
+               + '&limit='  + (limit||1000),
+      { headers: { 'X-Auth-Token': R2_TOKEN } }
+    );
+    if (!res.ok) return [];
+    return (await res.json()).objects || [];
+  } catch(e) { console.warn('listarR2:', e); return []; }
+}
+
+/** Devuelve la URL directa para abrir/descargar un archivo desde R2. */
+function urlR2(path, bucket, dl) {
+  return R2_WORKER + '/r2/file'
+    + '?bucket=' + encodeURIComponent(bucket || 'recibos')
+    + '&path='   + encodeURIComponent(path)
+    + (dl ? '&dl=1' : '')
+    + '&token='  + R2_TOKEN;
+}
+// ────────────────────────────────────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════
 
 function agregarConcepto() {
@@ -7183,19 +7247,13 @@ async function actualizarArchivoControl(){
   }
 }
 
-// ── PARTE 2: SUBIR PDF A SUPABASE STORAGE ────────────────────────
+// ── PARTE 2: SUBIR PDF A CLOUDFLARE R2 ───────────────────────────
 async function subirPDFaDrive(pdfBlob, nombreArchivo){
-  if(!window.SB || !window.SB_DESPACHO_ID) return false;
-  try {
-    const path = window.SB_DESPACHO_ID + '/recibos/' + nombreArchivo;
-    const { error } = await window.SB.storage.from(STORAGE_BUCKET).upload(path, pdfBlob, {
-      contentType: 'application/pdf',
-      upsert: true
-    });
-    if(error){ console.error('subirPDFaDrive:', error); return false; }
-    console.log('✓ PDF subido a Supabase:', nombreArchivo);
-    return true;
-  } catch(e){ console.error('subirPDFaDrive:', e); return false; }
+  if(!window.SB_DESPACHO_ID) return false;
+  const path = window.SB_DESPACHO_ID + '/recibos/' + nombreArchivo;
+  const ok = await subirR2(pdfBlob, path, 'recibos');
+  if(ok) console.log('✓ PDF subido a R2:', nombreArchivo);
+  return ok;
 }
 
 // Reemplaza un PDF existente (mismo nombre) o lo sube si no existe
@@ -11553,13 +11611,10 @@ function adminConsultarPDFRender(){
 }
 
 async function adminAbrirURLVersion(pdfPath, folioLabel){
-  if(!window.SB){ toast('Sin conexión a Supabase','err'); return; }
-  if(typeof toast==='function') toast('Generando enlace para '+folioLabel+'…','loading');
+  if(typeof toast==='function') toast('Abriendo '+folioLabel+'…','loading');
   try {
-    const { data, error } = await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(pdfPath, 300);
-    if(error || !data || !data.signedUrl) throw new Error((error&&error.message)||'Sin URL');
-    window.open(data.signedUrl, '_blank');
-    if(typeof toast==='function') toast('Enlace abierto · válido 5 minutos','ok');
+    window.open(urlR2(pdfPath, 'recibos'), '_blank');
+    if(typeof toast==='function') toast('PDF abierto ✓','ok');
   } catch(e){
     if(typeof toast==='function') toast('Error: '+e.message,'err');
   }
@@ -11620,13 +11675,10 @@ function restaurarVersionRecibo(folio, idx){
   showModal('Versión restaurada','El Folio #'+folioFormato(folio)+' fue restaurado al estado del '+v.fecha+' a las '+v.hora+'. El historial de versiones se conserva completo.');
 }
 
-// Abre el PDF de una versión directamente desde Supabase Storage (firmado por 60 s)
+// Abre el PDF de una versión directamente desde Cloudflare R2
 async function verPDFVersionSupabase(pdfPath){
-  if(!window.SB){ showModal('Error','Sin conexión a Supabase.'); return; }
   try {
-    const { data, error } = await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(pdfPath, 300);
-    if(error || !data){ showModal('Error','No se pudo obtener el PDF: '+(error?.message||'sin URL')); return; }
-    window.open(data.signedUrl, '_blank');
+    window.open(urlR2(pdfPath, 'recibos'), '_blank');
   } catch(e){ showModal('Error','Error al obtener PDF: '+e.message); }
 }
 
@@ -11658,7 +11710,7 @@ async function restaurarVersionDesdeSupabase(folio, letraTarget){
     if(vMasRecientes && vMasRecientes.length){
       for(const v of vMasRecientes){
         if(v.pdf_storage_path)
-          await window.SB.storage.from(STORAGE_BUCKET).remove([v.pdf_storage_path]).catch(()=>{});
+          await borrarR2(v.pdf_storage_path, 'recibos').catch(()=>{});
       }
       const letrasABorrar = vMasRecientes.map(v=>v.letra);
       await window.SB.from('versiones_recibo').delete()
@@ -15107,25 +15159,18 @@ async function eliminarAcuerdo(idxAc){
 }
 
 async function verPDFAcuerdo(fileId, nombre){
-  if(!window.SB || !window.SB_DESPACHO_ID){ toast('Sin sesión activa','err'); return; }
   toast('Cargando PDF...');
   try {
-    // En Supabase fileId puede ser una ruta completa (despacho_id/juicios/...) o solo el nombre
     let path = fileId;
-    if(!path.includes('/')){
-      path = window.SB_DESPACHO_ID + '/juicios/' + path;
-    }
-    const { data: blob, error } = await window.SB.storage.from(STORAGE_BUCKET).download(path);
-    if(error || !blob){ toast('No se pudo cargar el PDF','err'); console.warn(error); return; }
+    if(!path.includes('/')) path = (window.SB_DESPACHO_ID||'lex') + '/juicios/' + path;
+    const blob = await descargarR2(path, 'expedientes');
+    if(!blob){ toast('No se pudo cargar el PDF','err'); return; }
     const url = URL.createObjectURL(blob);
     $('visor-pdf-nombre').textContent = nombre;
     $('visor-pdf-iframe').src = url;
     $('visor-pdf-wrap').style.display = '';
     $('visor-pdf-wrap').scrollIntoView({behavior:'smooth'});
-  } catch(e){
-    toast('Error al cargar PDF','err');
-    console.warn(e);
-  }
+  } catch(e){ toast('Error al cargar PDF','err'); console.warn(e); }
 }
 
 function cerrarVisorPDF(){
@@ -15392,24 +15437,17 @@ async function cargarCarpetasDrive(){
   }
 }
 
-// ─── Subir PDF al juicio (Supabase Storage) ──────────────────────
+// ─── Subir PDF al juicio (Cloudflare R2 — lex-expedientes) ──────
 async function subirPDFaJuicio(file, folderId){
-  if(!window.SB || !window.SB_DESPACHO_ID) return null;
+  if(!window.SB_DESPACHO_ID) return null;
   try {
-    // folderId es el id virtual del juicio. Guardamos bajo despacho_id/juicios/{folderId}/...
     const safe = (file.name||'doc.pdf').replace(/[^a-zA-Z0-9._-]/g,'_');
     const path = window.SB_DESPACHO_ID + '/juicios/' + (folderId||'general') + '/' + Date.now() + '_' + safe;
-    const { error } = await window.SB.storage.from(STORAGE_BUCKET).upload(path, file, {
-      contentType: 'application/pdf',
-      upsert: false
-    });
-    if(error){ console.warn('subirPDFaJuicio:', error); return null; }
+    const ok = await subirR2(file, path, 'expedientes');
+    if(!ok) return null;
     toast('PDF subido ✓','ok');
     return { id: path, name: safe };
-  } catch(e){
-    console.warn('subirPDFaJuicio:', e);
-    return null;
-  }
+  } catch(e){ console.warn('subirPDFaJuicio:', e); return null; }
 }
 
 function renderCarpetasDriveModal(filtro=''){
@@ -17889,12 +17927,12 @@ async function hacerBackupDiario(){
       .single();
     if(!estado) return;
 
-    const nombreBackup = `${window.SB_DESPACHO_ID}/backups/lexmexico_backup_${hoyStr}.json`;
+    const nombreBackup = window.SB_DESPACHO_ID + '/backups/lexmexico_backup_' + hoyStr + '.json';
     const blob = new Blob([JSON.stringify(estado, null, 2)], { type: 'application/json' });
-    const { error } = await window.SB.storage.from(STORAGE_BUCKET).upload(nombreBackup, blob, { upsert: true });
-    if(error){ console.warn('backup diario:', error); return; }
+    const ok = await subirR2(blob, nombreBackup, 'recibos');
+    if(!ok){ console.warn('backup diario: fallo subida R2'); return; }
     try{ localStorage.setItem(BACKUP_KEY, hoyStr); } catch(e){ registrarError('localStorage.setItem', e); }
-console.log('✅ Backup diario creado en Supabase:', nombreBackup);
+    console.log('✅ Backup diario guardado en R2:', nombreBackup);
   } catch(e){ console.warn('backup diario:', e); }
 }
 
@@ -17904,7 +17942,7 @@ async function forzarBackup(){
   localStorage.removeItem(BACKUP_KEY);
   await hacerBackupDiario();
   const hoyStr = (typeof hoy === 'function') ? hoy() : new Date().toISOString().slice(0,10);
-  toast('✅ Backup creado en Supabase: lexmexico_backup_'+hoyStr+'.json');
+  toast('✅ Backup creado en R2: lexmexico_backup_'+hoyStr+'.json');
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -18685,16 +18723,10 @@ async function guardarFolioEnDrive(nuevoFolio) {
 }
 
 async function subirPDFaD(blob, nombre) {
-  if(!window.SB || !window.SB_DESPACHO_ID) return;
-  try {
-    const path = window.SB_DESPACHO_ID + '/recibos/' + nombre;
-    const { error } = await window.SB.storage.from(STORAGE_BUCKET).upload(path, blob, {
-      contentType: 'application/pdf',
-      upsert: true
-    });
-    if(error){ console.warn('subirPDF:', error); return; }
-    toast('PDF guardado ✓');
-  } catch(e){ console.warn('subirPDF:', e); }
+  if(!window.SB_DESPACHO_ID) return;
+  const path = window.SB_DESPACHO_ID + '/recibos/' + nombre;
+  const ok = await subirR2(blob, path, 'recibos');
+  if(ok) toast('PDF guardado ✓');
 }
 
 function renderRecibosRecientes() {
@@ -23853,13 +23885,11 @@ async function adminGuardarEdicionRecibo() {
   }
 }
 
-// Borrar PDF de Storage por nombre — para forzar regeneración desde JSON al consultar
+// Borrar PDF de R2 por nombre — para forzar regeneración desde JSON al consultar
 async function borrarPDFdeDrive(nombreArchivo) {
-  if(!window.SB || !window.SB_DESPACHO_ID) return;
-  try {
-    const path = window.SB_DESPACHO_ID + '/recibos/' + nombreArchivo;
-    await window.SB.storage.from(STORAGE_BUCKET).remove([path]);
-  } catch(e) { console.warn('borrarPDF:', e); }
+  if(!window.SB_DESPACHO_ID) return;
+  const path = window.SB_DESPACHO_ID + '/recibos/' + nombreArchivo;
+  await borrarR2(path, 'recibos');
 }
 // Movimientos en ceros (dinero retirado) — solo consulta
 // ══════════════════════════════════════════════════════════════════
@@ -23869,12 +23899,11 @@ let historialFileId = HISTORIAL_FILE;
 let historialData = null;
 
 async function cargarHistorialContabilidad() {
-  // Versión Supabase: descargar el JSON desde el bucket si existe
-  if(!window.SB || !window.SB_DESPACHO_ID) return null;
+  if(!window.SB_DESPACHO_ID) return null;
   try {
     const path = window.SB_DESPACHO_ID + '/historial/' + HISTORIAL_FILE;
-    const { data: blob, error } = await window.SB.storage.from(STORAGE_BUCKET).download(path);
-    if(error || !blob){
+    const blob = await descargarR2(path, 'recibos');
+    if(!blob){
       if(typeof toast === 'function') toast('Archivo historial_2026.json no encontrado','err');
       return null;
     }
@@ -26654,10 +26683,9 @@ async function rgenAutoCargar(tipo){
 
   try {
     if(tipo === 'pdf'){
-      // Buscar en {despacho_id}/recibos/
+      // Buscar en {despacho_id}/recibos/ (Cloudflare R2)
       const prefix = window.SB_DESPACHO_ID + '/recibos';
-      const { data: lista, error: errList } = await window.SB.storage.from(STORAGE_BUCKET).list(prefix, { limit: 1000 });
-      if(errList) throw errList;
+      const lista = await listarR2(prefix, 'recibos', 1000);
 
       const archivos = (lista||[]).filter(f => {
         if(!f.name || !f.name.toLowerCase().endsWith('.pdf')) return false;
@@ -26667,7 +26695,7 @@ async function rgenAutoCargar(tipo){
 
       if(archivos.length === 0){
         st.style.background='#fff8e8'; st.style.borderColor='#c8952a'; st.style.color='#8c6518';
-        st.textContent = '⚠ No se encontró PDF del folio #'+fs+' en Supabase. Prueba subir el archivo manualmente.';
+        st.textContent = '⚠ No se encontró PDF del folio #'+fs+' en R2. Prueba subir el archivo manualmente.';
         return;
       }
 
@@ -26675,9 +26703,9 @@ async function rgenAutoCargar(tipo){
       const candidatos = [];
       for(const f of archivos){
         try {
-          const path = prefix+'/'+f.name;
-          const { data: blob, error: errDl } = await window.SB.storage.from(STORAGE_BUCKET).download(path);
-          if(errDl || !blob) continue;
+          const path = f.key || (prefix+'/'+f.name);
+          const blob = await descargarR2(path, 'recibos');
+          if(!blob) continue;
           const buf = await blob.arrayBuffer();
           const b64Raw = btoa(new Uint8Array(buf).reduce((s,b)=>s+String.fromCharCode(b),''));
           const dataUri = 'data:application/pdf;base64,'+b64Raw;
@@ -26709,17 +26737,16 @@ async function rgenAutoCargar(tipo){
       rgenCandAbrir('pdf', candidatos);
 
     } else {
-      // tipo === 'backup': buscar en {despacho_id}/backups/ los snapshots JSON del app_state
+      // tipo === 'backup': buscar en {despacho_id}/backups/ los snapshots JSON (Cloudflare R2)
       const prefix = window.SB_DESPACHO_ID + '/backups';
-      const { data: lista, error: errList } = await window.SB.storage.from(STORAGE_BUCKET).list(prefix, { limit: 200 });
-      if(errList) throw errList;
+      const lista = await listarR2(prefix, 'recibos', 200);
 
       const archivos = (lista||[]).filter(f => f.name && f.name.endsWith('.json'))
         .sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''));
 
       if(archivos.length === 0){
         st.style.background='#fff8e8'; st.style.borderColor='#c8952a'; st.style.color='#8c6518';
-        st.textContent = '⚠ No hay backups en Supabase. Prueba subir el PDF manualmente.';
+        st.textContent = '⚠ No hay backups en R2. Prueba subir el archivo manualmente.';
         return;
       }
 
@@ -26727,9 +26754,9 @@ async function rgenAutoCargar(tipo){
       const candidatos = [];
       for(const f of archivos){
         try{
-          const path = prefix+'/'+f.name;
-          const { data: blob, error: errDl } = await window.SB.storage.from(STORAGE_BUCKET).download(path);
-          if(errDl || !blob) continue;
+          const path = f.key || (prefix+'/'+f.name);
+          const blob = await descargarR2(path, 'recibos');
+          if(!blob) continue;
           const txt = await blob.text();
           const obj = JSON.parse(txt);
           // Los backups tienen la estructura del app_state: {data:{...}, recibos:{recibos:[...]}}
@@ -26843,12 +26870,11 @@ async function rgenCandEliminar(){
   if(_rgenCandidatos.length < 2) return;
   const c = _rgenCandidatos[_rgenCandIdx];
   if(c.tipo !== 'pdf') return; // solo se eliminan PDFs de Storage
-  if(!confirm('⚠ ¿Eliminar permanentemente "'+c.nombre+'" de Supabase Storage? Esta acción no se puede deshacer.')) return;
-  if(!window.SB || !window.SB_DESPACHO_ID){ alert('⚠ Sin sesión Supabase.'); return; }
+  if(!confirm('⚠ ¿Eliminar permanentemente "'+c.nombre+'" de R2? Esta acción no se puede deshacer.')) return;
+  if(!window.SB_DESPACHO_ID){ alert('⚠ Sin despacho activo.'); return; }
   try{
     const path = window.SB_DESPACHO_ID+'/recibos/'+c.nombre;
-    const { error } = await window.SB.storage.from(STORAGE_BUCKET).remove([path]);
-    if(error) throw error;
+    await borrarR2(path, 'recibos');
     _rgenCandidatos.splice(_rgenCandIdx,1);
     if(_rgenCandIdx >= _rgenCandidatos.length) _rgenCandIdx = _rgenCandidatos.length-1;
     if(_rgenCandidatos.length===0){ rgenCandCerrar(); } else { rgenCandRender(); }

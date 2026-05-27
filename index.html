@@ -3605,6 +3605,7 @@ window.addEventListener('offline', ()=>{
 
         <input type="hidden" id="adminEditIdx">
         <input type="hidden" id="adminEditFolioRef">
+        <input type="hidden" id="adminEditLetraRef">
 
         <!-- Contexto de versión — solo visible en folios secundarios (B, C...) -->
         <div id="adminEditVersionCtx" style="display:none;margin-top:12px;border-top:1px solid rgba(200,149,42,0.15);padding-top:12px;">
@@ -23527,6 +23528,7 @@ function adminAbrirEditarRecibo(idx) {
   // Llenar campos
   document.getElementById('adminEditIdx').value = idx;
   var _fRef = document.getElementById('adminEditFolioRef'); if(_fRef) _fRef.value = r.folio != null ? r.folio : '';
+  var _lRef = document.getElementById('adminEditLetraRef'); if(_lRef) _lRef.value = r.letra || (typeof letraVersion==='function'?letraVersion(r):'A') || 'A';
   document.getElementById('adminEditFolioLabel').textContent = '#' + folioConLetra(r.folio||0, r.anio_folio, r.letra||letraVersion(r)||'A');
   document.getElementById('adminEditNombre').value = r.nombre || '';
   document.getElementById('adminEditFecha').value = r.fecha || r.fecha_recibo || '';
@@ -23680,7 +23682,7 @@ function adminEdicionFiltrar() {
       </div>
       <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
         ${saldoTag}
-        <button onclick="adminSeleccionarParaEditar(${r.folio})"
+        <button onclick="adminSeleccionarParaEditar(${r.folio},'${r.letra||(typeof letraVersion==='function'?letraVersion(r):'A')||'A'}')"
           style="background:linear-gradient(135deg,#1a4a8a,#0f2f5a);border:1px solid rgba(100,160,255,0.3);border-radius:4px;color:#c8e0ff;padding:5px 12px;cursor:pointer;font-family:monospace;font-size:0.68rem;font-weight:600;white-space:nowrap;">
           ✏️ Editar
         </button>
@@ -23689,8 +23691,12 @@ function adminEdicionFiltrar() {
   }).join('');
 }
 
-function adminSeleccionarParaEditar(folio) {
-  const r = ((appData || {}).recibos || []).find(x => x.folio === folio && !x.esComplemento);
+function adminSeleccionarParaEditar(folio, letra) {
+  const letraBuscar = letra || 'A';
+  const r = ((appData || {}).recibos || []).find(x =>
+    x.folio === folio && !x.esComplemento &&
+    (x.letra || (typeof letraVersion==='function'?letraVersion(x):'A') || 'A') === letraBuscar
+  );
   if(!r){ if(typeof toast === 'function') toast('Recibo no encontrado', 'err'); return; }
   if(typeof cerrarAdminModal === 'function') cerrarAdminModal();
   editarReciboEnConsulta(r);
@@ -23723,9 +23729,10 @@ function editarReciboEnConsulta(rParam) {
     if (typeof ir === 'function') ir('nuevo-recibo');
 
     const _folioEdicion = r.folio;
+    const _letraEdicion = r.letra || (typeof letraVersion==='function'?letraVersion(r):'A') || 'A';
     const _anioFolio    = r.anio_folio;
     setTimeout(function() {
-      var _r2 = ((appData||{}).recibos||[]).find(x => x.folio === _folioEdicion) || r;
+      var _r2 = ((appData||{}).recibos||[]).find(x => x.folio === _folioEdicion && (x.letra||(typeof letraVersion==='function'?letraVersion(x):'A')||'A') === _letraEdicion) || r;
       if (typeof cargarReciboEnFormulario === 'function') cargarReciboEnFormulario(_r2);
 
       var fd = document.getElementById('folio-display');
@@ -23752,11 +23759,12 @@ function editarReciboEnConsulta(rParam) {
 
 function adminAbrirEdicionCompleta() {
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
-  // Buscar por folio (más seguro) con respaldo por índice
+  // Buscar por folio+letra (exacto), respaldo por índice directo
   var _folioRef = document.getElementById('adminEditFolioRef');
+  var _letraRefVal = (document.getElementById('adminEditLetraRef') || {}).value || 'A';
   var _folioVal = _folioRef ? parseInt(_folioRef.value) : NaN;
   var r = (!isNaN(_folioVal) && _folioVal !== 0)
-    ? recibos.find(function(x){ return x.folio === _folioVal; })
+    ? recibos.find(function(x){ return x.folio === _folioVal && (x.letra||(typeof letraVersion==='function'?letraVersion(x):'A')||'A') === _letraRefVal; })
     : null;
   if (!r) {
     var idx = parseInt(document.getElementById('adminEditIdx').value);
@@ -23800,11 +23808,12 @@ function adminAbrirEdicionCompleta() {
 
     // 5. Cargar datos DESPUÉS de que ir() termine para evitar que el sync los pise
     var _folioEdicion = r.folio;
+    var _letraEdicion = r.letra || (typeof letraVersion==='function'?letraVersion(r):'A') || 'A';
     var _anioBanner   = r.anio_folio;
     setTimeout(function() {
-      // Recuperar referencia fresca al recibo (puede haber sincronizado)
+      // Recuperar referencia fresca al recibo por folio+letra (exacto)
       var _recibos2 = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
-      var _r2 = _recibos2.find(function(x){ return x.folio === _folioEdicion; }) || r;
+      var _r2 = _recibos2.find(function(x){ return x.folio === _folioEdicion && (x.letra||(typeof letraVersion==='function'?letraVersion(x):'A')||'A') === _letraEdicion; }) || r;
 
       if (typeof cargarReciboEnFormulario === 'function') cargarReciboEnFormulario(_r2);
 

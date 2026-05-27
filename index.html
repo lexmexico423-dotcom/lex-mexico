@@ -27193,8 +27193,9 @@ function rgenCapturar(){
   const err = document.getElementById('rgen-err');
   if(err) err.textContent = '';
 
-  // Verificar que el folio no exista ya
   const fs = typeof folioConLetra==='function' ? folioConLetra(_rgenFolio, null, _rgenLetra) : folioFormato(_rgenFolio);
+
+  // Verificar que el folio no exista ya
   if(typeof appData!=='undefined' && Array.isArray(appData.recibos)){
     if(appData.recibos.some(r => r.folio===_rgenFolio && (r.letra||(typeof letraVersion==='function'?letraVersion(r):'A')||'A')===_rgenLetra)){
       if(err) err.textContent = '⚠ El folio #'+fs+' ya existe. Bórralo primero.';
@@ -27202,40 +27203,52 @@ function rgenCapturar(){
     }
   }
 
-  // Activar modo restauración con recibo vacío — el usuario capturará los datos
+  // Guardar datos de restauración con recibo vacío
   window._restauracionFolio = _rgenFolio;
   window._restauracionLetra = _rgenLetra;
   window._restauracionRec   = { folio: _rgenFolio, letra: _rgenLetra };
   window._restauracionFecha = '';
 
-  // Cerrar modal
-  rgenCandCerrar();
+  // Recibo vacío para cargar en formulario
+  const recCarga = {
+    folio: _rgenFolio, letra: _rgenLetra,
+    clientes: [{ nombre:'', movil:'', tel:'', domicilio:'' }],
+    fecha_recibo: '', hora_recibo: '',
+    tipoTramite: 'normal', tipo_doc: 'copia',
+    copias: [], conceptos: [], anticipo: '0',
+    responsable: '', tramites: '',
+    clase:'', marca:'', serie:'', motor:'',
+    anio:'', puertas:'', color_veh:'', transmision:'',
+    cilindros:'', placa:'', ultima_tenencia:'', origen:'', combustible:''
+  };
 
-  // Limpiar formulario y activar modo restauración
+  cerrarRestaurarRecibo();
   if(typeof limpiarFormCompleto==='function') limpiarFormCompleto();
+  if(typeof ir==='function') ir('nuevo-recibo');
 
-  // Forzar modo restauración en el formulario
-  setTimeout(function(){
-    if(typeof activarModoRestauracion==='function'){
-      activarModoRestauracion(_rgenFolio, _rgenLetra);
-    } else {
-      // Fallback: configurar manualmente
-      window._restauracionFolio = _rgenFolio;
-      window._restauracionLetra = _rgenLetra;
-      const bannerEl = document.getElementById('restauracion-banner');
-      const labelFolio = document.getElementById('restauracion-folio-label');
-      const btnGuardar = document.getElementById('btn-guardar-restauracion');
-      const actNormal  = document.getElementById('actions-normal');
-      const actRest    = document.getElementById('actions-restauracion');
-      if(labelFolio) labelFolio.textContent = '#'+fs;
-      if(bannerEl){ bannerEl.style.display='flex'; }
-      if(btnGuardar){ btnGuardar.textContent='🔄 Restaurar Recibo #'+fs; btnGuardar.disabled=false; }
-      if(actNormal) actNormal.style.display='none';
-      if(actRest)   actRest.style.display='flex';
-      document.body.classList.add('modo-restauracion');
-    }
-    if(typeof setStatus==='function') setStatus('ok','Capturar folio #'+fs+' — Llena los datos y presiona RESTAURAR RECIBO','ok');
-  }, 200);
+  setTimeout(()=>{
+    if(typeof cargarReciboEnFormulario==='function') cargarReciboEnFormulario(recCarga);
+
+    document.body.classList.remove('recibo-frozen','modo-actualizacion','modo-edicion-completa');
+    document.body.classList.add('modo-restauracion');
+
+    const el = id => document.getElementById(id);
+    if(el('restauracion-folio-label')) el('restauracion-folio-label').textContent = '#'+fs;
+    if(el('restauracion-fecha-label')) el('restauracion-fecha-label').textContent = '(edítala abajo)';
+    if(el('btn-guardar-restauracion')) el('btn-guardar-restauracion').textContent = '🔄 Restaurar Recibo #'+fs;
+
+    ['actions-normal','actions-consulta','actions-actualizacion','actions-post-print','actions-edicion-completa']
+      .forEach(id=>{ const e=el(id); if(e) e.style.display='none'; });
+    if(el('actions-restauracion')) el('actions-restauracion').style.display='flex';
+    ['frozen-banner','consulta-banner','edicion-completa-banner']
+      .forEach(id=>{ const e=el(id); if(e) e.style.display='none'; });
+    if(el('restauracion-banner')) el('restauracion-banner').style.display='flex';
+
+    document.querySelectorAll('#panel-nuevo-recibo input,#panel-nuevo-recibo select,#panel-nuevo-recibo textarea')
+      .forEach(e=>{ e.disabled=false; e.style.pointerEvents=''; e.style.opacity=''; });
+
+    if(typeof setStatus==='function') setStatus('ok','Modo restauración — Folio #'+fs+' · Captura los datos y presiona Restaurar','ok');
+  }, 80);
 }
 
 function rgenVolverPaso1(){

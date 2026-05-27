@@ -26981,17 +26981,26 @@ function confirmarVincularRecibo() {
 
     <!-- PASO 1: FOLIO -->
     <div id="rgen-paso1" style="padding:24px 24px 20px;">
-      <label style="font-size:0.7rem;color:#8c6518;display:block;margin-bottom:6px;font-weight:700;letter-spacing:0.1em;">N° DE FOLIO</label>
+      <label style="font-size:0.7rem;color:#8c6518;display:block;margin-bottom:6px;font-weight:700;letter-spacing:0.1em;">N° DE FOLIO Y SERIE</label>
       <div style="display:flex;gap:8px;">
         <input id="rgen-folio" type="number" min="1" placeholder="Ej: 121"
           onkeydown="if(event.key==='Enter') rgenBuscarFolio()"
           style="flex:1;padding:11px 14px;border:2px solid #c8952a;border-radius:8px;font-size:1.3rem;font-weight:700;outline:none;background:#fff;color:#8c6518;font-family:monospace;text-align:center;">
+        <select id="rgen-letra"
+          style="padding:11px 10px;border:2px solid #c8952a;border-radius:8px;font-size:1rem;font-weight:700;outline:none;background:#fff;color:#8c6518;font-family:monospace;cursor:pointer;">
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="D">D</option>
+          <option value="E">E</option>
+        </select>
         <button onclick="rgenBuscarFolio()"
           style="padding:11px 18px;border:none;border-radius:8px;background:linear-gradient(135deg,#c8952a,#8c6518);color:#fff;cursor:pointer;font-size:0.82rem;font-weight:700;letter-spacing:0.04em;white-space:nowrap;">
           🔍 BUSCAR
         </button>
       </div>
-      <div id="rgen-paso1-msg" style="font-size:0.72rem;margin-top:8px;min-height:18px;text-align:center;"></div>
+      <div style="font-size:0.62rem;color:rgba(140,101,24,0.55);margin-top:5px;">Serie A = recibo original · B, C, D = pagos parciales</div>
+      <div id="rgen-paso1-msg" style="font-size:0.72rem;margin-top:6px;min-height:18px;text-align:center;"></div>
     </div>
 
     <!-- PASO 2: RESULTADO -->
@@ -27077,11 +27086,13 @@ function confirmarVincularRecibo() {
 //   Confirmar → inserta en appData y sincroniza con Supabase
 
 let _rgenFolio = 0;
+let _rgenLetra = 'A';
 let _rgenRec   = null;
 
 function abrirRestaurarRecibo(){
-  _rgenFolio = 0; _rgenRec = null;
+  _rgenFolio = 0; _rgenLetra = 'A'; _rgenRec = null;
   document.getElementById('rgen-folio').value = '';
+  const _letraEl = document.getElementById('rgen-letra'); if(_letraEl) _letraEl.value = 'A';
   document.getElementById('rgen-paso1-msg').textContent = '';
   document.getElementById('rgen-err').textContent = '';
   document.getElementById('rgen-paso2').style.display = 'none';
@@ -27091,7 +27102,7 @@ function abrirRestaurarRecibo(){
 }
 function cerrarRestaurarRecibo(){
   document.getElementById('overlay-restaurar-recibo').style.display = 'none';
-  _rgenFolio = 0; _rgenRec = null;
+  _rgenFolio = 0; _rgenLetra = 'A'; _rgenRec = null;
 }
 function rgenVolverPaso1(){
   _rgenRec = null;
@@ -27104,15 +27115,16 @@ function rgenVolverPaso1(){
 function rgenBuscarFolio(){
   const msg = document.getElementById('rgen-paso1-msg');
   const folioVal = parseInt(document.getElementById('rgen-folio').value) || 0;
+  const letraVal = (document.getElementById('rgen-letra')?.value || 'A').toUpperCase();
   if(!folioVal || folioVal < 1){
     msg.style.color = '#c0161a';
     msg.textContent = '⚠ Ingresa un número de folio válido.';
     return;
   }
-  const fs = folioFormato(folioVal);
+  const fs = folioConLetra(folioVal, null, letraVal);
 
   if(typeof appData !== 'undefined' && Array.isArray(appData.recibos)){
-    if(appData.recibos.some(r => r.folio === folioVal)){
+    if(appData.recibos.some(r => r.folio === folioVal && (r.letra||(typeof letraVersion==='function'?letraVersion(r):'A')||'A') === letraVal)){
       msg.style.color = '#c0161a';
       msg.textContent = '⚠ El folio #'+fs+' ya está activo en el sistema.';
       return;
@@ -27120,9 +27132,10 @@ function rgenBuscarFolio(){
   }
 
   _rgenFolio = folioVal;
+  _rgenLetra = letraVal;
 
   // Buscar en respaldos locales (localStorage)
-  const encontrado = _rgenBuscarEnRespaldos(folioVal);
+  const encontrado = _rgenBuscarEnRespaldos(folioVal, letraVal);
 
   document.getElementById('rgen-paso1').style.display = 'none';
   document.getElementById('rgen-paso2').style.display = 'block';
@@ -27147,10 +27160,11 @@ function rgenBuscarFolio(){
 }
 
 // ── Busca en respaldos localStorage ─────────────────────────────────────────
-function _rgenBuscarEnRespaldos(folioVal){
+function _rgenBuscarEnRespaldos(folioVal, letraVal){
+  const letraBuscar = letraVal || 'A';
   if(typeof appData !== 'undefined'){
     if(Array.isArray(appData.recibos)){
-      const r = appData.recibos.find(x => x.folio === folioVal);
+      const r = appData.recibos.find(x => x.folio === folioVal && (x.letra||(typeof letraVersion==='function'?letraVersion(x):'A')||'A') === letraBuscar);
       if(r) return r;
     }
     if(appData.historialVersiones){
@@ -27165,7 +27179,7 @@ function _rgenBuscarEnRespaldos(folioVal){
         const obj = JSON.parse(localStorage.getItem(it.clave)||'null');
         const lista = obj?.datos?.recibos;
         if(Array.isArray(lista)){
-          const r = lista.find(x => x.folio === folioVal);
+          const r = lista.find(x => x.folio === folioVal && (x.letra||(typeof letraVersion==='function'?letraVersion(x):'A')||'A') === letraBuscar);
           if(r) return r;
         }
       }catch(e){ registrarError('catch vacio', e); }
@@ -27956,13 +27970,14 @@ function _rgenMostrarPreview(r){
 function rgenConfirmar(){
   const err=document.getElementById('rgen-err');
   err.textContent='';
-  const fs=folioFormato(_rgenFolio);
+  const fs=typeof folioConLetra==='function'?folioConLetra(_rgenFolio,null,_rgenLetra):folioFormato(_rgenFolio);
   if(!_rgenFolio||!_rgenRec){ err.textContent='⚠ Sin datos para restaurar.'; return; }
   if(typeof appData==='undefined'||!Array.isArray(appData.recibos)){ err.textContent='❌ Sistema no listo.'; return; }
-  if(appData.recibos.some(r=>r.folio===_rgenFolio)){ err.textContent='⚠ El folio #'+fs+' ya existe. Bórralo primero.'; return; }
+  if(appData.recibos.some(r=>r.folio===_rgenFolio&&(r.letra||(typeof letraVersion==='function'?letraVersion(r):'A')||'A')===_rgenLetra)){ err.textContent='⚠ El folio #'+fs+' ya existe. Bórralo primero.'; return; }
 
   // Guardar datos de restauración globalmente
   window._restauracionFolio = _rgenFolio;
+  window._restauracionLetra = _rgenLetra;
   window._restauracionRec   = _rgenRec;
   window._restauracionFecha = _rgenRec.fecha_recibo || _rgenRec.fecha || '';
 
@@ -27970,6 +27985,7 @@ function rgenConfirmar(){
   const R = _rgenRec;
   const recCarga = {
     folio          : _rgenFolio,
+    letra          : _rgenLetra,
     nombre         : R.nombre || ((R.clientes||[])[0]?.nombre) || '',
     clientes       : R.clientes || [{ nombre:R.nombre||'', movil:R.movil||'', tel:'', domicilio:R.domicilio||'' }],
     fecha_recibo   : R.fecha_recibo || R.fecha || '',
@@ -27999,7 +28015,8 @@ function rgenConfirmar(){
     document.body.classList.remove('recibo-frozen','modo-actualizacion','modo-edicion-completa');
     document.body.classList.add('modo-restauracion');
 
-    const fs2=folioFormato(_rgenFolio);
+    const _rLetra2 = window._restauracionLetra || 'A';
+    const fs2=typeof folioConLetra==='function'?folioConLetra(window._restauracionFolio,null,_rLetra2):folioFormato(window._restauracionFolio);
     const el=id=>document.getElementById(id);
     if(el('restauracion-folio-label')) el('restauracion-folio-label').textContent='#'+fs2;
     if(el('restauracion-fecha-label')) el('restauracion-fecha-label').textContent=window._restauracionFecha||'(edítala abajo)';
@@ -28022,7 +28039,7 @@ function rgenConfirmar(){
 
 function cancelarRestauracion(){
   document.body.classList.remove('modo-restauracion');
-  window._restauracionFolio=null; window._restauracionRec=null; window._restauracionFecha=null;
+  window._restauracionFolio=null; window._restauracionLetra=null; window._restauracionRec=null; window._restauracionFecha=null;
   const el=id=>document.getElementById(id);
   if(el('actions-restauracion')) el('actions-restauracion').style.display='none';
   if(el('restauracion-banner'))  el('restauracion-banner').style.display='none';
@@ -28036,11 +28053,12 @@ async function guardarRestauracion(){
   if(!sbSession||Date.now()>=sbExpiry){ mostrarDriveOverlay('guardarRestauracion'); return; }
 
   const folio    = window._restauracionFolio;
-  const fs       = folioFormato(folio);
+  const letra    = window._restauracionLetra || 'A';
+  const fs       = typeof folioConLetra==='function'?folioConLetra(folio,null,letra):folioFormato(folio);
   const fechaOrig= window._restauracionFecha || fechaCDMX_ISO();
   const horaOrig = window._restauracionRec?.hora_recibo || window._restauracionRec?.hora || horaCDMX_HHMM();
 
-  if(typeof appData!=='undefined'&&Array.isArray(appData.recibos)&&appData.recibos.some(r=>r.folio===folio)){
+  if(typeof appData!=='undefined'&&Array.isArray(appData.recibos)&&appData.recibos.some(r=>r.folio===folio&&(r.letra||(typeof letraVersion==='function'?letraVersion(r):'A')||'A')===letra)){
     alert('⚠ El folio #'+fs+' ya existe. Bórralo primero.'); return;
   }
 
@@ -28104,7 +28122,7 @@ async function guardarRestauracion(){
 
     const copiasParsed=(()=>{try{const p=JSON.parse(datos.copias||'{}');return p.docs||[];}catch(e){return [];}})();
     const rec={
-      folio, nombre:primerNombre, fecha:fechaOrig, hora:horaOrig,
+      folio, letra, nombre:primerNombre, fecha:fechaOrig, hora:horaOrig,
       fecha_recibo:fechaOrig, hora_recibo:horaOrig,
       archivo:nombreArchivo, pdfBase64, saldoPendiente,
       anticipo:String(anticipo), totalAbonado:anticipo, saldoNuevo:saldoPendiente,
@@ -28124,7 +28142,7 @@ async function guardarRestauracion(){
     const idx=appData.recibos.findIndex(r=>r.folio<folio);
     if(idx>=0) appData.recibos.splice(idx,0,rec); else appData.recibos.push(rec);
 
-    if(appData.folioActual<=folio){ appData.folioActual=folio+1; if(typeof actualizarFolioDisplay==='function') actualizarFolioDisplay(); }
+    if(letra==='A' && appData.folioActual<=folio){ appData.folioActual=folio+1; if(typeof actualizarFolioDisplay==='function') actualizarFolioDisplay(); }
     if(typeof REC!=='undefined'){REC.recibos=appData.recibos;REC.folioActual=appData.folioActual;}
     if(typeof actualizarArchivoControl==='function') try{await actualizarArchivoControl();}catch(e){ registrarError('catch vacio', e); }
 
@@ -28135,10 +28153,10 @@ async function guardarRestauracion(){
       const tipoMov=esLiq?'Liquidado':'Anticipo';
       const conc1=(conceptos[0]?.concepto||'');
       if(typeof _registrarMovimiento==='function') _registrarMovimiento({
-        id:'M-REST-'+folio+'-'+Date.now(), folioCaja:'',
+        id:'M-REST-'+folio+letra+'-'+Date.now(), folioCaja:'',
         fecha:fechaOrig, hora:horaOrig,
         descripcion:tipoMov+' — Recibo #'+fs+' · '+primerNombre+(conc1?' · '+conc1:''),
-        nombre:primerNombre, folio, monto:montoCaja,
+        nombre:primerNombre, folio, letra, monto:montoCaja,
         tipo:'ingreso', cat:tipoMov+' · #'+fs, estatus:tipoMov,
         fuente:'recibo', esRestaurado:true, responsable:datos.responsable||'RESTAURADO'
       });
@@ -28160,7 +28178,7 @@ async function guardarRestauracion(){
     if(typeof setStatus==='function') setStatus('ok','Recibo #'+fs+' restaurado — PDF regenerado','ok');
 
     alert('✅ Recibo #'+fs+' restaurado.\n\n📋 '+primerNombre+'\n📅 '+fechaOrig
-      +'\n💰 $'+total.toFixed(2)+' | Abonado: $'+anticipo.toFixed(2)+' | Saldo: $'+saldoPendiente.toFixed(2)
+      +(letra!=='A'?' · Serie '+letra:'')+'\n💰 $'+total.toFixed(2)+' | Abonado: $'+anticipo.toFixed(2)+' | Saldo: $'+saldoPendiente.toFixed(2)
       +'\n\nAparece en Contabilidad con fecha '+fechaOrig+'.');
 
     if(typeof limpiarFormCompleto==='function') limpiarFormCompleto();

@@ -22945,7 +22945,7 @@ function adminRenderRecibos(q) {
       'style="background:#c0161a;border:none;border-radius:4px;color:#fff;',
       'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;">',
       '🗑 Eliminar</button>',
-      (r.tipoTramite === 'vehicular' ? [
+      (r.tipoTramite === 'vehicular' && !esSecundario ? [
         '<button onclick="adminCrearPendientePlacas(' + idx + ')" ',
         'style="background:#1a6a3a;border:none;border-radius:4px;color:#fff;',
         'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;">',
@@ -32631,14 +32631,15 @@ function _gestRenderHistorial(g){
   }
   body.innerHTML=recs.map(r=>{
     const tipoColor={'anticipo':'#e8c875','parcial':'#f08030','liquidacion':'#4dca6a'}[r.tipo]||'rgba(200,149,42,0.5)';
+    const _rLetra = r.letra || (typeof letraVersion==='function'?letraVersion(r):'A') || 'A';
     return `<div class="gest-rec-row">
       <span style="font-family:monospace;font-size:0.68rem;">${_gestFecha(r.fecha)}</span>
-      <span class="gest-rec-folio" onclick="abrirPreviaDesdeContab(${r.folio})">#${typeof folioConLetra==='function'?folioConLetra(r.folio, r.anio_folio, r.letra||letraVersion(r)||'A'):r.folio}</span>
+      <span class="gest-rec-folio" onclick="abrirPreviaDesdeContab(${r.folio},'${_rLetra}')">#${typeof folioConLetra==='function'?folioConLetra(r.folio, r.anio_folio, _rLetra):r.folio}</span>
       <span style="font-size:0.72rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.concepto||'—'}</span>
       <span style="text-align:right;font-family:monospace;font-size:0.78rem;font-weight:700;color:#4dca6a;">$${_gestFmt(r.monto)}</span>
       <span style="font-size:0.65rem;font-weight:700;color:${tipoColor};">${(r.tipo||'').toUpperCase()}</span>
       <span style="display:flex;gap:6px;">
-        <button onclick="abrirPreviaDesdeContab(${r.folio})" style="background:rgba(100,140,255,0.1);border:1px solid rgba(100,140,255,0.3);border-radius:4px;color:#80a8ff;font-size:0.6rem;padding:3px 8px;cursor:pointer;">Ver PDF</button>
+        <button onclick="abrirPreviaDesdeContab(${r.folio},'${_rLetra}')" style="background:rgba(100,140,255,0.1);border:1px solid rgba(100,140,255,0.3);border-radius:4px;color:#80a8ff;font-size:0.6rem;padding:3px 8px;cursor:pointer;">Ver PDF</button>
       </span>
     </div>`;
   }).join('');

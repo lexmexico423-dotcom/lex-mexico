@@ -13187,7 +13187,7 @@ function renderContab() {
       }
       if(!_letraF) _letraF = 'A';
       const str = folioConLetra(n, _rFol ? _rFol.anio_folio : null, _letraF);
-      folioTxt  = `<span onclick="abrirPreviaDesdeContab(${n})" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--azul);" title="Ver recibo #${str}">${str}</span>`;
+      folioTxt  = `<span onclick="abrirPreviaDesdeContab(${n},'${_letraF}')" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px;color:var(--azul);" title="Ver recibo #${str}">${str}</span>`;
       folioColor = '';
     } else {
       folioTxt  = `<span style="color:var(--gold-d);">${esc(m.folioCaja||'—')}</span>`;
@@ -21804,7 +21804,7 @@ function adminDelFolioBtnClick(){
 }
 
 // Abrir preview de recibo desde la tabla de Contabilidad — overlay flotante
-async function abrirPreviaDesdeContab(numFolio){
+async function abrirPreviaDesdeContab(numFolio, letra){
   const overlay = document.getElementById('contab-pdf-overlay');
   const embed   = document.getElementById('cpdf-embed');
   const loading = document.getElementById('cpdf-loading');
@@ -21813,9 +21813,14 @@ async function abrirPreviaDesdeContab(numFolio){
   const nombreEl= document.getElementById('cpdf-nombre');
   const estadoEl= document.getElementById('cpdf-estado');
 
-  // Buscar el recibo
+  // Buscar la versión exacta (letra A, B, C…) para mostrar su PDF propio
   const recibos = (typeof appData!=='undefined'&&appData.recibos)?appData.recibos:(REC.recibos||[]);
-  const r = recibos.find(x=>x.folio===numFolio||x.folio===parseInt(numFolio));
+  const letraBuscar = letra || 'A';
+  const r = recibos.find(x=>
+    (x.folio===numFolio||x.folio===parseInt(numFolio)) &&
+    !x.esComplemento &&
+    (x.letra || letraVersion(x) || 'A') === letraBuscar
+  );
   if(!r){ toast('Recibo #'+folioFormato(numFolio)+' no encontrado','err'); return; }
 
   // Mostrar overlay con estado de carga
@@ -21839,7 +21844,25 @@ async function abrirPreviaDesdeContab(numFolio){
       return;
     }
 
-    // ── 2. Intentar Supabase Storage por nombre de archivo ──
+    // ── 2. Intentar R2 ──
+    if(window.SB_DESPACHO_ID && r.archivo && typeof window.descargarR2 === 'function'){
+      try{
+        msg.textContent='Cargando PDF desde R2...';
+        const _r2Path = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
+        const _r2Blob = await window.descargarR2(_r2Path, 'recibos');
+        if(_r2Blob && _r2Blob.size > 0){
+          const _r2Url = URL.createObjectURL(_r2Blob);
+          embed.setAttribute('src', _r2Url + '#toolbar=0&navpanes=0');
+          loading.style.display='none';
+          const _r2Rd = new FileReader();
+          _r2Rd.onload = () => { if(!r.pdfBase64) r.pdfBase64 = _r2Rd.result; };
+          _r2Rd.readAsDataURL(_r2Blob);
+          return;
+        }
+      }catch(_eR2){ console.warn('[contabPDF] R2:', _eR2); }
+    }
+
+    // ── 3. Intentar Supabase Storage por nombre de archivo ──
     if(window.SB && window.SB_DESPACHO_ID && r.archivo){
       try{
         msg.textContent='Cargando PDF desde servidor...';
@@ -21863,7 +21886,7 @@ async function abrirPreviaDesdeContab(numFolio){
       }catch(_eSB){ console.warn('[contabPDF] Storage:', _eSB); }
     }
 
-    // ── 3. Último recurso: regenerar sobre COPIA — NUNCA mutar el recibo original ──
+    // ── 4. Último recurso: regenerar sobre COPIA — NUNCA mutar el recibo original ──
     msg.textContent='Generando PDF...';
     const _rC = Object.assign({}, r);
     (function _calcSaldos(rec){

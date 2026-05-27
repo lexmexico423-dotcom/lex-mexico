@@ -9841,7 +9841,7 @@ async function _imprimirActualizacionReal(){
     color_veh:recibo.color_veh, transmision:recibo.transmision,
     cilindros:recibo.cilindros, placa:recibo.placa,
     ultima_tenencia:recibo.ultima_tenencia, origen:recibo.origen, combustible:recibo.combustible,
-    copias: recibo.copias || [],
+    copias: recibo.copias || null,
     tipoTramite: recibo.tipoTramite,
     fecha_recibo: recibo.fecha || recibo.fecha_recibo || '',
     hora_recibo:  recibo.hora || recibo.hora_recibo || '',
@@ -9885,6 +9885,7 @@ async function _imprimirActualizacionReal(){
       const nuevoRegistro = Object.assign({}, appData.recibos[idx], {
         costosExtra:      costosExtra.map(c => Object.assign({}, c, {locked:true, folioLetra: c.folioLetra || letraActual})),
         pagosParciales:   pagosParciales_conAuth.map(p => Object.assign({}, p, {locked:true})),
+        copias:           appData.recibos[idx].copias,
         fechasImpresion:  fechasImpresion,
         total:            totalGeneral,
         saldoPendiente:   saldoNuevo,
@@ -11116,7 +11117,12 @@ async function guardarRecibo(){
         // 2. Registrar anticipo en contabilidad (evitar duplicado con guard de ID)
         if(typeof D !== 'undefined' && Array.isArray(D.movimientos) && _anticoGuardado > 0){
           const idMov = 'M-REC-' + _folioGuardado;
-          if(!D.movimientos.some(m => m.id === idMov)){
+          // Guard robusto: evitar duplicado por ID exacto O por folio+letra A ya registrado
+          const _yaExisteMovRecibo = D.movimientos.some(m =>
+            m.id === idMov ||
+            (m.folio === _folioGuardado && (m.letra||'A') === 'A' && m.fuente === 'recibo')
+          );
+          if(!_yaExisteMovRecibo){
             const mov = {
               id: idMov,
               folioCaja: '',
@@ -27136,8 +27142,13 @@ function confirmarVincularRecibo() {
       <div id="rgen-err" style="color:#c0161a;font-size:0.73rem;min-height:14px;margin-bottom:8px;"></div>
 
       <!-- Botones acción -->
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <div style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
         <button onclick="rgenVolverPaso1()" style="padding:9px 16px;border:1.5px solid #d4b870;border-radius:20px;background:none;cursor:pointer;font-size:0.76rem;color:#7a6840;">← Cambiar folio</button>
+        <button id="rgen-btn-capturar" onclick="rgenCapturar()"
+          style="padding:9px 18px;border:1.5px solid #2a7a3a;border-radius:20px;background:#eefff4;color:#1a5a28;cursor:pointer;font-size:0.76rem;font-weight:700;letter-spacing:0.04em;transition:all 0.2s;"
+          title="Abrir formulario vacío con este folio para capturar los datos manualmente">
+          ✏️ Capturar
+        </button>
         <button id="rgen-btn-confirmar" onclick="rgenConfirmar()" disabled
           style="padding:9px 22px;border:none;border-radius:20px;background:#888;color:#fff;cursor:not-allowed;font-size:0.78rem;font-weight:700;letter-spacing:0.04em;transition:all 0.2s;">
           ✅ Restaurar Recibo
@@ -27176,6 +27187,57 @@ function cerrarRestaurarRecibo(){
   document.getElementById('overlay-restaurar-recibo').style.display = 'none';
   _rgenFolio = 0; _rgenLetra = 'A'; _rgenRec = null;
 }
+function rgenCapturar(){
+  // Abrir formulario vacío con el folio buscado — sin necesidad de PDF
+  if(!_rgenFolio){ return; }
+  const err = document.getElementById('rgen-err');
+  if(err) err.textContent = '';
+
+  // Verificar que el folio no exista ya
+  const fs = typeof folioConLetra==='function' ? folioConLetra(_rgenFolio, null, _rgenLetra) : folioFormato(_rgenFolio);
+  if(typeof appData!=='undefined' && Array.isArray(appData.recibos)){
+    if(appData.recibos.some(r => r.folio===_rgenFolio && (r.letra||(typeof letraVersion==='function'?letraVersion(r):'A')||'A')===_rgenLetra)){
+      if(err) err.textContent = '⚠ El folio #'+fs+' ya existe. Bórralo primero.';
+      return;
+    }
+  }
+
+  // Activar modo restauración con recibo vacío — el usuario capturará los datos
+  window._restauracionFolio = _rgenFolio;
+  window._restauracionLetra = _rgenLetra;
+  window._restauracionRec   = { folio: _rgenFolio, letra: _rgenLetra };
+  window._restauracionFecha = '';
+
+  // Cerrar modal
+  rgenCandCerrar();
+
+  // Limpiar formulario y activar modo restauración
+  if(typeof limpiarFormCompleto==='function') limpiarFormCompleto();
+
+  // Forzar modo restauración en el formulario
+  setTimeout(function(){
+    if(typeof activarModoRestauracion==='function'){
+      activarModoRestauracion(_rgenFolio, _rgenLetra);
+    } else {
+      // Fallback: configurar manualmente
+      window._restauracionFolio = _rgenFolio;
+      window._restauracionLetra = _rgenLetra;
+      const bannerEl = document.getElementById('restauracion-banner');
+      const labelFolio = document.getElementById('restauracion-folio-label');
+      const btnGuardar = document.getElementById('btn-guardar-restauracion');
+      const actNormal  = document.getElementById('actions-normal');
+      const actRest    = document.getElementById('actions-restauracion');
+      if(labelFolio) labelFolio.textContent = '#'+fs;
+      if(bannerEl){ bannerEl.style.display='flex'; }
+      if(btnGuardar){ btnGuardar.textContent='🔄 Restaurar Recibo #'+fs; btnGuardar.disabled=false; }
+      if(actNormal) actNormal.style.display='none';
+      if(actRest)   actRest.style.display='flex';
+      document.body.classList.add('modo-restauracion');
+    }
+    if(typeof setStatus==='function') setStatus('ok','Capturar folio #'+fs+' — Llena los datos y presiona RESTAURAR RECIBO','ok');
+  }, 200);
+}
+
 function rgenVolverPaso1(){
   _rgenRec = null;
   document.getElementById('rgen-paso2').style.display = 'none';

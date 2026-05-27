@@ -24594,8 +24594,15 @@ function sincronizarFolioConREC() {
   if (typeof REC === 'undefined') return;
   if (REC.folioActual && REC.folioActual > (appData.folioActual || 100)) appData.folioActual = REC.folioActual;
   if (REC.recibos && REC.recibos.length > 0) {
-    var fds = new Set(REC.recibos.map(function(r){return r.folio;}));
-    var soloL = (appData.recibos||[]).filter(function(r){return !fds.has(r.folio);});
+    // Clave compuesta folio|letra para que B/C/D en appData sobrevivan si REC solo tiene A
+    var fds = new Set(REC.recibos.map(function(r){
+      var l = r.letra||(typeof letraVersion==='function'?letraVersion(r):'A')||'A';
+      return r.folio+'|'+l;
+    }));
+    var soloL = (appData.recibos||[]).filter(function(r){
+      var l = r.letra||(typeof letraVersion==='function'?letraVersion(r):'A')||'A';
+      return !fds.has(r.folio+'|'+l);
+    });
     appData.recibos = soloL.concat(REC.recibos);
   }
   if (typeof actualizarFolioDisplay === 'function') actualizarFolioDisplay();

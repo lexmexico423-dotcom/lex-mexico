@@ -5515,10 +5515,19 @@ window.addEventListener('offline', ()=>{
           <div style="font-family:'DM Mono',monospace;font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:#1a5a28;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
             <span style="font-size:0.8rem;">📋</span> Consultar Folios y Expedientes
           </div>
-          <!-- Búsqueda por folio numérico -->
-          <div class="field-group" style="margin-bottom:6px;">
-            <label style="font-family:'DM Mono',monospace;font-size:0.58rem;color:#3a6a48;letter-spacing:0.08em;text-transform:uppercase;">🔢 Por Número de Folio</label>
-            <input type="number" id="folio_anterior" placeholder="Ej: 0100" min="1" oninput="cargarHistorialFolio()" style="max-width:180px;border-color:#2a7a3a !important;">
+          <!-- Búsqueda por folio y expediente en línea -->
+          <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
+            <div class="field-group" style="margin:0;flex-shrink:0;">
+              <label style="font-family:'DM Mono',monospace;font-size:0.58rem;color:#3a6a48;letter-spacing:0.08em;text-transform:uppercase;">🔢 Por Número de Folio</label>
+              <input type="number" id="folio_anterior" placeholder="Ej: 0100" min="1" oninput="cargarHistorialFolio()" style="max-width:140px;border-color:#2a7a3a !important;">
+            </div>
+            <div style="flex-shrink:0;padding-bottom:6px;font-family:'DM Mono',monospace;font-size:0.6rem;color:#6a9a78;letter-spacing:0.1em;align-self:flex-end;">Ó</div>
+            <div class="field-group" style="margin:0;flex-shrink:0;">
+              <label style="font-family:'DM Mono',monospace;font-size:0.58rem;color:#3a6a48;letter-spacing:0.08em;text-transform:uppercase;">📁 Por Expediente</label>
+              <input type="text" id="expediente_buscar" placeholder="Ej: ARCH-00001" autocomplete="off"
+                oninput="this.value=this.value.toUpperCase();cargarHistorialExpediente()"
+                style="max-width:160px;border-color:#2a7a3a !important;font-family:'DM Mono',monospace;letter-spacing:0.05em;">
+            </div>
           </div>
           <!-- Historial de pagos del folio (A, B, C...) -->
           <div id="folios-relacionados" style="display:none;margin-top:6px;">
@@ -5526,19 +5535,6 @@ window.addEventListener('offline', ()=>{
           </div>
           <!-- Botón regresar — movido al footer del recibo-body -->
           <div id="btn-regresar-placeholder" style="display:none;"></div>
-          <!-- Divisor -->
-          <div style="display:flex;align-items:center;gap:6px;margin:4px 0 8px;">
-            <div style="flex:1;height:1px;background:#b8d8c0;"></div>
-            <span style="font-family:'DM Mono',monospace;font-size:0.55rem;color:#6a9a78;letter-spacing:0.1em;">Ó</span>
-            <div style="flex:1;height:1px;background:#b8d8c0;"></div>
-          </div>
-          <!-- Búsqueda por expediente -->
-          <div class="field-group" style="margin-bottom:6px;">
-            <label style="font-family:'DM Mono',monospace;font-size:0.58rem;color:#3a6a48;letter-spacing:0.08em;text-transform:uppercase;">📁 Por Número de Expediente</label>
-            <input type="text" id="expediente_buscar" placeholder="Ej: ARCH-00001" autocomplete="off"
-              oninput="this.value=this.value.toUpperCase();cargarHistorialExpediente()"
-              style="max-width:180px;border-color:#2a7a3a !important;font-family:'DM Mono',monospace;letter-spacing:0.05em;">
-          </div>
           <div class="field-group" id="info-folio-anterior" style="display:none;">
             <label>Estado</label>
             <div id="resumen-folio-anterior" style="font-size:0.82rem;padding:6px 8px;background:#f5f0e0;border:1px solid var(--border-light);border-radius:2px;line-height:1.6;"></div>
@@ -8370,8 +8366,23 @@ async function generarPDF(datos,folio,qrDataURL){
   }
 
   y += 0.5;
-  // QR versión A
-  if(!_esUpdate && qrDataURL){ try{doc.addImage(qrDataURL,'PNG',margin,y,18,18);}catch(e){ registrarError('catch vacio', e); } }
+  // QR + cuadro TOTAL/ABONADO/RESTA — solo versión A (primaria)
+  if(!_esUpdate){
+    if(qrDataURL){ try{doc.addImage(qrDataURL,'PNG',margin,y,18,18);}catch(e){ registrarError('catch vacio', e); } }
+    doc.setFillColor(255,255,255); doc.rect(margin+cW-62,y,62,22,'F');
+    doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.rect(margin+cW-62,y,62,22);
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
+    doc.text('TOTAL:',margin+cW-60,y+5);
+    doc.text('ABONADO:',margin+cW-60,y+11);
+    doc.setFont('helvetica','bold'); doc.setTextColor(154,110,24);
+    doc.text('RESTA:',margin+cW-60,y+18);
+    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
+    doc.text('$'+fmtMXN(totalGeneral),margin+cW-1.5,y+5,{align:'right'});
+    doc.text('$'+fmtMXN(totalAbonado),margin+cW-1.5,y+11,{align:'right'});
+    doc.setFontSize(11.5); doc.setTextColor(saldoFinal>0?154:42, saldoFinal>0?110:122, saldoFinal>0?24:58);
+    doc.text('$'+fmtMXN(Math.max(0,saldoFinal)),margin+cW-1.5,y+18.5,{align:'right'});
+    y += 24;
+  }
 
   // Historial de pagos (si hay folio anterior)
   if(datos.folioAnterior && datos.historialPagosRef && datos.historialPagosRef.length){
@@ -8645,12 +8656,7 @@ function cargarHistorialFolio(){
         : '<span style="color:#b01010;font-weight:700;">&#x26a0; $'+fmtMXN(saldoFinal)+' PENDIENTE</span>');
 
     // Botones de acción (solo si hay saldo y no está cancelado)
-    var botonesHtml = (!liquidado && !cancelado)
-      ? '<div style="display:flex;gap:6px;margin-top:7px;padding-top:6px;border-top:1px dashed #d8c880;">'
-        +'<button onclick="ejecutarPagoParcial()" class="btn-pago-parcial" style="flex:1;padding:5px 8px;font-size:0.69rem;">&#x1f4b0; Pago parcial</button>'
-        +'<button onclick="ejecutarLiquidacionTotal()" class="btn-liquidacion" style="flex:1;padding:5px 8px;font-size:0.69rem;">&#x2705; Pago total</button>'
-        +'</div>'
-      : '';
+    var botonesHtml = '';
 
     chipsBody.innerHTML =
       '<div style="background:#faf5e8;border:1px solid #c8b870;border-radius:5px;padding:8px 10px;">'

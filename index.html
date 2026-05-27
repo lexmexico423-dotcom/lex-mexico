@@ -5520,10 +5520,9 @@ window.addEventListener('offline', ()=>{
             <label style="font-family:'DM Mono',monospace;font-size:0.58rem;color:#3a6a48;letter-spacing:0.08em;text-transform:uppercase;">🔢 Por Número de Folio</label>
             <input type="number" id="folio_anterior" placeholder="Ej: 0100" min="1" oninput="cargarHistorialFolio()" style="max-width:180px;border-color:#2a7a3a !important;">
           </div>
-          <!-- Folios relacionados (misma base, distintas letras) -->
-          <div id="folios-relacionados" style="display:none;margin-top:5px;">
-            <label style="font-family:'DM Mono',monospace;font-size:0.55rem;color:#3a6a48;letter-spacing:0.08em;text-transform:uppercase;display:block;margin-bottom:4px;">Versiones del folio</label>
-            <div id="folios-relacionados-chips" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+          <!-- Historial de pagos del folio (A, B, C...) -->
+          <div id="folios-relacionados" style="display:none;margin-top:6px;">
+            <div id="folios-relacionados-chips"></div>
           </div>
           <!-- Botón regresar — movido al footer del recibo-body -->
           <div id="btn-regresar-placeholder" style="display:none;"></div>
@@ -8588,38 +8587,91 @@ function cargarHistorialFolio(){
   const todosConFolio = (appData.recibos||[]).filter(r => r.folio===val && !r.esComplemento);
   const chipsDiv  = document.getElementById('folios-relacionados');
   const chipsBody = document.getElementById('folios-relacionados-chips');
-  if(todosConFolio.length > 1){
-    // Ordenar: A primero, Z último — el más reciente es el último
-    const ordenados = todosConFolio.slice().sort(function(a,b){
-      const la = (a.letra||letraVersion(a)||'A');
-      const lb = (b.letra||letraVersion(b)||'A');
-      return la < lb ? -1 : la > lb ? 1 : 0;
-    });
-    chipsBody.innerHTML = ordenados.map(function(r){
-      const ltr  = r.letra || letraVersion(r) || 'A';
-      const fstr = folioConLetra(r.folio, r.anio_folio, ltr);
-      const esMasReciente = r === ordenados[ordenados.length-1];
-      const bg   = esMasReciente ? '#c8952a' : '#e8e0cc';
-      const col  = esMasReciente ? '#fff'    : '#5a4a20';
-      const brd  = esMasReciente ? '#c8952a' : '#c8b870';
-      return '<span style="font-family:\'DM Mono\',monospace;font-size:0.7rem;font-weight:700;'
-           + 'padding:2px 8px;border-radius:12px;border:1px solid '+brd+';'
-           + 'background:'+bg+';color:'+col+';letter-spacing:0.05em;cursor:default;pointer-events:none;user-select:none;"'
-           + ' title="'+(esMasReciente?'Más reciente':'Versión anterior')+'">'
-           + '#'+fstr+'</span>';
+
+  // Ordenar siempre: A primero, última letra al final
+  const ordenados = todosConFolio.slice().sort(function(a,b){
+    const la = (a.letra||(typeof letraVersion==='function'?letraVersion(a):'A')||'A');
+    const lb = (b.letra||(typeof letraVersion==='function'?letraVersion(b):'A')||'A');
+    return la < lb ? -1 : la > lb ? 1 : 0;
+  });
+
+  if(ordenados.length >= 1){
+    // Saldo seguro: funciona cuando saldoPendiente es exactamente 0
+    function _saldoRv(r){
+      if(r.saldoPendiente !== undefined && r.saldoPendiente !== null) return parseFloat(r.saldoPendiente)||0;
+      if(r.saldoNuevo     !== undefined && r.saldoNuevo     !== null) return parseFloat(r.saldoNuevo)||0;
+      return 0;
+    }
+    // Fecha corta "15/ene"
+    var _mc = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    function _fc(f){ if(!f) return '—'; var p=f.split('-'); if(p.length<3) return f; return parseInt(p[2],10)+'/'+_mc[parseInt(p[1],10)-1]; }
+
+    var ultimo    = ordenados[ordenados.length-1];
+    var primero   = ordenados[0];
+    var saldoFinal= _saldoRv(ultimo);
+    var totalTram = parseFloat(primero.total)||(primero.conceptos||[]).reduce(function(s,c){return s+(parseFloat(c.precio)||0);},0);
+    var liquidado = saldoFinal <= 0 && totalTram > 0;
+    var cancelado = !!ultimo.cancelado;
+
+    // Filas del timeline
+    var filasHtml = ordenados.map(function(rv, i){
+      var ltr      = rv.letra||(typeof letraVersion==='function'?letraVersion(rv):'A')||'A';
+      var saldoEste= _saldoRv(rv);
+      var prefix   = (i === ordenados.length-1) ? '└─' : '├─';
+      var fecha    = _fc(rv.fecha || rv.fecha_recibo);
+      var saldoAnt = (i === 0) ? totalTram : _saldoRv(ordenados[i-1]);
+      var pago     = Math.max(0, saldoAnt - saldoEste);
+      var esLiq    = saldoEste <= 0 && totalTram > 0;
+      var tipo     = (i===0) ? (esLiq?'Liquidado':'Anticipo') : (esLiq?'Liquidado':'Abono');
+      var colTipo  = esLiq ? '#1a7a3a' : '#8c6518';
+      var saldoTag = esLiq
+        ? ' <span style="color:#1a7a3a;font-size:0.62rem;">&#x2705;</span>'
+        : ' <span style="color:#b05010;font-size:0.62rem;">› saldo $'+fmtMXN(saldoEste)+'</span>';
+      return '<div style="display:grid;grid-template-columns:16px 18px 44px 60px 1fr;gap:0 5px;align-items:baseline;padding:2px 0;font-family:\'DM Mono\',monospace;font-size:0.69rem;">'
+        +'<span style="color:#a09070;">'+prefix+'</span>'
+        +'<span style="font-weight:700;color:#1a1008;">'+ltr+'</span>'
+        +'<span style="color:#7a6840;white-space:nowrap;">'+fecha+'</span>'
+        +'<span style="color:'+colTipo+';font-weight:'+(esLiq?'700':'500')+';">'+tipo+'</span>'
+        +'<span style="text-align:right;white-space:nowrap;font-weight:600;color:#1a1008;">$'+fmtMXN(pago)+saldoTag+'</span>'
+        +'</div>';
     }).join('');
+
+    // Badge de estado
+    var nRec = ordenados.length;
+    var statusHtml = cancelado
+      ? '<span style="color:#888;font-weight:700;text-decoration:line-through;">CANCELADO</span>'
+      : (liquidado
+        ? '<span style="color:#1a7a3a;font-weight:700;">&#x2705; LIQUIDADO</span>'
+        : '<span style="color:#b01010;font-weight:700;">&#x26a0; $'+fmtMXN(saldoFinal)+' PENDIENTE</span>');
+
+    // Botones de acción (solo si hay saldo y no está cancelado)
+    var botonesHtml = (!liquidado && !cancelado)
+      ? '<div style="display:flex;gap:6px;margin-top:7px;padding-top:6px;border-top:1px dashed #d8c880;">'
+        +'<button onclick="ejecutarPagoParcial()" class="btn-pago-parcial" style="flex:1;padding:5px 8px;font-size:0.69rem;">&#x1f4b0; Pago parcial</button>'
+        +'<button onclick="ejecutarLiquidacionTotal()" class="btn-liquidacion" style="flex:1;padding:5px 8px;font-size:0.69rem;">&#x2705; Pago total</button>'
+        +'</div>'
+      : '';
+
+    chipsBody.innerHTML =
+      '<div style="background:#faf5e8;border:1px solid #c8b870;border-radius:5px;padding:8px 10px;">'
+      +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px;'
+      +'margin-bottom:5px;padding-bottom:5px;border-bottom:1px solid #e0d0a0;'
+      +'font-family:\'DM Mono\',monospace;font-size:0.68rem;">'
+      +'<span><strong style="color:#1a1008;">'+folioFormato(val)+'</strong>'
+      +' <span style="color:#7a6840;">· '+ultimo.nombre+'</span>'
+      +' <span style="color:#9a8a60;font-size:0.62rem;">· '+nRec+(nRec===1?' recibo':' recibos')+'</span></span>'
+      + statusHtml
+      +'</div>'
+      + filasHtml
+      + botonesHtml
+      +'</div>';
     chipsDiv.style.display = '';
   } else {
     if(chipsDiv) chipsDiv.style.display = 'none';
   }
 
   // Usar el más reciente para mostrar en el visualizador
-  const recibo = todosConFolio.length
-    ? todosConFolio.slice().sort(function(a,b){
-        const la=(a.letra||letraVersion(a)||'A'), lb=(b.letra||letraVersion(b)||'A');
-        return la<lb?-1:la>lb?1:0;
-      })[todosConFolio.length-1]
-    : null;
+  const recibo = ordenados.length ? ordenados[ordenados.length-1] : null;
 
   if(!recibo){
     resumen.innerHTML='<span style="color:#b01010">Folio #'+folioFormato(val)+' no encontrado en historial.</span>';

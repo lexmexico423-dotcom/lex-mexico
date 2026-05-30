@@ -2389,6 +2389,11 @@ window.console.info = function(){};
     opacity: 1 !important;
     cursor: pointer !important;
   }
+  /* Ocultar "Agregar concepto" en modo actualización — solo aplica para recibos A */
+  body.modo-actualizacion #btn-agregar-concepto,
+  body.recibo-frozen.modo-actualizacion #btn-agregar-concepto {
+    display: none !important;
+  }
   /* Disabled checkboxes look clearly non-interactive after print */
   body.recibo-frozen .doc-check-item input[type="checkbox"]:disabled {
     accent-color: #999 !important;
@@ -11072,21 +11077,43 @@ async function guardarRecibo(){
     $('fecha_recibo').value = fechaAhora;
   }
 
+  // Folio anterior: si es comprobante de abono usar _folioReferencia, si no el campo manual
+  // ⚠️ CRÍTICO: leer folioAntNum ANTES de reservar folio para detectar si es abono
+  const folioAntNum = window._folioReferencia || parseInt($('folio_anterior').value)||null;
+  const historialPagosRef = folioAntNum ? obtenerHistorialPagosAbono(folioAntNum) : [];
+
   // ── RESERVAR FOLIO ATÓMICO — lee Drive en este instante y lo incrementa ──
-  // Esto garantiza que aunque Antonieta y el Lic. estén trabajando al mismo tiempo,
-  // cada quien obtiene un número diferente: el primero en imprimir toma el N,
-  // el segundo automáticamente obtiene el N+1.
-  setStatus('loading','Reservando folio único...','loading');
-  const folio = await reservarFolioEnDrive();
-  // Actualizar el display con el folio reservado (siempre versión A al crear)
-  $('folio-display').textContent = folioConLetra(folio, null, 'A');
+  // Si es un abono en modo retroactivo, NO se reserva folio nuevo — se reutiliza
+  // el folio del recibo original con la siguiente letra (B, C, D…).
+  // Esto corrige el bug donde modo retroactivo + pago parcial generaba un folio A nuevo
+  // en lugar de reutilizar el folio original con letra B.
+  let folio;
+  const _esAbonoRetroactivo = !!(folioAntNum && window._reciboRetroactivoActivo);
+  if (_esAbonoRetroactivo) {
+    // Reutilizar el folio del recibo original — calcular siguiente letra
+    folio = folioAntNum;
+    const _letrasUsadasRetro = (appData.recibos || [])
+      .filter(_r => _r.folio === folioAntNum && !_r.esComplemento)
+      .map(_r => (_r.letra || 'A').toUpperCase().charCodeAt(0));
+    const _maxLetraRetro = _letrasUsadasRetro.length > 0
+      ? Math.max(..._letrasUsadasRetro)
+      : 'A'.charCodeAt(0);
+    const _letraNuevaRetro = String.fromCharCode(_maxLetraRetro + 1);
+    // Guardar la letra calculada para usarla al construir datos
+    window._letraAbonoRetroactivo = _letraNuevaRetro;
+    setStatus('loading', 'Preparando abono retroactivo folio #' + folioAntNum + _letraNuevaRetro + '...', 'loading');
+  } else {
+    // Folio nuevo normal
+    window._letraAbonoRetroactivo = null;
+    setStatus('loading','Reservando folio único...','loading');
+    folio = await reservarFolioEnDrive();
+  }
+  // Actualizar el display con el folio (letra A si es nuevo, letra calculada si es abono retro)
+  const _letraDisplay = window._letraAbonoRetroactivo || 'A';
+  $('folio-display').textContent = folioConLetra(folio, null, _letraDisplay);
 
   const primerNombre=clientes[0].nombre;
   const saldoPendiente=Math.max(0,total-anticipo);
-
-  // Folio anterior: si es comprobante de abono usar _folioReferencia, si no el campo manual
-  const folioAntNum = window._folioReferencia || parseInt($('folio_anterior').value)||null;
-  const historialPagosRef = folioAntNum ? obtenerHistorialPagosAbono(folioAntNum) : [];
 
   // ── CORRECCIÓN BUG #2 y #3 — Cálculo de saldos en folio secundario ────────
   // Cuando este recibo es un abono (folioAntNum existe), la base para calcular
@@ -11158,7 +11185,7 @@ async function guardarRecibo(){
     totalAbonado: _totalAbonadoDatos,
     saldoNuevo:   _saldoNuevoDatos,
     descripcionVehicular: tipoTramite === 'vehicular' ? _descripcionVehicular : '',
-    letra: 'A'
+    letra: window._letraAbonoRetroactivo || 'A'
   };
 
   // ── Seleccionar responsable (solo admin ve el modal) ──
@@ -11221,7 +11248,7 @@ async function guardarRecibo(){
       nombre_cliente_firma: datos.nombre_cliente_firma,
       fecha_recibo: datos.fecha_recibo,
       hora_recibo: datos.hora_recibo,
-      letra: 'A'
+      letra: window._letraAbonoRetroactivo || 'A'
     });
 
     // ── ESCRITURA BLOQUEANTE: esperar confirmación de Drive antes de continuar ──

@@ -7062,11 +7062,19 @@ async function sincronizarFolio(){
         // Hacer backup del estado actual ANTES de cualquier cambio
         try { if(typeof backupLocal==='function') backupLocal('D', D); } catch(e){ registrarError('catch vacio', e); }
 
-        // Regla: si Supabase trae MENOS datos que lo actual en memoria → NO sobreescribir
+        // Regla: si Supabase trae MENOS datos que lo actual en memoria → NO sobreescribir.
+        // Comparación por IDs de movimientos de recibo: si local tiene IDs de recibo que SB no tiene
+        // (por ejemplo M_B recién creado pero aún no persistido) → conservar local.
         const movsActuales    = (D.movimientos||[]).length;
         const juiciosActuales = (D.juicios||[]).length;
 
-        const usarMovsSB    = sbMovs.length    >= movsActuales    || movsActuales    === 0;
+        const sbMovIds = new Set(sbMovs.map(m => m.id).filter(Boolean));
+        const _movsLocalSinSB = (D.movimientos||[]).filter(m =>
+          m && m.id && m.fuente === 'recibo' && !m.borrado && !sbMovIds.has(m.id)
+        );
+        // Usar SB solo si: SB tiene más movimientos Y local no tiene movimientos de recibo ausentes en SB
+        const usarMovsSB = (sbMovs.length >= movsActuales || movsActuales === 0)
+                           && _movsLocalSinSB.length === 0;
 
         // Para juicios: comparar por timestamp además de cantidad.
         // Si los juicios locales tienen alguno más reciente que cualquier juicio en SB → conservar local.
@@ -7076,10 +7084,20 @@ async function sincronizarFolio(){
           || juiciosActuales === 0
           || (sbJuicios.length >= juiciosActuales && tsMaxSB >= tsMaxLocal);
 
-        if (!usarMovsSB)    console.warn('[SB] Supabase movs('+sbMovs.length+') < memoria('+movsActuales+') — conservando memoria');
+        if (!usarMovsSB)    console.warn('[SB] Conservando movimientos locales — IDs sin SB:', _movsLocalSinSB.map(m=>m.id));
         if (!usarJuiciosSB) console.warn('[SB] Supabase juicios('+sbJuicios.length+') < memoria('+juiciosActuales+') — conservando memoria');
 
-        D.movimientos    = usarMovsSB    ? sbMovs    : D.movimientos;
+        // Merge: si SB tiene más que local pero local tiene movimientos de recibo nuevos → fusionar
+        if (!usarMovsSB && sbMovs.length > movsActuales) {
+          const _sbNoLocIds = new Set((D.movimientos||[]).map(m=>m.id).filter(Boolean));
+          const _soloEnSB = sbMovs.filter(m => m && m.id && !_sbNoLocIds.has(m.id));
+          if (_soloEnSB.length > 0) {
+            D.movimientos = [...(D.movimientos||[]), ..._soloEnSB];
+            console.warn('[SB] Merge: añadidos', _soloEnSB.length, 'movimientos de SB que local no tenía');
+          }
+        } else {
+          D.movimientos = usarMovsSB ? sbMovs : D.movimientos;
+        }
         D.juicios        = usarJuiciosSB ? sbJuicios : D.juicios;
         D.directorio     = data.data.directorio     || D.directorio  || [];
         D.carpetas       = data.data.carpetas       || D.carpetas     || [];
@@ -13021,9 +13039,22 @@ function _movimientosDeCaja() {
 function _recibosMap() {
   const arr1 = (typeof REC !== 'undefined' ? REC.recibos : []) || [];
   const arr2 = (typeof appData !== 'undefined' ? appData.recibos : []) || [];
-  const map = {};
+  // Deduplicar por folio+letra antes de construir el mapa — seleccionar la versión
+  // con la letra MÁS ALTA (más reciente) para cada folio numérico.
+  const byKey = {};
   [...arr1, ...arr2].forEach(r => {
-    if (r && r.folio != null && !r.esComplemento) map[r.folio] = r;
+    if (!r || r.folio == null || r.esComplemento) return;
+    const k = r.folio + '|' + (r.letra || (typeof letraVersion==='function'?letraVersion(r):'A') || 'A');
+    byKey[k] = r; // misma clave → sobrescribir (evita duplicados)
+  });
+  const map = {};
+  Object.values(byKey).forEach(r => {
+    const prev = map[r.folio];
+    if (!prev) { map[r.folio] = r; return; }
+    // Mantener la versión con la letra más alta (más reciente)
+    const la = (r.letra    || (typeof letraVersion==='function'?letraVersion(r):'A')    || 'A');
+    const lb = (prev.letra || (typeof letraVersion==='function'?letraVersion(prev):'A') || 'A');
+    if (la > lb) map[r.folio] = r;
   });
   return map;
 }
@@ -13055,6 +13086,11 @@ function _reciboAMovSintetico(r) {
   const liq   = r.saldoPendiente === 0;
   const fechaRec = (r.fecha && /^\d{4}-\d{2}-\d{2}/.test(r.fecha))
     ? r.fecha.substring(0, 10) : (r.fecha || '—');
+  // Determinar letra correcta del recibo para el enlace al PDF
+  const _letraR = r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A';
+  const _folioStr = typeof folioConLetra === 'function'
+    ? folioConLetra(r.folio, r.anio_folio, _letraR)
+    : String(r.folio).padStart(4,'0') + _letraR;
   return {
     id:    'R-' + r.folio, folio: r.folio, nombre: r.nombre || '',
     fecha: fechaRec, hora: r.hora || r.hora_recibo || '00:00',
@@ -13067,9 +13103,9 @@ function _reciboAMovSintetico(r) {
     saldoPendiente: r.saldoPendiente || 0,
     tipo: 'ingreso',
     estatus: liq ? 'Liquidado' : (anticipo > 0 ? 'Anticipo' : 'Pendiente'),
-    cat: (liq ? 'Liquidado' : (anticipo > 0 ? 'Anticipo' : 'Pendiente'))
-         + ' · #' + String(r.folio).padStart(4, '0'),
+    cat: (liq ? 'Liquidado' : (anticipo > 0 ? 'Anticipo' : 'Pendiente')) + ' · #' + _folioStr,
     fuente: 'recibo',
+    letra: _letraR,
     responsable: r.generadoPor || r.responsable || '—'
   };
 }

@@ -3104,7 +3104,16 @@ window.addEventListener('offline', ()=>{
             <div style="font-family:monospace;font-size:0.5rem;color:rgba(100,200,100,0.6);text-align:center;line-height:1.4;padding:0 4px;">Corrige título RECIBO OFICIAL→LIQUIDACIÓN y cuadro de totales en recibos históricos</div>
           </div>
 
-          <!-- 2b. Marcar PAGADO en PDFs liquidados sin marca -->
+          <!-- 2b. Corregir letras de movimientos de liquidación -->
+          <div onclick="adminCorregirLetrasMovimientos()" style="position:relative;background:rgba(26,74,138,0.1);border:1.5px solid rgba(26,74,138,0.3);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#1a4a8a';this.style.boxShadow='0 8px 20px rgba(26,74,138,0.25)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(26,74,138,0.3)';this.style.boxShadow=''">
+            <div style="width:60px;height:60px;border-radius:14px;background:#0a1f3a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">🔤</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a0c0ff;text-align:center;line-height:1.3;">Corregir<br>Letras</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(100,160,255,0.6);text-align:center;line-height:1.4;padding:0 4px;">Repara movimientos de liquidación que quedaron con letra A cuando deberían ser B — actualiza contabilidad y guarda en Supabase</div>
+          </div>
+
+          <!-- 2c. Marcar PAGADO en PDFs liquidados sin marca -->
           <div onclick="adminMarcaPagadoPDFs()" style="position:relative;background:rgba(26,122,58,0.1);border:1.5px solid rgba(26,122,58,0.3);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
                onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#1a7a3a';this.style.boxShadow='0 8px 20px rgba(26,122,58,0.25)'"
                onmouseout="this.style.transform='';this.style.borderColor='rgba(26,122,58,0.3)';this.style.boxShadow=''">
@@ -9977,7 +9986,10 @@ async function _imprimirActualizacionReal(){
   const _letrasUsadas = (appData.recibos || [])
     .filter(_r => _r.folio === recibo.folio && !_r.esComplemento)
     .map(_r => (_r.letra || 'A').toUpperCase().charCodeAt(0));
-  const _maxLetraCode = _letrasUsadas.length > 0 ? Math.max(..._letrasUsadas) : 64;
+  // Fallback: si appData no tiene el recibo en memoria, usar recibo.letra como base
+  // (evita _maxLetraCode=64 \u2192 letraActual='A' cuando deber\u00eda ser 'B' o superior)
+  const _letraBaseCode = (recibo.letra || 'A').toUpperCase().charCodeAt(0);
+  const _maxLetraCode = _letrasUsadas.length > 0 ? Math.max(..._letrasUsadas) : _letraBaseCode;
   const letraActual = String.fromCharCode(_maxLetraCode + 1);
 
   // Inyectar autorización en pagos NUEVOS (no bloqueados). Usamos guiones -fecha-
@@ -22617,6 +22629,49 @@ async function adminRegenerarPDFsHistoricos() {
   try { await actualizarArchivoControl(); } catch(e){}
   try { await syncEstadoSupabase(); } catch(e){}
   toast('✅ ' + ok + ' PDFs regenerados' + (err ? ' · ' + err + ' errores' : ''));
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CORREGIR LETRAS DE MOVIMIENTOS — Repara movimientos con letra 'A'
+// que deberían tener la letra de la versión más reciente del recibo
+// ══════════════════════════════════════════════════════════════════
+async function adminCorregirLetrasMovimientos(){
+  if(!Array.isArray(D.movimientos)){ toast('Sin movimientos en memoria','err'); return; }
+  var corregidos = 0;
+  D.movimientos.forEach(function(m){
+    if(!m || m.fuente !== 'recibo' || m.borrado || m.folio == null) return;
+    // Determinar la letra correcta para este movimiento según los recibos en memoria
+    var recibosDelFolio = (appData.recibos||[]).filter(function(r){
+      return r.folio === m.folio && !r.esComplemento;
+    });
+    if(!recibosDelFolio.length) return;
+    // Letra más alta = versión más reciente
+    var letraMax = recibosDelFolio.reduce(function(max, r){
+      var l = (r.letra || (typeof letraVersion==='function'?letraVersion(r):'A') || 'A');
+      return l > max ? l : max;
+    }, 'A');
+    // Solo corregir si el movimiento dice 'A' pero la versión más reciente es mayor
+    // Y el estatus es Liquidado/Liquidación (un abono parcial puede ser legítimamente A)
+    var esLiquidacion = (m.estatus==='Liquidado'||m.estatus==='Liquidación'||(m.cat||'').includes('Liquidac'));
+    if(esLiquidacion && letraMax > (m.letra||'A')){
+      var letraVieja = m.letra || 'A';
+      var folioViejo = typeof folioConLetra==='function'
+        ? folioConLetra(m.folio, null, letraVieja)
+        : String(m.folio).padStart(4,'0')+letraVieja;
+      var folioNuevo = typeof folioConLetra==='function'
+        ? folioConLetra(m.folio, (appData.recibos||[]).find(function(r){return r.folio===m.folio&&!r.esComplemento;})?.anio_folio||null, letraMax)
+        : String(m.folio).padStart(4,'0')+letraMax;
+      m.letra       = letraMax;
+      m.cat         = (m.cat||'').replace(folioViejo, folioNuevo);
+      m.descripcion = (m.descripcion||'').replace(folioViejo, folioNuevo);
+      console.log('[CorregirLetras] Movimiento '+m.id+': '+folioViejo+' → '+folioNuevo);
+      corregidos++;
+    }
+  });
+  if(!corregidos){ toast('No se encontraron movimientos con letra incorrecta'); return; }
+  try { await syncEstadoSupabase(); } catch(e){ console.warn(e); }
+  renderContab();
+  toast('✅ '+corregidos+' movimiento(s) corregido(s) y guardado(s)');
 }
 
 // ══════════════════════════════════════════════════════════════════

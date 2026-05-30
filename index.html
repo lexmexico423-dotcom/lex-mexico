@@ -11372,7 +11372,7 @@ async function guardarRecibo(){
             const idPend = 'PEND-REC-' + _folioGuardado;
             const yaExiste = D.pendientes.some(p => p.id === idPend);
 
-            if (!yaExiste && _saldoInicialGuardado > 0) {
+            if (!yaExiste) {
               const nuevoPend = {
                 id: idPend,
                 texto: textoPend,
@@ -29077,6 +29077,44 @@ async function guardarRestauracion(){
         fuente:'recibo', esRestaurado:true, responsable:datos.responsable||'RESTAURADO'
       });
       try{ if(typeof syncEstadoSupabaseDebounced==='function') syncEstadoSupabaseDebounced(); }catch(e){ registrarError('catch vacio', e); }
+    }
+
+    // ── PENDIENTE DE PLACAS automático si es trámite vehicular ──────────────
+    if(typeof D!=='undefined' && Array.isArray(D.pendientes) && datos.tipoTramite==='vehicular'){
+      try {
+        const idPend = 'PEND-REC-' + folio;
+        if(!D.pendientes.some(p => p.id === idPend)){
+          const conc0 = (conceptos[0]?.concepto||'').toLowerCase();
+          let tipoVeh = 'alta';
+          if(conc0.includes('reemplac'))                                    tipoVeh = 'reemplacamiento';
+          else if(conc0.includes('baja'))                                   tipoVeh = 'baja';
+          else if(conc0.includes('cambio')||conc0.includes('propiet'))      tipoVeh = 'cambio_propietario';
+          else if(conc0.includes('tarjeta')||conc0.includes('circulac'))    tipoVeh = 'tarjeta_circulacion';
+          const tipoLbl = {'alta':'Alta de placas','baja':'Baja de placas','cambio_propietario':'Cambio de propietario','tarjeta_circulacion':'Tarjeta de circulación','reemplacamiento':'Reemplacamiento'}[tipoVeh]||'Trámite vehicular';
+          const desc0 = conceptos[0]?.descripcion||'';
+          const concDesc = [conceptos[0]?.concepto, desc0].filter(Boolean).join(' — ');
+          D.pendientes.unshift({
+            id: idPend,
+            texto: concDesc || (tipoLbl+' — '+primerNombre+(rec.placa?' ('+rec.placa+')':'')),
+            persona: primerNombre,
+            categoria:'Placas', seccion:'placas', prioridad:'normal',
+            resp: datos.responsable||'',
+            obs:'', fechaLimite:'', carpeta:'',
+            resuelto:false,
+            fechaCreacion: typeof hoy==='function'?hoy():new Date().toISOString().split('T')[0],
+            fechaResolucion:'',
+            placasEstado: rec.origen||'',
+            placasNumero: rec.placa||'',
+            tipoVehicular: tipoVeh,
+            descripcionPlacas: concDesc||tipoLbl,
+            reciboVinculadoFolio: folio,
+            vehMarca: rec.marca||'', vehClase: rec.clase||'',
+            marca: rec.marca||'', clase: rec.clase||'',
+            documentos:[]
+          });
+          console.log('[Auto-pendiente REST] Creado pendiente de placas para recibo #'+fs);
+        }
+      } catch(ePend){ console.warn('[Auto-pendiente REST]', ePend); }
     }
 
     if(typeof renderHistorial==='function') try{renderHistorial();}catch(e){ registrarError('catch vacio', e); }

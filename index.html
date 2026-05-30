@@ -12897,7 +12897,8 @@ function ir(p){
   if(p==='registro-civil')rcAbrirSubpanel('home');
   if(p==='escrituras'){ if(!Array.isArray(D.escrituras))D.escrituras=[]; escRender(); }
   if(p==='gestiones'){ if(!Array.isArray(D.gestiones))D.gestiones=[]; gestRender(); }
-  if(p==='recibos'||p==='contabilidad'||p==='caja'){ repararFoliosDuplicados(); }
+  if(p==='recibos'||p==='contabilidad'||p==='caja'){ repararFoliosDuplicados(); sincronizarPendientesPlacas(); }
+  if(p==='pendientes'){ sincronizarPendientesPlacas(); }
   if(p==='configuracion'){ setTimeout(ocrCargarKeyEnCfg, 100); setTimeout(cfgMostrarFolioActual, 120); }
   if(p==='nuevo-recibo'){
     // Resetear el formulario completamente al navegar a este panel
@@ -34497,6 +34498,93 @@ function _gestAplicarVinculo(gid, folio, monto, tipo){
 
 // ══════════════════════════════════════════════════════════════════════
 // REPARACIÓN DE FOLIOS DUPLICADOS
+// ══════════════════════════════════════════════════════════════════════
+// SINCRONIZACIÓN AUTOMÁTICA DE PENDIENTES DE PLACAS
+// Recorre todos los recibos vehiculares sin liquidar y crea el pendiente
+// de placas si no existe todavía. Cubre dos casos no atendidos por el
+// flujo normal:
+//   1. Recibos anteriores a la función auto-pendiente (no tienen ninguno)
+//   2. Recibos creados por guardarReciboInterno() — ese flujo nunca creó
+//      pendientes porque usa vehiculo:{} en lugar de tipoTramite:'vehicular'
+// ══════════════════════════════════════════════════════════════════════
+function sincronizarPendientesPlacas() {
+  if (!appData || !Array.isArray(appData.recibos)) return;
+  if (typeof D === 'undefined' || !Array.isArray(D.pendientes)) return;
+
+  const _tipoLbl = {
+    alta: 'Alta de placas', baja: 'Baja de placas',
+    cambio_propietario: 'Cambio de propietario',
+    tarjeta_circulacion: 'Tarjeta de circulación',
+    reemplacamiento: 'Reemplacamiento'
+  };
+
+  let creados = 0;
+  appData.recibos.forEach(function(r) {
+    if (!r || r.cancelado || r.esComplemento) return;
+    // Detectar recibo vehicular por tipoTramite (flujo principal) o por objeto vehiculo (sub-panel)
+    const esVehicular = r.tipoTramite === 'vehicular' ||
+                        (r.vehiculo && typeof r.vehiculo === 'object' && r.vehiculo !== null);
+    if (!esVehicular) return;
+    // Solo recibos con saldo pendiente
+    if (!(parseFloat(r.saldoPendiente) > 0)) return;
+
+    const folio = r.folio;
+    const idPend = 'PEND-REC-' + folio;
+    // No tocar si ya existe un pendiente para este folio (resuelto o no)
+    const yaExiste = D.pendientes.some(function(p) {
+      return p.id === idPend || Number(p.reciboVinculadoFolio) === Number(folio);
+    });
+    if (yaExiste) return;
+
+    // Detectar tipo de trámite vehicular desde el primer concepto
+    const conc0 = ((r.conceptos && r.conceptos[0]) ? (r.conceptos[0].concepto || '') : '').toLowerCase();
+    let tipoVeh = 'alta';
+    if (conc0.includes('reemplac'))                                     tipoVeh = 'reemplacamiento';
+    else if (conc0.includes('baja'))                                    tipoVeh = 'baja';
+    else if (conc0.includes('cambio') || conc0.includes('propiet'))     tipoVeh = 'cambio_propietario';
+    else if (conc0.includes('tarjeta') || conc0.includes('circulac'))   tipoVeh = 'tarjeta_circulacion';
+    const tipoLbl = _tipoLbl[tipoVeh] || 'Trámite vehicular';
+
+    const nombre  = (r.nombre || (r.clientes && r.clientes[0] && r.clientes[0].nombre) || 'Sin nombre').toUpperCase();
+    const placa   = r.placa   || (r.vehiculo && r.vehiculo.placa)  || '';
+    const origen  = r.origen  || (r.vehiculo && r.vehiculo.estado) || '';
+    const marca   = r.marca   || (r.vehiculo && r.vehiculo.marca)  || '';
+    const clase   = r.clase   || (r.vehiculo && r.vehiculo.clase)  || '';
+
+    D.pendientes.unshift({
+      id: idPend,
+      texto: tipoLbl + ' — ' + nombre + (placa ? ' (' + placa + ')' : ''),
+      persona: nombre,
+      categoria: 'Placas',
+      seccion: 'placas',
+      prioridad: 'normal',
+      resp: r.responsable || r.generadoPor || '',
+      obs: '', fechaLimite: '', carpeta: '',
+      resuelto: false,
+      fechaCreacion: r.fecha || (typeof hoy === 'function' ? hoy() : new Date().toISOString().split('T')[0]),
+      fechaResolucion: '',
+      placasEstado: origen,
+      placasNumero: placa,
+      tipoVehicular: tipoVeh,
+      descripcionPlacas: tipoLbl,
+      reciboVinculadoFolio: folio,
+      vehMarca: marca, vehClase: clase,
+      marca: marca,   clase: clase,
+      documentos: []
+    });
+    creados++;
+    console.log('[LEX] Pendiente de placas creado automáticamente para recibo #' + folio);
+  });
+
+  if (creados > 0) {
+    if (typeof save === 'function') save();
+    if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
+    if (typeof renderPend === 'function') renderPend();
+    if (typeof badges === 'function') badges();
+    console.log('[LEX] sincronizarPendientesPlacas: ' + creados + ' pendiente(s) creado(s).');
+  }
+}
+
 // Se ejecuta una vez al cargar — detecta y corrige folios duplicados
 // usando la hora como criterio (el más temprano conserva el folio)
 // ══════════════════════════════════════════════════════════════════════

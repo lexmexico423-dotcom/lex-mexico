@@ -1676,7 +1676,7 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
 .hidden{display:none!important;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!-- PDF.js: extracción de texto de PDFs con capa de texto (gratuito, sin API) -->
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
 <!-- Tesseract.js: OCR local en el navegador para imágenes y PDFs escaneados (gratuito) -->
@@ -2685,6 +2685,17 @@ window.console.info = function(){};
   body.modo-edicion-completa #folio-display { display: none !important; }
   body.modo-edicion-completa #folio-edit-wrap { display: flex !important; }
 
+  /* ── MODO RESTAURACIÓN — barras de acción ── */
+  body.modo-restauracion #actions-normal         { display: none !important; }
+  body.modo-restauracion #actions-post-print     { display: none !important; }
+  body.modo-restauracion #actions-consulta       { display: none !important; }
+  body.modo-restauracion #actions-actualizacion  { display: none !important; }
+  body.modo-restauracion #actions-edicion-completa { display: none !important; }
+  body.modo-restauracion #actions-restauracion   { display: flex !important; }
+  body.modo-restauracion #restauracion-banner    { display: flex !important; }
+  body.modo-restauracion #frozen-banner          { display: none !important; }
+  body.modo-restauracion #edicion-completa-banner { display: none !important; }
+
   /* BOTONES DE PAGO EN HEADER */
   #header-pago-btns {
     display: none;
@@ -3084,6 +3095,16 @@ window.addEventListener('offline', ()=>{
             <div style="font-family:monospace;font-size:0.52rem;color:rgba(200,149,42,0.5);">Hoy: <strong id="adminMovHoyCnt" style="color:var(--gold-l);">0</strong> movs.</div>
           </div>
 
+          <!-- 2b. Borrar Movimientos por Fecha -->
+          <div onclick="adminAbrirBorrarPorFecha()" style="position:relative;background:rgba(192,22,26,0.08);border:1.5px solid rgba(192,22,26,0.28);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#c0161a';this.style.boxShadow='0 8px 20px rgba(192,22,26,0.25)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(192,22,26,0.28)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:#8a0f12;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">🗓️</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#ffe0e0;text-align:center;line-height:1.3;">Borrar Movs.<br>por Fecha</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(232,85,85,0.6);text-align:center;line-height:1.4;padding:0 4px;">Ej: capturaste los cobros del martes en la computadora equivocada. Elige la fecha y elimina solo esos movimientos de forma permanente — no regresan aunque se sincronice. ⚠ No se puede deshacer</div>
+          </div>
+
           <!-- 3. Borrar Cobro Específico -->
           <div onclick="adminAbrirBorrarEspecifico()" style="position:relative;background:rgba(200,149,42,0.08);border:1.5px solid rgba(200,149,42,0.3);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
                onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#c8952a';this.style.boxShadow='0 8px 20px rgba(200,149,42,0.2)'"
@@ -3296,6 +3317,34 @@ window.addEventListener('offline', ()=>{
         <button class="btn btn-ghost btn-sm" onclick="adminLogout()">🚪 Cerrar sesión</button>
         <button class="btn btn-ghost btn-sm" onclick="cerrarAdminModal()">✕ Cerrar</button>
         <button class="btn btn-ghost btn-sm" onclick="adminDiagnosticoSaldo()" style="color:#c8952a;border-color:rgba(200,149,42,0.3);">🔍 Diagnóstico saldo</button>
+      </div>
+    </div>
+
+    <!-- ZONA: BORRAR MOVIMIENTOS POR FECHA -->
+    <div id="adminBorrarFechaZone" class="admin-panel">
+      <div class="admin-modal-body">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+          <button onclick="adminVolverPanel()" style="background:none;border:none;cursor:pointer;color:var(--gold-l);font-size:0.85rem;padding:4px 8px;border-radius:4px;">← Volver</button>
+          <div style="font-family:serif;font-size:0.9rem;color:#ffb0b0;">🗓️ Borrar Movimientos por Fecha</div>
+        </div>
+        <div style="font-size:0.72rem;color:rgba(255,160,160,0.65);margin-bottom:14px;line-height:1.6;background:rgba(192,22,26,0.07);border:1px solid rgba(192,22,26,0.2);border-radius:6px;padding:10px 12px;">
+          ⚠️ Esta acción elimina los movimientos de la fecha seleccionada de forma <strong style="color:#ff8888;">permanente y sincronizada</strong>. El tombstone se sube a Supabase primero, garantizando que no regresen en la próxima sincronización.
+        </div>
+        <div style="margin-bottom:14px;">
+          <label style="font-family:monospace;font-size:0.65rem;color:rgba(200,149,42,0.7);display:block;margin-bottom:5px;">SELECCIONA LA FECHA</label>
+          <input type="date" id="adminBorrarFechaInput"
+            style="width:100%;background:rgba(192,22,26,0.06);border:1.5px solid rgba(192,22,26,0.3);border-radius:var(--radius-sm);padding:9px 12px;font-family:monospace;font-size:0.85rem;color:var(--gold-l);outline:none;cursor:pointer;"
+            oninput="adminBorrarFechaPreview()">
+        </div>
+        <div id="adminBorrarFechaPreviewBox" style="min-height:60px;margin-bottom:14px;"></div>
+        <button onclick="adminBorrarMovimientosPorFecha()"
+          style="width:100%;padding:11px;background:rgba(192,22,26,0.18);border:1.5px solid rgba(192,22,26,0.5);border-radius:8px;color:#ffb0b0;font-family:monospace;font-size:0.78rem;font-weight:700;cursor:pointer;letter-spacing:0.05em;transition:all 0.18s;"
+          onmouseover="this.style.background='rgba(192,22,26,0.35)';this.style.borderColor='#c0161a'"
+          onmouseout="this.style.background='rgba(192,22,26,0.18)';this.style.borderColor='rgba(192,22,26,0.5)'"
+          id="adminBorrarFechaBtn">
+          🗑 ELIMINAR MOVIMIENTOS DE ESTA FECHA
+        </button>
+        <div id="adminBorrarFechaStatus" style="margin-top:10px;font-family:monospace;font-size:0.65rem;text-align:center;min-height:18px;"></div>
       </div>
     </div>
 
@@ -6931,15 +6980,59 @@ async function sincronizarFolio(){
         console.error('[SB] sincronizarFolio:', error);
       }
     } else if(data){
-      // Reconstruir appData — SIEMPRE usar Supabase para recibos
-      // (la columna 'recibos' es la fuente de verdad, no el backup local)
+      // Reconstruir appData — usar Supabase para recibos CON PROTECCIÓN
       const recibosData = data.recibos || {};
       const sbRecibos = recibosData.recibos || [];
+      const recibosActuales = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
+
+      // ⚠️ CRÍTICO: proteger recibos igual que movimientos.
+      // Si Supabase trae MENOS versiones del mismo folio que memoria → conservar memoria.
+      // Esto evita que una sync tardía sobreescriba el B recién generado con solo el A.
+      function _mergeRecibos(sbArr, localArr) {
+        if (!localArr.length) return sbArr;
+        if (!sbArr.length) return localArr;
+        // Construir mapa de versiones: folio+letra → recibo
+        const mapaLocal = {};
+        localArr.forEach(function(r) {
+          var k = r.folio + '|' + (r.letra || 'A');
+          mapaLocal[k] = r;
+        });
+        const mapaSB = {};
+        sbArr.forEach(function(r) {
+          var k = r.folio + '|' + (r.letra || 'A');
+          mapaSB[k] = r;
+        });
+        // Resultado: unión de ambos, priorizando SB pero conservando versiones locales que SB no tiene
+        const claves = new Set([...Object.keys(mapaSB), ...Object.keys(mapaLocal)]);
+        const resultado = [];
+        claves.forEach(function(k) {
+          if (mapaSB[k]) {
+            resultado.push(mapaSB[k]); // SB tiene esta versión → usar SB
+          } else {
+            resultado.push(mapaLocal[k]); // solo local la tiene → conservar
+            console.warn('[merge recibos] versión solo en local conservada:', k);
+          }
+        });
+        // Ordenar: A antes de B del mismo folio
+        resultado.sort(function(a, b) {
+          if (a.folio !== b.folio) return 0;
+          var la = (a.letra || 'A'); var lb = (b.letra || 'A');
+          return la < lb ? -1 : la > lb ? 1 : 0;
+        });
+        return resultado;
+      }
+
+      const recibosFinales = _mergeRecibos(sbRecibos, recibosActuales);
       appData = {
         folioActual:     recibosData.folioActual || data.folio_actual || 1,
         anioFolioActual: recibosData.anioFolioActual || new Date().getFullYear(),
-        recibos:         sbRecibos
+        recibos:         recibosFinales
       };
+      // Si conservamos versiones locales que SB no tenía → re-subir
+      if (recibosFinales.length > sbRecibos.length) {
+        console.warn('[merge recibos] local tiene más versiones que SB — re-subiendo...');
+        setTimeout(function(){ if(typeof actualizarArchivoControl==='function') actualizarArchivoControl().catch(function(e){ console.warn('re-upload recibos:', e); }); }, 800);
+      }
 
       // Reconstruir D — PROTECCIÓN TOTAL CONTRA PÉRDIDA DE DATOS
       if(typeof D !== 'undefined' && data.data){
@@ -7063,13 +7156,23 @@ async function sincronizarFolio(){
 function _cargarDatosDesdeJSON(data){
   if(data && typeof data.folioActual === 'number'){
     appData.folioActual = data.folioActual;
-    appData.recibos     = data.recibos || [];
+    // ⚠️ CRÍTICO: ordenar para que A siempre preceda a B del mismo folio
+    appData.recibos     = (data.recibos || []).slice().sort(function(a, b) {
+      if (a.folio !== b.folio) return 0;
+      var la = (a.letra || 'A'); var lb = (b.letra || 'A');
+      return la < lb ? -1 : la > lb ? 1 : 0;
+    });
   } else if(data && (data.folio_actual || data.siguiente_folio)){
     // Formato legacy — corregir y reescribir
     console.warn('⚠ Formato JSON legacy detectado — migrando...');
     appData.folioActual = data.folio_actual || data.siguiente_folio || data.folio_inicial || 1;
     appData.anioFolioActual = data.anio_folio_actual || new Date().getFullYear();
-    appData.recibos     = data.recibos || [];
+    // ⚠️ CRÍTICO: ordenar para que A siempre preceda a B del mismo folio
+    appData.recibos     = (data.recibos || []).slice().sort(function(a, b) {
+      if (a.folio !== b.folio) return 0;
+      var la = (a.letra || 'A'); var lb = (b.letra || 'A');
+      return la < lb ? -1 : la > lb ? 1 : 0;
+    });
     actualizarArchivoControl(); // reescribir con formato correcto (no bloqueante)
   } else {
     // Archivo vacío o corrupto — mantener el folio en memoria sin resetear a 100
@@ -7209,6 +7312,9 @@ async function actualizarArchivoControl(){
     }
     console.log('✓ archivoControl actualizado — folioActual:', ligero.folioActual, '— recibos:', ligero.recibos.length);
     try { backupAppData(); } catch(e){ console.warn('backup appData:', e); }
+    // ⚠️ CRÍTICO: marcar timestamp para que _realtimeSincronizar no baje Supabase
+    // inmediatamente después de subir — evita que el B recién guardado sea sobreescrito
+    _ultimoSyncPropio = Date.now();
     // ── Notificar a otros usuarios que los recibos cambiaron ──
     try { lexRealtimeBroadcast(); } catch(e){ registrarError('catch vacio', e); }
     syncEnd(true);
@@ -7569,6 +7675,7 @@ function limpiarFormCompleto(){
   paso('clases-body', ()=>{
     ['modo-actualizacion','recibo-frozen','desde-liquidacion','actualizacion-impresa',
      'modo-consulta','folio-liquidado','folio-cancelado','modo-edicion-completa',
+     'modo-restauracion',
      'paneles-busqueda-abiertos','paneles-abiertos-consulta','en-accion-pago'].forEach(c=>document.body.classList.remove(c));
     _panelesBusquedaAbiertos = false;
     _reciboEnEdicionCompleta = null;
@@ -7589,13 +7696,17 @@ function limpiarFormCompleto(){
     const aPost   = document.getElementById('actions-post-print');
     const aAct    = document.getElementById('actions-actualizacion');
     const aCons   = document.getElementById('actions-consulta');
+    const aRest   = document.getElementById('actions-restauracion');
     const banner  = document.getElementById('frozen-banner');
+    const bannerRest = document.getElementById('restauracion-banner');
     const btnGuardar = document.getElementById('btn-guardar');
     if(aNormal) aNormal.style.display = 'flex';
     if(aPost)   aPost.style.display   = 'none';
     if(aAct)    aAct.style.removeProperty('display'); aAct && (aAct.style.display = 'none');
     if(aCons)   aCons.style.display   = 'none';
+    if(aRest)   aRest.style.display   = 'none';
     if(banner)  banner.style.display  = 'none';
+    if(bannerRest) bannerRest.style.display = 'none';
     if(btnGuardar) btnGuardar.disabled = false;
     // Forzar ocultar actions-actualizacion con atributo inline (gana al CSS !important)
     const _aActForce = document.getElementById('actions-actualizacion');
@@ -7922,7 +8033,10 @@ async function generarPDF(datos,folio,qrDataURL){
   // ── RECIBO OFICIAL / RECIBO DE LIQUIDACIÓN / RECIBO DE ABONO PARCIAL ──
   const _fps = datos.fechasImpresion || [];
   const _esUpdate = _fps.length > 1;
-  const _esFinalLiq = _esUpdate && (parseFloat(datos.saldoNuevo)<=0 || parseFloat(datos.saldoPendiente)<=0);
+  // ⚠️ FIX: si anticipo = total (pago completo desde el inicio), también es liquidación
+  const _pagadoCompleto = parseFloat(datos.saldoPendiente) <= 0 &&
+                          parseFloat(datos.totalAbonado || datos.anticipo || 0) >= parseFloat(datos.total || 0);
+  const _esFinalLiq = (_esUpdate || _pagadoCompleto) && (parseFloat(datos.saldoNuevo)<=0 || parseFloat(datos.saldoPendiente)<=0);
   const _esParcial  = _esUpdate && !_esFinalLiq;
   const _tituloRecibo = _esFinalLiq ? 'RECIBO DE LIQUIDACIÓN'
                       : _esParcial  ? 'RECIBO DE ABONO PARCIAL'
@@ -8012,7 +8126,17 @@ async function generarPDF(datos,folio,qrDataURL){
   doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(100,80,40);
   doc.text('DOCUMENTOS QUE DEJA EL INTERESADO:',margin,y); y+=3.5;
   let docsData = null;
-  try { if(datos.copias) docsData = typeof datos.copias==='object' ? datos.copias : JSON.parse(datos.copias); } catch(e){ /* copias guardadas en formato anterior, ignorar */ }
+  try {
+    if(datos.copias){
+      const _cop = typeof datos.copias==='string' ? JSON.parse(datos.copias) : datos.copias;
+      // Formato nuevo: {docs:[...], tipodoc:'...'} — Formato legacy: array plano de strings
+      if(_cop && _cop.docs && Array.isArray(_cop.docs)){
+        docsData = _cop;
+      } else if(Array.isArray(_cop) && _cop.length){
+        docsData = { docs: _cop, tipodoc: 'Documentos' };
+      }
+    }
+  } catch(e){ /* copias en formato anterior */ }
   if (docsData && docsData.docs && docsData.docs.length) {
     // Subtítulo: tipo de documento (Copia Simple / Escaneado) — resaltado
     doc.setFontSize(7); doc.setFont('helvetica','bold'); doc.setTextColor(42,100,42);
@@ -8947,12 +9071,13 @@ function cargarReciboEnFormulario(recibo){
   clientes.forEach(c => {
     clienteCount++;
     const cid = 'c'+clienteCount;
+    const _nomUp = (c.nombre||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[.]/g,'');
     const div = document.createElement('div');
     div.className = 'cliente-row'; div.id = 'cliente-row-'+cid;
     div.innerHTML =
       '<div class="cliente-fila-top">'
       +'<div class="field-group"><label>Nombre completo</label>'
-        +'<input type="text" id="nombre_'+cid+'" value="'+escHTML(c.nombre||'')+'" style="text-transform:uppercase"></div>'
+        +'<input type="text" id="nombre_'+cid+'" value="'+escHTML(_nomUp)+'" style="text-transform:uppercase"></div>'
       +'<div class="field-group"><label>M\u00f3vil</label>'
         +'<input type="text" id="movil_'+cid+'" value="'+escHTML(c.movil||'')+'"></div>'
       +'<div class="field-group"><label>Tel. Casa</label>'
@@ -9046,7 +9171,13 @@ function cargarReciboEnFormulario(recibo){
   const elResp = $('responsable');
   if(elResp && recibo.responsable) elResp.value = recibo.responsable;
   const elFirma = $('nombre_cliente_firma');
-  if(elFirma && recibo.nombre_cliente_firma) elFirma.value = recibo.nombre_cliente_firma;
+  if(elFirma){
+    const _firmaSrc = recibo.nombre_cliente_firma || (recibo.clientes&&recibo.clientes[0]?.nombre) || recibo.nombre || '';
+    const _firmaUp = _firmaSrc.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[.]/g,'');
+    elFirma.value = _firmaUp;
+    if(recibo.nombre_cliente_firma) elFirma.dataset.manualEdit='1';
+    else delete elFirma.dataset.manualEdit;
+  }
 
   // Mostrar bloque de placas si el recibo ya tiene capturadas
   mostrarPlacasEnPantalla(recibo.placasEntregadas, recibo.estadoPlacas);
@@ -9900,12 +10031,21 @@ async function _imprimirActualizacionReal(){
         fechaActualizacion: _fechaActualizacion,
         horaActualizacion:  _horaActualizacion
       });
-      // Insertar el nuevo registro al inicio (más reciente primero); el original queda intacto como registro independiente
-      appData.recibos.unshift(nuevoRegistro);
+      // ⚠️ CRÍTICO FIX: usar push en lugar de unshift para que .find() sin filtro de letra
+      // siempre devuelva la versión A (original). El array queda: [A, ..., B, C...]
+      // El sistema siempre busca el más reciente usando la letra explícita cuando la necesita.
+      appData.recibos.push(nuevoRegistro);
       _guardarVersionEnSupabase(nuevoRegistro, letraActual, nombreArchivo).catch(e=>console.warn('[SB versiones] actualizacion:',e));
     }
 
-    if(!appData.historialPagos) appData.historialPagos = {};
+    // Reordenar recibos después de insertar la nueva versión: A siempre antes de B/C para que
+    // .find() sin filtro de letra siempre devuelva el original y no la versión secundaria
+    appData.recibos.sort(function(a, b) {
+      if (a.folio !== b.folio) return 0; // solo reordenar dentro del mismo folio
+      var la = (a.letra || 'A'); var lb = (b.letra || 'A');
+      return la < lb ? -1 : la > lb ? 1 : 0;
+    });
+  if(!appData.historialPagos) appData.historialPagos = {};
     if(!appData.historialPagos[recibo.folio]) appData.historialPagos[recibo.folio] = [];
     const yaRegistrados = new Set(appData.historialPagos[recibo.folio].map(h=>h.fechaHora||''));
     pagosParciales.forEach(p => {
@@ -11711,6 +11851,14 @@ function filtrarHistorial(){
     list.innerHTML='<div class="empty-hist">'+(total?'Sin resultados para la búsqueda':'Aún no hay recibos generados')+'</div>';
     return;
   }
+  // Ordenar estrictamente por fecha+hora de generación descendente (más reciente arriba)
+  lista.sort(function(a, b) {
+    const fa = (a.fecha || '') + 'T' + (a.hora || '00:00');
+    const fb = (b.fecha || '') + 'T' + (b.hora || '00:00');
+    if (fb !== fa) return fb.localeCompare(fa);
+    // Misma fecha y hora: folio mayor primero
+    return (b.folio || 0) - (a.folio || 0);
+  });
   list.innerHTML = lista.map(r=>{
     const i = appData.recibos.indexOf(r);
     const folioStr='#'+folioConLetra(r.folio, r.anio_folio, r.letra || 'A');
@@ -11721,7 +11869,7 @@ function filtrarHistorial(){
       ?'<span style="color:'+saldoColor+';font-family:DM Mono,monospace;font-size:0.65rem;margin-left:6px">$'+r.saldoPendiente.toFixed(2)+'</span>':'';
     return '<div class="historial-item"'+(r.cancelado?' style="opacity:0.65;"':'')+' >'
       +'<span class="folio-num">'+folioStr+'</span>'+compTag+cancelTag
-      +'<span class="client-name">'+escHTML(r.nombre||'')+'</span>'
+      +'<span class="client-name">'+escHTML((r.nombre||'').toUpperCase())+'</span>'
       +'<span class="fecha-item">'+(r.fecha||'—')+' '+(r.hora||'')+'</span>'
       +(r.generadoPor?'<span style="font-family:\'DM Mono\',monospace;font-size:0.58rem;color:#7a6040;white-space:nowrap;margin-left:4px;" title="Generado por">👤 '+escHTML(r.generadoPor)+'</span>':'')
       +saldoTag
@@ -12551,15 +12699,15 @@ function escapeHtml(s) {
 // Los atajos solo se activan cuando el foco NO está en un input/textarea/select.
 // Esto evita interferir con la escritura del usuario.
 const ATAJOS = [
-  { tecla: '1', alt: true, accion: () => ir('caja'), descripcion: 'Ir a Caja' },
-  { tecla: '2', alt: true, accion: () => ir('nuevo-recibo'), descripcion: 'Nuevo Recibo' },
-  { tecla: '3', alt: true, accion: () => ir('recibos'), descripcion: 'Historial Recibos' },
-  { tecla: '4', alt: true, accion: () => ir('contabilidad'), descripcion: 'Contabilidad' },
-  { tecla: '5', alt: true, accion: () => ir('directorio'), descripcion: 'Directorio' },
-  { tecla: '6', alt: true, accion: () => ir('carpetas'), descripcion: 'Carpetas' },
-  { tecla: '7', alt: true, accion: () => ir('juicios'), descripcion: 'Juicios' },
-  { tecla: '8', alt: true, accion: () => ir('pendientes'), descripcion: 'Pendientes' },
-  { tecla: 'r', ctrl: true, alt: true, accion: () => ir('nuevo-recibo'), descripcion: 'Crear Recibo' },
+  { tecla: '1', alt: true, accion: function(){ if(typeof ir==='function') ir('caja'); }, descripcion: 'Ir a Caja' },
+  { tecla: '2', alt: true, accion: function(){ if(typeof ir==='function') ir('nuevo-recibo'); }, descripcion: 'Nuevo Recibo' },
+  { tecla: '3', alt: true, accion: function(){ if(typeof ir==='function') ir('recibos'); }, descripcion: 'Historial Recibos' },
+  { tecla: '4', alt: true, accion: function(){ if(typeof ir==='function') ir('contabilidad'); }, descripcion: 'Contabilidad' },
+  { tecla: '5', alt: true, accion: function(){ if(typeof ir==='function') ir('directorio'); }, descripcion: 'Directorio' },
+  { tecla: '6', alt: true, accion: function(){ if(typeof ir==='function') ir('carpetas'); }, descripcion: 'Carpetas' },
+  { tecla: '7', alt: true, accion: function(){ if(typeof ir==='function') ir('juicios'); }, descripcion: 'Juicios' },
+  { tecla: '8', alt: true, accion: function(){ if(typeof ir==='function') ir('pendientes'); }, descripcion: 'Pendientes' },
+  { tecla: 'r', ctrl: true, alt: true, accion: function(){ if(typeof ir==='function') ir('nuevo-recibo'); }, descripcion: 'Crear Recibo' },
   { tecla: 'q', ctrl: true, alt: true, accion: () => { if (typeof abrirLibre === 'function') abrirLibre(); }, descripcion: 'Captura Rápida' },
   { tecla: 'b', ctrl: true, alt: true, accion: () => { 
     const inp = document.getElementById('global-search-inp'); 
@@ -13242,7 +13390,9 @@ function renderContab() {
     let folioTxt, folioColor;
     if (m.fuente === 'recibo') {
       const n = m.folio != null ? m.folio : parseInt((m.id||'').replace('R-',''));
-      const _rFol = (typeof appData !== 'undefined' ? appData.recibos||[] : []).find(function(r){ return r.folio === n && !r.esComplemento; });
+      // ⚠️ CRÍTICO: buscar siempre la versión A (original) para anio_folio — el B tiene la misma base
+      const _rFol = (typeof appData !== 'undefined' ? appData.recibos||[] : []).find(function(r){ return r.folio === n && !r.esComplemento && (r.letra||'A')==='A'; }) ||
+                    (typeof appData !== 'undefined' ? appData.recibos||[] : []).find(function(r){ return r.folio === n && !r.esComplemento; });
       let _letraF = m.letra || null;
       if(!_letraF && m.cat){
         const _catMatch = (m.cat||'').match(/#\d{2}-\d{3,}([A-Z])\b/);
@@ -13300,6 +13450,31 @@ function renderContab() {
 
   let granIngTotal = 0, granEgrTotal = 0;
 
+  // ── PRE-CÁLCULO GLOBAL: saldo "EN CAJA" cruzando meses y años ──
+  // El acumulado NO se reinicia al cambiar de mes; solo se reinicia con un
+  // corte de caja. Recorremos TODAS las fechas en orden ascendente una sola vez.
+  const _acumGlobal = {};
+  {
+    const _todasFechasAsc = [];
+    Object.keys(arbol).sort().forEach(a =>
+      Object.keys(arbol[a]).sort().forEach(m =>
+        Object.keys(arbol[a][m]).sort().forEach(f => _todasFechasAsc.push(f))
+      )
+    );
+    let _carry = 0;
+    _todasFechasAsc.forEach(f => {
+      const _a = f.substring(0,4), _m = f.substring(5,7);
+      const msDia = arbol[_a][_m][f];
+      const corteF = (D.cierres||[]).find(c => c.fecha===f && c.esCorte);
+      if (corteF) _carry = 0;
+      const ingF = msDia.filter(m => m.tipo==='ingreso').reduce((s,m)=>s+(parseFloat(m.monto)||0),0);
+      const egrF = msDia.filter(m => m.tipo==='egreso').reduce((s,m)=>s+(parseFloat(m.monto)||0),0);
+      _carry += ingF - egrF;
+      _acumGlobal[f] = _carry;
+      if (corteF) _carry = 0;
+    });
+  }
+
   const html = aniosDesc.map(anio => {
     const mesesDesc = Object.keys(arbol[anio]).sort((a,b) => b.localeCompare(a));
     let anioIng = 0, anioEgr = 0;
@@ -13309,21 +13484,10 @@ function renderContab() {
       let mesIng = 0, mesEgr = 0;
       let di = 0; // alternating day row colors
 
-      // Calcular acumulado corriente ascendente para este mes
-      // Se resetea a 0 cuando hay un corte de caja
+      // acumPorDia viene del pre-cálculo global — cruza meses y años correctamente
       const diasAsc = [...diasDesc].sort();
-      let _acumMes = 0;
       const acumPorDia = {};
-      diasAsc.forEach(f => {
-        const msDia = arbol[anio][mes][f];
-        const corteF = (D.cierres||[]).find(c => c.fecha===f && c.esCorte);
-        if (corteF) _acumMes = 0; // el corte entrega el efectivo: reinicia
-        const ingF = msDia.filter(m => m.tipo==='ingreso').reduce((s,m)=>s+(parseFloat(m.monto)||0),0);
-        const egrF = msDia.filter(m => m.tipo==='egreso').reduce((s,m)=>s+(parseFloat(m.monto)||0),0);
-        _acumMes += ingF - egrF;
-        acumPorDia[f] = _acumMes;
-        if (corteF) _acumMes = 0; // después del corte, el siguiente día empieza en 0
-      });
+      diasAsc.forEach(f => { acumPorDia[f] = _acumGlobal[f] !== undefined ? _acumGlobal[f] : 0; });
 
       const diasHtml = diasDesc.map(fecha => {
         const ms     = arbol[anio][mes][fecha];
@@ -13606,7 +13770,7 @@ function renderRec(){
   const rTodos=[...recArr2,...recArr1].filter(x=>{
     if(foliosVistos.has(x.folio))return false;
     foliosVistos.add(x.folio);return true;
-  }).sort((a,b)=>b.folio-a.folio);
+  }).sort((function(a,b){ var fa=(a.fecha||a.fecha_recibo||'')+'T'+(a.hora||'00:00'); var fb=(b.fecha||b.fecha_recibo||'')+'T'+(b.hora||'00:00'); if(fb!==fa) return fb.localeCompare(fa); if(a.folio!==b.folio) return (b.folio||0)-(a.folio||0); var la=(a.letra||'A'),lb=(b.letra||'A'); return la<lb?-1:la>lb?1:0; }));
   
   // Mejora 4: aplicar filtros
   const r = aplicarFiltrosRecibos(rTodos);
@@ -13744,7 +13908,7 @@ function exportarRecibosCSV() {
   const rTodos = [...recArr2, ...recArr1].filter(x => {
     if (foliosVistos.has(x.folio)) return false;
     foliosVistos.add(x.folio); return true;
-  }).sort((a,b) => b.folio - a.folio);
+  }).sort((function(a,b){ var fa=(a.fecha||a.fecha_recibo||'')+'T'+(a.hora||'00:00'); var fb=(b.fecha||b.fecha_recibo||'')+'T'+(b.hora||'00:00'); if(fb!==fa) return fb.localeCompare(fa); if(a.folio!==b.folio) return (b.folio||0)-(a.folio||0); var la=(a.letra||'A'),lb=(b.letra||'A'); return la<lb?-1:la>lb?1:0; }));
   
   // Aplicar los mismos filtros que están activos en pantalla
   const r = aplicarFiltrosRecibos(rTodos);
@@ -14732,7 +14896,7 @@ function filtrarRecibosParaJuicio() {
   let filtrados;
   if (!q) {
     // Sin búsqueda: mostrar los 30 más recientes
-    filtrados = recibos.slice().sort((a,b) => (b.folio||0) - (a.folio||0)).slice(0, 30);
+    filtrados = recibos.slice().sort((function(a,b){ var fa=(a.fecha||a.fecha_recibo||'')+'T'+(a.hora||'00:00'); var fb=(b.fecha||b.fecha_recibo||'')+'T'+(b.hora||'00:00'); if(fb!==fa) return fb.localeCompare(fa); if(a.folio!==b.folio) return (b.folio||0)-(a.folio||0); var la=(a.letra||'A'),lb=(b.letra||'A'); return la<lb?-1:la>lb?1:0; })).slice(0, 30);
   } else {
     filtrados = recibos.filter(r => {
       const folioStr = String(r.folio || '');
@@ -14740,7 +14904,7 @@ function filtrarRecibosParaJuicio() {
       // Buscar por folio EXACTO o por nombre que contiene la búsqueda
       return folioStr === q || folioStr === folioFormato(parseInt(q)||0) || 
              nombre.includes(q);
-    }).sort((a,b) => (b.folio||0) - (a.folio||0)).slice(0, 50);
+    }).sort((function(a,b){ var fa=(a.fecha||a.fecha_recibo||'')+'T'+(a.hora||'00:00'); var fb=(b.fecha||b.fecha_recibo||'')+'T'+(b.hora||'00:00'); if(fb!==fa) return fb.localeCompare(fa); if(a.folio!==b.folio) return (b.folio||0)-(a.folio||0); var la=(a.letra||'A'),lb=(b.letra||'A'); return la<lb?-1:la>lb?1:0; })).slice(0, 50);
   }
   
   if (!filtrados.length) {
@@ -16376,8 +16540,8 @@ function renderSelectorReciboVehicular(){
     return;
   }
 
-  // Ordenar por folio descendente (más recientes arriba)
-  filtrados.sort((a,b)=>(parseInt(b.folio)||0) - (parseInt(a.folio)||0));
+  // Ordenar por fecha desc, folio desc, letra asc
+  filtrados.sort((function(a,b){ var fa=(a.fecha||a.fecha_recibo||'')+'T'+(a.hora||'00:00'); var fb=(b.fecha||b.fecha_recibo||'')+'T'+(b.hora||'00:00'); if(fb!==fa) return fb.localeCompare(fa); if(a.folio!==b.folio) return (b.folio||0)-(a.folio||0); var la=(a.letra||'A'),lb=(b.letra||'A'); return la<lb?-1:la>lb?1:0; }));
 
   cont.innerHTML = filtrados.map(r => {
     const folioStr = '#' + folioFormato(r.folio||0);
@@ -17883,10 +18047,29 @@ function limpiarBackupsViejos() {
 
 function backupAppData() {
   if (typeof appData !== 'undefined' && appData && appData.recibos) {
-    backupLocal('appData', {
-      folioActual: appData.folioActual,
-      recibos: appData.recibos
+    // ⚠️ CRÍTICO: excluir pdfBase64 del backup local — los PDFs en base64 son muy
+    // pesados (~200KB c/u) y llenan el localStorage rápidamente (QuotaExceededError).
+    // Los PDFs viven en Supabase Storage; el backup local es solo para emergencias offline.
+    const recibosSinPDF = appData.recibos.map(function(r) {
+      if (!r.pdfBase64) return r;
+      const copia = Object.assign({}, r);
+      delete copia.pdfBase64;
+      return copia;
     });
+    try {
+      backupLocal('appData', {
+        folioActual: appData.folioActual,
+        recibos: recibosSinPDF
+      });
+    } catch(e) {
+      // Si aún falla, limpiar backups viejos y reintentar una vez
+      Object.keys(localStorage)
+        .filter(function(k){ return k.startsWith('lex_backup'); })
+        .forEach(function(k){ localStorage.removeItem(k); });
+      try {
+        backupLocal('appData', { folioActual: appData.folioActual, recibos: recibosSinPDF });
+      } catch(e2) { console.warn('[backupAppData] localStorage lleno incluso después de limpiar:', e2); }
+    }
   }
 }
 function saveCarpetas(){
@@ -22348,6 +22531,142 @@ function adminBorrarCobrosHoy() {
 }
 
 // ══════════════════════════════════════════════════════════════════
+// BORRAR MOVIMIENTOS POR FECHA — Eliminación permanente con sync garantizado
+// ══════════════════════════════════════════════════════════════════
+
+function adminAbrirBorrarPorFecha() {
+  document.getElementById('adminPanelZone').classList.remove('show');
+  var z = document.getElementById('adminBorrarFechaZone');
+  if (z) z.classList.add('show');
+  // Poner fecha de hoy por defecto
+  var inp = document.getElementById('adminBorrarFechaInput');
+  if (inp) { inp.value = hoy(); adminBorrarFechaPreview(); }
+  var st = document.getElementById('adminBorrarFechaStatus');
+  if (st) st.textContent = '';
+}
+
+function adminBorrarFechaPreview() {
+  var inp = document.getElementById('adminBorrarFechaInput');
+  var box = document.getElementById('adminBorrarFechaPreviewBox');
+  var btn = document.getElementById('adminBorrarFechaBtn');
+  if (!inp || !box) return;
+  var fecha = inp.value;
+  if (!fecha) { box.innerHTML = ''; if (btn) btn.disabled = true; return; }
+  var movsFecha = (D.movimientos || []).filter(function(m){ return m.fecha === fecha && !m.borrado; });
+  var total = movsFecha.reduce(function(s, m){ return s + (m.tipo === 'ingreso' ? (m.monto||0) : -(m.monto||0)); }, 0);
+  var ingresos = movsFecha.filter(function(m){ return m.tipo === 'ingreso'; }).length;
+  var egresos  = movsFecha.filter(function(m){ return m.tipo === 'egreso';  }).length;
+  if (!movsFecha.length) {
+    box.innerHTML = '<div style="font-family:monospace;font-size:0.68rem;color:rgba(200,149,42,0.45);text-align:center;padding:12px;">No hay movimientos para esta fecha</div>';
+    if (btn) btn.disabled = true;
+    return;
+  }
+  if (btn) btn.disabled = false;
+  var color = total >= 0 ? '#4dca6a' : '#e85555';
+  box.innerHTML =
+    '<div style="background:rgba(192,22,26,0.07);border:1px solid rgba(192,22,26,0.2);border-radius:6px;padding:10px 12px;">' +
+    '<div style="font-family:monospace;font-size:0.62rem;color:rgba(255,160,160,0.7);margin-bottom:6px;">SE ELIMINARÁN:</div>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+    '<span style="font-family:monospace;font-size:0.75rem;color:#e8c875;font-weight:700;">' + movsFecha.length + ' movimientos</span>' +
+    '<span style="font-family:monospace;font-size:0.7rem;color:#4dca6a;">' + ingresos + ' ingresos</span>' +
+    '<span style="font-family:monospace;font-size:0.7rem;color:#e85555;">' + egresos + ' egresos</span>' +
+    '<span style="font-family:monospace;font-size:0.7rem;color:' + color + ';">Balance: $' + Math.abs(total).toFixed(2) + '</span>' +
+    '</div>' +
+    '</div>';
+}
+
+async function adminBorrarMovimientosPorFecha() {
+  var inp    = document.getElementById('adminBorrarFechaInput');
+  var st     = document.getElementById('adminBorrarFechaStatus');
+  var btn    = document.getElementById('adminBorrarFechaBtn');
+  if (!inp || !inp.value) { toast('Selecciona una fecha primero', 'err'); return; }
+  var fecha  = inp.value;
+  var movsFecha = (D.movimientos || []).filter(function(m){ return m.fecha === fecha && !m.borrado; });
+  if (!movsFecha.length) { toast('No hay movimientos en esa fecha', 'err'); return; }
+
+  if (!confirm('¿Eliminar de forma PERMANENTE los ' + movsFecha.length + ' movimientos del ' + fecha + '?\n\nEsta acción sincroniza primero con Supabase para que no regresen. No se puede deshacer.')) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sincronizando con Supabase...'; }
+  if (st)  { st.style.color = 'rgba(232,200,117,0.8)'; st.textContent = '⏳ Paso 1/3 — Marcando tombstones locales...'; }
+
+  var fechaBorrado = new Date().toISOString();
+  var borradoPor   = (typeof empleadoActual !== 'undefined' && empleadoActual && empleadoActual.email)
+                     ? empleadoActual.email : 'admin';
+  var idsABorrar   = new Set(movsFecha.map(function(m){ return m.id; }));
+  var cnt          = movsFecha.length;
+
+  // PASO 1 — Marcar tombstones en el array local
+  D.movimientos.forEach(function(m){
+    if (idsABorrar.has(m.id)){
+      m.borrado      = true;
+      m.fechaBorrado = fechaBorrado;
+      m.borradoPor   = borradoPor;
+    }
+  });
+
+  // PASO 2 — Subir a Supabase con los tombstones incluidos (sin debounce, directo)
+  if (st) st.textContent = '⏳ Paso 2/3 — Subiendo tombstones a Supabase...';
+  try {
+    if (window.SB && window.SB_DESPACHO_ID) {
+      var movsLimpios = (D.movimientos || []).filter(function(m){ return m && m.id && !/^R-\d+$/.test(m.id); });
+      var estado = {
+        movimientos:          movsLimpios,
+        directorio:           D.directorio           || [],
+        carpetas:             D.carpetas             || [],
+        juicios:              D.juicios              || [],
+        pendientes:           D.pendientes           || [],
+        cierres:              D.cierres              || [],
+        prestamos:            D.prestamos            || [],
+        saldoAcumulado:       D.saldoAcumulado       || 0,
+        escrituras:           D.escrituras           || [],
+        recibosExcluidosCaja: D.recibosExcluidosCaja || [],
+        captura_meses:        capturaMesCargar()     || D.captura_meses || {},
+        retro_global:         window._retroGlobalActivo !== undefined
+                              ? { activo: !!window._retroGlobalActivo }
+                              : (D.retro_global || null)
+      };
+      var recibos = {
+        folioActual: (typeof REC !== 'undefined' && REC.folioActual) ? REC.folioActual : (appData.folioActual || 100),
+        recibos:     appData.recibos || []
+      };
+      var user = (await window.SB.auth.getUser()).data.user;
+      var res  = await window.SB.from('app_state').update({
+        data:         estado,
+        recibos:      recibos,
+        folio_actual: recibos.folioActual,
+        updated_by:   user ? user.id : null
+      }).eq('despacho_id', window.SB_DESPACHO_ID);
+      if (res.error) throw new Error(res.error.message);
+    }
+  } catch(e) {
+    // Si falla la sync revertimos los tombstones para no dejar datos corruptos
+    D.movimientos.forEach(function(m){
+      if (idsABorrar.has(m.id)){ delete m.borrado; delete m.fechaBorrado; delete m.borradoPor; }
+    });
+    if (st)  { st.style.color = '#e85555'; st.textContent = '✗ Error al sincronizar con Supabase. No se eliminó nada.'; }
+    if (btn) { btn.disabled = false; btn.textContent = '🗑 ELIMINAR MOVIMIENTOS DE ESTA FECHA'; }
+    toast('Error al sincronizar — no se eliminó nada. Intenta de nuevo.', 'err');
+    console.warn('[borrarPorFecha] sync error:', e);
+    return;
+  }
+
+  // PASO 3 — Eliminar definitivamente del array local y persistir
+  if (st) st.textContent = '⏳ Paso 3/3 — Eliminando del array local...';
+  D.movimientos = D.movimientos.filter(function(m){ return !idsABorrar.has(m.id); });
+  try { backupLocal('D', D); } catch(e){ /* ignore */ }
+  _reordenarFoliosCaja();
+  if (typeof renderCaja    === 'function') renderCaja();
+  if (typeof renderContab  === 'function') renderContab();
+  if (typeof renderHistorial === 'function') renderHistorial();
+  if (typeof badges        === 'function') badges();
+
+  if (st)  { st.style.color = '#4dca6a'; st.textContent = '✓ ' + cnt + ' movimientos del ' + fecha + ' eliminados permanentemente.'; }
+  if (btn) { btn.textContent = '✓ Eliminados correctamente'; }
+  toast('🗑 ' + cnt + ' movimientos del ' + fecha + ' eliminados — Supabase actualizado ✓');
+  adminBorrarFechaPreview(); // Actualizar preview (debería mostrar 0)
+}
+
+// ══════════════════════════════════════════════════════════════════
 // EDITAR COBROS / EGRESOS — Zona nueva (botón 11)
 // ══════════════════════════════════════════════════════════════════
 var _adminEditarTipoFiltro = 'todos';
@@ -22535,7 +22854,7 @@ function adminAbrirBorrarEspecifico() {
 }
 
 function adminVolverPanel() {
-  ['adminBorrarEspecZone','adminEditarCobrosZone','adminEditarMovDesdeEditarZone','adminHistoricosZone','adminCapturaMesZone','adminConsultarPDFZone'].forEach(function(id){
+  ['adminBorrarEspecZone','adminBorrarFechaZone','adminEditarCobrosZone','adminEditarMovDesdeEditarZone','adminHistoricosZone','adminCapturaMesZone','adminConsultarPDFZone'].forEach(function(id){
     var el = document.getElementById(id);
     if(el) el.classList.remove('show');
   });
@@ -22964,11 +23283,14 @@ function adminRenderRecibos(q) {
   });
   // Ordenar por fecha de generación descendente (más reciente primero); empate → folio mayor primero
   filtrados.sort(function(a, b) {
-    var fa = a.fecha || a.fecha_recibo || '';
-    var fb = b.fecha || b.fecha_recibo || '';
+    var fa = (a.fecha || a.fecha_recibo || '') + 'T' + (a.hora || '00:00');
+    var fb = (b.fecha || b.fecha_recibo || '') + 'T' + (b.hora || '00:00');
     if (fb > fa) return 1;
     if (fb < fa) return -1;
-    return (b.folio || 0) - (a.folio || 0);
+    if (a.folio !== b.folio) return (b.folio || 0) - (a.folio || 0);
+    // Mismo folio: A antes que B
+    var la = (a.letra || 'A'), lb = (b.letra || 'A');
+    return la < lb ? -1 : la > lb ? 1 : 0;
   });
   var cntEl = document.getElementById('adminRecCnt');
   if (cntEl) cntEl.textContent = recibos.length;
@@ -23013,6 +23335,13 @@ function adminRenderRecibos(q) {
         'style="background:#1a6a3a;border:none;border-radius:4px;color:#fff;',
         'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;">',
         '🚗 Pendiente</button>'
+      ].join('') : ''),
+      (esSecundario ? [
+        '<button onclick="adminRevertirLetraA(' + idx + ')" ',
+        'style="background:#5a3a8a;border:none;border-radius:4px;color:#fff;',
+        'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;" ',
+        'title="Revertir este recibo a VER.A (deshacer la versión secundaria)">',
+        '↩ VER.A</button>'
       ].join('') : ''),
       '</div>',
       '</div>'
@@ -23592,6 +23921,131 @@ function adminConfirmarCambioFecha(){
 }
 
 // ── EDITAR RECIBO ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════
+// REVERTIR RECIBO DE VER.B (o C,D...) A VER.A — solución definitiva
+// ══════════════════════════════════════════════════════════════════
+// El problema raíz: al actualizar un recibo (pago parcial o error), el sistema
+// crea una nueva versión B y el movimiento en contabilidad queda con letra:'B'.
+// Al mismo tiempo el movimiento del anticipo (letra:'A') permanece en la fecha
+// original. Si se usa el botón Editar sobre el recibo B, el movimiento A quedaba
+// sin letra guardada → renderContab caía al fallback 'A' y mostraba ambos como A.
+// Esta función: (1) revierte la letra del recibo a 'A', (2) elimina la versión B
+// de appData.recibos, (3) corrige TODOS los movimientos del folio en D.movimientos,
+// (4) sincroniza con Supabase de forma directa (no debounced).
+async function adminRevertirLetraA(idx) {
+  var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
+  var r = recibos[idx];
+  if (!r) { toast('Recibo no encontrado', 'err'); return; }
+  var letraActual = r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A';
+  if (letraActual === 'A') { toast('Este recibo ya es VER.A — no necesita revertirse', 'err'); return; }
+
+  var folioStr = typeof folioConLetra === 'function'
+    ? folioConLetra(r.folio, r.anio_folio, letraActual) : r.folio + letraActual;
+
+  if (!confirm('¿Revertir el recibo #' + folioStr + ' (VER.' + letraActual + ') a VER.A?\n\n' +
+    'Esto:\n' +
+    '• Cambia la letra del recibo de ' + letraActual + ' a A\n' +
+    '• Elimina la copia VER.' + letraActual + ' del historial de recibos\n' +
+    '• Corrige los movimientos en contabilidad para que muestren ' + r.folio + '-001A\n' +
+    '• Sincroniza con Supabase\n\n' +
+    'El registro VER.A original recupera todos los datos de esta versión.\n' +
+    'Esta acción no se puede deshacer.')) return;
+
+  // 1. Buscar versión A original del mismo folio
+  var idxA = recibos.findIndex(function(_r) {
+    return _r.folio === r.folio && !_r.esComplemento && (_r.letra || 'A') === 'A';
+  });
+
+  if (idxA >= 0 && idxA !== idx) {
+    // Copiar datos clave de la versión B/C al registro A (para que quede actualizado)
+    var rA = recibos[idxA];
+    // Preservar datos de pago/saldo de la versión más reciente
+    rA.saldoPendiente  = r.saldoPendiente;
+    rA.totalAbonado    = r.totalAbonado;
+    rA.saldoNuevo      = r.saldoNuevo;
+    rA.pagosParciales  = r.pagosParciales  || rA.pagosParciales;
+    rA.costosExtra     = r.costosExtra     || rA.costosExtra;
+    rA.fechasImpresion = r.fechasImpresion || rA.fechasImpresion;
+    rA.pdfBase64       = null; // invalidar caché
+    rA.archivo         = typeof folioConLetra === 'function'
+      ? folioConLetra(r.folio, r.anio_folio, 'A') + '.pdf' : r.folio + 'A.pdf';
+    // Eliminar la versión B del array
+    appData.recibos.splice(idx, 1);
+  } else if (idxA < 0) {
+    // No existe versión A separada — simplemente cambiar letra de este registro
+    r.letra   = 'A';
+    r.archivo = typeof folioConLetra === 'function'
+      ? folioConLetra(r.folio, r.anio_folio, 'A') + '.pdf' : r.folio + 'A.pdf';
+    r.pdfBase64 = null;
+  }
+
+  // 2. Corregir TODOS los movimientos de este folio en D.movimientos
+  if (typeof D !== 'undefined' && Array.isArray(D.movimientos)) {
+    var folioStrA = typeof folioConLetra === 'function'
+      ? folioConLetra(r.folio, r.anio_folio, 'A') : r.folio + 'A';
+    D.movimientos.forEach(function(m) {
+      if (String(m.folio) !== String(r.folio)) return;
+      // Cambiar letra del movimiento a 'A'
+      m.letra = 'A';
+      // Actualizar campo cat para que muestre la letra correcta
+      if (m.cat) {
+        m.cat = m.cat.replace(/#\d{2}-\d{3,}[A-Z]/, '#' + folioStrA);
+      }
+      // Actualizar descripcion si contiene el folio antiguo
+      if (m.descripcion) {
+        m.descripcion = m.descripcion.replace(
+          new RegExp('Recibo #' + (r.anio_folio ? String(r.anio_folio).slice(-2) : '\\d{2}') + '-\\d{3,}' + letraActual + '\\b', 'g'),
+          'Recibo #' + folioStrA
+        );
+      }
+    });
+  }
+
+  // 3. Sincronizar con Supabase — esperar confirmación antes de persistir local
+  toast('⏳ Revirtiendo a VER.A y sincronizando...');
+  try {
+    if (window.SB && window.SB_DESPACHO_ID) {
+      var movsLimpios = (D.movimientos || []).filter(function(m){ return m && m.id && !/^R-\d+$/.test(m.id); });
+      var estado = {
+        movimientos: movsLimpios,
+        directorio:  D.directorio  || [], carpetas: D.carpetas || [],
+        juicios:     D.juicios     || [], pendientes: D.pendientes || [],
+        cierres:     D.cierres     || [], prestamos:  D.prestamos || [],
+        saldoAcumulado: D.saldoAcumulado || 0,
+        escrituras:  D.escrituras  || [],
+        recibosExcluidosCaja: D.recibosExcluidosCaja || [],
+        captura_meses: (typeof capturaMesCargar === 'function' ? capturaMesCargar() : null) || D.captura_meses || {},
+        retro_global: window._retroGlobalActivo !== undefined
+          ? { activo: !!window._retroGlobalActivo } : (D.retro_global || null)
+      };
+      var recibosSync = {
+        folioActual: (typeof REC !== 'undefined' && REC.folioActual) ? REC.folioActual : (appData.folioActual || 100),
+        recibos:     appData.recibos || []
+      };
+      var user = (await window.SB.auth.getUser()).data.user;
+      var res  = await window.SB.from('app_state').update({
+        data: estado, recibos: recibosSync,
+        folio_actual: recibosSync.folioActual,
+        updated_by: user ? user.id : null
+      }).eq('despacho_id', window.SB_DESPACHO_ID);
+      if (res.error) throw new Error(res.error.message);
+    }
+  } catch(e) {
+    toast('⚠ Error al sincronizar con Supabase: ' + e.message, 'err');
+    console.warn('[revertirLetraA] sync error:', e);
+    // No revertir — los cambios locales ya se hicieron; el usuario debe reintentar
+  }
+
+  // 4. Persistir local y refrescar UI
+  try { if (typeof backupLocal === 'function') backupLocal('D', D); } catch(e){}
+  if (typeof save === 'function') save();
+  if (typeof renderCaja === 'function') renderCaja();
+  if (typeof renderContab === 'function') renderContab();
+  if (typeof badges === 'function') badges();
+  adminFiltrarRecibos();
+  toast('✅ Recibo #' + folioStrA + ' revertido a VER.A correctamente');
+}
+
 function adminAbrirEditarRecibo(idx) {
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
   var r = recibos[idx];
@@ -24237,21 +24691,28 @@ async function adminGuardarEdicionRecibo() {
       const c0 = conceptos2[0];
       const txtConc = c0 ? ((c0.concepto||'') + (c0.descripcion ? ' — '+c0.descripcion : '')) : (r.tramites||'');
       const movDesc = 'Recibo #' + folioStr2 + ' · ' + r.nombre + (txtConc ? ' · ' + txtConc : '');
-      // Buscar movimiento existente por id canónico O por folio
+      // ⚠️ CRÍTICO: distinguir por folio+letra para no confundir movimiento A con B del mismo folio
+      const _letraRecibo = r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A';
+      const folioStrConLetra = typeof folioConLetra === 'function'
+        ? folioConLetra(r.folio, r.anio_folio, _letraRecibo) : folioStr2 + _letraRecibo;
       const idMov = 'M-REC-' + r.folio;
       const idxMov = D.movimientos.findIndex(function(m){
-        return m.id === idMov || m.id === ('M-REC-NEW-' + r.folio) || String(m.folio) === String(r.folio);
+        const _mLetra = m.letra || 'A';
+        return (m.id === idMov && _mLetra === _letraRecibo) ||
+               (m.id === ('M-REC-NEW-' + r.folio) && _mLetra === _letraRecibo) ||
+               (String(m.folio) === String(r.folio) && _mLetra === _letraRecibo);
       });
       if (idxMov >= 0) {
-        // Actualizar movimiento existente
+        // Actualizar movimiento existente — preservar letra siempre
         D.movimientos[idxMov].nombre      = r.nombre;
         D.movimientos[idxMov].descripcion = movDesc;
         D.movimientos[idxMov].fecha       = r.fecha || nuevaFecha;
         D.movimientos[idxMov].hora        = r.hora  || nuevaHora;
         D.movimientos[idxMov].monto       = nuevoAnticipo || nuevoTotal;
         D.movimientos[idxMov].responsable = nuevoResp;
+        D.movimientos[idxMov].letra       = _letraRecibo;
         D.movimientos[idxMov].estatus     = nuevoAnticipo < nuevoTotal ? 'Anticipo' : 'Liquidado';
-        D.movimientos[idxMov].cat         = (nuevoAnticipo < nuevoTotal ? 'Anticipo' : 'Liquidado') + ' · #' + folioStr2;
+        D.movimientos[idxMov].cat         = (nuevoAnticipo < nuevoTotal ? 'Anticipo' : 'Liquidado') + ' · #' + folioStrConLetra;
       } else if (nuevoAnticipo > 0 || nuevoTotal > 0) {
         // Crear movimiento si no existía (recibo capturado antes de esta lógica)
         D.movimientos.unshift({
@@ -24264,9 +24725,10 @@ async function adminGuardarEdicionRecibo() {
           folio:       r.folio,
           monto:       nuevoAnticipo || nuevoTotal,
           tipo:        'ingreso',
-          cat:         'Anticipo · #' + folioStr2,
+          cat:         'Anticipo · #' + folioStrConLetra,
           estatus:     nuevoAnticipo < nuevoTotal ? 'Anticipo' : 'Liquidado',
           fuente:      'recibo',
+          letra:       _letraRecibo,
           responsable: nuevoResp
         });
       }
@@ -24275,6 +24737,13 @@ async function adminGuardarEdicionRecibo() {
     // 4. Regenerar PDF y subirlo a Supabase Storage
     // generarPDFRecibo retorna Blob directamente; generarPDF retorna objeto jsPDF
     try {
+      // Recalcular saldos antes de generar el PDF
+      const _totalN    = parseFloat(r.total) || 0;
+      const _anticipoN = parseFloat(r.anticipo) || 0;
+      r.totalAbonado   = Math.min(_anticipoN, _totalN);
+      r.saldoNuevo     = Math.max(0, _totalN - _anticipoN);
+      r.saldoPendiente = r.saldoNuevo;
+
       const _qrTxt = 'LEX-MEXICO|Folio:' + folioFormato(r.folio, r.anio_folio) + '|' + r.nombre + '|' + (r.fecha_recibo||r.fecha||'') + ' ' + (r.hora_recibo||r.hora||'');
       const _qrURL = typeof qrToDataURL === 'function' ? await qrToDataURL(_qrTxt) : null;
       const _nombrePDF = 'Recibo_' + folioFormato(r.folio, r.anio_folio) + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf';
@@ -24303,7 +24772,12 @@ async function adminGuardarEdicionRecibo() {
       }
       if (_blob) {
         r.archivo = _nombrePDF;
-        await subirPDFaDrive(_blob, _nombrePDF);
+        // Cachear pdfBase64 en sesión para que Contabilidad no tenga que ir a Storage
+        const _rdAdmin = new FileReader();
+        _rdAdmin.onload = () => { r.pdfBase64 = _rdAdmin.result; };
+        _rdAdmin.readAsDataURL(_blob);
+        // Subir a Storage (no bloqueante)
+        subirPDFaDrive(_blob, _nombrePDF).catch(e => console.warn('[Admin] PDF upload:', e));
         console.log('[Admin] PDF regenerado y subido:', _nombrePDF);
       }
     } catch(_ePDF) {
@@ -27247,8 +27721,35 @@ function rgenCapturar(){
     document.querySelectorAll('#panel-nuevo-recibo input,#panel-nuevo-recibo select,#panel-nuevo-recibo textarea')
       .forEach(e=>{ e.disabled=false; e.style.pointerEvents=''; e.style.opacity=''; });
 
-    if(typeof setStatus==='function') setStatus('ok','Modo restauración — Folio #'+fs+' · Captura los datos y presiona Restaurar','ok');
-  }, 80);
+
+    // ── Inyectar fecha/hora retroactiva en el formulario ──
+    const _rfecha = window._restauracionFecha || '';
+    const _rhora  = window._restauracionRec?.hora_recibo || window._restauracionRec?.hora || '';
+    if(_rfecha){
+      const _fhEl = document.getElementById('fecha_recibo');
+      const _fhDisp = document.getElementById('fecha_recibo_display');
+      if(_fhEl){ _fhEl.value = _rfecha; }
+      if(_fhDisp){
+        try{
+          const _fd = new Date(_rfecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+          _fhDisp.textContent = _fd.charAt(0).toUpperCase()+_fd.slice(1);
+        }catch(e){ _fhDisp.textContent = _rfecha; }
+      }
+    }
+    if(_rhora){
+      const _horaEl = document.getElementById('hora_recibo');
+      const _horaDisp = document.getElementById('hora_recibo_display');
+      if(_horaEl) _horaEl.value = _rhora;
+      if(_horaDisp) _horaDisp.textContent = _rhora + ' hrs.';
+    }
+    // ── Activar modo retroactivo para que la fecha sea editable ──
+    window._reciboRetroactivoActivo = true;
+    const _dispFechaR = document.getElementById('fecha_recibo_display');
+    if(_dispFechaR){ _dispFechaR.style.borderBottom='2px dashed #5a3a8a'; _dispFechaR.style.color='#8b5cf6'; _dispFechaR.style.fontWeight='700'; _dispFechaR.title='Click para cambiar la fecha'; }
+    const _dispHoraR = document.getElementById('hora_recibo_display');
+    if(_dispHoraR){ _dispHoraR.style.color='#8b5cf6'; _dispHoraR.style.fontWeight='700'; }
+    if(typeof setStatus==='function') setStatus('ok','Modo restauración — Folio #'+fs+' · Captura los datos · Click en la fecha para cambiarla','ok');
+  }, 400);
 }
 
 function rgenVolverPaso1(){
@@ -28180,13 +28681,43 @@ function rgenConfirmar(){
     document.querySelectorAll('#panel-nuevo-recibo input,#panel-nuevo-recibo select,#panel-nuevo-recibo textarea')
       .forEach(e=>{ e.disabled=false; e.style.pointerEvents=''; e.style.opacity=''; });
 
-    if(typeof setStatus==='function') setStatus('ok','Modo restauración — Folio #'+fs2+' · Completa y presiona Restaurar','ok');
-  }, 80);
+
+    // ── Inyectar fecha/hora retroactiva en el formulario ──
+    const _rfecha = window._restauracionFecha || '';
+    const _rhora  = window._restauracionRec?.hora_recibo || window._restauracionRec?.hora || '';
+    if(_rfecha){
+      const _fhEl = document.getElementById('fecha_recibo');
+      const _fhDisp = document.getElementById('fecha_recibo_display');
+      if(_fhEl){ _fhEl.value = _rfecha; }
+      if(_fhDisp){
+        try{
+          const _fd = new Date(_rfecha+'T12:00:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+          _fhDisp.textContent = _fd.charAt(0).toUpperCase()+_fd.slice(1);
+        }catch(e){ _fhDisp.textContent = _rfecha; }
+      }
+    }
+    if(_rhora){
+      const _horaEl = document.getElementById('hora_recibo');
+      const _horaDisp = document.getElementById('hora_recibo_display');
+      if(_horaEl) _horaEl.value = _rhora;
+      if(_horaDisp) _horaDisp.textContent = _rhora + ' hrs.';
+    }
+    // ── Activar modo retroactivo para que la fecha sea editable ──
+    window._reciboRetroactivoActivo = true;
+    const _dispFechaR = document.getElementById('fecha_recibo_display');
+    if(_dispFechaR){ _dispFechaR.style.borderBottom='2px dashed #5a3a8a'; _dispFechaR.style.color='#8b5cf6'; _dispFechaR.style.fontWeight='700'; _dispFechaR.title='Click para cambiar la fecha'; }
+    const _dispHoraR = document.getElementById('hora_recibo_display');
+    if(_dispHoraR){ _dispHoraR.style.color='#8b5cf6'; _dispHoraR.style.fontWeight='700'; }
+    if(typeof setStatus==='function') setStatus('ok','Modo restauración — Folio #'+fs2+' · Completa y presiona Restaurar · Click en la fecha para cambiarla','ok');
+  }, 400);
 }
 
 function cancelarRestauracion(){
   document.body.classList.remove('modo-restauracion');
   window._restauracionFolio=null; window._restauracionLetra=null; window._restauracionRec=null; window._restauracionFecha=null;
+  window._reciboRetroactivoActivo = false;
+  window._reciboRetroactivoFechaPersonalizada = null;
+  window._reciboRetroactivoHoraPersonalizada = null;
   const el=id=>document.getElementById(id);
   if(el('actions-restauracion')) el('actions-restauracion').style.display='none';
   if(el('restauracion-banner'))  el('restauracion-banner').style.display='none';
@@ -28202,8 +28733,18 @@ async function guardarRestauracion(){
   const folio    = window._restauracionFolio;
   const letra    = window._restauracionLetra || 'A';
   const fs       = typeof folioConLetra==='function'?folioConLetra(folio,null,letra):folioFormato(folio);
-  const fechaOrig= window._restauracionFecha || fechaCDMX_ISO();
-  const horaOrig = window._restauracionRec?.hora_recibo || window._restauracionRec?.hora || horaCDMX_HHMM();
+  // Prioridad: editor retroactivo → input del formulario → _restauracionFecha → fecha actual
+  const _inputFecha = document.getElementById('fecha_recibo');
+  const _inputHora  = document.getElementById('hora_recibo');
+  const fechaOrig = window._reciboRetroactivoFechaPersonalizada
+                 || (_inputFecha?.value?.trim())
+                 || window._restauracionFecha
+                 || fechaCDMX_ISO();
+  const horaOrig  = window._reciboRetroactivoHoraPersonalizada
+                 || (_inputHora?.value?.trim())
+                 || window._restauracionRec?.hora_recibo
+                 || window._restauracionRec?.hora
+                 || horaCDMX_HHMM();
 
   if(typeof appData!=='undefined'&&Array.isArray(appData.recibos)&&appData.recibos.some(r=>r.folio===folio&&(r.letra||(typeof letraVersion==='function'?letraVersion(r):'A')||'A')===letra)){
     alert('⚠ El folio #'+fs+' ya existe. Bórralo primero.'); return;
@@ -28216,7 +28757,20 @@ async function guardarRestauracion(){
   const anticipo       = parsePrecio($('anticipo').value);
   const total          = conceptos.reduce((s,c)=>s+(parseFloat(c.precio)||0),0);
   const saldoPendiente = Math.max(0,total-anticipo);
-  const primerNombre   = clientes[0].nombre;
+  const primerNombre   = (clientes[0].nombre||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\./g,'');
+  clientes[0].nombre   = primerNombre;
+
+  // Modal de placas para trámites vehiculares
+  const _tipoTramiteRest = document.querySelector('.tramite-btn.active')?.id==='btn-tramite-vehicular'?'vehicular':'normal';
+  let _placasRest = { placas: null, estado: null };
+  if(_tipoTramiteRest === 'vehicular'){
+    const _resultadoPlacas = await pedirDatosPlacas();
+    if(_resultadoPlacas === null){
+      if(typeof setStatus==='function') setStatus('ok','Restauración cancelada','ok');
+      return;
+    }
+    _placasRest = { placas: _resultadoPlacas.placas, estado: _resultadoPlacas.estado };
+  }
 
   const btn=document.getElementById('btn-guardar-restauracion');
   if(btn){btn.disabled=true;btn.textContent='⏳ Restaurando…';}
@@ -28251,6 +28805,7 @@ async function guardarRestauracion(){
       timestamp   : fechaOrig+'T'+horaOrig+':00',
       folioAnterior:null, historialPagosRef:[],
       totalGeneral:total, totalAbonado:anticipo, saldoNuevo:saldoPendiente,
+      placasEntregadas:_placasRest.placas||null, estadoPlacas:_placasRest.estado||null,
       descripcionVehicular:''
     };
 
@@ -28283,10 +28838,17 @@ async function guardarRestauracion(){
       ultima_tenencia:datos.ultima_tenencia, origen:datos.origen, combustible:datos.combustible,
       pagosParciales:[],
       esRestaurado:true, fechaRestauracion:new Date().toISOString(),
+      placasEntregadas:_placasRest.placas||null,
+      estadoPlacas:_placasRest.estado||null,
       notas:'⚠ Restaurado el '+new Date().toLocaleDateString('es-MX')+' — PDF regenerado'
     };
 
-    const idx=appData.recibos.findIndex(r=>r.folio<folio);
+    // Insertar en posición correcta considerando folio Y letra (A < B < C...)
+    const _letraOrd = l => (l||'A').charCodeAt(0);
+    const idx = appData.recibos.findIndex(r =>
+      r.folio < folio ||
+      (r.folio === folio && _letraOrd(r.letra||'A') < _letraOrd(letra))
+    );
     if(idx>=0) appData.recibos.splice(idx,0,rec); else appData.recibos.push(rec);
 
     if(letra==='A' && appData.folioActual<=folio){ appData.folioActual=folio+1; if(typeof actualizarFolioDisplay==='function') actualizarFolioDisplay(); }
@@ -28314,15 +28876,20 @@ async function guardarRestauracion(){
     if(typeof renderCaja==='function')      safeExec('renderCaja', () => renderCaja());
     try{ if(typeof syncEstadoSupabaseDebounced==='function') syncEstadoSupabaseDebounced(); }catch(e){ registrarError('catch vacio', e); }
 
-    // Salir del modo restauración
+    // Salir del modo restauración y limpiar flags retroactivos
     document.body.classList.remove('modo-restauracion');
     window._restauracionFolio=null; window._restauracionRec=null; window._restauracionFecha=null;
+    window._reciboRetroactivoActivo = false;
+    window._reciboRetroactivoFechaPersonalizada = null;
+    window._reciboRetroactivoHoraPersonalizada = null;
     document.getElementById('restauracion-banner').style.display='none';
     document.getElementById('actions-restauracion').style.display='none';
     document.getElementById('actions-normal').style.display='flex';
 
     if(typeof toast==='function') toast('✅ Recibo #'+fs+' restaurado');
     if(typeof setStatus==='function') setStatus('ok','Recibo #'+fs+' restaurado — PDF regenerado','ok');
+    if(_placasRest.placas && typeof mostrarPlacasEnPantalla==='function')
+      mostrarPlacasEnPantalla(_placasRest.placas, _placasRest.estado);
 
     alert('✅ Recibo #'+fs+' restaurado.\n\n📋 '+primerNombre+'\n📅 '+fechaOrig
       +(letra!=='A'?' · Serie '+letra:'')+'\n💰 $'+total.toFixed(2)+' | Abonado: $'+anticipo.toFixed(2)+' | Saldo: $'+saldoPendiente.toFixed(2)

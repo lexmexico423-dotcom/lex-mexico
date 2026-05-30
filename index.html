@@ -21742,14 +21742,12 @@ function _ymdAddDays(ymd, dias) {
 // Detecta y elimina recibos duplicados generados en la misma fecha y hora.
 // Dos recibos son "duplicados" si tienen el mismo folio, misma fecha y misma hora.
 // Conserva el primero (índice menor) y elimina los sobrantes.
+// También detecta movimientos duplicados en D.movimientos (mismo folio+letra+fecha+monto+estatus)
+// que causan que el mismo recibo aparezca dos veces en contabilidad aunque appData.recibos esté limpio.
 function adminEliminarRecibosDuplicados() {
   var recibos = (typeof appData !== 'undefined' && Array.isArray(appData.recibos)) ? appData.recibos : [];
-  if (recibos.length === 0) {
-    alert('ℹ️ No hay recibos registrados en el sistema.');
-    return;
-  }
 
-  // Detectar duplicados: mismo folio + misma fecha + misma hora
+  // ── A. Duplicados en appData.recibos (mismo folio+fecha+hora) ──────────────
   var vistos = {};
   var duplicados = [];
   recibos.forEach(function(r, idx) {
@@ -21762,47 +21760,95 @@ function adminEliminarRecibosDuplicados() {
     }
   });
 
-  if (duplicados.length === 0) {
-    alert('✅ No se encontraron recibos duplicados.\n\nTodos los recibos tienen fecha y hora únicos.');
+  // ── B. Duplicados en D.movimientos (mismo folio+letra+fecha+monto+estatus) ─
+  // Esto ocurre cuando el mismo recibo generó dos entradas en la contabilidad
+  // con distinto ID pero igual contenido (p.ej. 26-001A aparece dos veces).
+  var movimientos = (typeof D !== 'undefined' && Array.isArray(D.movimientos)) ? D.movimientos : [];
+  var vistosMov = {};
+  var duplicadosMov = []; // índices en D.movimientos a eliminar
+  movimientos.forEach(function(m, idx) {
+    if (!m || m.borrado || m.fuente !== 'recibo') return;
+    var clave = (m.folio != null ? m.folio : '') + '|' +
+                (m.letra || 'A') + '|' +
+                (m.fecha || '') + '|' +
+                (parseFloat(m.monto) || 0) + '|' +
+                (m.estatus || '');
+    if (vistosMov[clave] !== undefined) {
+      duplicadosMov.push({ idx: idx, mov: m });
+    } else {
+      vistosMov[clave] = idx;
+    }
+  });
+
+  var totalProblemas = duplicados.length + duplicadosMov.length;
+  if (totalProblemas === 0) {
+    alert('✅ No se encontraron recibos duplicados.\n\nTodos los recibos y movimientos contables tienen datos únicos.');
     return;
   }
 
-  // Construir mensaje con detalle de duplicados encontrados
-  var msg = '🔁 RECIBOS DUPLICADOS ENCONTRADOS\n\n';
-  msg += 'Se encontraron ' + duplicados.length + ' recibo(s) duplicado(s):\n\n';
-  duplicados.forEach(function(d) {
-    var r = d.recibo;
-    var folioStr = r.folio ? ('#' + r.folio) : '(sin folio)';
-    var nombre = r.nombre || 'Sin nombre';
-    msg += '  • ' + folioStr + ' — ' + nombre + '\n';
-    msg += '    Fecha: ' + (r.fecha || '—') + '  Hora: ' + (r.hora || '—') + '\n';
-  });
-  msg += '\nSe conservará el primero registrado de cada grupo.\n';
-  msg += '⚠️ Esta acción NO se puede deshacer.\n\n¿Eliminar los ' + duplicados.length + ' duplicado(s)?';
+  // ── Construir mensaje de confirmación ──────────────────────────────────────
+  var msg = '🔁 DUPLICADOS ENCONTRADOS\n\n';
+  if (duplicados.length > 0) {
+    msg += '📋 En lista de recibos (' + duplicados.length + '):\n';
+    duplicados.forEach(function(d) {
+      var r = d.recibo;
+      var folioStr = r.folio ? ('#' + r.folio) : '(sin folio)';
+      msg += '  • ' + folioStr + ' — ' + (r.nombre || 'Sin nombre') + '\n';
+      msg += '    Fecha: ' + (r.fecha || '—') + '  Hora: ' + (r.hora || '—') + '\n';
+    });
+    msg += '\n';
+  }
+  if (duplicadosMov.length > 0) {
+    msg += '📊 En contabilidad (D.movimientos) (' + duplicadosMov.length + '):\n';
+    duplicadosMov.forEach(function(d) {
+      var m = d.mov;
+      var folioStr = m.folio != null ? ('#' + m.folio + (m.letra || 'A')) : '(sin folio)';
+      msg += '  • ' + folioStr + ' — ' + (m.nombre || 'Sin nombre') + '\n';
+      msg += '    Fecha: ' + (m.fecha || '—') + '  $' + (m.monto || 0) + '\n';
+    });
+    msg += '\n';
+  }
+  msg += 'Se conservará el primero registrado de cada grupo.\n';
+  msg += '⚠️ Esta acción NO se puede deshacer.\n\n¿Eliminar los ' + totalProblemas + ' duplicado(s)?';
 
   if (!confirm(msg)) return;
 
-  // Eliminar en orden inverso para no alterar índices
-  var indices = duplicados.map(function(d) { return d.idx; }).sort(function(a, b) { return b - a; });
   var eliminados = 0;
-  indices.forEach(function(idx) {
+
+  // ── Eliminar duplicados en appData.recibos (orden inverso) ─────────────────
+  var indicesRec = duplicados.map(function(d) { return d.idx; }).sort(function(a, b) { return b - a; });
+  indicesRec.forEach(function(idx) {
     if (typeof adminEliminarRecibo === 'function') {
-      // Usar función existente que limpia movimientos, pagos y storage
       adminEliminarRecibo(idx);
       eliminados++;
     }
   });
 
-  // Forzar re-render si está disponible
+  // ── Eliminar movimientos duplicados en D.movimientos (orden inverso) ────────
+  // Marcar como borrado en lugar de splice para no romper índices de otros procesos
+  var indicesMov = duplicadosMov.map(function(d) { return d.idx; }).sort(function(a, b) { return b - a; });
+  indicesMov.forEach(function(idx) {
+    if (D.movimientos[idx]) {
+      D.movimientos[idx].borrado = true;
+      eliminados++;
+    }
+  });
+  // Compactar: quitar los marcados como borrado que sean duplicados recién marcados
+  if (indicesMov.length > 0) {
+    D.movimientos = D.movimientos.filter(function(m) { return m && !m.borrado; });
+    if (typeof save === 'function') save();
+    if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
+  }
+
+  // ── Re-render ──────────────────────────────────────────────────────────────
   if (typeof renderContab === 'function') renderContab();
   if (typeof renderCaja === 'function') renderCaja();
   if (typeof adminAbrirGestionRecibos === 'function') {
-    // Si el modal de gestión estaba abierto, refrescarlo
     var zona = document.getElementById('adminGestRecZona');
     if (zona && zona.style.display !== 'none') adminAbrirGestionRecibos();
   }
 
-  alert('✅ Limpieza completada.\n\n' + eliminados + ' recibo(s) duplicado(s) eliminado(s).\nTu sistema ahora refleja datos correctos.');
+  alert('✅ Limpieza completada.\n\n' + eliminados + ' duplicado(s) eliminado(s).\nTu sistema ahora refleja datos correctos.');
 }
 
 // Detecta y elimina cierres duplicados del mismo día.

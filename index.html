@@ -3240,6 +3240,16 @@ window.addEventListener('offline', ()=>{
             <div style="font-family:monospace;font-size:0.5rem;color:rgba(200,149,42,0.55);text-align:center;line-height:1.4;padding:0 4px;">Ej: el sistema hizo corte de caja dos veces el mismo día y la contabilidad aparece doble. Esto detecta los duplicados y deja solo el cierre correcto automáticamente</div>
           </div>
 
+          <!-- 12b. Eliminar Recibos Duplicados -->
+          <div onclick="dashAccionAdmin('eliminarRecDuplicados')" style="position:relative;background:rgba(180,30,30,0.1);border:1.5px solid rgba(220,60,60,0.3);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#e03c3c';this.style.boxShadow='0 8px 20px rgba(180,30,30,0.25)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(220,60,60,0.3)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:#7a1a1a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">🔁</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#ffb0b0;text-align:center;line-height:1.3;">Eliminar Recibos<br>Duplicados</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(255,160,160,0.55);text-align:center;line-height:1.4;padding:0 4px;">Ej: se generó el mismo recibo dos veces en la misma fecha y hora por doble clic o reconexión. Detecta los duplicados exactos y elimina el sobrante conservando el original</div>
+          </div>
+
           <!-- 13. Reparar Folios -->
           <div onclick="dashAccionAdmin('repararFolios')" style="position:relative;background:rgba(26,42,74,0.25);border:1.5px solid rgba(100,140,255,0.3);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
                onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#6488ff';this.style.boxShadow='0 8px 20px rgba(26,42,74,0.35)'"
@@ -19478,6 +19488,7 @@ function dashNombreAccion(accion){
     'backup': '💾 Backup Manual',
     'verificar': '🔍 Verificar Conflictos',
     'limpiarCierres': '🧹 Limpiar Cierres Duplicados',
+    'eliminarRecDuplicados': '🔁 Eliminar Recibos Duplicados',
     'repararFolios': '🔢 Reparar Numeración de Folios',
     'corte': '🔒 Corte de Caja'
   };
@@ -19545,6 +19556,9 @@ function dashEjecutarAccion(accion){
           if(typeof renderCaja === 'function') renderCaja();
         }
       }
+      break;
+    case 'eliminarRecDuplicados':
+      if(typeof adminEliminarRecibosDuplicados === 'function') adminEliminarRecibosDuplicados();
       break;
     case 'repararFolios':
       if(typeof adminRepararFoliosCaja === 'function') adminRepararFoliosCaja();
@@ -21725,6 +21739,72 @@ function _ymdAddDays(ymd, dias) {
 }
 
 // ═══ LIMPIEZA DE CIERRES DUPLICADOS ═══════════════════════════════
+// Detecta y elimina recibos duplicados generados en la misma fecha y hora.
+// Dos recibos son "duplicados" si tienen el mismo folio, misma fecha y misma hora.
+// Conserva el primero (índice menor) y elimina los sobrantes.
+function adminEliminarRecibosDuplicados() {
+  var recibos = (typeof appData !== 'undefined' && Array.isArray(appData.recibos)) ? appData.recibos : [];
+  if (recibos.length === 0) {
+    alert('ℹ️ No hay recibos registrados en el sistema.');
+    return;
+  }
+
+  // Detectar duplicados: mismo folio + misma fecha + misma hora
+  var vistos = {};
+  var duplicados = [];
+  recibos.forEach(function(r, idx) {
+    if (!r) return;
+    var clave = (r.folio || '') + '|' + (r.fecha || '') + '|' + (r.hora || '');
+    if (vistos[clave] !== undefined) {
+      duplicados.push({ idx: idx, recibo: r, claveOriginal: vistos[clave] });
+    } else {
+      vistos[clave] = idx;
+    }
+  });
+
+  if (duplicados.length === 0) {
+    alert('✅ No se encontraron recibos duplicados.\n\nTodos los recibos tienen fecha y hora únicos.');
+    return;
+  }
+
+  // Construir mensaje con detalle de duplicados encontrados
+  var msg = '🔁 RECIBOS DUPLICADOS ENCONTRADOS\n\n';
+  msg += 'Se encontraron ' + duplicados.length + ' recibo(s) duplicado(s):\n\n';
+  duplicados.forEach(function(d) {
+    var r = d.recibo;
+    var folioStr = r.folio ? ('#' + r.folio) : '(sin folio)';
+    var nombre = r.nombre || 'Sin nombre';
+    msg += '  • ' + folioStr + ' — ' + nombre + '\n';
+    msg += '    Fecha: ' + (r.fecha || '—') + '  Hora: ' + (r.hora || '—') + '\n';
+  });
+  msg += '\nSe conservará el primero registrado de cada grupo.\n';
+  msg += '⚠️ Esta acción NO se puede deshacer.\n\n¿Eliminar los ' + duplicados.length + ' duplicado(s)?';
+
+  if (!confirm(msg)) return;
+
+  // Eliminar en orden inverso para no alterar índices
+  var indices = duplicados.map(function(d) { return d.idx; }).sort(function(a, b) { return b - a; });
+  var eliminados = 0;
+  indices.forEach(function(idx) {
+    if (typeof adminEliminarRecibo === 'function') {
+      // Usar función existente que limpia movimientos, pagos y storage
+      adminEliminarRecibo(idx);
+      eliminados++;
+    }
+  });
+
+  // Forzar re-render si está disponible
+  if (typeof renderContab === 'function') renderContab();
+  if (typeof renderCaja === 'function') renderCaja();
+  if (typeof adminAbrirGestionRecibos === 'function') {
+    // Si el modal de gestión estaba abierto, refrescarlo
+    var zona = document.getElementById('adminGestRecZona');
+    if (zona && zona.style.display !== 'none') adminAbrirGestionRecibos();
+  }
+
+  alert('✅ Limpieza completada.\n\n' + eliminados + ' recibo(s) duplicado(s) eliminado(s).\nTu sistema ahora refleja datos correctos.');
+}
+
 // Detecta y elimina cierres duplicados del mismo día.
 // Mantiene solo el más reciente (por hora). Si dos tienen misma hora,
 // prioriza: corte de caja > cierre normal > cierre sinMovimientos.

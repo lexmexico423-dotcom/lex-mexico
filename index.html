@@ -11404,6 +11404,10 @@ async function guardarRecibo(){
               D.pendientes.unshift(nuevoPend);
               console.log('[Auto-pendiente] Creado pendiente de placas para recibo #' + _folioGuardado);
             }
+            // Si el recibo quedó liquidado desde el primer momento, eliminar el pendiente
+            if (_saldoInicialGuardado <= 0 && typeof _eliminarPendientePorFolio === 'function') {
+              _eliminarPendientePorFolio(_folioGuardado);
+            }
           } catch(ePend) {
             console.warn('[Auto-pendiente]', ePend);
           }
@@ -29113,6 +29117,10 @@ async function guardarRestauracion(){
             documentos:[]
           });
           console.log('[Auto-pendiente REST] Creado pendiente de placas para recibo #'+fs);
+          // Si el recibo ya está liquidado, eliminar el pendiente inmediatamente
+          if(saldoPendiente <= 0 && typeof _eliminarPendientePorFolio === 'function'){
+            _eliminarPendientePorFolio(folio);
+          }
         }
       } catch(ePend){ console.warn('[Auto-pendiente REST]', ePend); }
     }

@@ -10103,20 +10103,14 @@ async function _imprimirActualizacionReal(){
         fechaActualizacion: _fechaActualizacion,
         horaActualizacion:  _horaActualizacion
       });
-      // ⚠️ CRÍTICO FIX: usar push en lugar de unshift para que .find() sin filtro de letra
-      // siempre devuelva la versión A (original). El array queda: [A, ..., B, C...]
-      // El sistema siempre busca el más reciente usando la letra explícita cuando la necesita.
-      appData.recibos.push(nuevoRegistro);
+      // ⚠️ CRÍTICO: insertar B inmediatamente DESPUÉS de A usando splice(idx+1).
+      // Esto garantiza que find(r => r.folio === n) sin filtro de letra siempre
+      // devuelve A primero. push() + sort() fue reemplazado porque el comparador
+      // con return 0 para folios distintos viola la transitividad de sort() y
+      // producía que B quedara antes que A, rompiendo el display en historial y contab.
+      appData.recibos.splice(idx + 1, 0, nuevoRegistro);
       _guardarVersionEnSupabase(nuevoRegistro, letraActual, nombreArchivo).catch(e=>console.warn('[SB versiones] actualizacion:',e));
     }
-
-    // Reordenar recibos después de insertar la nueva versión: A siempre antes de B/C para que
-    // .find() sin filtro de letra siempre devuelva el original y no la versión secundaria
-    appData.recibos.sort(function(a, b) {
-      if (a.folio !== b.folio) return 0; // solo reordenar dentro del mismo folio
-      var la = (a.letra || 'A'); var lb = (b.letra || 'A');
-      return la < lb ? -1 : la > lb ? 1 : 0;
-    });
   if(!appData.historialPagos) appData.historialPagos = {};
     if(!appData.historialPagos[recibo.folio]) appData.historialPagos[recibo.folio] = [];
     const yaRegistrados = new Set(appData.historialPagos[recibo.folio].map(h=>h.fechaHora||''));

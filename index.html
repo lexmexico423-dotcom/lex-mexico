@@ -7189,6 +7189,8 @@ async function sincronizarFolio(){
     if(typeof badges==='function') badges();
     if(typeof capturaMesCargarSupabase==='function') capturaMesCargarSupabase();
     if(typeof retroGlobalCargarSupabase==='function') retroGlobalCargarSupabase();
+    // Auto-corregir letras de movimientos y paths R2 (silencioso, 8s después)
+    if(typeof _autoCorregirLetrasR2 === 'function') _autoCorregirLetrasR2();
 
   } catch(e){
     console.error('[SB] sincronizarFolio error:', e);
@@ -22639,43 +22641,133 @@ async function adminRegenerarPDFsHistoricos() {
 // CORREGIR LETRAS DE MOVIMIENTOS — Repara movimientos con letra 'A'
 // que deberían tener la letra de la versión más reciente del recibo
 // ══════════════════════════════════════════════════════════════════
-async function adminCorregirLetrasMovimientos(){
-  if(!Array.isArray(D.movimientos)){ toast('Sin movimientos en memoria','err'); return; }
+// ══════════════════════════════════════════════════════════════════
+// CORREGIR LETRAS + VERIFICAR R2 — función permanente
+// Se ejecuta: (1) manualmente desde el panel admin,
+//             (2) automáticamente al cargar (modo silencioso, sin confirm)
+// ══════════════════════════════════════════════════════════════════
+async function adminCorregirLetrasMovimientos(silencioso){
+  if(!Array.isArray(D.movimientos)){ if(!silencioso) toast('Sin movimientos en memoria','err'); return; }
   var corregidos = 0;
+
+  // ── PASO 1: Corregir letras de movimientos de liquidación ──────
   D.movimientos.forEach(function(m){
     if(!m || m.fuente !== 'recibo' || m.borrado || m.folio == null) return;
-    // Determinar la letra correcta para este movimiento según los recibos en memoria
     var recibosDelFolio = (appData.recibos||[]).filter(function(r){
       return r.folio === m.folio && !r.esComplemento;
     });
     if(!recibosDelFolio.length) return;
-    // Letra más alta = versión más reciente
     var letraMax = recibosDelFolio.reduce(function(max, r){
       var l = (r.letra || (typeof letraVersion==='function'?letraVersion(r):'A') || 'A');
       return l > max ? l : max;
     }, 'A');
-    // Solo corregir si el movimiento dice 'A' pero la versión más reciente es mayor
-    // Y el estatus es Liquidado/Liquidación (un abono parcial puede ser legítimamente A)
     var esLiquidacion = (m.estatus==='Liquidado'||m.estatus==='Liquidación'||(m.cat||'').includes('Liquidac'));
     if(esLiquidacion && letraMax > (m.letra||'A')){
       var letraVieja = m.letra || 'A';
+      var rRef = (appData.recibos||[]).find(function(r){return r.folio===m.folio&&!r.esComplemento;});
       var folioViejo = typeof folioConLetra==='function'
         ? folioConLetra(m.folio, null, letraVieja)
         : String(m.folio).padStart(4,'0')+letraVieja;
       var folioNuevo = typeof folioConLetra==='function'
-        ? folioConLetra(m.folio, (appData.recibos||[]).find(function(r){return r.folio===m.folio&&!r.esComplemento;})?.anio_folio||null, letraMax)
+        ? folioConLetra(m.folio, rRef ? rRef.anio_folio : null, letraMax)
         : String(m.folio).padStart(4,'0')+letraMax;
       m.letra       = letraMax;
       m.cat         = (m.cat||'').replace(folioViejo, folioNuevo);
       m.descripcion = (m.descripcion||'').replace(folioViejo, folioNuevo);
-      console.log('[CorregirLetras] Movimiento '+m.id+': '+folioViejo+' → '+folioNuevo);
+      console.log('[CorregirLetras] Mov '+m.id+': '+folioViejo+' → '+folioNuevo);
       corregidos++;
     }
   });
-  if(!corregidos){ toast('No se encontraron movimientos con letra incorrecta'); return; }
-  try { await syncEstadoSupabase(); } catch(e){ console.warn(e); }
-  renderContab();
-  toast('✅ '+corregidos+' movimiento(s) corregido(s) y guardado(s)');
+
+  // ── PASO 2: Verificar y corregir paths de R2 en documentos de pendientes ──
+  var r2Corregidos = 0;
+  if(typeof window.subirR2 === 'function' && window.SB_DESPACHO_ID && Array.isArray(D.pendientes)){
+    for(var pi = 0; pi < D.pendientes.length; pi++){
+      var p = D.pendientes[pi];
+      if(!p || !Array.isArray(p.documentos) || !p.documentos.length) continue;
+      for(var di = 0; di < p.documentos.length; di++){
+        var doc = p.documentos[di];
+        if(!doc) continue;
+        // Corregir bucket incorrecto (guardado en 'recibos' en lugar de 'placas')
+        if(doc.r2path && doc.bucket && doc.bucket !== 'placas'){
+          console.warn('[CorregirR2] doc en bucket incorrecto:', doc.bucket, doc.r2path);
+          // Intentar mover: descargar de bucket viejo y resubir a 'placas'
+          try {
+            if(typeof window.descargarR2 === 'function'){
+              var blob = await window.descargarR2(doc.r2path, doc.bucket);
+              if(blob && blob.size > 0){
+                var nombreCliente = (p.persona||p.nombre||'cliente').replace(/[^a-zA-Z0-9_\-]/g,'_').substring(0,40);
+                var newPath = window.SB_DESPACHO_ID+'/placas/'+nombreCliente+'/'+Date.now()+'_'+doc.nombre;
+                var file = new File([blob], doc.nombre, {type: doc.tipo || blob.type});
+                var ok = await window.subirR2(file, newPath, 'placas');
+                if(ok){
+                  // Borrar del bucket viejo
+                  if(typeof window.borrarR2 === 'function'){
+                    await window.borrarR2(doc.r2path, doc.bucket).catch(function(e){ console.warn('borrar viejo:', e); });
+                  }
+                  doc.r2path = newPath;
+                  doc.bucket = 'placas';
+                  r2Corregidos++;
+                  console.log('[CorregirR2] Movido a placas:', newPath);
+                }
+              }
+            }
+          } catch(e){ console.warn('[CorregirR2] error moviendo doc:', e); }
+        }
+        // Corregir documentos con solo base64 (legacy) — registrar r2path si falta
+        if(doc.base64 && !doc.r2path && typeof window.subirR2 === 'function'){
+          try {
+            var nombreCliente2 = (p.persona||p.nombre||'cliente').replace(/[^a-zA-Z0-9_\-]/g,'_').substring(0,40);
+            var newPath2 = window.SB_DESPACHO_ID+'/placas/'+nombreCliente2+'/'+Date.now()+'_'+doc.nombre;
+            var mimeType = doc.tipo || 'application/octet-stream';
+            var b64data = doc.base64.includes(',') ? doc.base64.split(',')[1] : doc.base64;
+            var byteChars = atob(b64data);
+            var byteArr = new Uint8Array(byteChars.length);
+            for(var bi=0; bi<byteChars.length; bi++) byteArr[bi] = byteChars.charCodeAt(bi);
+            var blob2 = new Blob([byteArr], {type: mimeType});
+            var file2 = new File([blob2], doc.nombre, {type: mimeType});
+            var ok2 = await window.subirR2(file2, newPath2, 'placas');
+            if(ok2){
+              doc.r2path = newPath2;
+              doc.bucket = 'placas';
+              delete doc.base64; // limpiar base64 del objeto para ahorrar espacio
+              r2Corregidos++;
+              console.log('[CorregirR2] base64→R2:', newPath2);
+            }
+          } catch(e){ console.warn('[CorregirR2] error subiendo base64:', e); }
+        }
+      }
+    }
+  }
+
+  // ── PASO 3: Guardar si hubo cambios ───────────────────────────
+  var totalCambios = corregidos + r2Corregidos;
+  if(totalCambios > 0){
+    try {
+      Object.keys(localStorage).filter(function(k){ return k.startsWith('lex_backup'); })
+        .forEach(function(k){ localStorage.removeItem(k); });
+      await syncEstadoSupabase();
+    } catch(e){ console.warn('[CorregirLetras] sync error:', e); }
+    if(typeof renderContab === 'function') renderContab();
+    if(typeof renderPend === 'function') renderPend();
+  }
+
+  if(!silencioso){
+    if(totalCambios === 0) toast('No se encontraron problemas que corregir ✓');
+    else toast('✅ '+corregidos+' letra(s) + '+r2Corregidos+' doc(s) R2 corregidos');
+  } else if(totalCambios > 0){
+    console.log('[CorregirLetras+R2] Auto-corrección: '+corregidos+' letras, '+r2Corregidos+' docs R2');
+  }
+}
+
+// Ejecutar automáticamente al cargar — modo silencioso
+// Se lanza después de que Supabase cargó los datos (debounced 8s)
+var _autoCorregirTimer = null;
+function _autoCorregirLetrasR2(){
+  if(_autoCorregirTimer) clearTimeout(_autoCorregirTimer);
+  _autoCorregirTimer = setTimeout(function(){
+    adminCorregirLetrasMovimientos(true).catch(function(e){ console.warn('[AutoCorregir]', e); });
+  }, 8000);
 }
 
 // ══════════════════════════════════════════════════════════════════

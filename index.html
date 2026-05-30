@@ -22836,7 +22836,82 @@ async function adminCorregirLetrasMovimientos(silencioso){
     }
   });
 
-  // ── PASO 2: Verificar y corregir paths de R2 en documentos de pendientes ──
+  // ── PASO 2: Corregir letras de TODOS los movimientos en contabilidad ──────
+  // Agrupa por folio, compara contra los recibos reales y asigna la letra correcta.
+  // Movimientos con misma fecha+hora+monto pero distintas letras ya asignadas
+  // se consideran versiones distintas (A y B legítimos) y NO se tocan.
+  var corregidosContab = 0;
+  var _movsPorFolio = {};
+  D.movimientos.forEach(function(m){
+    if(!m || m.borrado || m.fuente !== 'recibo' || m.folio == null) return;
+    var k = String(m.folio);
+    if(!_movsPorFolio[k]) _movsPorFolio[k] = [];
+    _movsPorFolio[k].push(m);
+  });
+
+  Object.keys(_movsPorFolio).forEach(function(folioStr){
+    var folio = Number(folioStr);
+    var movs  = _movsPorFolio[folioStr];
+
+    // Recibos del folio ordenados por letra A < B < C
+    var recs = (appData.recibos||[])
+      .filter(function(r){ return r.folio === folio && !r.esComplemento; })
+      .sort(function(a,b){
+        var la = a.letra||'A', lb = b.letra||'A';
+        return la < lb ? -1 : la > lb ? 1 : 0;
+      });
+    if(!recs.length) return;
+
+    var letrasRec = recs.map(function(r){ return r.letra||'A'; });
+
+    // ¿Ya están todos bien asignados? (cada movimiento tiene una letra única de recibo)
+    var letrasTomadas = {};
+    var movsSinCorrecta = [];
+    movs.forEach(function(m){
+      var l = m.letra || 'A';
+      if(letrasRec.indexOf(l) >= 0 && !letrasTomadas[l]){
+        letrasTomadas[l] = true;
+      } else {
+        movsSinCorrecta.push(m);
+      }
+    });
+    if(!movsSinCorrecta.length) return; // todo OK
+
+    // Letras aún disponibles (no ocupadas por movimientos correctos)
+    var letrasDisp = letrasRec.filter(function(l){ return !letrasTomadas[l]; });
+    if(!letrasDisp.length) return;
+
+    // Ordenar los movimientos incorrectos cronológicamente para asignar letras en orden
+    movsSinCorrecta.sort(function(a,b){
+      var ta = (a.fecha||'')+'T'+(a.hora||'00:00');
+      var tb = (b.fecha||'')+'T'+(b.hora||'00:00');
+      return ta.localeCompare(tb);
+    });
+
+    movsSinCorrecta.forEach(function(m, i){
+      if(i >= letrasDisp.length) return;
+      var letraEsperada = letrasDisp[i];
+      var letraVieja    = m.letra || 'A';
+      if(letraVieja === letraEsperada) return;
+
+      var rRef = recs.find(function(r){ return (r.letra||'A') === letraEsperada; });
+      var anioFolio = rRef ? rRef.anio_folio : null;
+      var folioViejo = typeof folioConLetra==='function'
+        ? folioConLetra(folio, null, letraVieja)
+        : String(folio).padStart(4,'0')+letraVieja;
+      var folioNuevo = typeof folioConLetra==='function'
+        ? folioConLetra(folio, anioFolio, letraEsperada)
+        : String(folio).padStart(4,'0')+letraEsperada;
+
+      m.letra       = letraEsperada;
+      m.cat         = (m.cat||'').replace(folioViejo, folioNuevo);
+      m.descripcion = (m.descripcion||'').replace(folioViejo, folioNuevo);
+      corregidosContab++;
+      console.log('[CorregirLetras] Contab mov '+(m.id||'?')+': '+folioViejo+' → '+folioNuevo);
+    });
+  });
+
+  // ── PASO 3: Verificar y corregir paths de R2 en documentos de pendientes ──
   var r2Corregidos = 0;
   if(typeof window.subirR2 === 'function' && window.SB_DESPACHO_ID && Array.isArray(D.pendientes)){
     for(var pi = 0; pi < D.pendientes.length; pi++){
@@ -22897,8 +22972,8 @@ async function adminCorregirLetrasMovimientos(silencioso){
     }
   }
 
-  // ── PASO 3: Guardar si hubo cambios ───────────────────────────
-  var totalCambios = corregidos + r2Corregidos;
+  // ── PASO 4: Guardar si hubo cambios ───────────────────────────
+  var totalCambios = corregidos + corregidosContab + r2Corregidos;
   if(totalCambios > 0){
     try {
       Object.keys(localStorage).filter(function(k){ return k.startsWith('lex_backup'); })
@@ -22911,9 +22986,9 @@ async function adminCorregirLetrasMovimientos(silencioso){
 
   if(!silencioso){
     if(totalCambios === 0) toast('No se encontraron problemas que corregir ✓');
-    else toast('✅ '+corregidos+' letra(s) + '+r2Corregidos+' doc(s) R2 corregidos');
+    else toast('✅ '+corregidos+' liq. + '+corregidosContab+' contab. + '+r2Corregidos+' R2 corregidos');
   } else if(totalCambios > 0){
-    console.log('[CorregirLetras+R2] Auto-corrección: '+corregidos+' letras, '+r2Corregidos+' docs R2');
+    console.log('[CorregirLetras+R2] Auto-corrección: '+corregidos+' liq., '+corregidosContab+' contab., '+r2Corregidos+' R2');
   }
 }
 

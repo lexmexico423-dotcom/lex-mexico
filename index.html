@@ -9417,8 +9417,15 @@ function abrirModoActualizacion(recibo){
   // Cargar todos los datos del recibo en el formulario
   cargarReciboEnFormulario(recibo);
 
-  // Asegurar que el folio mostrado sea el ORIGINAL con su letra de versión almacenada
-  document.getElementById('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, recibo.letra || 'A');
+  // Calcular la letra que se GENERARÁ al imprimir la actualización (misma lógica que _imprimirActualizacionReal)
+  const _letrasUsadasAct = (appData.recibos || [])
+    .filter(_r => _r.folio === recibo.folio && !_r.esComplemento)
+    .map(_r => (_r.letra || 'A').toUpperCase().charCodeAt(0));
+  const _letraBaseAct = (recibo.letra || 'A').toUpperCase().charCodeAt(0);
+  const _maxLetraAct  = _letrasUsadasAct.length > 0 ? Math.max(..._letrasUsadasAct) : _letraBaseAct;
+  const _letraProximaAct = String.fromCharCode(_maxLetraAct + 1);
+  // Mostrar desde el inicio el folio con la letra que se asignará al imprimir
+  document.getElementById('folio-display').textContent = folioConLetra(recibo.folio, recibo.anio_folio, _letraProximaAct);
 
   // Congelar el formulario (todos los campos originales bloqueados)
   document.body.classList.add('recibo-frozen');
@@ -9441,7 +9448,7 @@ function abrirModoActualizacion(recibo){
   pintarCostosExtra(recibo.costosExtra || []);
   pintarPagosParciales(recibo.pagosParciales || []);
 
-  setStatus('ok','Modo actualización: folio #'+folioConLetra(recibo.folio, recibo.anio_folio, recibo.letra || 'A')+' — agrega costos extra o pagos parciales','ok');
+  setStatus('ok','Modo actualización: folio #'+folioConLetra(recibo.folio, recibo.anio_folio, _letraProximaAct)+' — agrega costos extra o pagos parciales','ok');
 
   setTimeout(()=>{ document.getElementById('seccion-pagos-parciales').scrollIntoView({behavior:'smooth',block:'center'}); }, 200);
 }

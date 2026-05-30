@@ -16128,6 +16128,7 @@ function renderPend(){
         <div style="display:flex;gap:4px;">
           <button onclick="event.stopPropagation();_pendEstatus(${idx},this)" style="display:flex;align-items:center;gap:3px;background:transparent;border:1px solid #b5d4f4;border-radius:5px;padding:3px 7px;cursor:pointer;font-size:9.5px;color:#1a4a8a;transition:background 0.15s;" onmouseover="this.style.background='#e6f1fb'" onmouseout="this.style.background='transparent'" title="Cambiar estatus">🔄 Estatus</button>
           <button onclick="event.stopPropagation();abrirPendiente(${idx})" style="display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid var(--border-l,#d4b870);border-radius:5px;padding:3px 7px;cursor:pointer;font-size:9.5px;color:var(--muted);transition:all 0.15s;" onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'" onmouseout="this.style.borderColor='var(--border-l,#d4b870)';this.style.color='var(--muted)'" title="Editar">✏</button>
+          <button onclick="event.stopPropagation();eliminarPendienteDirecto(${idx})" style="display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid rgba(192,22,26,0.25);border-radius:5px;padding:3px 7px;cursor:pointer;font-size:9.5px;color:var(--rojo,#c0161a);transition:all 0.15s;" onmouseover="this.style.background='rgba(192,22,26,0.07)';this.style.borderColor='var(--rojo,#c0161a)'" onmouseout="this.style.background='transparent';this.style.borderColor='rgba(192,22,26,0.25)'" title="Eliminar pendiente">🗑</button>
         </div>
       </div>
     </div>`;
@@ -16408,7 +16409,27 @@ async function eliminarPend(){
   });
   if(!ok) return;
   D.pendientes.splice(eiP,1);
-  cerrar('mPendiente');save();renderPend();badges();syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); });toast('Pendiente eliminado');
+  cerrar('mPendiente');
+  renderPend();badges();
+  save();
+  toast('Pendiente eliminado ✓');
+}
+
+async function eliminarPendienteDirecto(idx){
+  const p = D.pendientes[idx];
+  if(!p) return;
+  const ok = await confirmarBonito({
+    titulo: 'Eliminar pendiente',
+    mensaje: '"'+(p.texto||'Pendiente sin texto')+'"\n\nEsta acción no se puede deshacer.\nSe eliminará definitivamente de Supabase.',
+    btnSi: 'Sí, eliminar',
+    btnNo: 'Cancelar',
+    peligro: true
+  });
+  if(!ok) return;
+  D.pendientes.splice(idx,1);
+  renderPend();badges();
+  save();
+  toast('Pendiente eliminado ✓');
 }
 
 // ═══════════════════════════════════════════════════════════════

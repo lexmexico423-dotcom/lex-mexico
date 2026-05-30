@@ -11083,32 +11083,33 @@ async function guardarRecibo(){
   const historialPagosRef = folioAntNum ? obtenerHistorialPagosAbono(folioAntNum) : [];
 
   // ── RESERVAR FOLIO ATÓMICO — lee Drive en este instante y lo incrementa ──
-  // Si es un abono en modo retroactivo, NO se reserva folio nuevo — se reutiliza
-  // el folio del recibo original con la siguiente letra (B, C, D…).
-  // Esto corrige el bug donde modo retroactivo + pago parcial generaba un folio A nuevo
-  // en lugar de reutilizar el folio original con letra B.
+  // Si hay un folio de referencia (_folioReferencia), es un abono sobre un recibo
+  // existente — tanto en modo normal como retroactivo.
+  // En ese caso NO se reserva folio nuevo: se reutiliza el folio original con la
+  // siguiente letra (A→B, B→C, etc.).
+  // Si no hay referencia, es un recibo nuevo y se reserva el siguiente folio.
   let folio;
-  const _esAbonoRetroactivo = !!(folioAntNum && window._reciboRetroactivoActivo);
-  if (_esAbonoRetroactivo) {
-    // Reutilizar el folio del recibo original — calcular siguiente letra
+  const _esAbono = !!(window._folioReferencia);
+  if (_esAbono) {
+    // Reutilizar el folio del recibo original — calcular siguiente letra disponible
     folio = folioAntNum;
-    const _letrasUsadasRetro = (appData.recibos || [])
+    const _letrasUsadas = (appData.recibos || [])
       .filter(_r => _r.folio === folioAntNum && !_r.esComplemento)
       .map(_r => (_r.letra || 'A').toUpperCase().charCodeAt(0));
-    const _maxLetraRetro = _letrasUsadasRetro.length > 0
-      ? Math.max(..._letrasUsadasRetro)
+    const _maxLetra = _letrasUsadas.length > 0
+      ? Math.max(..._letrasUsadas)
       : 'A'.charCodeAt(0);
-    const _letraNuevaRetro = String.fromCharCode(_maxLetraRetro + 1);
-    // Guardar la letra calculada para usarla al construir datos
-    window._letraAbonoRetroactivo = _letraNuevaRetro;
-    setStatus('loading', 'Preparando abono retroactivo folio #' + folioAntNum + _letraNuevaRetro + '...', 'loading');
+    const _letraNueva = String.fromCharCode(_maxLetra + 1);
+    window._letraAbonoRetroactivo = _letraNueva;
+    const _modoLabel = window._reciboRetroactivoActivo ? 'abono retroactivo' : 'abono';
+    setStatus('loading', 'Preparando ' + _modoLabel + ' — folio #' + folioAntNum + _letraNueva + '...', 'loading');
   } else {
-    // Folio nuevo normal
+    // Recibo nuevo — reservar folio único
     window._letraAbonoRetroactivo = null;
     setStatus('loading','Reservando folio único...','loading');
     folio = await reservarFolioEnDrive();
   }
-  // Actualizar el display con el folio (letra A si es nuevo, letra calculada si es abono retro)
+  // Actualizar el display con el folio y letra correctos
   const _letraDisplay = window._letraAbonoRetroactivo || 'A';
   $('folio-display').textContent = folioConLetra(folio, null, _letraDisplay);
 
@@ -11300,9 +11301,9 @@ async function guardarRecibo(){
       if(banner) banner.style.display='none';
     }
 
-    // Mostrar el folio del recibo impreso (no el siguiente)
-    $('folio-display').textContent = folioConLetra(folio, null, 'A');
-    setStatus('ok','Recibo #'+folioConLetra(folio, null, 'A')+' guardado — abriendo impresora...','ok');
+    // Mostrar el folio del recibo impreso con la letra correcta (A para nuevos, B/C/… para abonos)
+    $('folio-display').textContent = folioConLetra(folio, null, _letraGuardada);
+    setStatus('ok','Recibo #'+folioConLetra(folio, null, _letraGuardada)+' guardado — abriendo impresora...','ok');
 
     // Guardar blob para reimprimir sin cambiar folio
     lastPdfBlob = new Blob([doc.output('arraybuffer')], {type:'application/pdf'});
@@ -11330,6 +11331,7 @@ async function guardarRecibo(){
     const _saldoInicialGuardado = saldoPendiente;
     const _retroFechaGuardada   = window._reciboRetroactivoFechaPersonalizada || null;
     const _retroHoraGuardada    = window._reciboRetroactivoHoraPersonalizada  || null;
+    const _letraGuardada        = window._letraAbonoRetroactivo || 'A';
 
     setTimeout(() => {
       try {

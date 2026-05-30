@@ -19135,6 +19135,16 @@ async function generarPDFRecibo(datos, folio, qrDataURL) {
   doc.text('Firma del Cliente',W-mg-32,fY+4,{align:'center'});
   doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(140,101,24);
   doc.text('LEX-MEXICO Despacho Juridico · Santiago Juxtlahuaca, Oaxaca · Comprobante oficial de pago.', W/2, H-mg+2, {align:'center'});
+  // ── MARCA DE AGUA ──
+  var _sldWM = datos.saldo !== undefined ? parseFloat(datos.saldo||0)
+             : datos.saldoPendiente !== undefined ? parseFloat(datos.saldoPendiente||0)
+             : 999;
+  if (_sldWM <= 0 && parseFloat(datos.total||0) > 0) {
+    dibujarMarcaAgua(doc, 'PAGADO', [30, 140, 60]);
+  }
+  if (datos.cancelado) {
+    dibujarMarcaAgua(doc, 'CANCELADO', [120, 120, 120]);
+  }
   return doc.output('blob');
 }
 

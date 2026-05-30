@@ -7101,12 +7101,17 @@ async function sincronizarFolio(){
                            && _movsLocalSinSB.length === 0;
 
         // Para juicios: comparar por timestamp además de cantidad.
-        // Si los juicios locales tienen alguno más reciente que cualquier juicio en SB → conservar local.
-        const tsMaxLocal = Math.max(0, ...(D.juicios||[]).map(j => j.updatedAt || 0));
+        // D._juiciosModTs registra cuándo fue la última modificación local (incluyendo eliminaciones).
+        // Esto evita que SB restaure un juicio recién eliminado cuando su conteo (10) > local (9).
+        const tsMaxLocal = Math.max(
+          D._juiciosModTs || 0,
+          ...(D.juicios||[]).map(j => j.updatedAt || 0)
+        );
         const tsMaxSB    = Math.max(0, ...sbJuicios.map(j => j.updatedAt || 0));
-        const usarJuiciosSB = sbJuicios.length > juiciosActuales
-          || juiciosActuales === 0
-          || (sbJuicios.length >= juiciosActuales && tsMaxSB >= tsMaxLocal);
+        // Solo usar SB si: (a) no hay datos locales, O (b) SB tiene más Y no es más viejo que nuestra última modificación
+        const usarJuiciosSB = juiciosActuales === 0
+          || (sbJuicios.length > juiciosActuales && tsMaxSB >= tsMaxLocal)
+          || (sbJuicios.length >= juiciosActuales && tsMaxSB > tsMaxLocal);
 
         if (!usarMovsSB)    console.warn('[SB] Conservando movimientos locales — IDs sin SB:', _movsLocalSinSB.map(m=>m.id));
         if (!usarJuiciosSB) console.warn('[SB] Supabase juicios('+sbJuicios.length+') < memoria('+juiciosActuales+') — conservando memoria');
@@ -7123,8 +7128,10 @@ async function sincronizarFolio(){
           D.movimientos = usarMovsSB ? sbMovs : D.movimientos;
         }
         D.juicios        = usarJuiciosSB ? sbJuicios : D.juicios;
-        D.directorio     = data.data.directorio     || D.directorio  || [];
-        D.carpetas       = data.data.carpetas       || D.carpetas     || [];
+        if (usarJuiciosSB) D._juiciosModTs = data.data._juiciosModTs || 0;
+        D.gestiones      = data.data.gestiones      || D.gestiones    || [];
+        D.directorio     = data.data.directorio     || D.directorio   || [];
+        D.carpetas       = data.data.carpetas       || D.carpetas      || [];
         D.pendientes     = sbPends.length >= (D.pendientes||[]).length ? sbPends : D.pendientes;
         // Migrar pendientes legacy: marca/clase → vehMarca/vehClase
         (D.pendientes||[]).forEach(p=>{ if(p.seccion==='placas'){ if(!p.vehMarca&&p.marca) p.vehMarca=p.marca; if(!p.vehClase&&p.clase) p.vehClase=p.clase; } });
@@ -16011,7 +16018,9 @@ function actualizarBadgeArchivoDesdeRecibo(folioNum) {
 
 
 function saveJuicios(){
-  // Marcar timestamp ANTES de subir para que postgres_changes lo ignore
+  // Registrar timestamp de modificación local (cubre también eliminaciones)
+  // para que sincronizarFolio() no restaure datos viejos de Supabase.
+  D._juiciosModTs = Date.now();
   _ultimoSyncPropio = Date.now();
   syncEstadoSupabase().catch(function(e){ console.warn('[saveJuicios]', e); });
 }
@@ -18297,6 +18306,7 @@ async function syncEstadoSupabase(){
       directorio:            D.directorio            || [],
       carpetas:              D.carpetas              || [],
       juicios:               D.juicios               || [],
+      gestiones:             D.gestiones             || [],
       pendientes:            D.pendientes            || [],
       cierres:               D.cierres               || [],
       prestamos:             D.prestamos             || [],
@@ -18306,7 +18316,8 @@ async function syncEstadoSupabase(){
       captura_meses:         capturaMesCargar() || D.captura_meses || {},
       retro_global:          window._retroGlobalActivo !== undefined
                              ? { activo: !!window._retroGlobalActivo }
-                             : (D.retro_global || null)
+                             : (D.retro_global || null),
+      _juiciosModTs:         D._juiciosModTs         || 0
     };
 
     const recibos = {

@@ -25026,12 +25026,11 @@ function renderHistorial2026() {
     var esI = m.tipo === 'ingreso';
     var color = esI ? '#2a9a4a' : '#c0161a';
     var signo = esI ? '+' : '-';
-    // Agregar letra de versión al folio si el movimiento está vinculado a un recibo
-    var letra = 'A';
-    if (m.folio && typeof appData !== 'undefined') {
-      var rLet = (appData.recibos||[]).find(function(r){ return r.folio === m.folio; });
-      if (rLet) letra = letraVersion(rLet);
-    }
+    // ⚠️ CRÍTICO: usar m.letra (guardado en el movimiento) para distinguir A de B.
+    // NO buscar en appData.recibos porque .find() sin filtro de letra siempre devuelve
+    // el registro A (que ahora es el primero tras el fix unshift→push), haciendo que
+    // tanto el anticipo (6/ene) como la liquidación (19/ene) muestren la misma letra.
+    var letra = m.letra || 'A';
     // Inyectar letra en m.cat (e.g. "#26-001" → "#26-001A") para registros ya guardados
     var displayCat = (m.cat||'').replace(/(#\d{2}-\d{3,})(?![A-Z\d])/g, '$1' + letra);
     var folioDisplay = m.folio ? ' · Folio ' + folioConLetra(m.folio, m.anio_folio, letra) : '';

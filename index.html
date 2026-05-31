@@ -34717,6 +34717,112 @@ function repararFoliosDuplicados() {
     if(typeof toast === 'function') toast('🔧 ' + indicesAEliminar.length + ' recibo(s) duplicado(s) eliminado(s)', 'ok');
     console.log('[LEX] Reparación de folios completada: ' + indicesAEliminar.length + ' duplicado(s) eliminado(s).');
   }
+  // Después de limpiar duplicados, reparar folios huérfanos (B/C sin A padre)
+  repararFoliosHuerfanos();
+}
+
+// Detecta registros B/C/D cuyo número de folio no tiene versión A correspondiente.
+// Ocurre cuando la versión anterior de repararFoliosDuplicados renumeraba en vez de eliminar:
+// 26-001B se guardaba como 26-013B. Esta función lo devuelve a 26-001B buscando el A
+// por nombre + fecha (campos que B hereda de A vía Object.assign).
+function repararFoliosHuerfanos() {
+  if(!appData || !Array.isArray(appData.recibos)) return;
+  var recibos = appData.recibos;
+
+  var foliosConA = new Set(
+    recibos
+      .filter(function(r){ return r && !r.esComplemento && (r.letra||'A')==='A'; })
+      .map(function(r){ return Number(r.folio); })
+  );
+
+  var huerfanos = recibos.filter(function(r){
+    if(!r || r.esComplemento || r.cancelado) return false;
+    if((r.letra||'A')==='A') return false;
+    return !foliosConA.has(Number(r.folio));
+  });
+
+  if(!huerfanos.length) return;
+
+  var aRecords = recibos.filter(function(r){
+    return r && !r.esComplemento && !r.cancelado && (r.letra||'A')==='A';
+  });
+
+  var reparados = 0;
+  huerfanos.forEach(function(orphan){
+    var folioViejo   = Number(orphan.folio);
+    var letraOrphan  = orphan.letra || 'A';
+    var nombreOrphan = (orphan.nombre||'').trim();
+    var fechaOrphan  = (orphan.fecha || orphan.fecha_recibo || '').substring(0,10);
+
+    // B hereda nombre y fecha de A — buscar A con coincidencia exacta
+    var candidatos = aRecords.filter(function(a){
+      return (a.nombre||'').trim() === nombreOrphan &&
+             (a.fecha || a.fecha_recibo || '').substring(0,10) === fechaOrphan;
+    });
+
+    if(candidatos.length !== 1){
+      console.warn('[RepararHuerfanos] Sin coincidencia única para ' + folioViejo + letraOrphan +
+        ' (' + nombreOrphan + ', ' + fechaOrphan + '): ' + candidatos.length + ' candidatos');
+      return;
+    }
+
+    var padreA     = candidatos[0];
+    var folioNuevo = Number(padreA.folio);
+    if(folioNuevo === folioViejo) return;
+
+    // No reparar si el destino ya tiene esa letra (evita colisiones)
+    var yaExiste = recibos.some(function(r){
+      return !r.esComplemento && Number(r.folio)===folioNuevo && (r.letra||'A')===letraOrphan;
+    });
+    if(yaExiste){
+      console.warn('[RepararHuerfanos] Ya existe ' + folioNuevo + letraOrphan + ', se omite ' + folioViejo + letraOrphan);
+      return;
+    }
+
+    // Aplicar corrección
+    orphan.folio = folioNuevo;
+    if(!orphan.anio_folio && padreA.anio_folio) orphan.anio_folio = padreA.anio_folio;
+
+    // Actualizar nombre de archivo PDF
+    if(orphan.archivo && typeof folioConLetra === 'function'){
+      var vStr = folioConLetra(folioViejo, null, letraOrphan);
+      var nStr = folioConLetra(folioNuevo, orphan.anio_folio || null, letraOrphan);
+      orphan.archivo = orphan.archivo.replace(vStr, nStr);
+    }
+
+    // Actualizar movimientos de caja
+    if(typeof D !== 'undefined' && Array.isArray(D.movimientos)){
+      D.movimientos.forEach(function(m){
+        if(!m || m.fuente !== 'recibo') return;
+        if(Number(m.folio) === folioViejo && (m.letra||'A') === letraOrphan){
+          var vStr = typeof folioConLetra === 'function' ? folioConLetra(folioViejo, null, letraOrphan) : String(folioViejo)+letraOrphan;
+          var nStr = typeof folioConLetra === 'function' ? folioConLetra(folioNuevo, orphan.anio_folio||null, letraOrphan) : String(folioNuevo)+letraOrphan;
+          m.folio = folioNuevo;
+          if(m.cat)        m.cat        = m.cat.replace(vStr, nStr);
+          if(m.descripcion) m.descripcion = m.descripcion.replace(vStr, nStr);
+        }
+      });
+    }
+
+    // Sincronizar REC.recibos
+    if(typeof REC !== 'undefined' && Array.isArray(REC.recibos)){
+      REC.recibos.forEach(function(r){
+        if(r && Number(r.folio) === folioViejo && (r.letra||'A') === letraOrphan) r.folio = folioNuevo;
+      });
+    }
+
+    reparados++;
+    console.log('[RepararHuerfanos] ' + folioConLetra(folioViejo, null, letraOrphan) +
+      ' → ' + folioConLetra(folioNuevo, orphan.anio_folio||null, letraOrphan) +
+      ' (' + nombreOrphan + ')');
+  });
+
+  if(reparados > 0){
+    if(typeof save === 'function') save();
+    if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
+    if(typeof renderContab === 'function') renderContab();
+    if(typeof toast === 'function') toast('🔧 ' + reparados + ' folio(s) reasignados al padre correcto', 'ok');
+  }
 }
 
 // ══ FIN MÓDULO RECIBOS EN GESTIÓN ══════════════════════════════════════

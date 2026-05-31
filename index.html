@@ -342,6 +342,7 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
 .tag-a{background:var(--amarillo-l);color:var(--amarillo);}
 .tag-b{background:var(--azul-l);color:var(--azul);}
 .tag-m{background:#f0ead8;color:var(--muted);}
+.tag-sa{background:#f5f0e8;color:#9a6010;border:1px solid #d4a853;}
 
 /* ───────── TABLA ───────── */
 .tabla{width:100%;border-collapse:collapse;font-size:0.78rem;}
@@ -13118,18 +13119,21 @@ function _foliosYaEnCaja(movsCaja) {
 function _reciboAMovSintetico(r) {
   const anticipo     = parseFloat(r.anticipo || 0);
   const totalAbonado = parseFloat(r.totalAbonado || 0);
-  // Usar anticipo (pago registrado en ESTE folio) como monto del movimiento.
-  // totalAbonado es acumulado histórico — usarlo causaría doble conteo en folios de abono.
+  const totalRec     = parseFloat(r.total || 0);
+  // monto = solo lo que realmente se cobró en este folio.
+  // Si anticipo=0 y total>0 → el cliente no dejó nada → monto=$0 (Sin Anticipo).
+  // totalAbonado solo se usa si tampoco hay anticipo explícito, para folios de abono posteriores.
   const monto = anticipo > 0 ? anticipo : (totalAbonado > 0 ? totalAbonado : 0);
-  // Solo es "Liquidado" si hubo algún pago; sin anticipo/abono es "Pendiente" aunque saldoPendiente sea 0
   const liq   = r.saldoPendiente === 0 && (anticipo > 0 || totalAbonado > 0);
+  // "Sin Anticipo": recibo con total>0 pero sin pago inicial registrado
+  const sinAnticipo = monto === 0 && totalRec > 0;
   const fechaRec = (r.fecha && /^\d{4}-\d{2}-\d{2}/.test(r.fecha))
     ? r.fecha.substring(0, 10) : (r.fecha || '—');
-  // Determinar letra correcta del recibo para el enlace al PDF
   const _letraR = r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A';
   const _folioStr = typeof folioConLetra === 'function'
     ? folioConLetra(r.folio, r.anio_folio, _letraR)
     : String(r.folio).padStart(4,'0') + _letraR;
+  const _estatus = liq ? 'Liquidado' : (anticipo > 0 ? 'Anticipo' : (sinAnticipo ? 'Sin Anticipo' : 'Pendiente'));
   return {
     id:    'R-' + r.folio, folio: r.folio, nombre: r.nombre || '',
     fecha: fechaRec, hora: r.hora || r.hora_recibo || '00:00',
@@ -13138,11 +13142,11 @@ function _reciboAMovSintetico(r) {
       const desc = r.conceptos && r.conceptos[0] ? r.conceptos[0].descripcion || '' : '';
       return conc + (desc ? ' — ' + desc : '');
     })(),
-    monto, total: parseFloat(r.total || 0),
+    monto, total: totalRec,
     saldoPendiente: r.saldoPendiente || 0,
     tipo: 'ingreso',
-    estatus: liq ? 'Liquidado' : (anticipo > 0 ? 'Anticipo' : 'Pendiente'),
-    cat: (liq ? 'Liquidado' : (anticipo > 0 ? 'Anticipo' : 'Pendiente')) + ' · #' + _folioStr,
+    estatus: _estatus,
+    cat: _estatus + ' · #' + _folioStr,
     fuente: 'recibo',
     letra: _letraR,
     responsable: r.generadoPor || r.responsable || '—'
@@ -13156,7 +13160,7 @@ function getAllMovs() {
   const sinteticos = Object.values(_recibosMap())
     .filter(r => !excluidos.has(String(r.folio)) && !yaEnCaja.has(Number(r.folio)))
     .map(_reciboAMovSintetico)
-    .filter(m => m.monto > 0 || m.estatus === 'Pendiente');
+    .filter(m => m.monto > 0 || m.estatus === 'Pendiente' || m.estatus === 'Sin Anticipo');
   return _ordenarMovs([...movsCaja, ...sinteticos]);
 }
 
@@ -13481,11 +13485,13 @@ function renderContab() {
       'Anticipo':     'Pago Parcial',
       'Abono parcial':'Abonado',
       'Abono':        'Abonado',
-      'Pendiente':    'Pendiente'
+      'Pendiente':    'Pendiente',
+      'Sin Anticipo': 'Sin Anticipo'
     };
     const label = labelMap[est] || est || m.cat || '—';
-    const cls = est === 'Liquidado' ? 'tag-v' :
-                est === 'Anticipo'  ? 'tag-b' :
+    const cls = est === 'Liquidado'    ? 'tag-v' :
+                est === 'Anticipo'     ? 'tag-b' :
+                est === 'Sin Anticipo' ? 'tag-sa' :
                 (est === 'Abono parcial' || est === 'Abono') ? 'tag-a' :
                 'tag-m';
     return `<span class="tag ${cls}" style="font-size:0.54rem;">${esc(label)}</span>`;
@@ -19059,15 +19065,16 @@ async function guardarReciboInterno() {
     // ─────────────────────────────────────────────────────────────
 
     // ── REGISTRAR EN CAJA/CONTABILIDAD — siempre, incluso si monto=$0 ──────
-    // Los recibos de $0 se registran como "Pendiente" para servir de referencia
-    // cuando se realicen pagos parciales posteriores.
-    const _montoMov = datos.anticipo > 0 ? datos.anticipo : datos.total;
+    // Los recibos sin anticipo se registran como "Sin Anticipo" con monto $0.
+    // NO se usa datos.total para evitar registrar ingresos ficticios cuando
+    // el cliente no dejó ningún pago al momento de generar el recibo.
+    const _montoMov = datos.anticipo > 0 ? datos.anticipo : 0;
     if(typeof D !== 'undefined' && Array.isArray(D.movimientos)){
-      const _esLiq   = datos.anticipo >= datos.total && datos.total > 0;
-      const _esPend  = _montoMov === 0;
+      const _esLiq         = datos.anticipo >= datos.total && datos.total > 0;
+      const _esSinAnticipo = _montoMov === 0 && parseFloat(datos.total || 0) > 0;
       const _folioStr = folioFormato(folio);
-      const _estatusRec  = _esPend ? 'Pendiente' : (_esLiq ? 'Liquidado' : 'Anticipo');
-      const _descPrefix  = _esPend ? 'Pendiente — Recibo #' : (_esLiq ? 'Recibo #' : 'Anticipo — Recibo #');
+      const _estatusRec  = _esLiq ? 'Liquidado' : (_esSinAnticipo ? 'Sin Anticipo' : 'Anticipo');
+      const _descPrefix  = _esLiq ? 'Recibo #' : (_esSinAnticipo ? 'Sin Anticipo — Recibo #' : 'Anticipo — Recibo #');
       const mov = {
         id: 'M-REC-NEW-' + folio + '-' + Date.now(),
         folioCaja: typeof generarFolioMovCaja === 'function' ? generarFolioMovCaja() : '',

@@ -7331,21 +7331,35 @@ async function actualizarArchivoControl(){
   }
 }
 
+// Genera el nombre descriptivo para R2: Recibo_26-001A_NOMBRE_CLIENTE.pdf
+// Supabase Storage y los campos internos siguen usando el nombre corto (26-001A.pdf).
+function _nombreArchivoR2(folioStr, nombre) {
+  var sanitizado = (nombre || '')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, '')
+    .trim()
+    .replace(/\s+/g, '_');
+  return 'Recibo_' + folioStr + '_' + sanitizado + '.pdf';
+}
+
 // ── PARTE 2: SUBIR PDF A SUPABASE STORAGE ────────────────────────
-async function subirPDFaDrive(pdfBlob, nombreArchivo){
-  // Intentar subir a R2 primero
+// r2Nombre (opcional): nombre descriptivo solo para R2. Supabase usa siempre nombreArchivo.
+async function subirPDFaDrive(pdfBlob, nombreArchivo, r2Nombre){
+  // Intentar subir a R2 primero (con nombre descriptivo si se proporcionó)
   if(typeof window.subirR2 === 'function' && window.SB_DESPACHO_ID){
     try {
-      const path = window.SB_DESPACHO_ID + '/recibos/' + nombreArchivo;
-      const file = new File([pdfBlob], nombreArchivo, {type:'application/pdf'});
+      const r2n  = r2Nombre || nombreArchivo;
+      const path = window.SB_DESPACHO_ID + '/recibos/' + r2n;
+      const file = new File([pdfBlob], r2n, {type:'application/pdf'});
       const ok = await window.subirR2(file, path, 'recibos');
       if(ok){
-        console.log('✓ PDF guardado en R2:', nombreArchivo);
+        console.log('✓ PDF guardado en R2:', r2n);
         return true;
       }
     } catch(e){ console.warn('R2 upload falló, intentando Supabase:', e); }
   }
-  // Fallback a Supabase Storage
+  // Fallback a Supabase Storage (siempre con el nombre corto)
   if(!window.SB || !window.SB_DESPACHO_ID) return false;
   try {
     const path = window.SB_DESPACHO_ID + '/recibos/' + nombreArchivo;
@@ -8953,14 +8967,15 @@ async function activarModoConsulta(recibo){
     await mostrarBlobEnIframe(recibo.pdfBase64);
   } else if(recibo.archivo && window.SB_DESPACHO_ID){
     // Nueva sesión: buscar PDF en R2 y luego en Supabase Storage
-    const _path = window.SB_DESPACHO_ID + '/recibos/' + recibo.archivo;
+    const _pathSB = window.SB_DESPACHO_ID + '/recibos/' + recibo.archivo;
+    const _pathR2 = window.SB_DESPACHO_ID + '/recibos/' + (recibo.archivoR2 || recibo.archivo);
     let _cargado = false;
 
     // 1) Intentar R2
     if(!_cargado && typeof window.descargarR2 === 'function'){
       try {
         setStatus('loading','Cargando PDF…','loading');
-        const _blob = await window.descargarR2(_path, 'recibos');
+        const _blob = await window.descargarR2(_pathR2, 'recibos');
         if(_blob && _blob.size > 0){
           const _url = URL.createObjectURL(_blob);
           iframe._blobUrl = _url;
@@ -8979,7 +8994,7 @@ async function activarModoConsulta(recibo){
       try {
         setStatus('loading','Cargando PDF…','loading');
         const { data: _sd, error: _se } = await window.SB.storage
-          .from(STORAGE_BUCKET).createSignedUrl(_path, 120);
+          .from(STORAGE_BUCKET).createSignedUrl(_pathSB, 120);
         if(!_se && _sd && _sd.signedUrl){
           const _res = await fetch(_sd.signedUrl);
           if(_res.ok){
@@ -10025,9 +10040,10 @@ async function _imprimirActualizacionReal(){
     const qrDataURL = await qrToDataURL(qrTexto);
     const doc = await generarPDF(datos, recibo.folio, qrDataURL);
     const nombreArchivo = folioConLetra(recibo.folio, recibo.anio_folio, letraActual) + '.pdf';
+    const _r2NombreAct  = _nombreArchivoR2(folioConLetra(recibo.folio, recibo.anio_folio, letraActual), primerNombre);
 
     // Subir como archivo nuevo (no sobrescribir la versión anterior)
-    subirPDFaDrive(doc.output('blob'), nombreArchivo).catch(e=>console.warn('SB upload version:',e));
+    subirPDFaDrive(doc.output('blob'), nombreArchivo, _r2NombreAct).catch(e=>console.warn('SB upload version:',e));
 
     // Buscar el registro de la versión que se está actualizando (por folio + letra exacta)
     const letraOriginal = recibo.letra || letraVersion(recibo) || 'A';
@@ -10049,6 +10065,7 @@ async function _imprimirActualizacionReal(){
         totalAbonado:     totalAbonado,
         pdfBase64:        doc.output('datauristring'),
         archivo:          nombreArchivo,
+        archivoR2:        _r2NombreAct,
         letra:            letraActual,
         placasEntregadas: _placasCapturadas.placas,
         estadoPlacas:     _placasCapturadas.estado,
@@ -11161,10 +11178,11 @@ async function guardarRecibo(){
     const qrDataURL=await qrToDataURL(qrTexto);
     const doc=await generarPDF(datos,folio,qrDataURL);
     const nombreArchivo = folioConLetra(folio, appData.anioFolioActual || new Date().getFullYear(), 'A') + '.pdf';
+    const _r2NombreNuevo = _nombreArchivoR2(folioConLetra(folio, appData.anioFolioActual || new Date().getFullYear(), 'A'), primerNombre);
 
     setStatus('loading','Generando PDF · Folio #'+folioConLetra(folio, appData.anioFolioActual, 'A')+'...','loading');
     // Subir PDF a Supabase Storage
-    subirPDFaDrive(doc.output('blob'), nombreArchivo).catch(e=>console.warn('SB upload:',e));
+    subirPDFaDrive(doc.output('blob'), nombreArchivo, _r2NombreNuevo).catch(e=>console.warn('SB upload:',e));
     guardarEnDirectorio(datos).catch(e=>console.warn('Directorio:',e));
 
     // ── Guardar TODOS los campos necesarios para restaurar el formulario en modo actualización ──
@@ -11179,7 +11197,7 @@ async function guardarRecibo(){
     appData.recibos.unshift({
       folio, anio_folio: appData.anioFolioActual || new Date().getFullYear(),
       nombre:primerNombre, fecha:datos.fecha_recibo, hora:datos.hora_recibo,
-      archivo:nombreArchivo, saldoPendiente: _saldoNuevoDatos, pdfBase64:doc.output('datauristring'),
+      archivo:nombreArchivo, archivoR2:_r2NombreNuevo, saldoPendiente: _saldoNuevoDatos, pdfBase64:doc.output('datauristring'),
       folioAnterior: folioAntNum,
       anticipo: String(anticipo),
       totalAbonado: _totalAbonadoDatos,
@@ -11956,16 +11974,17 @@ async function reDescargar(i){
     const a=document.createElement('a'); a.href=r.pdfBase64; a.download=r.archivo||'recibo.pdf'; a.click(); return;
   }
   if(!r.archivo || !window.SB_DESPACHO_ID){ setStatus('err','No hay PDF disponible para este folio','err'); return; }
-  const _path = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
+  const _pathSBRD = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
+  const _pathR2RD = window.SB_DESPACHO_ID + '/recibos/' + (r.archivoR2 || r.archivo);
   let _blob = null;
   // Intentar R2
   if(typeof window.descargarR2 === 'function'){
-    try { const b = await window.descargarR2(_path,'recibos'); if(b&&b.size>0) _blob=b; } catch(e){ console.warn('[reDescargar] R2:',e); }
+    try { const b = await window.descargarR2(_pathR2RD,'recibos'); if(b&&b.size>0) _blob=b; } catch(e){ console.warn('[reDescargar] R2:',e); }
   }
   // Intentar Supabase Storage
   if(!_blob && window.SB){
     try {
-      const {data:sd,error:se}=await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_path,120);
+      const {data:sd,error:se}=await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_pathSBRD,120);
       if(!se&&sd&&sd.signedUrl){ const res=await fetch(sd.signedUrl); if(res.ok) _blob=await res.blob(); }
     } catch(e){ console.warn('[reDescargar] SB:',e); }
   }
@@ -18984,12 +19003,19 @@ async function guardarReciboInterno() {
     var qrDataURL = await getQRDataURL();
     var blob = await generarPDFRecibo(datos, folio, qrDataURL);
     lastPdfBlob = blob;
-    // ── Guardar PDF en R2 (fire-and-forget, no bloquea el flujo) ──
+    // ── Guardar PDF en R2 con nombre descriptivo ──
+    var _folioRIStr = typeof folioConLetra === 'function'
+      ? folioConLetra(folio, (typeof appData !== 'undefined' ? appData.anioFolioActual : null) || new Date().getFullYear(), 'A')
+      : String(folio);
+    var _r2NombreRI = typeof _nombreArchivoR2 === 'function'
+      ? _nombreArchivoR2(_folioRIStr, rClientes[0] ? rClientes[0].nombre : datos.nombre)
+      : _folioRIStr + '.pdf';
     if (typeof subirR2 === 'function' && window.SB_DESPACHO_ID) {
-      const r2Path = window.SB_DESPACHO_ID + '/recibos/' + folio + '.pdf';
-      subirR2(new File([blob], folio + '.pdf', {type:'application/pdf'}), r2Path, 'recibos')
+      const r2Path = window.SB_DESPACHO_ID + '/recibos/' + _r2NombreRI;
+      subirR2(new File([blob], _r2NombreRI, {type:'application/pdf'}), r2Path, 'recibos')
         .then(ok => { if(ok) console.log('PDF guardado en R2:', r2Path); });
     }
+    datos.archivoR2 = _r2NombreRI;
     if (!REC.recibos) REC.recibos = [];
     REC.recibos.unshift(datos);
     // ── Sincronizar con appData.recibos para que Contabilidad lo vea ──
@@ -22330,11 +22356,11 @@ async function abrirPreviaDesdeContab(numFolio, letra){
       return;
     }
 
-    // ── 2. Intentar R2 ──
-    if(window.SB_DESPACHO_ID && r.archivo && typeof window.descargarR2 === 'function'){
+    // ── 2. Intentar R2 (usa archivoR2 si existe, sino archivo) ──
+    if(window.SB_DESPACHO_ID && (r.archivoR2 || r.archivo) && typeof window.descargarR2 === 'function'){
       try{
         msg.textContent='Cargando PDF desde R2...';
-        const _r2Path = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
+        const _r2Path = window.SB_DESPACHO_ID + '/recibos/' + (r.archivoR2 || r.archivo);
         const _r2Blob = await window.descargarR2(_r2Path, 'recibos');
         if(_r2Blob && _r2Blob.size > 0){
           const _r2Url = URL.createObjectURL(_r2Blob);
@@ -25590,14 +25616,15 @@ async function verVistaPrevia(idx) {
   if(r.pdfBase64){ _mostrarEnIframe(r.pdfBase64); return; }
   if(!r.archivo || !window.SB_DESPACHO_ID){ setStatus('err','Sin PDF para este folio','err'); return; }
 
-  const _path = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
+  const _pathSBVP = window.SB_DESPACHO_ID + '/recibos/' + r.archivo;
+  const _pathR2VP = window.SB_DESPACHO_ID + '/recibos/' + (r.archivoR2 || r.archivo);
   let _blob = null;
   if(typeof window.descargarR2 === 'function'){
-    try { const b=await window.descargarR2(_path,'recibos'); if(b&&b.size>0) _blob=b; } catch(e){ console.warn('[verVistaPrevia] R2:',e); }
+    try { const b=await window.descargarR2(_pathR2VP,'recibos'); if(b&&b.size>0) _blob=b; } catch(e){ console.warn('[verVistaPrevia] R2:',e); }
   }
   if(!_blob && window.SB){
     try {
-      const {data:sd,error:se}=await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_path,120);
+      const {data:sd,error:se}=await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_pathSBVP,120);
       if(!se&&sd&&sd.signedUrl){ const res=await fetch(sd.signedUrl); if(res.ok) _blob=await res.blob(); }
     } catch(e){ console.warn('[verVistaPrevia] SB:',e); }
   }

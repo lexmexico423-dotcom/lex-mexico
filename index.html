@@ -20631,8 +20631,8 @@ async function abrirPreviaDesdeContab(numFolio, letra){
     : '<span style="background:rgba(40,180,80,0.15);color:#4dca6a;border:1px solid rgba(40,180,80,0.3);border-radius:4px;padding:2px 8px;font-family:JetBrains Mono,monospace;font-size:0.6rem;">&#10003; LIQUIDADO</span>';
   try{
     if(!r.clientes && !r.nombre){ msg.textContent='Sin datos suficientes para generar el PDF'; loading.style.display='none'; return; }
-    // ── 1. PDF original en sesión — mostrarlo directamente sin regenerar ──
-    if(r.pdfBase64){
+    // ── 1. PDF original en sesión — solo si es un PDF base64 válido ──
+    if(r.pdfBase64 && r.pdfBase64.startsWith('data:application/pdf')){
       embed.setAttribute('src', r.pdfBase64);
       loading.style.display='none';
       return;
@@ -20643,14 +20643,22 @@ async function abrirPreviaDesdeContab(numFolio, letra){
         msg.textContent='Cargando PDF desde R2...';
         const _r2Path = window.SB_DESPACHO_ID + '/recibos/' + (r.archivoR2 || r.archivo);
         const _r2Blob = await window.descargarR2(_r2Path, 'recibos');
-        if(_r2Blob && _r2Blob.size > 0){
-          const _r2Url = URL.createObjectURL(_r2Blob);
-          embed.setAttribute('src', _r2Url + '#toolbar=0&navpanes=0');
-          loading.style.display='none';
-          const _r2Rd = new FileReader();
-          _r2Rd.onload = () => { if(!r.pdfBase64) r.pdfBase64 = _r2Rd.result; };
-          _r2Rd.readAsDataURL(_r2Blob);
-          return;
+        // Validar que el blob es realmente un PDF (no una página de error HTML)
+        const _esR2Pdf = _r2Blob && _r2Blob.size > 100 &&
+          (_r2Blob.type.includes('pdf') || _r2Blob.type === 'application/octet-stream' || _r2Blob.type === '');
+        if(_esR2Pdf){
+          // Verificar los primeros bytes: todo PDF empieza con %PDF
+          const _arr = await _r2Blob.slice(0,4).arrayBuffer();
+          const _hdr = String.fromCharCode(...new Uint8Array(_arr));
+          if(_hdr === '%PDF'){
+            const _r2Url = URL.createObjectURL(_r2Blob);
+            embed.setAttribute('src', _r2Url + '#toolbar=0&navpanes=0');
+            loading.style.display='none';
+            const _r2Rd = new FileReader();
+            _r2Rd.onload = () => { if(!r.pdfBase64) r.pdfBase64 = _r2Rd.result; };
+            _r2Rd.readAsDataURL(_r2Blob);
+            return;
+          }
         }
       }catch(_eR2){ console.warn('[contabPDF] R2:', _eR2); }
     }
@@ -20665,14 +20673,18 @@ async function abrirPreviaDesdeContab(numFolio, letra){
           const _res = await fetch(_sd.signedUrl);
           if(_res.ok){
             const _blob = await _res.blob();
-            const _url  = URL.createObjectURL(_blob);
-            embed.setAttribute('src', _url + '#toolbar=0&navpanes=0');
-            loading.style.display='none';
-            // Cachear en sesión sin sobrescribir el original
-            const _rd = new FileReader();
-            _rd.onload = () => { if(!r.pdfBase64) r.pdfBase64 = _rd.result; };
-            _rd.readAsDataURL(_blob);
-            return;
+            // Verificar los primeros bytes: todo PDF empieza con %PDF
+            const _arrSB = await _blob.slice(0,4).arrayBuffer();
+            const _hdrSB = String.fromCharCode(...new Uint8Array(_arrSB));
+            if(_hdrSB === '%PDF'){
+              const _url  = URL.createObjectURL(_blob);
+              embed.setAttribute('src', _url + '#toolbar=0&navpanes=0');
+              loading.style.display='none';
+              const _rd = new FileReader();
+              _rd.onload = () => { if(!r.pdfBase64) r.pdfBase64 = _rd.result; };
+              _rd.readAsDataURL(_blob);
+              return;
+            }
           }
         }
       }catch(_eSB){ console.warn('[contabPDF] Storage:', _eSB); }

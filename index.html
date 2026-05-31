@@ -13475,8 +13475,20 @@ function renderContab() {
   function _badgeEstatus(m) {
     const est = m.estatus || (m.monto === 0 ? 'Pendiente' : null);
     if (!est && !m.cat) return '<span class="tag tag-m" style="font-size:0.54rem;">—</span>';
-    const cls = est === 'Liquidado' ? 'tag-v' : est === 'Anticipo' ? 'tag-b' : est === 'Abono parcial' ? 'tag-a' : 'tag-m';
-    return `<span class="tag ${cls}" style="font-size:0.54rem;">${esc(est || m.cat || '—')}</span>`;
+    // Etiquetas visibles al usuario — los valores internos no cambian
+    const labelMap = {
+      'Liquidado':    'Pago Total',
+      'Anticipo':     'Pago Parcial',
+      'Abono parcial':'Abonado',
+      'Abono':        'Abonado',
+      'Pendiente':    'Pendiente'
+    };
+    const label = labelMap[est] || est || m.cat || '—';
+    const cls = est === 'Liquidado' ? 'tag-v' :
+                est === 'Anticipo'  ? 'tag-b' :
+                (est === 'Abono parcial' || est === 'Abono') ? 'tag-a' :
+                'tag-m';
+    return `<span class="tag ${cls}" style="font-size:0.54rem;">${esc(label)}</span>`;
   }
 
   function _fila(m, bgBody) {
@@ -19046,24 +19058,28 @@ async function guardarReciboInterno() {
     setTimeout(()=>syncEstadoSupabaseDebounced(),300);
     // ─────────────────────────────────────────────────────────────
 
-    // ── REGISTRAR INGRESO EN CAJA/CONTABILIDAD ───────────────────────
-    // Registra si hay anticipo > 0 O si el total fue pagado al 100% (liquidado).
+    // ── REGISTRAR EN CAJA/CONTABILIDAD — siempre, incluso si monto=$0 ──────
+    // Los recibos de $0 se registran como "Pendiente" para servir de referencia
+    // cuando se realicen pagos parciales posteriores.
     const _montoMov = datos.anticipo > 0 ? datos.anticipo : datos.total;
-    if(typeof D !== 'undefined' && Array.isArray(D.movimientos) && _montoMov > 0){
-      const _esLiq = datos.anticipo >= datos.total && datos.total > 0;
+    if(typeof D !== 'undefined' && Array.isArray(D.movimientos)){
+      const _esLiq   = datos.anticipo >= datos.total && datos.total > 0;
+      const _esPend  = _montoMov === 0;
       const _folioStr = folioFormato(folio);
+      const _estatusRec  = _esPend ? 'Pendiente' : (_esLiq ? 'Liquidado' : 'Anticipo');
+      const _descPrefix  = _esPend ? 'Pendiente — Recibo #' : (_esLiq ? 'Recibo #' : 'Anticipo — Recibo #');
       const mov = {
         id: 'M-REC-NEW-' + folio + '-' + Date.now(),
         folioCaja: typeof generarFolioMovCaja === 'function' ? generarFolioMovCaja() : '',
         fecha: datos.fecha || (typeof hoy === 'function' ? hoy() : new Date().toISOString().split('T')[0]),
         hora: datos.hora || (typeof hora === 'function' ? hora() : ''),
-        descripcion: (_esLiq ? 'Recibo #' : 'Anticipo — Recibo #') + _folioStr + ' · ' + datos.nombre + (datos.conceptos&&datos.conceptos[0] ? ' · ' + (datos.conceptos[0].concepto||'') : ''),
+        descripcion: _descPrefix + _folioStr + ' · ' + datos.nombre + (datos.conceptos&&datos.conceptos[0] ? ' · ' + (datos.conceptos[0].concepto||'') : ''),
         nombre: datos.nombre,
         folio: folio,
         monto: _montoMov,
         tipo: 'ingreso',
-        cat: (_esLiq ? 'Liquidado · #' : 'Anticipo · #') + _folioStr,
-        estatus: _esLiq ? 'Liquidado' : 'Anticipo',
+        cat: _estatusRec + ' · #' + _folioStr,
+        estatus: _estatusRec,
         fuente: 'recibo',
         letra: 'A', /* ⚠️ CRÍTICO — NO QUITAR: sin esta línea, _fila() toma la letra de la versión más reciente */
         responsable: datos.generadoPor || (typeof empNombre === 'function' ? empNombre() : '')

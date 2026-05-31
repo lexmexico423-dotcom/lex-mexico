@@ -16076,6 +16076,12 @@ function renderPend(){
     if(filtroP==='vencidos')return!p.resuelto&&p.fechaLimite&&p.fechaLimite<hoy2;
     return true;
   }).filter(p=>!q||(p.texto||'').toLowerCase().includes(q)||(p.obs||'').toLowerCase().includes(q)||(p.carpeta||'').includes(q));
+  // Ordenar: más reciente arriba, más antiguo abajo
+  l.sort(function(a, b) {
+    const fa = (a.fechaCreacion || '0000-00-00') + 'T' + (a.horaCreacion || '00:00');
+    const fb = (b.fechaCreacion || '0000-00-00') + 'T' + (b.horaCreacion || '00:00');
+    return fb.localeCompare(fa);
+  });
   const el=$('listaPend');
   if(!l.length){
     const msgSec = filtroSeccion!=='todas' ? ' en la sección "'+filtroSeccion.charAt(0).toUpperCase()+filtroSeccion.slice(1)+'"' : '';
@@ -34535,6 +34541,28 @@ function sincronizarPendientesPlacas() {
     reemplacamiento: 'Reemplacamiento'
   };
 
+  // ── Paso 1: auto-resolver pendientes cuyo recibo ya fue liquidado ──────────
+  let resueltos = 0;
+  D.pendientes.forEach(function(p) {
+    if (p.resuelto || p.seccion !== 'placas' || !p.reciboVinculadoFolio) return;
+    // Buscar el recibo más reciente (mayor letra) para este folio
+    const recibosDelFolio = appData.recibos.filter(function(r) {
+      return r && !r.esComplemento && Number(r.folio) === Number(p.reciboVinculadoFolio);
+    });
+    if (!recibosDelFolio.length) return; // recibo no encontrado, no tocar
+    // Revisar si ALGUNA versión del folio tiene saldo pendiente
+    const hayPendiente = recibosDelFolio.some(function(r) {
+      return parseFloat(r.saldoPendiente) > 0;
+    });
+    if (!hayPendiente) {
+      // Todas las versiones liquidadas — marcar pendiente como resuelto
+      p.resuelto = true;
+      p.fechaResolucion = (typeof hoy === 'function' ? hoy() : new Date().toISOString().split('T')[0]);
+      resueltos++;
+      console.log('[LEX] Pendiente de placas auto-resuelto — folio #' + p.reciboVinculadoFolio + ' liquidado');
+    }
+  });
+
   let creados = 0;
   appData.recibos.forEach(function(r) {
     if (!r || r.cancelado || r.esComplemento) return;
@@ -34593,12 +34621,13 @@ function sincronizarPendientesPlacas() {
     console.log('[LEX] Pendiente de placas creado automáticamente para recibo #' + folio);
   });
 
-  if (creados > 0) {
+  if (creados > 0 || resueltos > 0) {
     if (typeof save === 'function') save();
     if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
     if (typeof renderPend === 'function') renderPend();
     if (typeof badges === 'function') badges();
-    console.log('[LEX] sincronizarPendientesPlacas: ' + creados + ' pendiente(s) creado(s).');
+    if (creados > 0)   console.log('[LEX] sincronizarPendientesPlacas: ' + creados + ' pendiente(s) creado(s).');
+    if (resueltos > 0) console.log('[LEX] sincronizarPendientesPlacas: ' + resueltos + ' pendiente(s) auto-resuelto(s) por liquidación.');
   }
 }
 

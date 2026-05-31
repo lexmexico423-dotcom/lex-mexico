@@ -19335,6 +19335,20 @@ function _folioSiguienteUnico(folioBase) {
   return f;
 }
 
+// Devuelve el primer número de folio libre (≥1). Úsalo para recalcular folioActual
+// después de eliminar un recibo o al activar el modo "llenar huecos".
+function _recalcularFolioActual() {
+  var usados = new Set(
+    ((appData && appData.recibos) ? appData.recibos : [])
+      .concat((typeof REC !== 'undefined' && REC.recibos) ? REC.recibos : [])
+      .filter(function(r){ return r && r.folio; })
+      .map(function(r){ return Number(r.folio); })
+  );
+  var f = 1;
+  while (usados.has(f)) f++;
+  return f;
+}
+
 // ── Lock de folio: evita que dos generaciones simultáneas tomen el mismo ──
 let _folioEnUso = false;
 async function _tomarFolioSeguro() {
@@ -23949,9 +23963,10 @@ async function adminReordenarFolios() {
               '(siguen accesibles por el nombre antiguo como fallback). Los PDFs en R2 se renombrarán al próximo guardado desde el modo edición.' +
             '</div>' +
           '</div>' +
-          '<div style="padding:0 22px 18px;display:flex;gap:10px;justify-content:flex-end;">' +
+          '<div style="padding:0 22px 18px;display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">' +
             '<button onclick="document.getElementById(\'modal-reordenar-folios\').remove()" style="padding:8px 20px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.15);background:none;color:var(--muted);font-family:monospace;font-size:0.72rem;cursor:pointer;">Cancelar</button>' +
-            '<button id="btn-confirmar-reordenar" onclick="adminConfirmarReordenarFolios()" style="padding:8px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#7a30c0,#4a1880);color:#fff;font-family:monospace;font-size:0.72rem;font-weight:700;cursor:pointer;letter-spacing:0.05em;">🔢 Compactar y Guardar</button>' +
+            '<button onclick="adminUsarSiguienteHueco()" style="padding:8px 22px;border-radius:8px;border:1.5px solid rgba(42,180,130,0.5);background:rgba(42,180,130,0.12);color:#90ffd8;font-family:monospace;font-size:0.72rem;font-weight:700;cursor:pointer;letter-spacing:0.05em;" title="No renumera nada — solo apunta el contador al primer número libre para que los nuevos recibos llenen los huecos">▶ Usar siguiente hueco</button>' +
+            '<button id="btn-confirmar-reordenar" onclick="adminConfirmarReordenarFolios()" style="padding:8px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#7a30c0,#4a1880);color:#fff;font-family:monospace;font-size:0.72rem;font-weight:700;cursor:pointer;letter-spacing:0.05em;">🔢 Compactar todo</button>' +
           '</div>'
       ) +
     '</div>';
@@ -23991,6 +24006,26 @@ async function adminConfirmarReordenarFolios() {
 
   window._reordenarFoliosMapa     = null;
   window._reordenarFoliosNuevoMax = null;
+  document.getElementById('modal-reordenar-folios')?.remove();
+}
+
+// Apunta folioActual al primer hueco disponible sin renumerar nada.
+// Los nuevos recibos irán llenando huecos de forma natural.
+async function adminUsarSiguienteHueco() {
+  var siguiente = _recalcularFolioActual();
+  var anio = (typeof appData !== 'undefined' && appData.anioFolioActual) || new Date().getFullYear();
+  var folioStr = typeof folioConLetra === 'function' ? folioConLetra(siguiente, anio, 'A') : String(siguiente);
+
+  appData.folioActual = siguiente;
+  if (typeof REC !== 'undefined') REC.folioActual = siguiente;
+  if (typeof actualizarFolioDisplay === 'function') actualizarFolioDisplay();
+  _ultimoSyncPropio = Date.now();
+  try {
+    await guardarFolioEnDrive(siguiente);
+  } catch(e) {
+    console.warn('[UsarSiguienteHueco] guardarFolioEnDrive:', e);
+  }
+  if (typeof toast === 'function') toast('▶ Siguiente folio: ' + folioStr + ' — los nuevos recibos llenarán los huecos', 'ok');
   document.getElementById('modal-reordenar-folios')?.remove();
 }
 
@@ -24288,9 +24323,10 @@ async function adminEliminarRecibo(idx) {
   // 1. Eliminar recibo del array (solo el específico por índice)
   recibos.splice(idx, 1);
 
-  // 2. Restaurar folio solo si es primario, el más reciente, y no quedan otras versiones
-  if (esPrimario && !hayOtras && (typeof appData !== 'undefined') && (r.folio >= (appData.folioActual - 1))) {
-    appData.folioActual = r.folio;
+  // 2. Recalcular folioActual al primer hueco disponible (incluye el hueco que dejó este recibo)
+  if (!hayOtras && typeof appData !== 'undefined') {
+    appData.folioActual = _recalcularFolioActual();
+    if (typeof REC !== 'undefined') REC.folioActual = appData.folioActual;
     if (typeof actualizarFolioDisplay === 'function') actualizarFolioDisplay();
   }
 

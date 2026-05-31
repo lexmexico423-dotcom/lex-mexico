@@ -22420,49 +22420,144 @@ async function abrirPreviaDesdeContab(numFolio, letra){
       }catch(_eSB){ console.warn('[contabPDF] Storage:', _eSB); }
     }
 
-    // ── 4. Último recurso: regenerar sobre COPIA — NUNCA mutar el recibo original ──
-    msg.textContent='Generando PDF...';
-    const _rC = Object.assign({}, r);
-    (function _calcSaldos(rec){
-      const t  = parseFloat(rec.total)||0;
-      const a  = parseFloat(rec.anticipo)||0;
-      const sp = (rec.pagosParciales||[]).reduce((s,p)=>s+(parseFloat(p.cantidad)||0),0);
-      const ab = Number(rec.totalAbonado)||0;
-      const pagado = sp > 0 ? Math.min(sp,t) : (ab > 0 ? Math.min(ab,t) : Math.min(a,t));
-      rec.totalAbonado   = pagado;
-      rec.saldoNuevo     = Math.max(0, t - pagado);
-      rec.saldoPendiente = rec.saldoNuevo;
-    })(_rC);
-
-    const datos = {
-      folio: _rC.folio,
-      clientes: _rC.clientes||[{nombre:_rC.nombre||'',movil:'',tel:'',domicilio:''}],
-      conceptos: _rC.conceptos||[], tipoTramite: _rC.tipoTramite||'normal',
-      fecha_recibo: _rC.fecha_recibo||_rC.fecha, hora_recibo: _rC.hora_recibo||_rC.hora,
-      anticipo: _rC.anticipo||'0', responsable: _rC.responsable||'',
-      nombre_cliente_firma: _rC.nombre_cliente_firma||_rC.nombre||'',
-      tramites: _rC.tramites||'', clase:_rC.clase||'', marca:_rC.marca||'',
-      serie:_rC.serie||'', motor:_rC.motor||'', anio:_rC.anio||'', puertas:_rC.puertas||'',
-      color_veh:_rC.color_veh||'', transmision:_rC.transmision||'',
-      cilindros:_rC.cilindros||'', placa:_rC.placa||'',
-      ultima_tenencia:_rC.ultima_tenencia||'', origen:_rC.origen||'', combustible:_rC.combustible||'',
-      copias:_rC.copias||[], costosExtra:_rC.costosExtra||[],
-      pagosParciales:_rC.pagosParciales||[], fechasImpresion:_rC.fechasImpresion||[],
-      totalGeneral: _rC.total||0,
-      totalAbonado: _rC.totalAbonado,
-      saldoNuevo:   _rC.saldoNuevo
-    };
-
-    const qrTexto='LEX-MEXICO|Folio:'+folioFormato(_rC.folio,_rC.anio_folio)+'|'+(_rC.nombre||'')+'|'+(datos.fecha_recibo||'')+' '+(datos.hora_recibo||'');
-    const qrDataURL=await qrToDataURL(qrTexto);
-    const doc=await generarPDF(datos,_rC.folio,qrDataURL);
-    const pdfUri=doc.output('datauristring');
-    if(!r.pdfBase64) r.pdfBase64 = pdfUri; // cachear solo si no había original
-    embed.setAttribute('src',pdfUri);
-    loading.style.display='none';
+    // ── 4. PDF no encontrado — mostrar formulario de confirmación ──
+    // Para B/C/D: pre-rellenar desde la letra inmediatamente anterior.
+    // Para A: usar los datos del propio recibo.
+    const _letraActual = (r.letra || letraVersion(r) || 'A').toUpperCase();
+    const _letraCode   = _letraActual.charCodeAt(0);
+    const _letraPrevia = _letraCode > 65 ? String.fromCharCode(_letraCode - 1) : null;
+    const _fuente = _letraPrevia
+      ? (recibos.find(x =>
+          (x.folio === r.folio || x.folio === parseInt(r.folio)) &&
+          !x.esComplemento &&
+          (x.letra || letraVersion(x) || 'A').toUpperCase() === _letraPrevia
+        ) || r)
+      : r;
+    _cpdfMostrarFormGenerar(r, _fuente, embed, loading);
   }catch(e){
     msg.textContent='Error: '+e.message;
     console.error('contabPDF:',e);
+  }
+}
+
+// Muestra el formulario de confirmación dentro del overlay de contabilidad.
+// r = recibo a generar; fuente = recibo del que se toman los datos base.
+function _cpdfMostrarFormGenerar(r, fuente, embed, loading) {
+  var letraActual = (r.letra || letraVersion(r) || 'A').toUpperCase();
+  var letraPrevia = fuente !== r ? (fuente.letra || letraVersion(fuente) || 'A').toUpperCase() : null;
+  var folioStr    = typeof folioConLetra === 'function'
+    ? folioConLetra(r.folio, r.anio_folio, letraActual) : r.folio + letraActual;
+  var fuenteStr   = letraPrevia && typeof folioConLetra === 'function'
+    ? folioConLetra(fuente.folio, fuente.anio_folio, letraPrevia) : null;
+
+  var nombre    = fuente.nombre || (fuente.clientes && fuente.clientes[0] ? fuente.clientes[0].nombre : '') || '—';
+  var concepto0 = fuente.conceptos && fuente.conceptos[0] ? (fuente.conceptos[0].concepto||'') : (fuente.tramites||'—');
+  var totalTxt  = '$' + (typeof fmt === 'function' ? fmt(parseFloat(fuente.total||0)) : parseFloat(fuente.total||0).toFixed(2));
+  var antTxt    = '$' + (typeof fmt === 'function' ? fmt(parseFloat(fuente.anticipo||0)) : parseFloat(fuente.anticipo||0).toFixed(2));
+
+  var fechaDef  = r.fecha_recibo || r.fecha || (typeof hoy === 'function' ? hoy() : new Date().toISOString().slice(0,10));
+  var horaDef   = r.hora_recibo  || r.hora  || (typeof horaCDMX_HHMM === 'function' ? horaCDMX_HHMM() : '00:00');
+
+  // Guardar referencias para cpdfConfirmarGenerar()
+  window._cpdfPendienteRecibo = r;
+  window._cpdfPendienteFuente = fuente;
+  window._cpdfPendienteEmbed  = embed;
+  window._cpdfPendienteLoading = loading;
+
+  loading.innerHTML =
+    '<div style="background:#1a1510;border:1.5px solid rgba(200,149,42,0.4);border-radius:14px;padding:22px 24px;max-width:420px;width:90%;display:flex;flex-direction:column;gap:14px;">' +
+      '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<span style="font-size:1.4rem;">📄</span>' +
+        '<div>' +
+          '<div style="font-family:monospace;font-size:0.8rem;font-weight:700;color:var(--gold-d);">Generar PDF · #' + (typeof esc === 'function' ? esc(folioStr) : folioStr) + '</div>' +
+          (fuenteStr
+            ? '<div style="font-family:monospace;font-size:0.58rem;color:rgba(200,149,42,0.55);margin-top:2px;">Pre-rellenado desde #' + (typeof esc === 'function' ? esc(fuenteStr) : fuenteStr) + '</div>'
+            : '') +
+        '</div>' +
+      '</div>' +
+      '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;">' +
+        '<div style="font-size:0.72rem;font-weight:600;color:var(--gold-l);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (typeof esc === 'function' ? esc(nombre) : nombre) + '</div>' +
+        '<div style="font-size:0.62rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (typeof esc === 'function' ? esc(concepto0) : concepto0) + '</div>' +
+        '<div style="font-size:0.6rem;color:var(--muted);">Total: <strong style="color:var(--gold-l);">' + totalTxt + '</strong> · Anticipo: <strong>' + antTxt + '</strong></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '<div>' +
+          '<label style="font-family:monospace;font-size:0.58rem;color:var(--muted);display:block;margin-bottom:3px;">FECHA</label>' +
+          '<input id="cpdf-gen-fecha" type="date" value="' + fechaDef + '" style="width:100%;box-sizing:border-box;background:#0f0b06;border:1px solid rgba(200,149,42,0.4);color:var(--gold-l);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:0.72rem;">' +
+        '</div>' +
+        '<div>' +
+          '<label style="font-family:monospace;font-size:0.58rem;color:var(--muted);display:block;margin-bottom:3px;">HORA</label>' +
+          '<input id="cpdf-gen-hora" type="time" value="' + horaDef + '" style="width:100%;box-sizing:border-box;background:#0f0b06;border:1px solid rgba(200,149,42,0.4);color:var(--gold-l);border-radius:6px;padding:6px 8px;font-family:monospace;font-size:0.72rem;">' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button onclick="cerrarContabPDF()" style="padding:7px 16px;border-radius:7px;border:1px solid rgba(255,255,255,0.15);background:none;color:var(--muted);font-family:monospace;font-size:0.68rem;cursor:pointer;">Cancelar</button>' +
+        '<button onclick="cpdfConfirmarGenerar()" id="btn-cpdf-confirmar" style="padding:7px 18px;border-radius:7px;border:none;background:linear-gradient(135deg,#c8952a,#8a5a10);color:#fff;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">📄 Generar PDF</button>' +
+      '</div>' +
+    '</div>';
+  loading.style.display = 'flex';
+}
+
+async function cpdfConfirmarGenerar() {
+  var btn     = document.getElementById('btn-cpdf-confirmar');
+  var r       = window._cpdfPendienteRecibo;
+  var fuente  = window._cpdfPendienteFuente;
+  var embed   = window._cpdfPendienteEmbed;
+  var loading = window._cpdfPendienteLoading;
+  if (!r || !fuente) return;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Generando...'; }
+
+  var fecha = (document.getElementById('cpdf-gen-fecha') || {}).value || (r.fecha_recibo || r.fecha);
+  var hora  = (document.getElementById('cpdf-gen-hora')  || {}).value || (r.hora_recibo  || r.hora);
+
+  try {
+    // Calcular saldos sobre la fuente
+    var _s = Object.assign({}, fuente);
+    var t  = parseFloat(_s.total)||0;
+    var a  = parseFloat(_s.anticipo)||0;
+    var sp = (_s.pagosParciales||[]).reduce(function(s,p){ return s+(parseFloat(p.cantidad)||0); }, 0);
+    var ab = Number(_s.totalAbonado)||0;
+    var pagado = sp > 0 ? Math.min(sp,t) : (ab > 0 ? Math.min(ab,t) : Math.min(a,t));
+    _s.totalAbonado   = pagado;
+    _s.saldoNuevo     = Math.max(0, t - pagado);
+    _s.saldoPendiente = _s.saldoNuevo;
+
+    var datos = {
+      folio: r.folio,
+      clientes: _s.clientes || [{nombre: _s.nombre||'', movil:'', tel:'', domicilio:''}],
+      conceptos: _s.conceptos||[], tipoTramite: _s.tipoTramite||'normal',
+      fecha_recibo: fecha, hora_recibo: hora,
+      anticipo: _s.anticipo||'0', responsable: _s.responsable||'',
+      nombre_cliente_firma: _s.nombre_cliente_firma||_s.nombre||'',
+      tramites: _s.tramites||'', clase:_s.clase||'', marca:_s.marca||'',
+      serie:_s.serie||'', motor:_s.motor||'', anio:_s.anio||'', puertas:_s.puertas||'',
+      color_veh:_s.color_veh||'', transmision:_s.transmision||'',
+      cilindros:_s.cilindros||'', placa:_s.placa||'',
+      ultima_tenencia:_s.ultima_tenencia||'', origen:_s.origen||'', combustible:_s.combustible||'',
+      copias:_s.copias||[], costosExtra: r.costosExtra||_s.costosExtra||[],
+      pagosParciales: r.pagosParciales||_s.pagosParciales||[],
+      fechasImpresion: r.fechasImpresion||_s.fechasImpresion||[],
+      totalGeneral: t, totalAbonado: _s.totalAbonado, saldoNuevo: _s.saldoNuevo,
+      letra: (r.letra || letraVersion(r) || 'A')
+    };
+
+    var qrTexto = 'LEX-MEXICO|Folio:' + folioFormato(r.folio, r.anio_folio) + '|' + (_s.nombre||'') + '|' + fecha + ' ' + hora;
+    var qrDataURL = await qrToDataURL(qrTexto);
+    var doc = await generarPDF(datos, r.folio, qrDataURL);
+    var pdfUri = doc.output('datauristring');
+    if (!r.pdfBase64) r.pdfBase64 = pdfUri;
+    embed.setAttribute('src', pdfUri);
+    if (loading) loading.style.display = 'none';
+
+    // Limpiar estado pendiente
+    window._cpdfPendienteRecibo  = null;
+    window._cpdfPendienteFuente  = null;
+    window._cpdfPendienteEmbed   = null;
+    window._cpdfPendienteLoading = null;
+  } catch(e) {
+    if (btn) { btn.disabled = false; btn.textContent = '📄 Generar PDF'; }
+    if (typeof toast === 'function') toast('Error al generar: ' + e.message, 'err');
+    console.error('[cpdfConfirmarGenerar]', e);
   }
 }
 

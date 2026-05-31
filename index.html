@@ -22347,10 +22347,17 @@ async function abrirPreviaDesdeContab(numFolio, letra){
   const nombreEl= document.getElementById('cpdf-nombre');
   const estadoEl= document.getElementById('cpdf-estado');
 
-  // Buscar la versión exacta (letra A, B, C…) para mostrar su PDF propio
-  const recibos = (typeof appData!=='undefined'&&appData.recibos)?appData.recibos:(REC.recibos||[]);
+  // Buscar la versión exacta (letra A, B, C…) combinando ambas fuentes
+  const _arr1 = (typeof appData!=='undefined' && appData.recibos) ? appData.recibos : [];
+  const _arr2 = (typeof REC!=='undefined' && REC.recibos) ? REC.recibos : [];
+  const recibos = _arr1.length ? _arr1 : _arr2; // para uso posterior en fuente de datos
+  const _todosRecibos = [...new Map(
+    [..._arr1, ..._arr2]
+      .filter(x => x && x.folio != null)
+      .map(x => [x.folio + '|' + (x.letra || letraVersion(x) || 'A'), x])
+  ).values()];
   const letraBuscar = letra || 'A';
-  const r = recibos.find(x=>
+  const r = _todosRecibos.find(x=>
     (x.folio===numFolio||x.folio===parseInt(numFolio)) &&
     !x.esComplemento &&
     (x.letra || letraVersion(x) || 'A') === letraBuscar
@@ -22427,7 +22434,7 @@ async function abrirPreviaDesdeContab(numFolio, letra){
     const _letraCode   = _letraActual.charCodeAt(0);
     const _letraPrevia = _letraCode > 65 ? String.fromCharCode(_letraCode - 1) : null;
     const _fuente = _letraPrevia
-      ? (recibos.find(x =>
+      ? (_todosRecibos.find(x =>
           (x.folio === r.folio || x.folio === parseInt(r.folio)) &&
           !x.esComplemento &&
           (x.letra || letraVersion(x) || 'A').toUpperCase() === _letraPrevia

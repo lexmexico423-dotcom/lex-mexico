@@ -3353,6 +3353,16 @@ window.addEventListener('offline', ()=>{
             <div style="font-family:monospace;font-size:0.52rem;color:rgba(160,232,200,0.5);">Versiones: <strong id="adminVersCnt" style="color:#a0e8c8;">—</strong></div>
           </div>
 
+          <!-- Reordenar / Compactar Folios -->
+          <div onclick="adminReordenarFolios()" style="position:relative;background:rgba(120,60,180,0.10);border:1.5px solid rgba(160,100,220,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#a064dc';this.style.boxShadow='0 8px 20px rgba(120,60,180,0.3)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(160,100,220,0.35)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:linear-gradient(135deg,#6a1fa8,#3a0f6a);display:flex;align-items:center;justify-content:center;font-size:1.7rem;">🔢</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#d8b8ff;text-align:center;line-height:1.3;">Reordenar<br>Folios</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(200,160,255,0.6);text-align:center;line-height:1.4;padding:0 4px;">Elimina huecos en la numeración y hace los folios consecutivos. Ej: 1,2,5,6 → 1,2,3,4. Actualiza recibos, movimientos y R2.</div>
+          </div>
+
         </div><!-- /grid -->
       </div><!-- /admin-modal-body -->
 
@@ -23822,6 +23832,168 @@ if (_origRegistrarMovimiento) {
   };
 }
 
+// ── MODAL: REORDENAR / COMPACTAR FOLIOS ─────────────────────────────────────
+async function adminReordenarFolios() {
+  if (!sbSession || Date.now() >= sbExpiry) {
+    if (typeof mostrarDriveOverlay === 'function') mostrarDriveOverlay('adminReordenarFolios');
+    return;
+  }
+
+  var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
+  var anio = (typeof appData !== 'undefined' && appData.anioFolioActual) || new Date().getFullYear();
+
+  // Folios únicos presentes (cualquier letra cuenta para detectar si el slot está ocupado)
+  var foliosSet = new Set(
+    recibos.filter(function(r){ return r && !r.esComplemento && Number(r.folio) > 0; })
+           .map(function(r){ return Number(r.folio); })
+  );
+  var foliosOrdenados = Array.from(foliosSet).sort(function(a,b){ return a-b; });
+
+  if (!foliosOrdenados.length) {
+    if (typeof toast === 'function') toast('No hay folios registrados', 'err');
+    return;
+  }
+
+  var maxFolio = foliosOrdenados[foliosOrdenados.length - 1];
+
+  // Huecos: números del 1 al máximo que no tienen ningún recibo
+  var vacios = [];
+  for (var i = 1; i <= maxFolio; i++) {
+    if (!foliosSet.has(i)) vacios.push(i);
+  }
+
+  // Mapa de renumeración: oldFolio → newFolio
+  var mapa = new Map();
+  foliosOrdenados.forEach(function(oldF, idx) {
+    var newF = idx + 1;
+    if (oldF !== newF) mapa.set(oldF, newF);
+  });
+
+  var nuevoFolioActual = foliosOrdenados.length + 1;
+
+  // Helper: info del recibo A de un folio
+  function _infoFolio(folio) {
+    var r = recibos.find(function(x) {
+      return x && !x.esComplemento && Number(x.folio) === folio && (x.letra || 'A') === 'A';
+    }) || recibos.find(function(x) {
+      return x && !x.esComplemento && Number(x.folio) === folio;
+    });
+    return r ? { nombre: r.nombre || '—', fecha: (r.fecha || r.fecha_recibo || '—').substring(0,10) } : { nombre: '—', fecha: '—' };
+  }
+
+  function _fStr(f) {
+    return typeof folioConLetra === 'function' ? folioConLetra(f, anio, 'A') : String(f).padStart(3,'0')+'A';
+  }
+
+  // Construir filas de la tabla preview (solo los que cambian)
+  var cambios = foliosOrdenados.filter(function(f){ return mapa.has(f); });
+  var rowsHTML = cambios.map(function(oldF) {
+    var newF = mapa.get(oldF);
+    var info = _infoFolio(oldF);
+    return '<tr style="border-bottom:1px solid rgba(255,255,255,0.06);">' +
+      '<td style="font-family:monospace;font-size:0.72rem;color:#ff9090;font-weight:700;padding:5px 8px;white-space:nowrap;">' + _fStr(oldF) + '</td>' +
+      '<td style="font-size:0.7rem;color:#888;padding:0 4px;">→</td>' +
+      '<td style="font-family:monospace;font-size:0.72rem;color:#90ff90;font-weight:700;padding:5px 8px;white-space:nowrap;">' + _fStr(newF) + '</td>' +
+      '<td style="font-size:0.68rem;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:5px 8px;">' + (typeof esc==='function'?esc(info.nombre):info.nombre) + '</td>' +
+      '<td style="font-size:0.65rem;color:var(--muted);white-space:nowrap;padding:5px 8px;">' + info.fecha + '</td>' +
+      '</tr>';
+  }).join('');
+
+  // HTML de los huecos
+  var vaciosHTML = vacios.slice(0,30).map(function(f){
+    return '<span style="font-family:monospace;font-size:0.65rem;color:#ff7070;background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.25);border-radius:4px;padding:2px 6px;">' + _fStr(f) + '</span>';
+  }).join(' ') + (vacios.length > 30 ? '<span style="color:var(--muted);font-size:0.6rem;"> … y ' + (vacios.length-30) + ' más</span>' : '');
+
+  var ov = document.createElement('div');
+  ov.id = 'modal-reordenar-folios';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,8,5,0.88);z-index:9100;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);';
+  ov.innerHTML =
+    '<div style="background:#1a1510;border:1.5px solid rgba(160,100,220,0.5);border-radius:18px;max-width:680px;width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.7);">' +
+      '<div style="padding:18px 22px 14px;border-bottom:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:12px;">' +
+        '<div style="font-size:1.6rem;">🔢</div>' +
+        '<div>' +
+          '<div style="font-family:sans-serif;font-weight:800;font-size:1rem;color:#d8b8ff;">Reordenar Folios</div>' +
+          '<div style="font-family:monospace;font-size:0.6rem;color:var(--muted);margin-top:2px;">' +
+            foliosOrdenados.length + ' folios registrados · ' +
+            '<span style="color:#ff9090;">' + vacios.length + ' huecos</span>' +
+            ' · folioActual: ' + ((typeof appData!=='undefined'&&appData.folioActual)||'?') +
+            ' → <span style="color:#90ff90;">' + nuevoFolioActual + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<button onclick="document.getElementById(\'modal-reordenar-folios\').remove()" style="margin-left:auto;background:none;border:none;color:var(--muted);font-size:1.2rem;cursor:pointer;padding:4px;">✕</button>' +
+      '</div>' +
+      (vacios.length === 0
+        ? '<div style="padding:28px 22px;text-align:center;color:#90ff90;font-family:monospace;font-size:0.78rem;">✅ Los folios ya están consecutivos — no hay huecos.</div>'
+        : '<div style="padding:14px 22px 8px;">' +
+            '<div style="font-family:monospace;font-size:0.6rem;color:var(--muted);margin-bottom:6px;">Huecos detectados:</div>' +
+            '<div style="display:flex;flex-wrap:wrap;gap:4px;">' + vaciosHTML + '</div>' +
+          '</div>' +
+          '<div style="padding:6px 22px 10px;">' +
+            '<div style="font-family:monospace;font-size:0.6rem;color:var(--muted);margin-bottom:6px;">' + cambios.length + ' folio(s) cambiarán de número:</div>' +
+            '<div style="overflow-y:auto;max-height:280px;border:1px solid rgba(255,255,255,0.08);border-radius:8px;">' +
+              '<table style="width:100%;border-collapse:collapse;">' +
+                '<thead><tr style="background:rgba(255,255,255,0.05);font-family:monospace;font-size:0.58rem;color:var(--muted);">' +
+                  '<th style="padding:5px 8px;text-align:left;">ANTES</th>' +
+                  '<th></th>' +
+                  '<th style="padding:5px 8px;text-align:left;">DESPUÉS</th>' +
+                  '<th style="padding:5px 8px;text-align:left;">CLIENTE</th>' +
+                  '<th style="padding:5px 8px;text-align:left;">FECHA</th>' +
+                '</tr></thead>' +
+                '<tbody>' + rowsHTML + '</tbody>' +
+              '</table>' +
+            '</div>' +
+          '</div>' +
+          '<div style="padding:4px 22px 14px;">' +
+            '<div style="background:rgba(255,160,0,0.08);border:1px solid rgba(255,160,0,0.25);border-radius:8px;padding:8px 12px;font-family:monospace;font-size:0.58rem;color:#ffb060;line-height:1.5;">' +
+              '⚠ Esta operación es irreversible. Los PDFs en Supabase Storage <strong>no se renombran</strong> automáticamente ' +
+              '(siguen accesibles por el nombre antiguo como fallback). Los PDFs en R2 se renombrarán al próximo guardado desde el modo edición.' +
+            '</div>' +
+          '</div>' +
+          '<div style="padding:0 22px 18px;display:flex;gap:10px;justify-content:flex-end;">' +
+            '<button onclick="document.getElementById(\'modal-reordenar-folios\').remove()" style="padding:8px 20px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.15);background:none;color:var(--muted);font-family:monospace;font-size:0.72rem;cursor:pointer;">Cancelar</button>' +
+            '<button id="btn-confirmar-reordenar" onclick="adminConfirmarReordenarFolios()" style="padding:8px 22px;border-radius:8px;border:none;background:linear-gradient(135deg,#7a30c0,#4a1880);color:#fff;font-family:monospace;font-size:0.72rem;font-weight:700;cursor:pointer;letter-spacing:0.05em;">🔢 Compactar y Guardar</button>' +
+          '</div>'
+      ) +
+    '</div>';
+
+  // Guardar el mapa para que el confirm pueda usarlo
+  window._reordenarFoliosMapa     = mapa;
+  window._reordenarFoliosNuevoMax = nuevoFolioActual;
+
+  document.body.appendChild(ov);
+  ov.addEventListener('click', function(e){ if(e.target===ov) ov.remove(); });
+}
+
+async function adminConfirmarReordenarFolios() {
+  var btn = document.getElementById('btn-confirmar-reordenar');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Compactando...'; }
+
+  var mapa     = window._reordenarFoliosMapa;
+  var nuevoMax = window._reordenarFoliosNuevoMax;
+  var anio     = (typeof appData !== 'undefined' && appData.anioFolioActual) || new Date().getFullYear();
+
+  if (!mapa || !mapa.size) {
+    if (typeof toast === 'function') toast('Nada que compactar', 'ok');
+    document.getElementById('modal-reordenar-folios')?.remove();
+    return;
+  }
+
+  try {
+    _ultimoSyncPropio = Date.now();
+    await _aplicarMapaRenumeracion(mapa, anio, nuevoMax);
+    if (typeof renderContab  === 'function') renderContab();
+    if (typeof renderHistorial === 'function') renderHistorial();
+    if (typeof toast === 'function') toast('✅ ' + mapa.size + ' folio(s) renumerados — sin huecos', 'ok');
+  } catch(e) {
+    console.error('[ReordenarFolios]', e);
+    if (typeof toast === 'function') toast('Error al compactar: ' + e.message, 'err');
+  }
+
+  window._reordenarFoliosMapa     = null;
+  window._reordenarFoliosNuevoMax = null;
+  document.getElementById('modal-reordenar-folios')?.remove();
+}
+
 // ══════════════════════════════════════════════════════════════════
 // ADMIN — GESTIÓN DE RECIBOS
 // ══════════════════════════════════════════════════════════════════
@@ -37583,6 +37755,10 @@ async function _aplicarMapaRenumeracion(mapa, anioActual, siguiente){
     if(nF !== undefined){
       r.folio   = nF;
       r.archivo = folioConLetra(nF, anioActual, r.letra||'A') + '.pdf';
+      // Actualizar también el nombre descriptivo de R2
+      if(typeof _nombreArchivoR2 === 'function'){
+        r.archivoR2 = _nombreArchivoR2(folioConLetra(nF, anioActual, r.letra||'A'), r.nombre||'');
+      }
     }
     if(r.folioAnterior != null && mapa.has(r.folioAnterior)) r.folioAnterior = mapa.get(r.folioAnterior);
     if(r.folioRef      != null && mapa.has(r.folioRef))      r.folioRef      = mapa.get(r.folioRef);

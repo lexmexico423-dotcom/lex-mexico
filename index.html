@@ -6689,8 +6689,9 @@ async function reservarFolioEnDrive(){
     });
     if(error) throw error;
     if(folio == null) throw new Error('La función no devolvió folio');
-    // Actualizar display local (solo cosmético, la fuente de verdad es la DB)
+    // Actualizar AMBOS contadores locales para que syncEstadoSupabase no revierta con el valor viejo
     appData.folioActual = folio + 1;
+    if(typeof REC !== 'undefined' && REC) REC.folioActual = folio + 1;
     console.log('✓ Folio reservado (atómico):', folio, '— próximo:', folio + 1);
     return folio;
   } catch(e) {
@@ -6706,6 +6707,7 @@ async function reservarFolioEnDrive(){
     // Saltar cualquier folio ya usado
     while(recibosActuales.has(f)) f++;
     appData.folioActual = f + 1;
+    if(typeof REC !== 'undefined' && REC) REC.folioActual = f + 1;
     console.warn('⚠ Folio fallback asignado:', f, '(próximo:', f+1, ')');
     return f;
   }

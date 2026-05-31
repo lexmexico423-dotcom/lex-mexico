@@ -11338,10 +11338,9 @@ async function guardarRecibo(){
             (m.folio === _folioGuardado && (m.letra||'A') === _letraGuardada && m.fuente === 'recibo')
           );
           if(!_yaExisteMovRecibo){
-            const _esAbonoCont = _letraGuardada !== 'A';
-            const _estatusCont = _anticoGuardado > 0
-              ? (_esAbonoCont ? 'Abono' : 'Anticipo')
-              : 'Pendiente';
+            const _esSinAntCont = _anticoGuardado === 0 && _saldoInicialGuardado > 0;
+            const _estatusCont  = _anticoGuardado > 0 ? 'Anticipo'
+                                : (_esSinAntCont    ? 'Sin Anticipo' : 'Pendiente');
             const mov = {
               id: idMov,
               folioCaja: '',
@@ -13496,11 +13495,12 @@ function renderContab() {
   }
 
   function _badgeEstatus(m) {
-    const est = m.estatus || (m.monto === 0 ? 'Pendiente' : null);
-    if (!est && !m.cat) return '<span class="tag tag-m" style="font-size:0.54rem;">—</span>';
+    // Fallback: monto>0 sin estatus → 'Anticipo'; monto=0 → 'Pendiente'
+    const est = m.estatus || (m.monto > 0 ? 'Anticipo' : 'Pendiente');
     // Etiquetas visibles al usuario — los valores internos no cambian
     const labelMap = {
       'Liquidado':    'Pago Total',
+      'Liquidación':  'Pago Total',
       'Anticipo':     'Pago Parcial',
       'Abono parcial':'Abonado',
       'Abono':        'Abonado',
@@ -13508,7 +13508,7 @@ function renderContab() {
       'Sin Anticipo': 'Sin Anticipo'
     };
     const label = labelMap[est] || est || m.cat || '—';
-    const cls = est === 'Liquidado'    ? 'tag-v' :
+    const cls = (est === 'Liquidado' || est === 'Liquidación') ? 'tag-v' :
                 est === 'Anticipo'     ? 'tag-b' :
                 est === 'Sin Anticipo' ? 'tag-sa' :
                 (est === 'Abono parcial' || est === 'Abono') ? 'tag-a' :
@@ -19097,8 +19097,8 @@ async function guardarReciboInterno() {
       const _esLiq         = datos.anticipo >= datos.total && datos.total > 0;
       const _esSinAnticipo = _montoMov === 0 && parseFloat(datos.total || 0) > 0;
       const _folioStr = folioFormato(folio);
-      const _estatusRec  = _esLiq ? 'Liquidado' : (_esSinAnticipo ? 'Sin Anticipo' : 'Anticipo');
-      const _descPrefix  = _esLiq ? 'Recibo #' : (_esSinAnticipo ? 'Sin Anticipo — Recibo #' : 'Anticipo — Recibo #');
+      const _estatusRec  = _esLiq ? 'Liquidado' : (_esSinAnticipo ? 'Sin Anticipo' : (_montoMov > 0 ? 'Anticipo' : 'Pendiente'));
+      const _descPrefix  = _esLiq ? 'Recibo #' : (_esSinAnticipo ? 'Sin Anticipo — Recibo #' : (_montoMov > 0 ? 'Anticipo — Recibo #' : 'Pendiente — Recibo #'));
       const mov = {
         id: 'M-REC-NEW-' + folio + '-' + Date.now(),
         folioCaja: typeof generarFolioMovCaja === 'function' ? generarFolioMovCaja() : '',

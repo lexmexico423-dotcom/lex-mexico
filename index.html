@@ -7270,6 +7270,20 @@ function limpiarFormCompleto(){
     if(typeof lastActualizacionNombre !== 'undefined') lastActualizacionNombre = null;
     if(typeof lastPdfBlob !== 'undefined') lastPdfBlob = null;
   });
+  // 11b. Resetear visualmente el botón RETRO y estilos de fecha/hora
+  paso('reset-retro-visual', ()=>{
+    var _btnRetro = document.getElementById('btn-toggle-retro');
+    if(_btnRetro){
+      _btnRetro.style.background  = 'none';
+      _btnRetro.style.color       = 'var(--muted)';
+      _btnRetro.style.borderColor = 'rgba(200,149,42,0.3)';
+      _btnRetro.textContent       = '⏰ RETRO';
+    }
+    var _fDisp = document.getElementById('fecha_recibo_display');
+    if(_fDisp){ _fDisp.style.borderBottom=''; _fDisp.style.color=''; _fDisp.style.fontWeight=''; }
+    var _hDisp = document.getElementById('hora_recibo_display');
+    if(_hDisp){ _hDisp.style.color=''; _hDisp.style.fontWeight=''; }
+  });
   // 12. Reiniciar fecha/hora con la hora CDMX actual (vía referencia global)
   paso('fecha-hora', ()=>{
     if(typeof window._aplicarFechaLocal === 'function'){
@@ -17636,6 +17650,8 @@ async function guardarReciboInterno() {
     btn.textContent = '✅ Impreso';
     // Intentar vincular con gestión activa
     setTimeout(function(){ _gestVincularModal(datos, folio); }, 600);
+    // Auto-limpiar formulario y avanzar al siguiente folio sin requerir clic manual
+    setTimeout(function(){ if(typeof nuevoReciboLimpio === 'function') nuevoReciboLimpio(); }, 700);
   } catch(e) {
     console.error(e);
     toast('Error: ' + e.message, 'err');

@@ -7812,12 +7812,20 @@ function limpiarFormCompleto(){
     if(typeof pagoParcialCount !== 'undefined') pagoParcialCount = 0;
   });
 
-  // 11. Resetear variables internas de modo actualización, consulta y autorización
+  // 11. Resetear variables internas de modo actualización, consulta, abono y retroactivo
   paso('vars-internas', ()=>{
     if(typeof reciboEnActualizacion !== 'undefined') reciboEnActualizacion = null;
     if(typeof reciboEnConsulta      !== 'undefined') reciboEnConsulta      = null;
-    window._autorizacionActual      = null;
-    window._autorizacionCancelacion = null;
+    window._autorizacionActual               = null;
+    window._autorizacionCancelacion          = null;
+    // Modo abono: limpiar referencia para evitar que el siguiente recibo quede como abono
+    window._folioReferencia                  = null;
+    window._letraAbonoRetroactivo            = null;
+    window._respSeleccionado                 = null;
+    // Modo retroactivo
+    window._reciboRetroactivoActivo          = false;
+    window._reciboRetroactivoFechaPersonalizada = null;
+    window._reciboRetroactivoHoraPersonalizada  = null;
     if(typeof lastActualizacionBlob   !== 'undefined') lastActualizacionBlob   = null;
     if(typeof lastActualizacionNombre !== 'undefined') lastActualizacionNombre = null;
     if(typeof lastPdfBlob !== 'undefined') lastPdfBlob = null;
@@ -11246,6 +11254,8 @@ async function guardarRecibo(){
       if(banner) banner.style.display='none';
     }
 
+    // La letra del recibo — se captura aquí, ANTES de usarla (evita TDZ con const)
+    const _letraGuardada = window._letraAbonoRetroactivo || 'A';
     // Mostrar el folio del recibo impreso con la letra correcta (A para nuevos, B/C/… para abonos)
     $('folio-display').textContent = folioConLetra(folio, null, _letraGuardada);
     setStatus('ok','Recibo #'+folioConLetra(folio, null, _letraGuardada)+' guardado — abriendo impresora...','ok');
@@ -11255,6 +11265,8 @@ async function guardarRecibo(){
 
     // Abrir nueva pestaña con el PDF para que el empleado configure la impresora
     imprimirDesdeBlob(lastPdfBlob, nombreArchivo);
+    // Congelar formulario inmediatamente: oculta "Imprimir", muestra "Reimprimir/Siguiente"
+    congelarFormulario();
 
     // ─── OFERTA AUTOMÁTICA DE EXPEDIENTE — solo en recibos originales (no abonos) ──
     if(!folioAntNum){
@@ -11276,7 +11288,7 @@ async function guardarRecibo(){
     const _saldoInicialGuardado = saldoPendiente;
     const _retroFechaGuardada   = window._reciboRetroactivoFechaPersonalizada || null;
     const _retroHoraGuardada    = window._reciboRetroactivoHoraPersonalizada  || null;
-    const _letraGuardada        = window._letraAbonoRetroactivo || 'A';
+    // _letraGuardada se captura antes de imprimirDesdeBlob() — no repetir aquí
 
     // Marcar sync propio ANTES del timeout para proteger contra Realtime durante esos 700ms
     _ultimoSyncPropio = Date.now();
@@ -12889,6 +12901,18 @@ function ir(p){
     renderHistorial();
     if(typeof actualizarFolioDisplay === 'function') actualizarFolioDisplay();
     if(typeof generarQRPreview === 'function') generarQRPreview();
+    // Leer folio fresco de Supabase en background para asegurar que el display es correcto
+    if(window.SB && window.SB_DESPACHO_ID){
+      window.SB.from('app_state').select('folio_actual')
+        .eq('despacho_id', window.SB_DESPACHO_ID).single()
+        .then(function(res){
+          if(res.data && res.data.folio_actual){
+            appData.folioActual = res.data.folio_actual;
+            if(typeof REC !== 'undefined') REC.folioActual = res.data.folio_actual;
+            if(typeof actualizarFolioDisplay === 'function') actualizarFolioDisplay();
+          }
+        }).catch(function(){});
+    }
   }
   if(p==='configuracion'){setTimeout(renderConfig,50);}
 }

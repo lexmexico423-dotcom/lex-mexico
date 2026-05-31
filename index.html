@@ -11309,13 +11309,20 @@ async function guardarRecibo(){
 
         // 2. Registrar en contabilidad — siempre, aunque anticipo sea 0 (aparece como Pendiente)
         if(typeof D !== 'undefined' && Array.isArray(D.movimientos)){
-          const idMov = 'M-REC-' + _folioGuardado;
-          // Guard robusto: evitar duplicado por ID exacto O por folio+letra A ya registrado
+          // El ID incluye la letra para que los abonos (B, C…) no colisionen con el ID de la versión A
+          const idMov = _letraGuardada === 'A'
+            ? 'M-REC-' + _folioGuardado
+            : 'M-REC-' + _folioGuardado + '-' + _letraGuardada;
+          // Dedup exacto por ID, o por folio+letra+fuente (evita duplicados entre reinicios)
           const _yaExisteMovRecibo = D.movimientos.some(m =>
             m.id === idMov ||
-            (m.folio === _folioGuardado && (m.letra||'A') === 'A' && m.fuente === 'recibo')
+            (m.folio === _folioGuardado && (m.letra||'A') === _letraGuardada && m.fuente === 'recibo')
           );
           if(!_yaExisteMovRecibo){
+            const _esAbonoCont = _letraGuardada !== 'A';
+            const _estatusCont = _anticoGuardado > 0
+              ? (_esAbonoCont ? 'Abono' : 'Anticipo')
+              : 'Pendiente';
             const mov = {
               id: idMov,
               folioCaja: '',
@@ -11326,17 +11333,18 @@ async function guardarRecibo(){
                 const conc = c0 ? (c0.concepto||'') : '';
                 const desc = c0 ? (c0.descripcion||'') : '';
                 const txt  = conc + (desc ? ' — ' + desc : '');
-                return 'Recibo #' + folioFormato(_folioGuardado) + ' · ' + _nombreGuardado + (txt ? ' · ' + txt : '');
+                const _fStr = folioConLetra(_folioGuardado, appData.anioFolioActual || new Date().getFullYear(), _letraGuardada);
+                return 'Recibo #' + _fStr + ' · ' + _nombreGuardado + (txt ? ' · ' + txt : '');
               })(),
               nombre: _nombreGuardado,
               folio:  _folioGuardado,
               monto:  _anticoGuardado,
               tipo:   'ingreso',
-              cat:    (_anticoGuardado > 0 ? 'Anticipo' : 'Pendiente') + ' · #' + folioConLetra(_folioGuardado, appData.anioFolioActual || new Date().getFullYear(), 'A'),
-              estatus: _anticoGuardado > 0 ? 'Anticipo' : 'Pendiente',
+              cat:    _estatusCont + ' · #' + folioConLetra(_folioGuardado, appData.anioFolioActual || new Date().getFullYear(), _letraGuardada),
+              estatus: _estatusCont,
               fuente: 'recibo',
-              letra:  'A',
-              responsable: window._respSeleccionado || empNombre()
+              letra:  _letraGuardada,
+              responsable: (typeof empNombre === 'function' ? empNombre() : '—')
             };
             if(typeof _registrarMovimiento === 'function') _registrarMovimiento(mov);
           }
@@ -34587,6 +34595,26 @@ function sincronizarPendientesPlacas() {
 // ══════════════════════════════════════════════════════════════════════
 function repararFoliosDuplicados() {
   if(!appData || !Array.isArray(appData.recibos)) return;
+
+  // ── Limpiar recibosExcluidosCaja de entradas inválidas ────────────────────
+  // La versión anterior de esta función agregaba folios a recibosExcluidosCaja
+  // aunque el recibo original siguiera existiendo. Eso impedía que aparecieran
+  // en contabilidad. Aquí se corrigen esas entradas históricas.
+  if(typeof D !== 'undefined' && Array.isArray(D.recibosExcluidosCaja) && D.recibosExcluidosCaja.length) {
+    const foliosVivos = new Set(
+      (appData.recibos||[])
+        .filter(function(r){ return r && !r.cancelado && r.folio != null; })
+        .map(function(r){ return String(r.folio); })
+    );
+    const antesExc = D.recibosExcluidosCaja.length;
+    D.recibosExcluidosCaja = D.recibosExcluidosCaja.filter(function(f){ return !foliosVivos.has(String(f)); });
+    if(D.recibosExcluidosCaja.length < antesExc){
+      const recuperados = antesExc - D.recibosExcluidosCaja.length;
+      console.log('[LEX] recibosExcluidosCaja: recuperados ' + recuperados + ' folio(s) que tenían recibos válidos');
+      if(typeof save === 'function') save();
+    }
+  }
+
   const recibos = appData.recibos;
   // Agrupar por folio+letra — duplicados son SOLO los registros con AMBOS iguales.
   // ⚠️ CRÍTICO: agrupar solo por folio eliminaba versiones B/C legítimas cuando un

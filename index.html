@@ -18961,10 +18961,8 @@ async function guardarReciboInterno() {
   var now = new Date();
   var _rfecha = document.getElementById('r-fecha'); if(_rfecha) _rfecha.value = hoy();
   var _rhora = document.getElementById('r-hora'); if(_rhora) _rhora.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-  var folio = _folioSiguienteUnico(REC.folioActual || appData.folioActual || 1);
-  // Reservar el folio inmediatamente para evitar duplicados
-  REC.folioActual = folio + 1;
-  appData.folioActual = folio + 1;
+  // _tomarFolioSeguro usa lock para evitar colisiones si dos secretarias imprimen simultáneamente
+  var folio = await _tomarFolioSeguro();
   var total = parsePrecioR((document.getElementById('r-total')||{value:''}).value);
   var anticipo = parsePrecioR((document.getElementById('r-anticipo')||{value:''}).value);
   var saldo = Math.max(0, total - anticipo);
@@ -34810,11 +34808,12 @@ function repararFoliosHuerfanos() {
     orphan.folio = folioNuevo;
     if(!orphan.anio_folio && padreA.anio_folio) orphan.anio_folio = padreA.anio_folio;
 
-    // Actualizar nombre de archivo PDF
-    if(orphan.archivo && typeof folioConLetra === 'function'){
+    // Actualizar nombres de archivo PDF (corto para Supabase, descriptivo para R2)
+    if(typeof folioConLetra === 'function'){
       var vStr = folioConLetra(folioViejo, null, letraOrphan);
       var nStr = folioConLetra(folioNuevo, orphan.anio_folio || null, letraOrphan);
-      orphan.archivo = orphan.archivo.replace(vStr, nStr);
+      if(orphan.archivo)   orphan.archivo   = orphan.archivo.replace(vStr, nStr);
+      if(orphan.archivoR2) orphan.archivoR2 = orphan.archivoR2.replace(vStr, nStr);
     }
 
     // Actualizar movimientos de caja

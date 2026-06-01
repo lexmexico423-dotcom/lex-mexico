@@ -5799,8 +5799,9 @@ window.addEventListener('offline', ()=>{
       <label for="placas-sin-placas" onclick="event.stopPropagation();">Sin placas — vehiculo nuevo o trámite que no genera placas</label>
     </div>
     <div class="modal-btns">
-      <button class="btn btn-secondary" onclick="cerrarModalPlacas()">✕ Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarModalPlacas()">Continuar a impresión →</button>
+      <button class="btn btn-secondary" onclick="cerrarModalPlacas()" style="flex:0.7;font-size:0.78rem;">✕ Cancelar</button>
+      <button class="btn" onclick="omitirModalPlacas()" style="flex:1.3;background:rgba(200,149,42,0.12);border:1.5px solid rgba(200,149,42,0.4);color:var(--gold-d);font-size:0.78rem;" title="Imprime el ticket sin número de placas — podrás agregarlos después desde Editar Recibo">⏭ No hay placas aún</button>
+      <button class="btn btn-primary" onclick="confirmarModalPlacas()" style="flex:1.3;">Registrar y continuar →</button>
     </div>
   </div>
 </div>
@@ -9914,7 +9915,16 @@ function cerrarModalPlacas(){
   if(_placasPromiseResolver){
     const r = _placasPromiseResolver;
     _placasPromiseResolver = null;
-    r(null); // null = cancelado
+    r(null); // null = cancelar impresión
+  }
+}
+function omitirModalPlacas(){
+  // Continúa la impresión sin registrar placas (se podrán agregar después)
+  document.getElementById('modal-placas').classList.remove('show');
+  if(_placasPromiseResolver){
+    const r = _placasPromiseResolver;
+    _placasPromiseResolver = null;
+    r({ placas: null, estado: null }); // omitido → continúa sin placas
   }
 }
 function actualizarLabelPlacas(){

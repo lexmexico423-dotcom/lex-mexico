@@ -11982,7 +11982,11 @@ function ir(p){
           if(res.data && res.data.folio_actual){
             appData.folioActual = res.data.folio_actual;
             if(typeof REC !== 'undefined') REC.folioActual = res.data.folio_actual;
-            if(typeof actualizarFolioDisplay === 'function') actualizarFolioDisplay();
+            // No actualizar display si ya estamos en modo actualización (B/C/D):
+            // abrirModoActualizacion() ya puso el folio correcto y este SELECT lo pisaría.
+            if(typeof actualizarFolioDisplay === 'function' && !document.body.classList.contains('modo-actualizacion')){
+              actualizarFolioDisplay();
+            }
           }
         }).catch(function(){});
     }

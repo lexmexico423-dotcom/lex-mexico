@@ -9183,11 +9183,14 @@ async function _imprimirActualizacionReal(){
       return;
     }
   }
-  // Modal de placas: SOLO en Pago Total (desde-liquidacion) Y trámite vehicular.
-  // En Pago Parcial o trámite normal se reutilizan placas ya guardadas sin preguntar.
+  // Modal de placas: SOLO cuando es Pago Total (desde-liquidacion) Y trámite vehicular.
+  // En Pago Parcial NO se piden placas — el trámite aún no está completo y las
+  // placas/tarjeta no han sido emitidas todavía. El cliente llega a recoger sus
+  // documentos al pago total, y es ahí cuando se pueden registrar.
   let _placasCapturadas;
   const esVehicular = (recibo.tipoTramite === 'vehicular');
-  if(esVehicular){
+  const esPagoTotal = document.body.classList.contains('desde-liquidacion');
+  if(esVehicular && esPagoTotal){
     const resultado = await pedirDatosPlacas();
     if(resultado === null){
       setStatus('ok','Impresión cancelada — modal de placas cerrado','ok');
@@ -9195,6 +9198,7 @@ async function _imprimirActualizacionReal(){
     }
     _placasCapturadas = { placas: resultado.placas, estado: resultado.estado };
   } else {
+    // Pago Parcial o no vehicular: conservar placas ya guardadas sin preguntar
     _placasCapturadas = { placas: recibo.placasEntregadas || null, estado: recibo.estadoPlacas || null };
   }
   setStatus('loading','Generando PDF actualizado...','loading');

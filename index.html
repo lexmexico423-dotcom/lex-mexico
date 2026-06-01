@@ -5495,7 +5495,6 @@ window.addEventListener('offline', ()=>{
         <thead><tr><th style="width:24%">Concepto</th><th style="width:34%">Descripción</th><th style="width:16%;text-align:right">Cantidad ($)</th><th style="width:18%">Fecha y hora</th><th style="width:8%"></th></tr></thead>
         <tbody id="pagos-parciales-tbody"></tbody>
       </table>
-      <button class="add-btn" onclick="agregarPagoParcial()" style="background:#e8f5e0;border-color:#7ac070;color:#2a7a3a;">＋ Agregar pago parcial</button>
       <div id="resumen-pagos-parciales" style="margin-top:8px;padding:8px 12px;background:#f0f8e8;border:1px solid #c0dba8;border-radius:4px;font-family:'DM Mono',monospace;font-size:0.8rem;display:none;">
       </div>
     </div>
@@ -5793,6 +5792,10 @@ window.addEventListener('offline', ()=>{
           <option value="Zacatecas">Zacatecas</option>
         </select>
       </div>
+    </div>
+    <div class="placas-checkbox-row" onclick="togglePlacasSinPlacasFromRow(event)">
+      <input type="checkbox" id="placas-sin-placas" onclick="event.stopPropagation(); aplicarEstadoSinPlacas();">
+      <label for="placas-sin-placas" onclick="event.stopPropagation();">Sin placas — vehiculo nuevo o trámite que no genera placas</label>
     </div>
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="cerrarModalPlacas()" style="flex:0.7;font-size:0.78rem;">✕ Cancelar</button>
@@ -8887,7 +8890,18 @@ function agregarPagoParcial(data){
 }
 function quitarPagoParcial(id){
   const r = document.getElementById('pago-parcial-row-'+id);
-  if(r){ r.remove(); recalcularResumenActualizacion(); }
+  if(!r) return;
+  const btn = r.querySelector('.del-concept');
+  if(r.dataset.oculto === '1'){
+    r.dataset.oculto = '0';
+    r.querySelectorAll('td:not(:last-child)').forEach(td => td.style.display = '');
+    if(btn){ btn.textContent = '\u2715'; btn.title = 'Ocultar'; btn.style.color = ''; }
+  } else {
+    r.dataset.oculto = '1';
+    r.querySelectorAll('td:not(:last-child)').forEach(td => td.style.display = 'none');
+    if(btn){ btn.textContent = '+'; btn.title = 'Mostrar'; btn.style.color = 'var(--verde)'; }
+  }
+  recalcularResumenActualizacion();
 }
 // Sincroniza tr.dataset.fechaHora cuando el usuario edita los inputs de fecha/hora retro
 function _ppSyncFechaRetro(el){
@@ -9870,7 +9884,7 @@ function pedirDatosPlacas(){
     $('placas-numero').disabled = false;
     $('placas-estado').value = '';
     $('placas-estado').disabled = false;
-    if($('placas-sin-placas')) $('placas-sin-placas').checked = false;
+    $('placas-sin-placas').checked = false;
     if($('placas-tipo')){ $('placas-tipo').value = 'placas'; actualizarLabelPlacas(); }
     $('placas-error-msg').classList.remove('show');
     $('placas-error-msg').textContent = '';
@@ -9880,14 +9894,13 @@ function pedirDatosPlacas(){
   });
 }
 function togglePlacasSinPlacasFromRow(ev){
+  // Click en la fila (no en el checkbox ni el label, porque ellos tienen stopPropagation)
   const chk = $('placas-sin-placas');
-  if(!chk) return;
   chk.checked = !chk.checked;
   aplicarEstadoSinPlacas();
 }
 function aplicarEstadoSinPlacas(){
   const chk = $('placas-sin-placas');
-  if(!chk) return;
   const inpNum = $('placas-numero');
   const selEst = $('placas-estado');
   if(chk.checked){
@@ -9940,7 +9953,7 @@ function actualizarLabelPlacas(){
   }
 }
 function confirmarModalPlacas(){
-  const sinPlacas = $('placas-sin-placas') ? $('placas-sin-placas').checked : false;
+  const sinPlacas = $('placas-sin-placas').checked;
   const errBox = $('placas-error-msg');
   const tipo = ($('placas-tipo')||{value:'placas'}).value;
   let placas = '';
@@ -27563,6 +27576,17 @@ function confirmarFechaRetro(){
     hDisplay.style.fontWeight = '700';
   }
   document.getElementById('modalReciboRetro').remove();
+  // Sincronizar fecha/hora retro con filas de pagos parciales NO bloqueadas
+  document.querySelectorAll('#pagos-parciales-tbody tr').forEach(function(tr){
+    if(tr.dataset.locked === '1') return; // no tocar filas bloqueadas
+    var fechaHoraNueva = fecha + ' ' + hr;
+    tr.dataset.fechaHora = fechaHoraNueva;
+    // Actualizar el display visible de fecha/hora en la celda
+    var celdaFechaHora = tr.querySelectorAll('td')[3];
+    if(celdaFechaHora && !celdaFechaHora.querySelector('.pp-fecha-retro')){
+      celdaFechaHora.textContent = fechaHoraNueva + ' hrs.';
+    }
+  });
   if(typeof toast === 'function') toast('✅ Fecha retroactiva aplicada: ' + fecha, 'ok');
 }
 // Hook al guardado de recibo: si modo retro está activo, agregar auditoría

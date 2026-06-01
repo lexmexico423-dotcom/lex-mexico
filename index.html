@@ -9183,11 +9183,14 @@ async function _imprimirActualizacionReal(){
       return;
     }
   }
-  // Modal de placas: SOLO en Pago Total (desde-liquidacion) Y trámite vehicular.
-  // En Pago Parcial o trámite normal se reutilizan placas ya guardadas sin preguntar.
+  // Modal de placas: SOLO cuando es Pago Total (desde-liquidacion) Y trámite vehicular.
+  // En Pago Parcial NO se piden placas — el trámite aún no está completo y las
+  // placas/tarjeta no han sido emitidas todavía. El cliente llega a recoger sus
+  // documentos al pago total, y es ahí cuando se pueden registrar.
   let _placasCapturadas;
   const esVehicular = (recibo.tipoTramite === 'vehicular');
-  if(esVehicular){
+  const esPagoTotal = document.body.classList.contains('desde-liquidacion');
+  if(esVehicular && esPagoTotal){
     const resultado = await pedirDatosPlacas();
     if(resultado === null){
       setStatus('ok','Impresión cancelada — modal de placas cerrado','ok');
@@ -9195,6 +9198,7 @@ async function _imprimirActualizacionReal(){
     }
     _placasCapturadas = { placas: resultado.placas, estado: resultado.estado };
   } else {
+    // Pago Parcial o no vehicular: conservar placas ya guardadas sin preguntar
     _placasCapturadas = { placas: recibo.placasEntregadas || null, estado: recibo.estadoPlacas || null };
   }
   setStatus('loading','Generando PDF actualizado...','loading');
@@ -9688,8 +9692,9 @@ function siguienteFolio() {
         .single()
         .then(function(res){
           if(res.data && res.data.folio_actual){
-            appData.folioActual = res.data.folio_actual;
-            if(typeof REC !== 'undefined') REC.folioActual = res.data.folio_actual;
+            // +1: folio_actual en DB es el ultimo USADO, el proximo es +1
+            appData.folioActual = res.data.folio_actual + 1;
+            if(typeof REC !== 'undefined') REC.folioActual = res.data.folio_actual + 1;
           }
           if(typeof actualizarFolioDisplay === 'function') actualizarFolioDisplay();
           setStatus('ok', 'Folio #'+folioFormato(appData.folioActual)+' listo — formulario en blanco', 'ok');
@@ -11928,8 +11933,9 @@ function ir(p){
         .eq('despacho_id', window.SB_DESPACHO_ID).single()
         .then(function(res){
           if(res.data && res.data.folio_actual){
-            appData.folioActual = res.data.folio_actual;
-            if(typeof REC !== 'undefined') REC.folioActual = res.data.folio_actual;
+            // +1: folio_actual en DB es el ultimo USADO, el proximo es +1
+            appData.folioActual = res.data.folio_actual + 1;
+            if(typeof REC !== 'undefined') REC.folioActual = res.data.folio_actual + 1;
             if(typeof actualizarFolioDisplay === 'function') actualizarFolioDisplay();
           }
         }).catch(function(){});

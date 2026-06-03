@@ -6439,10 +6439,11 @@ async function sincronizarFolio(forzarSB){
           var _borrados = 0;
           D.pendientes = D.pendientes.filter(function(p){
             if(p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
-            var rec = appData.recibos.find(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
-            // Eliminar si: no existe el recibo, está cancelado, o saldo es 0 o NaN
-            var saldo = rec ? parseFloat(rec.saldoPendiente) : NaN;
-            if(!rec || rec.cancelado || !(saldo > 0)){
+            var _versLb = appData.recibos.filter(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
+            // Eliminar si: no existe el recibo, está cancelado, o el saldo mínimo entre todas las versiones es 0
+            var saldo = _versLb.reduce(function(m,r){ var s=parseFloat(r.saldoPendiente); return isNaN(s)?m:Math.min(m,s); }, Infinity);
+            var _cancelLb = _versLb.some(function(r){ return r.cancelado; });
+            if(_versLb.length === 0 || _cancelLb || !(saldo > 0)){
               var fs = String(p.reciboVinculadoFolio);
               if(_lbSB.indexOf(fs) < 0) _lbSB.push(fs);
               _borrados++;
@@ -16790,9 +16791,9 @@ async function syncEstadoSupabase(){
     // Filtrar pendientes de placas liquidados antes de subir a Supabase
     const _pendientesSinLiquidados = (D.pendientes || []).filter(function(p){
       if(p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
-      var rec = (appData.recibos||[]).find(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
-      var saldo = rec ? parseFloat(rec.saldoPendiente) : NaN;
-      return rec && !rec.cancelado && (saldo > 0);
+      var _versSave = (appData.recibos||[]).filter(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
+      var saldo = _versSave.reduce(function(m,r){ var s=parseFloat(r.saldoPendiente); return isNaN(s)?m:Math.min(m,s); }, Infinity);
+      return _versSave.length > 0 && !_versSave.some(function(r){return r.cancelado;}) && (saldo > 0);
     });
     const estado = {
       movimientos:           movsLimpios,
@@ -31868,11 +31869,12 @@ function sincronizarPendientesPlacas() {
   D.pendientes = D.pendientes.filter(function(p) {
     if (p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
     // Buscar el recibo vinculado
-    var recVinc = appData.recibos.find(function(r) {
+    var _versSync = appData.recibos.filter(function(r) {
       return Number(r.folio) === Number(p.reciboVinculadoFolio);
     });
-    // Si el recibo ya no tiene saldo o fue cancelado → eliminar pendiente
-    if (!recVinc || recVinc.cancelado || !(parseFloat(recVinc.saldoPendiente) > 0)) {
+    var _saldoMinSync = _versSync.reduce(function(m,r){ var s=parseFloat(r.saldoPendiente); return isNaN(s)?m:Math.min(m,s); }, Infinity);
+    // Si el recibo ya no tiene saldo (en cualquier versión) o fue cancelado → eliminar pendiente
+    if (_versSync.length === 0 || _versSync.some(function(r){return r.cancelado;}) || !(_saldoMinSync > 0)) {
       var fStr = String(p.reciboVinculadoFolio);
       if (_lb.indexOf(fStr) < 0) _lb.push(fStr);
       _eliminados++;

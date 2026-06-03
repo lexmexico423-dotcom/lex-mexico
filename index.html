@@ -2610,6 +2610,22 @@ window.console.info = function(){};
     box-shadow: 0 2px 8px rgba(26,122,58,0.2);
   }
   .btn-liquidacion:hover { background: #c8f5d8; border-color: #0a5020; transform: translateY(-1px); }
+  .btn-serv-comp {
+    padding: 9px 18px;
+    border: 2.5px solid #d4a060;
+    border-radius: 4px;
+    background: #fff0e0;
+    color: #7a4010;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    font-weight: 700;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(212,160,96,0.2);
+  }
+  .btn-serv-comp:hover { background: #fde8cc; border-color: #a05010; transform: translateY(-1px); }
   .btn-cancelado {
     padding: 6px 10px;
     border: none;
@@ -2779,7 +2795,6 @@ window.addEventListener('offline', ()=>{
       <div class="nav-item" id="nav-pendientes-gen" data-panel="pendientes" onclick="ir('pendientes');setPSec('manual',document.getElementById('pend-todas-btn'));document.getElementById('nav-placas').classList.remove('active');"><span class="ni">📌</span><span>Pendientes</span><span class="nav-badge amarillo" id="badgeP">?</span></div>
       <div class="nav-item" id="nav-placas" data-panel="pendientes" onclick="ir('pendientes');setPSec('placas',document.querySelector('#panel-pendientes .pend-sec-btn[data-sec=\'placas\']'));document.getElementById('nav-pendientes-gen').classList.remove('active');"><span class="ni">🚗</span><span>Placas</span><span class="nav-badge amarillo" id="badgePlacas" style="display:none;"></span></div>
       <div class="nav-item" onclick="ir('escrituras')" id="nav-escrituras"><span class="ni">📄</span><span>Escrituras</span><span class="nav-badge amarillo" id="badgeEscrituras" style="display:none;"></span></div>
-      <div class="nav-item" onclick="ir('gestiones')" id="nav-gestiones"><span class="ni">📋</span><span>En Gestión</span><span class="nav-badge amarillo" id="badgeGestiones" style="display:none;"></span></div>
     </div>
   </div>
   <!-- ═══ BARRA CAPTURA RETROACTIVA (Admin + Secretaria) ═══ -->
@@ -4653,384 +4668,212 @@ window.addEventListener('offline', ()=>{
     </div>
     <!-- ═══ JUICIOS ═══ -->
     <div id="panel-juicios" class="panel">
-      <!-- LISTA DE JUICIOS -->
+
+      <!-- ══ LISTA DE EXPEDIENTES ══ -->
       <div id="juicios-lista-view">
-        <div class="search-row">
-          <input class="search-inp" placeholder="🔍 Cliente, expediente, tipo..." id="juicioQ" oninput="renderJuicios()">
-          <button class="btn btn-primary" onclick="abrirJuicio()">＋ Nuevo Expediente</button>
+        <div class="search-row" style="display:flex;align-items:center;gap:10px;padding:16px 20px 10px;border-bottom:1px solid var(--border-l);">
+          <input class="search-inp" placeholder="🔍 Cliente, expediente, tipo..." id="juicioQ" oninput="renderJuicios()" style="flex:1;">
+          <button class="btn btn-primary btn-sm" onclick="abrirJuicio()">＋ Nuevo Expediente</button>
         </div>
-        <div class="filtros">
+        <div class="filtros" style="padding:8px 20px;display:flex;gap:6px;border-bottom:1px solid var(--border-l);">
           <button class="fbtn active" onclick="setJF('todos',this)">Todos</button>
           <button class="fbtn" onclick="setJF('urgente',this)">🔴 Urgente</button>
           <button class="fbtn" onclick="setJF('proceso',this)">🟡 En Proceso</button>
           <button class="fbtn" onclick="setJF('estable',this)">🟢 Estable</button>
           <button class="fbtn" onclick="setJF('concluido',this)">⚫ Concluidos</button>
         </div>
-        <div id="listaJuicios"></div>
+        <div id="listaJuicios" style="padding:12px 16px;"></div>
       </div>
-      <!-- DETALLE DE JUICIO (pantalla completa) -->
-      <!-- ═══ SALA DE JUICIO — PANTALLA COMPLETA POR EXPEDIENTE ═══ -->
-      <div id="juicio-detalle">
-        <!-- HEADER DEL EXPEDIENTE -->
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:2px solid rgba(200,149,42,0.15);">
+
+      <!-- ══ MODAL DE EXPEDIENTE — PANTALLA COMPLETA ══ -->
+      <div id="modal-expediente" style="display:none;position:absolute;inset:0;background:var(--surface);z-index:20;display:none;flex-direction:column;overflow:hidden;">
+
+        <!-- HEADER -->
+        <div style="display:flex;align-items:center;gap:10px;padding:13px 20px;border-bottom:1px solid var(--border-l);background:var(--surface);flex-shrink:0;">
+          <button onclick="cerrarModalExpediente()" style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-l);background:none;color:var(--muted);font-size:0.75rem;cursor:pointer;font-family:'JetBrains Mono',monospace;">← Expedientes</button>
           <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;">
-              <span class="tag" id="jdet-estatus-tag"></span>
-              <span class="folio-badge" id="jdet-exp-badge" style="color:rgba(200,149,42,0.7)"></span>
-              <span class="folio-badge" id="jdet-folio-badge" style="display:none;"></span>
-              <span class="drive-link-badge" id="jdet-drive-badge" onclick="abrirVinculacionDrive()" title="Vincular carpeta Drive">
-                📁 <span id="jdet-drive-label">Vincular Drive</span>
-              </span>
-            </div>
-            <div class="jdet-titulo" id="jdet-nombre" style="font-size:1.3rem;"></div>
-            <div class="jdet-sub" id="jdet-tipo"></div>
+            <div id="mexp-titulo" style="font-size:1.1rem;font-weight:700;color:var(--ink);font-family:'Fraunces',serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+            <div id="mexp-sub" style="font-size:0.7rem;color:var(--muted);margin-top:1px;"></div>
           </div>
-          <div style="display:flex;gap:8px;flex-shrink:0;align-items:center;">
-            <button class="btn btn-ghost btn-sm" onclick="abrirJuicioEdit(jdetIdx)">✏️ Editar datos</button>
-            <button class="btn btn-ghost btn-sm" onclick="confirmarEliminarJuicio(jdetIdx)" style="color:var(--rojo);border-color:rgba(192,22,26,0.3);">🗑️ Eliminar</button>
-            <button class="btn btn-ghost btn-sm" onclick="cerrarDetalle()">← Volver</button>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+            <!-- LEYES DEL CASO -->
+            <button id="btn-leyes-caso" onclick="abrirModalLeyes()" style="display:flex;align-items:center;gap:7px;padding:7px 13px;border-radius:var(--radius-sm);border:1px solid var(--border-l);background:var(--surface);font-size:0.72rem;color:var(--ink);cursor:pointer;font-weight:600;font-family:'JetBrains Mono',monospace;transition:all 0.15s;">
+              📚 Leyes del caso <span id="mexp-ley-count" style="background:var(--azul-l);color:var(--azul);font-size:0.6rem;padding:1px 7px;border-radius:10px;font-weight:700;">0</span>
+            </button>
+            <!-- REDACTAR ESCRITO -->
+            <button onclick="abrirModalEscrito()" style="display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:var(--radius-sm);border:none;background:var(--azul);color:#fff;font-size:0.72rem;cursor:pointer;font-weight:600;font-family:'JetBrains Mono',monospace;transition:all 0.15s;">
+              ✍️ Redactar escrito
+            </button>
+            <!-- CERRAR EXPEDIENTE -->
+            <button id="btn-cerrar-exp" onclick="confirmarCerrarExpediente()" style="display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:var(--radius-sm);border:1px solid rgba(192,22,26,0.3);background:rgba(192,22,26,0.06);font-size:0.7rem;color:var(--rojo);cursor:pointer;font-weight:600;font-family:'JetBrains Mono',monospace;">
+              📦 Cerrar exp.
+            </button>
           </div>
         </div>
-        <!-- CUERPO: DOS COLUMNAS -->
-        <div style="display:grid;grid-template-columns:1fr 380px;gap:18px;align-items:start;">
-          <!-- ══ COLUMNA IZQUIERDA: HISTORIAL CRONOLÓGICO ══ -->
-          <div>
-            <!-- Botón nueva entrada -->
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-              <div style="font-family:monospace;font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--gold-d);font-weight:700;">▪ Historial Cronológico del Expediente</div>
-              <button class="btn btn-primary btn-sm" onclick="hjAbrirNueva()">＋ Nueva entrada</button>
+
+        <!-- STATS -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border-l);flex-shrink:0;">
+          <div style="padding:10px 18px;border-right:1px solid var(--border-l);">
+            <div id="mexp-stat-docs" style="font-size:1.25rem;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace;">—</div>
+            <div style="font-size:0.62rem;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:0.08em;">Docs en R2</div>
+          </div>
+          <div style="padding:10px 18px;border-right:1px solid var(--border-l);">
+            <div id="mexp-stat-hist" style="font-size:1.25rem;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace;">—</div>
+            <div style="font-size:0.62rem;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:0.08em;">Historial</div>
+          </div>
+          <div style="padding:10px 18px;border-right:1px solid var(--border-l);">
+            <div id="mexp-stat-leyes" style="font-size:1.25rem;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace;">0</div>
+            <div style="font-size:0.62rem;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:0.08em;">Leyes activas</div>
+          </div>
+          <div style="padding:10px 18px;">
+            <div id="mexp-stat-aud" style="font-size:1.25rem;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace;">—</div>
+            <div style="font-size:0.62rem;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:0.08em;">Próx. audiencia</div>
+          </div>
+        </div>
+
+        <!-- CUERPO 3 COLUMNAS -->
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);flex:1;overflow:hidden;min-height:0;">
+
+          <!-- ── COL 1: DOCUMENTOS R2 ── -->
+          <div style="border-right:1px solid var(--border-l);display:flex;flex-direction:column;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border-l);flex-shrink:0;">
+              <span style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);font-weight:700;">Documentos R2</span>
+              <label style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;border:1px solid var(--border-l);background:var(--gold-bg);color:var(--gold-d);font-size:0.62rem;cursor:pointer;font-weight:700;" title="Subir PDF a R2">
+                ＋ Subir
+                <input type="file" id="r2-file-input" accept="application/pdf" style="display:none;" onchange="subirDocR2(this)">
+              </label>
             </div>
-            <!-- Formulario nueva entrada (oculto por defecto) -->
-            <div id="hj-form" style="display:none;background:rgba(200,149,42,0.04);border:1.5px solid rgba(200,149,42,0.2);border-radius:10px;padding:16px;margin-bottom:16px;">
-              <!-- Fecha y Tipo -->
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div id="mexp-r2-lista" style="flex:1;overflow-y:auto;padding:10px 12px;"></div>
+          </div>
+
+          <!-- ── COL 2: HISTORIAL ── -->
+          <div style="border-right:1px solid var(--border-l);display:flex;flex-direction:column;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border-l);flex-shrink:0;">
+              <span style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);font-weight:700;">Historial cronológico</span>
+              <button onclick="abrirFormHistorial()" style="display:flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;border:1px solid var(--border-l);background:var(--gold-bg);color:var(--gold-d);font-size:0.62rem;cursor:pointer;font-weight:700;">＋ Entrada</button>
+            </div>
+            <!-- Formulario nueva entrada historial (oculto) -->
+            <div id="mexp-hist-form" style="display:none;padding:10px 12px;border-bottom:1px solid var(--border-l);background:var(--surface2);flex-shrink:0;">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
                 <div>
-                  <label style="font-family:monospace;font-size:0.55rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.1em;display:block;margin-bottom:4px;">Fecha</label>
-                  <input type="date" id="hj-fecha" style="width:100%;border:1.5px solid var(--border-l);border-radius:6px;padding:7px 10px;font-family:monospace;font-size:0.8rem;background:var(--surface);color:var(--ink);outline:none;">
+                  <div style="font-size:0.58rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:3px;">Fecha</div>
+                  <input type="date" id="mexp-hf-fecha" style="width:100%;padding:5px 8px;border:1px solid var(--border-l);border-radius:4px;font-size:0.76rem;background:var(--surface);color:var(--ink);">
                 </div>
                 <div>
-                  <label style="font-family:monospace;font-size:0.55rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.1em;display:block;margin-bottom:4px;">Tipo de entrada</label>
-                  <select id="hj-tipo" onchange="hjTipoChange()" style="width:100%;border:1.5px solid var(--border-l);border-radius:6px;padding:7px 10px;font-family:sans-serif;font-size:0.82rem;background:var(--surface);color:var(--ink);outline:none;">
-                    <option value="escrito">✍️ Escrito presentado</option>
+                  <div style="font-size:0.58rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:3px;">Tipo</div>
+                  <select id="mexp-hf-tipo" style="width:100%;padding:5px 8px;border:1px solid var(--border-l);border-radius:4px;font-size:0.76rem;background:var(--surface);color:var(--ink);">
+                    <option value="escrito">✍️ Escrito</option>
                     <option value="acuerdo">⚖️ Acuerdo judicial</option>
                     <option value="requerimiento">📋 Requerimiento</option>
                     <option value="notificacion">📬 Notificación</option>
-                    <option value="diligencia">🔧 Diligencia / Gestión</option>
                     <option value="audiencia">🏛️ Audiencia</option>
-                    <option value="apelacion">📤 Apelación / Recurso</option>
+                    <option value="apelacion">📤 Apelación/Recurso</option>
                     <option value="nota">📌 Nota interna</option>
-                    <option value="libre">✏️ Texto libre...</option>
                   </select>
-                  <input id="hj-tipo-libre" type="text" placeholder="Escribe el tipo..."
-                    style="display:none;width:100%;margin-top:6px;border:1.5px solid var(--gold);border-radius:6px;padding:7px 10px;font-family:sans-serif;font-size:0.82rem;background:var(--surface);color:var(--ink);outline:none;">
                 </div>
               </div>
-              <div style="margin-bottom:12px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-                  <label style="font-family:monospace;font-size:0.55rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.1em;">Fecha de notificación <span style="color:rgba(200,149,42,0.4);font-size:0.5rem;">(opcional)</span></label>
-                  <button type="button" onclick="hjToggleNotif()" id="btn-add-notif"
-                    style="font-family:monospace;font-size:0.52rem;padding:2px 10px;border-radius:10px;border:1px solid rgba(200,149,42,0.3);background:rgba(200,149,42,0.05);color:var(--gold-d);cursor:pointer;">
-                    + Agregar notificación
-                  </button>
-                </div>
-                <div id="hj-notif-wrap" style="display:none;">
-                  <input type="date" id="hj-fecha-notif"
-                    style="width:100%;border:1.5px solid rgba(200,149,42,0.4);border-radius:6px;padding:7px 10px;font-family:monospace;font-size:0.8rem;background:var(--surface);color:var(--ink);outline:none;">
-                </div>
-              </div>
-              <!-- ══ MÓDULO OCR GEMINI ══ -->
-              <div class="ocr-mod-wrap">
-                <!-- Botones del módulo OCR — estilo botón como en la imagen -->
-                <div style="display:flex;gap:8px;margin-bottom:12px;">
-                  <button id="ocr-btn-subir"
-                    onclick="ocrModTab('subir',this)"
-                    style="flex:1;padding:9px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;border:1.5px solid var(--gold);background:rgba(200,149,42,0.15);color:var(--gold-l);font-family:monospace;transition:all 0.18s;text-align:center;">
-                    📤 Subir archivo
-                  </button>
-                  <button id="ocr-btn-drive"
-                    onclick="ocrModTab('drive',this)"
-                    style="flex:1;padding:9px 14px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:600;border:1.5px solid rgba(200,149,42,0.25);background:rgba(200,149,42,0.05);color:rgba(200,149,42,0.6);font-family:monospace;transition:all 0.18s;text-align:center;">
-                    🗂️ Google Drive
-                  </button>
-                  <button onclick="ocrAbrirConfig()"
-                    title="Configurar API Key de Gemini"
-                    style="padding:9px 12px;border-radius:8px;cursor:pointer;font-size:0.82rem;border:1.5px solid rgba(200,149,42,0.25);background:rgba(200,149,42,0.05);color:rgba(200,149,42,0.6);font-family:monospace;transition:all 0.18s;white-space:nowrap;"
-                    onmouseover="this.style.background='rgba(200,149,42,0.15)';this.style.color='var(--gold-l)'"
-                    onmouseout="this.style.background='rgba(200,149,42,0.05)';this.style.color='rgba(200,149,42,0.6)'">
-                    ⚙️
-                  </button>
-                </div>
-                <!-- Modal de configuración OCR (inline, oculto por defecto) -->
-                <div id="ocr-cfg-modal" style="display:none;background:var(--surface);border:1.5px solid var(--border-l);border-radius:10px;padding:14px;margin-bottom:12px;">
-                  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border-l);">
-                    <div style="font-family:monospace;font-size:0.65rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--gold-d);">⚙️ Configuración Gemini OCR</div>
-                    <button onclick="ocrCerrarConfig()" style="background:none;border:none;cursor:pointer;font-size:1rem;color:var(--muted);">✕</button>
-                  </div>
-                                    <!-- Token Drive PROMINENTE -->
-                  <div style="background:rgba(26,122,58,0.06);border:1px solid rgba(26,122,58,0.25);border-radius:8px;padding:10px 12px;margin-bottom:12px;">
-                    <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:var(--verde);margin-bottom:6px;">🗂️ TOKEN DE GOOGLE DRIVE</div>
-                    <input type="text" id="ocr-cfg-drive-inline-v2" placeholder="ya29.A0..."
-                      style="width:100%;padding:8px 11px;border:1.5px solid rgba(26,122,58,0.3);border-radius:7px;font-family:monospace;font-size:0.72rem;color:var(--ink);background:#fff;outline:none;margin-bottom:6px;">
-                    <button onclick="ocrGuardarTokenDrive()"
-                      style="width:100%;padding:7px;border-radius:7px;background:var(--verde);color:#fff;border:none;font-family:sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;margin-bottom:4px;">
-                      💾 Guardar token
-                    </button>
-                    <div style="font-size:0.62rem;color:var(--muted);line-height:1.5;">
-                      oauthplayground → Drive API v3 → drive.readonly → fcolex0@gmail.com → Access token (ya29...)
-                    </div>
-                  </div>
-                  <!-- Groq API Key (principal) -->
-                  <div style="margin-bottom:10px;padding:10px 12px;background:rgba(139,92,246,0.06);border:1.5px solid rgba(139,92,246,0.25);border-radius:9px;">
-                    <label style="font-family:monospace;font-size:0.6rem;text-transform:uppercase;color:#7c3aed;letter-spacing:0.08em;display:block;margin-bottom:4px;">🚀 API Key de Groq (GRATIS — recomendado)</label>
-                    <div style="display:flex;gap:6px;">
-                      <input type="password" id="cfg-groq-key" placeholder="gsk_..."
-                        style="flex:1;padding:8px 11px;border:1.5px solid rgba(139,92,246,0.3);border-radius:7px;font-family:monospace;font-size:0.78rem;color:var(--ink);background:#fff;outline:none;"
-                        onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='rgba(139,92,246,0.3)'">
-                      <button onclick="groqTestKey()"
-                        style="padding:8px 12px;border-radius:7px;border:1.5px solid rgba(139,92,246,0.4);background:rgba(139,92,246,0.1);color:#7c3aed;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;white-space:nowrap;">
-                        🧪 Probar
-                      </button>
-                      <button onclick="groqGuardarKey()"
-                        style="padding:8px 12px;border-radius:7px;border:none;background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;white-space:nowrap;">
-                        💾 Guardar
-                      </button>
-                    </div>
-                    <div id="cfg-groq-st" style="font-family:monospace;font-size:0.65rem;margin-top:4px;"></div>
-                    <div style="font-size:0.62rem;color:var(--muted);margin-top:3px;">Gratis en <strong>console.groq.com</strong> → API Keys → Create. Llama 3.3 70B, muy rápido.</div>
-                  </div>
-                  <!-- Mistral API Key (OCR especializado) -->
-                  <div style="margin-bottom:10px;padding:10px 12px;background:rgba(255,140,0,0.06);border:1.5px solid rgba(255,140,0,0.25);border-radius:9px;">
-                    <label style="font-family:monospace;font-size:0.6rem;text-transform:uppercase;color:#d97706;letter-spacing:0.08em;display:block;margin-bottom:4px;">📄 API Key de Mistral (OCR de documentos — GRATIS)</label>
-                    <div style="display:flex;gap:6px;">
-                      <input type="password" id="cfg-mistral-key" placeholder="..."
-                        style="flex:1;padding:8px 11px;border:1.5px solid rgba(255,140,0,0.3);border-radius:7px;font-family:monospace;font-size:0.78rem;color:var(--ink);background:#fff;outline:none;"
-                        onfocus="this.style.borderColor='#d97706'" onblur="this.style.borderColor='rgba(255,140,0,0.3)'">
-                      <button onclick="mistralTestKey()"
-                        style="padding:8px 12px;border-radius:7px;border:1.5px solid rgba(255,140,0,0.4);background:rgba(255,140,0,0.1);color:#d97706;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;white-space:nowrap;">
-                        🧪 Probar
-                      </button>
-                      <button onclick="mistralGuardarKey()"
-                        style="padding:8px 12px;border-radius:7px;border:none;background:linear-gradient(135deg,#d97706,#b45309);color:#fff;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;white-space:nowrap;">
-                        💾 Guardar
-                      </button>
-                    </div>
-                    <div id="cfg-mistral-st" style="font-family:monospace;font-size:0.65rem;margin-top:4px;"></div>
-                    <div style="font-size:0.62rem;color:var(--muted);margin-top:3px;">Gratis en <strong>console.mistral.ai</strong> → API Keys. Extrae texto de PDFs e imágenes sin gastar tokens de visión.</div>
-                  </div>
-                  <!-- API Key -->
-                  <div style="margin-bottom:10px;">
-                    <label style="font-family:monospace;font-size:0.6rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;display:block;margin-bottom:4px;">API Key de Gemini (Google AI Studio) — fallback</label>
-                    <div style="display:flex;gap:6px;">
-                      <input type="password" id="ocr-cfg-key-inline" placeholder="AIzaSy..."
-                        style="flex:1;padding:8px 11px;border:1.5px solid var(--border-l);border-radius:7px;font-family:monospace;font-size:0.78rem;color:var(--ink);background:#fff;outline:none;"
-                        onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border-l)'">
-                      <button onclick="ocrTestKeyInline()"
-                        style="padding:8px 12px;border-radius:7px;border:1.5px solid rgba(200,149,42,0.4);background:rgba(200,149,42,0.08);color:var(--gold-d);font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;white-space:nowrap;">
-                        🧪 Probar
-                      </button>
-                    </div>
-                    <div id="ocr-cfg-key-st" style="font-family:monospace;font-size:0.65rem;margin-top:4px;"></div>
-                    <div style="font-size:0.65rem;color:var(--muted);margin-top:3px;">Gratis en <strong>aistudio.google.com</strong> → "Get API key" → "Create API key"</div>
-                  </div>
-                  <!-- Drive Token -->
-                  <div style="margin-bottom:10px;">
-                    <label style="font-family:monospace;font-size:0.6rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;display:block;margin-bottom:4px;">Token de Google Drive (para buscar en Drive)</label>
-                    <input type="password" id="ocr-cfg-drive-inline" placeholder="ya29.A0..."
-                      style="width:100%;padding:8px 11px;border:1.5px solid var(--border-l);border-radius:7px;font-family:monospace;font-size:0.78rem;color:var(--ink);background:#fff;outline:none;"
-                      onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border-l)'">
-                    <div style="font-size:0.62rem;color:var(--muted);margin-top:3px;">Genera en <strong>developers.google.com/oauthplayground</strong> con scope <code>drive.readonly</code>. Dura ~1h.</div>
-                  </div>
-                  <!-- Profundidad -->
-                  <div style="margin-bottom:10px;">
-                    <label style="font-family:monospace;font-size:0.6rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;display:block;margin-bottom:4px;">Profundidad del resumen</label>
-                    <select id="ocr-cfg-prof-inline"
-                      style="width:100%;padding:8px 11px;border:1.5px solid var(--border-l);border-radius:7px;font-family:sans-serif;font-size:0.82rem;color:var(--ink);background:#fff;outline:none;">
-                      <option value="ejecutivo">Ejecutivo (breve)</option>
-                      <option value="detallado" selected>Detallado (completo)</option>
-                      <option value="tecnico">Técnico-jurídico</option>
-                    </select>
-                  </div>
-                  <!-- Instrucciones fijas -->
-                  <div style="margin-bottom:10px;">
-                    <label style="font-family:monospace;font-size:0.6rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.08em;display:block;margin-bottom:4px;">Instrucciones fijas del despacho</label>
-                    <textarea id="ocr-cfg-extra-inline" rows="2"
-                      placeholder="Ej: Siempre incluye prestaciones reclamadas y próximas audiencias..."
-                      style="width:100%;padding:8px 11px;border:1.5px solid var(--border-l);border-radius:7px;font-family:sans-serif;font-size:0.8rem;color:var(--ink);background:#fff;outline:none;resize:none;"></textarea>
-                  </div>
-                  <button onclick="ocrGuardarConfigInline()"
-                    style="width:100%;padding:8px;border-radius:8px;background:linear-gradient(135deg,var(--gold),var(--gold-d));color:#fff;border:none;font-family:sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;">
-                    💾 Guardar configuración
-                  </button>
-                </div>
-                <!-- Tab: Subir archivo -->
-                <div id="ocr-tab-subir">
-                  <div class="ocr-upload-zone" id="ocr-uz" ondragover="ocrDov(event)" ondragleave="ocrDlv()" ondrop="ocrDdr(event)">
-                    <input type="file" id="ocr-fi" accept="image/jpeg,image/png,image/webp,image/heic,application/pdf,.docx,.doc,.xlsx,.xls" multiple onchange="ocrFilesIn(this.files)">
-                    <span style="font-size:1.6rem;display:block;margin-bottom:8px;">📎</span>
-                    <div style="font-size:0.82rem;font-weight:600;color:var(--ink);margin-bottom:4px;">Arrastra o haz clic para seleccionar</div>
-                    <div style="font-size:0.68rem;color:var(--muted);">PDF · Imágenes · Word (.docx) · Excel (.xlsx) · Múltiples archivos</div>
-                  </div>
-                  <div class="ocr-prev-grid" id="ocr-pg"></div>
-                  <!-- Tipo de juicio chips -->
-                  <div style="margin-bottom:8px;">
-                    <div style="font-family:monospace;font-size:0.58rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.1em;margin-bottom:6px;">Tipo de juicio</div>
-                    <div class="ocr-chips" id="ocr-chips-s">
-                      <div class="ocr-chip civil active" onclick="ocrSelChip(this,'Civil','ocr-chips-s')">Civil</div>
-                      <div class="ocr-chip penal" onclick="ocrSelChip(this,'Penal','ocr-chips-s')">Penal</div>
-                      <div class="ocr-chip mercantil" onclick="ocrSelChip(this,'Mercantil','ocr-chips-s')">Mercantil</div>
-                      <div class="ocr-chip laboral" onclick="ocrSelChip(this,'Laboral','ocr-chips-s')">Laboral</div>
-                      <div class="ocr-chip admin" onclick="ocrSelChip(this,'Administrativo','ocr-chips-s')">Administrativo</div>
-                      <div class="ocr-chip familiar" onclick="ocrSelChip(this,'Familiar','ocr-chips-s')">Familiar</div>
-                    </div>
-                  </div>
-                  <button onclick="ocrAnalizarSubidos()" style="width:100%;padding:9px;border-radius:8px;background:linear-gradient(135deg,var(--gold),var(--gold-d));color:#fff;border:none;font-family:sans-serif;font-size:0.85rem;font-weight:600;cursor:pointer;margin-bottom:8px;">
-                    🔍 Analizar con Gemini AI
-                  </button>
-                  <!-- Progreso subida -->
-                  <div class="ocr-prog" id="ocr-pw-s">
-                    <div class="ocr-spin"></div>
-                    <div style="flex:1;">
-                      <div id="ocr-pl-s" style="margin-bottom:4px;">Procesando...</div>
-                      <div class="ocr-prog-steps">
-                        <div class="ocr-step" id="ocr-s1">1. Leyendo</div>
-                        <div class="ocr-step" id="ocr-s2">2. Enviando</div>
-                        <div class="ocr-step" id="ocr-s3">3. OCR + análisis</div>
-                        <div class="ocr-step" id="ocr-s4">4. Resumen</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <!-- Tab: Google Drive -->
-                <div id="ocr-tab-drive" class="hidden">
-                  <div class="ocr-drive-st off" id="ocr-dst">
-                    <div class="ocr-st-dot"></div>
-                    <span id="ocr-dst-txt">Sin conexión · haz clic en "Conectar Drive"</span>
-                  </div>
-                  <div id="ocr-drive-connect-btn" style="display:none;margin-bottom:10px;">
-                    <button onclick="driveIniciarOAuth()"
-                      style="width:100%;padding:10px;border-radius:8px;background:linear-gradient(135deg,#1a7a3a,#0f5228);color:#fff;border:none;font-family:sans-serif;font-size:0.88rem;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;">
-                      ⚡ Conectar Google Drive permanentemente
-                    </button>
-                    <div style="font-size:0.65rem;color:var(--muted);text-align:center;margin-top:5px;">Solo necesitas hacerlo una vez. El sistema se conecta automáticamente después.</div>
-                  </div>
-                  <div class="ocr-drive-search">
-                    <input type="text" id="ocr-ds-inp" placeholder="Buscar expediente o cliente..." onkeydown="if(event.key==='Enter')ocrBuscarDrive()">
-                    <button onclick="ocrBuscarDrive()" style="padding:7px 11px;border-radius:7px;border:1.5px solid var(--border-l);background:var(--surface2);color:var(--muted);font-size:0.78rem;cursor:pointer;">🔍</button>
-                    <button onclick="ocrListarDrive()" style="padding:7px 11px;border-radius:7px;border:1.5px solid var(--border-l);background:var(--surface2);color:var(--muted);font-size:0.78rem;cursor:pointer;">📂 Ver todo</button>
-                  </div>
-                  <div class="ocr-drive-list" id="ocr-dl">
-                    <div style="padding:18px;text-align:center;color:var(--muted);font-size:0.78rem;">Haz clic en "Ver todo" para listar tus archivos</div>
-                  </div>
-                  <!-- Tipo de juicio chips drive -->
-                  <div style="margin:8px 0;">
-                    <div class="ocr-chips" id="ocr-chips-d">
-                      <div class="ocr-chip civil active" onclick="ocrSelChip(this,'Civil','ocr-chips-d')">Civil</div>
-                      <div class="ocr-chip penal" onclick="ocrSelChip(this,'Penal','ocr-chips-d')">Penal</div>
-                      <div class="ocr-chip mercantil" onclick="ocrSelChip(this,'Mercantil','ocr-chips-d')">Mercantil</div>
-                      <div class="ocr-chip laboral" onclick="ocrSelChip(this,'Laboral','ocr-chips-d')">Laboral</div>
-                      <div class="ocr-chip admin" onclick="ocrSelChip(this,'Administrativo','ocr-chips-d')">Administrativo</div>
-                      <div class="ocr-chip familiar" onclick="ocrSelChip(this,'Familiar','ocr-chips-d')">Familiar</div>
-                    </div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="font-size:0.7rem;color:var(--muted);"><span id="ocr-sel-n">0</span> seleccionado(s)</span>
-                    <button onclick="ocrAnalizarDrive()" style="margin-left:auto;padding:8px 16px;border-radius:8px;background:linear-gradient(135deg,var(--gold),var(--gold-d));color:#fff;border:none;font-family:sans-serif;font-size:0.82rem;font-weight:600;cursor:pointer;">
-                      🔍 Analizar selección
-                    </button>
-                  </div>
-                  <!-- Progreso Drive -->
-                  <div class="ocr-prog" id="ocr-pw-d">
-                    <div class="ocr-spin"></div>
-                    <div style="flex:1;">
-                      <div id="ocr-pl-d" style="margin-bottom:4px;">Procesando...</div>
-                      <div class="ocr-prog-steps">
-                        <div class="ocr-step" id="ocr-d1">1. Descargando</div>
-                        <div class="ocr-step" id="ocr-d2">2. Convirtiendo</div>
-                        <div class="ocr-step" id="ocr-d3">3. Gemini OCR</div>
-                        <div class="ocr-step" id="ocr-d4">4. Resumen</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <!-- Resultado del análisis OCR -->
-                <div class="ocr-result" id="ocr-result">
-                  <div class="ocr-res-hdr">
-                    <span style="font-size:1.1rem;">⚖️</span>
-                    <div style="flex:1;font-family:serif;font-size:0.9rem;color:var(--gold-l);">Análisis completado</div>
-                    <span class="ocr-res-badge">✓ LISTO</span>
-                  </div>
-                  <div class="ocr-res-body">
-                    <div class="ocr-res-sec">
-                      <div class="ocr-res-title">📋 Datos del juicio</div>
-                      <div class="ocr-campos-grid" id="ocr-r-datos"></div>
-                    </div>
-                    <div class="ocr-res-sec" id="ocr-r-partes-sec">
-                      <div class="ocr-res-title">👥 Partes</div>
-                      <div class="ocr-partes" id="ocr-r-partes"></div>
-                    </div>
-                    <div class="ocr-res-sec">
-                      <div class="ocr-res-title">📝 Resumen ejecutivo</div>
-                      <div class="ocr-res-txt" id="ocr-r-resumen"></div>
-                    </div>
-                    <div class="ocr-res-sec">
-                      <div class="ocr-res-title">📌 Hechos relevantes</div>
-                      <ul class="ocr-tl" id="ocr-r-tl"></ul>
-                    </div>
-                    <div class="ocr-res-sec">
-                      <div class="ocr-res-title">🔤 Texto OCR</div>
-                      <div class="ocr-txt-box" id="ocr-r-ocr"></div>
-                    </div>
-                  </div>
-                  <div class="ocr-res-actions">
-                    <button class="ocr-btn-usar" onclick="ocrUsarResumen()">✅ Usar resumen en entrada</button>
-                    <button class="ocr-btn-sec" onclick="ocrNuevoAnalisis()">🔄 Nuevo análisis</button>
-                  </div>
-                </div>
-                <div class="ocr-no-key" id="ocr-no-key">
-                  ⚠ Configura tu API Key de Gemini en <strong>⚙️ Configuración</strong> → sección "Gemini OCR"
-                </div>
-              </div>
-              <!-- ══ FIN MÓDULO OCR ══ -->
-              <!-- Contenido manual -->
-              <div style="margin-bottom:10px;">
-                <label style="font-family:monospace;font-size:0.55rem;text-transform:uppercase;color:var(--muted);letter-spacing:0.1em;display:block;margin-bottom:4px;">Contenido <span style="color:rgba(139,92,246,0.6);font-size:0.5rem;">· El análisis OCR se cargará aquí automáticamente, o escribe manualmente</span></label>
-                <textarea id="hj-texto" rows="5" placeholder="El resumen del análisis OCR aparecerá aquí automáticamente. También puedes escribir manualmente o pegar texto de NotebookLM..."
-                  style="width:100%;border:1.5px solid var(--border-l);border-radius:6px;padding:10px 12px;font-family:sans-serif;font-size:0.84rem;color:var(--ink);background:var(--surface);outline:none;resize:vertical;line-height:1.6;box-sizing:border-box;transition:border-color 0.15s;"
-                  onfocus="this.style.borderColor='var(--gold)'" onblur="this.style.borderColor='var(--border-l)'"></textarea>
-              </div>
-              <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;">
-                <button id="btn-analizar-texto" onclick="ocrAnalizarTextoPlano()"
-                  style="display:inline-flex;align-items:center;gap:6px;padding:7px 13px;border-radius:8px;font-size:0.75rem;font-weight:600;cursor:pointer;border:1.5px solid rgba(200,149,42,0.4);background:rgba(200,149,42,0.07);color:var(--gold-d);font-family:monospace;transition:all 0.18s;letter-spacing:0.03em;"
-                  onmouseover="this.style.background='rgba(200,149,42,0.15)';this.style.borderColor='var(--gold)'"
-                  onmouseout="this.style.background='rgba(200,149,42,0.07)';this.style.borderColor='rgba(200,149,42,0.4)'">
-                  ✨ Analizar texto con IA
-                </button>
-                <div style="display:flex;gap:8px;">
-                  <button class="btn btn-ghost btn-sm" onclick="hjCerrarForm()">Cancelar</button>
-                  <button class="btn btn-primary" onclick="hjGuardar()">💾 Guardar entrada</button>
-                </div>
-              </div>
-              <div id="ocr-texto-prog" style="display:none;align-items:center;gap:8px;padding:8px 12px;background:rgba(200,149,42,0.05);border:1px solid rgba(200,149,42,0.2);border-radius:8px;font-family:monospace;font-size:0.63rem;color:var(--gold-d);margin-top:8px;">
-                <div style="width:13px;height:13px;border:2px solid rgba(200,149,42,0.2);border-top-color:var(--gold);border-radius:50%;animation:ocrSpin 0.7s linear infinite;flex-shrink:0;"></div>
-                <span id="ocr-texto-prog-msg">Analizando...</span>
+              <textarea id="mexp-hf-texto" rows="3" placeholder="Descripción de la entrada..." style="width:100%;padding:6px 8px;border:1px solid var(--border-l);border-radius:4px;font-size:0.76rem;background:var(--surface);color:var(--ink);resize:none;font-family:sans-serif;"></textarea>
+              <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px;">
+                <button onclick="cerrarFormHistorial()" style="padding:5px 12px;border-radius:4px;border:1px solid var(--border-l);background:none;color:var(--muted);font-size:0.72rem;cursor:pointer;">Cancelar</button>
+                <button onclick="guardarEntradaHistorial()" style="padding:5px 12px;border-radius:4px;border:none;background:var(--gold);color:#fff;font-size:0.72rem;cursor:pointer;font-weight:700;">💾 Guardar</button>
               </div>
             </div>
-            <!-- Lista del historial -->
-            <div id="hj-lista" style="display:flex;flex-direction:column;gap:12px;"></div>
+            <div id="mexp-historial-lista" style="flex:1;overflow-y:auto;padding:12px 14px;"></div>
           </div>
-          <!-- ══ COLUMNA DERECHA: IA + TÉRMINOS ══ -->
-          <div style="position:sticky;top:80px;display:flex;flex-direction:column;gap:14px;">
-            <!-- TÉRMINOS ACTIVOS -->
-            <div style="background:var(--surface);border:1px solid var(--border-l);border-radius:10px;overflow:hidden;">
-              <div style="padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border-l);display:flex;align-items:center;justify-content:space-between;">
-                <span style="font-family:monospace;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);">⏱ Términos y Audiencias</span>
-                <button onclick="hjAbrirTerminoManual()" style="background:none;border:1px solid rgba(200,149,42,0.3);border-radius:12px;padding:2px 10px;cursor:pointer;font-family:monospace;font-size:0.52rem;color:var(--gold-d);">＋ Manual</button>
+
+          <!-- ── COL 3: ANÁLISIS IA ── -->
+          <div style="display:flex;flex-direction:column;overflow:hidden;">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border-l);flex-shrink:0;">
+              <span style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);font-weight:700;">Análisis IA</span>
+              <div style="display:flex;gap:4px;">
+                <span style="font-size:0.58rem;padding:2px 7px;border-radius:20px;background:var(--azul-l);color:var(--azul);border:1px solid rgba(26,74,138,0.2);">Mistral OCR</span>
+                <span style="font-size:0.58rem;padding:2px 7px;border-radius:20px;background:var(--verde-l);color:var(--verde-d);border:1px solid rgba(26,122,58,0.2);">Gemini 2.5</span>
               </div>
-              <div id="hj-terminos" style="padding:10px 12px;max-height:200px;overflow-y:auto;"></div>
             </div>
-          </div><!-- /columna derecha -->
-        </div><!-- /grid -->
-      </div><!-- /juicio-detalle -->
+            <div style="flex:1;display:flex;flex-direction:column;padding:12px 14px;gap:10px;overflow:hidden;">
+              <!-- Resumen IA -->
+              <div style="background:var(--surface2);border:1px solid var(--border-l);border-radius:var(--radius-sm);padding:10px 12px;flex-shrink:0;">
+                <div style="font-size:0.58rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:5px;">✨ Resumen del expediente</div>
+                <div id="mexp-ia-resumen" style="font-size:0.76rem;color:var(--ink);line-height:1.6;">Selecciona un expediente y presiona «Analizar» para obtener un resumen con IA.</div>
+                <button onclick="analizarExpedienteIA()" style="margin-top:8px;width:100%;padding:7px;border-radius:var(--radius-sm);background:linear-gradient(135deg,var(--gold),var(--gold-d));color:#fff;border:none;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:sans-serif;">🔍 Analizar expediente con IA</button>
+              </div>
+              <!-- Chips rápidos -->
+              <div style="display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0;">
+                <button onclick="preguntaRapidaIA('argumentos')" style="font-size:0.65rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);cursor:pointer;">Argumentos clave ↗</button>
+                <button onclick="preguntaRapidaIA('riesgos')" style="font-size:0.65rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);cursor:pointer;">Riesgos ↗</button>
+                <button onclick="preguntaRapidaIA('resumen-cliente')" style="font-size:0.65rem;padding:4px 10px;border-radius:20px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);cursor:pointer;">Resumen cliente ↗</button>
+              </div>
+              <!-- Chat IA -->
+              <div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px;min-height:0;" id="mexp-ia-chat"></div>
+              <!-- Input IA -->
+              <div style="display:flex;gap:6px;flex-shrink:0;padding-top:8px;border-top:1px solid var(--border-l);">
+                <input type="text" id="mexp-ia-input" placeholder="Pregunta sobre este expediente..." style="flex:1;padding:7px 10px;border:1px solid var(--border-l);border-radius:var(--radius-sm);font-size:0.76rem;background:var(--surface);color:var(--ink);" onkeydown="if(event.key==='Enter')enviarPreguntaIA()">
+                <button onclick="enviarPreguntaIA()" style="padding:7px 11px;border-radius:var(--radius-sm);border:1px solid var(--border-l);background:var(--surface);color:var(--muted);cursor:pointer;font-size:0.8rem;">↗</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- MODAL SELECTOR DE LEYES -->
+      <div id="modal-leyes-caso" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.35);z-index:40;align-items:center;justify-content:center;">
+        <div style="background:var(--surface);border:1px solid var(--border-l);border-radius:var(--radius);width:360px;max-height:85%;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border-l);">
+            <div>
+              <div style="font-size:0.88rem;font-weight:700;color:var(--ink);">Leyes del caso</div>
+              <div style="font-size:0.65rem;color:var(--muted);margin-top:2px;">Selecciona las que usará la IA</div>
+            </div>
+            <button onclick="cerrarModalLeyes()" style="background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--muted);padding:2px 6px;border-radius:4px;">✕</button>
+          </div>
+          <div id="modal-leyes-lista" style="flex:1;overflow-y:auto;padding:10px 12px;max-height:320px;"></div>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 14px;border:1px dashed var(--border-l);border-radius:var(--radius-sm);cursor:pointer;margin:0 12px 10px;font-size:0.72rem;color:var(--muted);">
+            📤 Subir nueva ley al despacho
+            <input type="file" id="ley-file-input" accept="application/pdf" style="display:none;" onchange="subirNuevaLey(this)">
+          </label>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--border-l);">
+            <span id="modal-leyes-count-txt" style="font-size:0.68rem;color:var(--muted);">0 leyes activas</span>
+            <button onclick="cerrarModalLeyes()" style="padding:7px 16px;border-radius:var(--radius-sm);border:none;background:var(--verde);color:#fff;font-size:0.76rem;font-weight:700;cursor:pointer;">✓ Confirmar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL REDACTAR ESCRITO -->
+      <div id="modal-redactar-escrito" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,0.35);z-index:40;align-items:center;justify-content:center;">
+        <div style="background:var(--surface);border:1px solid var(--border-l);border-radius:var(--radius);width:420px;display:flex;flex-direction:column;overflow:hidden;">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border-l);">
+            <div style="font-size:0.88rem;font-weight:700;color:var(--ink);">Redactar escrito</div>
+            <button onclick="cerrarModalEscrito()" style="background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--muted);padding:2px 6px;border-radius:4px;">✕</button>
+          </div>
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px;">
+            <div>
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px;">Tipo de escrito</div>
+              <select id="escrito-tipo-sel" style="width:100%;padding:7px 10px;border:1px solid var(--border-l);border-radius:var(--radius-sm);font-size:0.8rem;background:var(--surface);color:var(--ink);">
+                <option value="demanda">Escrito de demanda inicial</option>
+                <option value="contestacion">Contestación de demanda</option>
+                <option value="apelacion">Recurso de apelación</option>
+                <option value="amparo">Amparo indirecto</option>
+                <option value="pruebas">Escrito de ofrecimiento de pruebas</option>
+                <option value="alegatos">Alegatos</option>
+                <option value="promocion">Promoción general</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px;">Leyes activas para este escrito</div>
+              <div id="escrito-leyes-chips" style="display:flex;gap:5px;flex-wrap:wrap;min-height:24px;"></div>
+            </div>
+            <div>
+              <div style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:4px;">Instrucciones adicionales <span style="font-size:0.55rem;color:var(--muted);text-transform:none;">(opcional)</span></div>
+              <textarea id="escrito-instrucciones" rows="3" placeholder="Ej: incluir prestaciones específicas, tono formal..." style="width:100%;padding:7px 10px;border:1px solid var(--border-l);border-radius:var(--radius-sm);font-size:0.78rem;background:var(--surface);color:var(--ink);resize:none;font-family:sans-serif;"></textarea>
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;padding:10px 16px;border-top:1px solid var(--border-l);">
+            <button onclick="cerrarModalEscrito()" style="padding:7px 16px;border-radius:var(--radius-sm);border:1px solid var(--border-l);background:none;font-size:0.78rem;color:var(--muted);cursor:pointer;">Cancelar</button>
+            <button onclick="generarEscritorIA()" style="padding:7px 18px;border-radius:var(--radius-sm);border:none;background:var(--azul);color:#fff;font-size:0.78rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;">✨ Generar con IA</button>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /panel-juicios -->
     <!-- ═══ PENDIENTES ═══ -->
     <div id="panel-pendientes" class="panel">
@@ -5126,7 +4969,7 @@ window.addEventListener('offline', ()=>{
   <div id="header-pago-btns" style="align-items:center;">
     <button class="btn-pago-parcial" onclick="ejecutarPagoParcial()">💰 PAGO PARCIAL</button>
     <button class="btn-liquidacion" onclick="ejecutarLiquidacionTotal()">✅ PAGO TOTAL</button>
-    <button class="btn-serv-comp" onclick="ejecutarServicioComplementario()" style="background:linear-gradient(135deg,#fff0e0,#fde8cc);border:1.5px solid #d4a060;color:#7a4010;font-family:'DM Mono',monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.08em;padding:7px 14px;border-radius:6px;cursor:pointer;">＋ SERVICIO COMPLEMENTARIO</button>
+    <button class="btn-serv-comp" onclick="ejecutarServicioComplementario()">＋ SERVICIO COMPLEMENTARIO</button>
     <button class="btn-cerrar-consulta" onclick="cerrarConsulta()">✕ CERRAR CONSULTA</button>
     <button class="btn-cancelado" onclick="ejecutarTramiteCancelado()">Anular trámite &rsaquo;&rsaquo;&rsaquo;</button>
   </div>
@@ -5215,6 +5058,9 @@ window.addEventListener('offline', ()=>{
               <input type="text" id="expediente_buscar" placeholder="Ej: ARCH-00001" autocomplete="off"
                 oninput="this.value=this.value.toUpperCase();cargarHistorialExpediente()"
                 style="max-width:160px;border-color:#2a7a3a !important;font-family:'DM Mono',monospace;letter-spacing:0.05em;">
+            </div>
+            <div style="flex-shrink:0;align-self:flex-end;padding-bottom:2px;">
+              <button onclick="abrirFichaFolio()" style="font-family:'DM Mono',monospace;font-size:0.62rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:7px 13px;border-radius:4px;cursor:pointer;border:2px solid #8B6914;background:#FEF9EC;color:#6B4F0A;transition:all 0.2s;" onmouseover="this.style.background='#FDE8A0'" onmouseout="this.style.background='#FEF9EC'">📋 Ficha del Folio</button>
             </div>
           </div>
           <!-- Historial de pagos del folio (A, B, C...) -->
@@ -6585,6 +6431,31 @@ async function sincronizarFolio(forzarSB){
         if(data.data.retro_global !== undefined) D.retro_global = data.data.retro_global;
         // Migrar pendientes legacy: marca/clase → vehMarca/vehClase
         D.pendientes.forEach(p=>{ if(p.seccion==='placas'){ if(!p.vehMarca&&p.marca) p.vehMarca=p.marca; if(!p.vehClase&&p.clase) p.vehClase=p.clase; } });
+        // ── LIMPIEZA INMEDIATA: eliminar pendientes de placas cuyo recibo ya está liquidado ──
+        // Se corre aquí porque Supabase acaba de sobreescribir D.pendientes con los datos del servidor
+        (function _limpiarPlacasLiquidadas(){
+          if(!Array.isArray(appData.recibos)) return;
+          var _lbSB = JSON.parse(localStorage.getItem('lex-placas-liquidados') || '[]');
+          var _borrados = 0;
+          D.pendientes = D.pendientes.filter(function(p){
+            if(p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
+            var _versLb = appData.recibos.filter(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
+            // Eliminar si: no existe el recibo, está cancelado, o el saldo mínimo entre todas las versiones es 0
+            var saldo = _versLb.reduce(function(m,r){ var s=parseFloat(r.saldoPendiente); return isNaN(s)?m:Math.min(m,s); }, Infinity);
+            var _cancelLb = _versLb.some(function(r){ return r.cancelado; });
+            if(_versLb.length === 0 || _cancelLb || !(saldo > 0)){
+              var fs = String(p.reciboVinculadoFolio);
+              if(_lbSB.indexOf(fs) < 0) _lbSB.push(fs);
+              _borrados++;
+              return false;
+            }
+            return true;
+          });
+          if(_borrados > 0){
+            localStorage.setItem('lex-placas-liquidados', JSON.stringify(_lbSB));
+            console.log('[LEX] Limpieza SB-load: ' + _borrados + ' pendiente(s) de placas liquidados eliminados.');
+          }
+        })();
         // captura_meses: cargar desde Supabase
         const sbCapturaMeses = data.data.captura_meses || {};
         if(Object.keys(sbCapturaMeses).length > 0){
@@ -8269,7 +8140,7 @@ function cargarHistorialFolio(){
     histDiv.style.display='none';
   }
   // Activar modo consulta siempre que haya un folio válido (con o sin saldo)
-  reciboEnConsulta = saldo > 0 ? recibo : null;
+  reciboEnConsulta = recibo;
   activarModoConsulta(recibo);
 }
 async function activarModoConsulta(recibo){
@@ -10082,8 +9953,16 @@ function _eliminarPendientePorFolio(folio) {
   const idPend = 'PEND-REC-' + folio;
   const idx = D.pendientes.findIndex(p => 
     p.id === idPend || 
-    (p.reciboVinculadoFolio === folio && p.seccion === 'placas')
+    (Number(p.reciboVinculadoFolio) === Number(folio) && p.seccion === 'placas')
   );
+  // Guardar en lista negra para que sincronizarPendientesPlacas no lo recree
+  try {
+    const _lb = JSON.parse(localStorage.getItem('lex-placas-liquidados') || '[]');
+    if (_lb.indexOf(String(folio)) < 0) {
+      _lb.push(String(folio));
+      localStorage.setItem('lex-placas-liquidados', JSON.stringify(_lb));
+    }
+  } catch(e) {}
   if (idx >= 0) {
     D.pendientes.splice(idx, 1);
     if (typeof save === 'function') save();
@@ -10091,7 +9970,7 @@ function _eliminarPendientePorFolio(folio) {
     if (typeof badges === 'function') badges();
     if (typeof syncEstadoSupabaseDebounced === 'function') 
       syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); });
-    console.log('[Auto-pendiente] Pendiente de placas eliminado — folio #' + folio);
+    console.log('[Auto-pendiente] Pendiente de placas eliminado permanentemente — folio #' + folio);
   }
 }
 // ═══════════════════════════════════════════════════════════════
@@ -16909,13 +16788,20 @@ async function syncEstadoSupabase(){
   try {
     // Limpiar movimientos sintéticos antes de persistir
     const movsLimpios = (D.movimientos||[]).filter(m => m && m.id && !/^R-\d+$/.test(m.id));
+    // Filtrar pendientes de placas liquidados antes de subir a Supabase
+    const _pendientesSinLiquidados = (D.pendientes || []).filter(function(p){
+      if(p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
+      var _versSave = (appData.recibos||[]).filter(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
+      var saldo = _versSave.reduce(function(m,r){ var s=parseFloat(r.saldoPendiente); return isNaN(s)?m:Math.min(m,s); }, Infinity);
+      return _versSave.length > 0 && !_versSave.some(function(r){return r.cancelado;}) && (saldo > 0);
+    });
     const estado = {
       movimientos:           movsLimpios,
       directorio:            D.directorio            || [],
       carpetas:              D.carpetas              || [],
       juicios:               D.juicios               || [],
       gestiones:             D.gestiones             || [],
-      pendientes:            D.pendientes            || [],
+      pendientes:            _pendientesSinLiquidados,
       cierres:               D.cierres               || [],
       prestamos:             D.prestamos             || [],
       saldoAcumulado:        D.saldoAcumulado        || 0,
@@ -20876,6 +20762,10 @@ async function cpdfConfirmarGenerar() {
   }
 }
 function cerrarContabPDF(){
+  if(window._fichaAbiertaAntes){
+    window._fichaAbiertaAntes=false;
+    setTimeout(function(){if(reciboEnConsulta)abrirFichaFolio();},400);
+  }
   const overlay=document.getElementById('contab-pdf-overlay');
   overlay.style.display='none';
   document.getElementById('cpdf-embed').setAttribute('src','');
@@ -31971,6 +31861,35 @@ function _gestAplicarVinculo(gid, folio, monto, tipo){
 function sincronizarPendientesPlacas() {
   if (!appData || !Array.isArray(appData.recibos)) return;
   if (typeof D === 'undefined' || !Array.isArray(D.pendientes)) return;
+
+  // ── PASO 1: limpiar pendientes de placas cuyo recibo ya está liquidado ──
+  // Esto corrige pendientes históricos que quedaron huérfanos antes del fix
+  var _lb = JSON.parse(localStorage.getItem('lex-placas-liquidados') || '[]');
+  var _eliminados = 0;
+  D.pendientes = D.pendientes.filter(function(p) {
+    if (p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
+    // Buscar el recibo vinculado
+    var _versSync = appData.recibos.filter(function(r) {
+      return Number(r.folio) === Number(p.reciboVinculadoFolio);
+    });
+    var _saldoMinSync = _versSync.reduce(function(m,r){ var s=parseFloat(r.saldoPendiente); return isNaN(s)?m:Math.min(m,s); }, Infinity);
+    // Si el recibo ya no tiene saldo (en cualquier versión) o fue cancelado → eliminar pendiente
+    if (_versSync.length === 0 || _versSync.some(function(r){return r.cancelado;}) || !(_saldoMinSync > 0)) {
+      var fStr = String(p.reciboVinculadoFolio);
+      if (_lb.indexOf(fStr) < 0) _lb.push(fStr);
+      _eliminados++;
+      return false; // quitar del array
+    }
+    return true;
+  });
+  if (_eliminados > 0) {
+    localStorage.setItem('lex-placas-liquidados', JSON.stringify(_lb));
+    if (typeof save === 'function') save();
+    if (typeof renderPend === 'function') renderPend();
+    if (typeof badges === 'function') badges();
+    console.log('[LEX] sincronizarPendientesPlacas: ' + _eliminados + ' pendiente(s) huérfano(s) eliminado(s).');
+  }
+
   const _tipoLbl = {
     alta: 'Alta de placas', baja: 'Baja de placas',
     cambio_propietario: 'Cambio de propietario',
@@ -31988,6 +31907,9 @@ function sincronizarPendientesPlacas() {
     if (!(parseFloat(r.saldoPendiente) > 0)) return;
     const folio = r.folio;
     const idPend = 'PEND-REC-' + folio;
+    // No recrear si ya fue liquidado/eliminado (lista negra en localStorage)
+    const _listaNegraPlacas = JSON.parse(localStorage.getItem('lex-placas-liquidados') || '[]');
+    if (_listaNegraPlacas.indexOf(String(folio)) >= 0) return;
     // No tocar si ya existe un pendiente para este folio (resuelto o no)
     const yaExiste = D.pendientes.some(function(p) {
       return p.id === idPend || Number(p.reciboVinculadoFolio) === Number(folio);
@@ -34812,6 +34734,917 @@ function regresarAlFormulario(){
     }, 80);
   }
 }
+</script>
+
+<!-- ═══ MODAL FICHA DEL FOLIO ═══ -->
+<div id="modal-ficha-folio" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#fdfaf4;border:1.5px solid #c8952a;border-radius:8px;width:94%;max-width:920px;height:90vh;display:flex;flex-direction:row;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+
+    <!-- PANEL LATERAL IZQUIERDO -->
+    <div style="width:185px;flex-shrink:0;background:#f5f0e0;border-right:1px solid #d4b870;display:flex;flex-direction:column;padding:10px 8px;gap:5px;">
+      <div style="font-size:8px;font-family:'DM Mono',monospace;color:#a08050;text-transform:uppercase;letter-spacing:0.1em;padding-bottom:6px;border-bottom:0.5px solid #d4b870;margin-bottom:2px;">Acciones del folio</div>
+
+      <button id="ficha-btn-pago-parcial" onclick="cerrarFichaFolio();setTimeout(ejecutarPagoParcial,200);" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #d4902a;background:#fff5e0;color:#7a4010;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#ffecc8'" onmouseout="this.style.background='#fff5e0'">
+        <span style="font-size:15px;line-height:1;">💰</span>Pago Parcial
+      </button>
+
+      <div style="flex:1;max-height:10px;"></div>
+
+      <button id="ficha-btn-pago-total" onclick="cerrarFichaFolio();setTimeout(ejecutarLiquidacionTotal,200);" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #2a7a4a;background:#e8f5ec;color:#0a4020;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#c8f5d8'" onmouseout="this.style.background='#e8f5ec'">
+        <span style="font-size:15px;line-height:1;">✅</span>Pago Total
+      </button>
+
+      <div style="flex:1;max-height:10px;"></div>
+
+      <button id="ficha-btn-serv-comp" onclick="cerrarFichaFolio();setTimeout(ejecutarServicioComplementario,200);" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #d4a060;background:#fff0e0;color:#7a4010;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#fde8cc'" onmouseout="this.style.background='#fff0e0'">
+        <span style="font-size:15px;line-height:1;">🧩</span>Servicio Complementario
+      </button>
+
+      <div style="flex:1;max-height:10px;"></div>
+
+      <button id="ficha-btn-vincular" onclick="cerrarFichaFolio();setTimeout(abrirVincularArchivo,200);" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #c8952a;background:#fff8e0;color:#6B4F0A;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#fde8a0'" onmouseout="this.style.background='#fff8e0'">
+        <span style="font-size:15px;line-height:1;">🗂️</span>Vincular Arch.
+      </button>
+
+      <div style="flex:1;max-height:10px;"></div>
+
+      <button id="ficha-btn-exp-digital" onclick="" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #4a6ea8;background:#e6f1fb;color:#1a3a70;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#c8dcf4'" onmouseout="this.style.background='#e6f1fb'">
+        <span style="font-size:15px;line-height:1;">📋</span>Exp. Digital
+      </button>
+
+      <div style="flex:1;"></div>
+      <div style="height:0.5px;background:#d4b870;margin:2px 0;"></div>
+
+      <button onclick="fichaImprimirHistorial()" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #4a6ea8;background:#e6f1fb;color:#1a3a70;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#c8dcf4'" onmouseout="this.style.background='#e6f1fb'">
+        <span style="font-size:15px;line-height:1;">🖨️</span>Imprimir
+      </button>
+    </div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+
+      <!-- HEADER -->
+      <div style="background:#f5f0e0;border-bottom:1px solid #d4b870;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span style="font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#5a3e10;">📋 Ficha del Folio</span>
+          <span id="ficha-folio-num" style="font-family:'DM Mono',monospace;font-size:0.8rem;font-weight:700;color:#1a5fa8;background:#e6f1fb;padding:2px 10px;border-radius:20px;"></span>
+          <span id="ficha-carpeta-badge" style="display:none;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#0f5228;background:#d4f5e0;padding:2px 10px;border-radius:20px;border:0.5px solid #2a9a50;">📁 <span id="ficha-carpeta-txt"></span></span>
+          <span id="ficha-expediente-badge" style="display:none;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#1a3a7a;background:#dce8ff;padding:2px 10px;border-radius:20px;border:0.5px solid #4a6ea8;">📂 <span id="ficha-expediente-txt"></span></span>
+          <span id="ficha-badge-liquidado" style="display:none;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#0f5228;background:#d4f5e0;padding:2px 10px;border-radius:20px;border:0.5px solid #2a9a50;">✅ LIQUIDADO · Solo lectura</span>
+        </div>
+        <button onclick="cerrarFichaFolio()" style="background:none;border:none;cursor:pointer;color:#7a6840;font-size:1.4rem;line-height:1;padding:2px 6px;border-radius:4px;" onmouseover="this.style.background='#e8dcc0'" onmouseout="this.style.background='none'">✕</button>
+      </div>
+
+      <!-- SCROLL AREA -->
+      <div style="overflow-y:auto;flex:1;padding:14px 18px;">
+
+        <!-- ENCABEZADO CLIENTE -->
+        <div style="background:#f7f3e8;border:0.5px solid #e0d4a8;border-radius:6px;padding:12px 14px;margin-bottom:12px;">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;">
+            <div>
+              <div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">Cliente</div>
+              <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+                <div id="ficha-cliente-nombre" style="font-size:0.9rem;font-weight:700;color:#1a1008;"></div>
+                <div id="ficha-cliente-tel" style="font-size:0.72rem;color:#7a6840;white-space:nowrap;"></div>
+              </div>
+              <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:4px;">
+                <div id="ficha-concepto" style="font-size:0.72rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;"></div>
+                <div id="ficha-domicilio" style="font-size:0.72rem;color:#7a6840;"></div>
+              </div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">Folio</div>
+              <div id="ficha-folio-ref" style="font-size:0.9rem;font-weight:700;color:#1a5fa8;font-family:'DM Mono',monospace;"></div>
+            </div>
+          </div>
+          <div style="height:0.5px;background:#d4b870;margin:10px 0;"></div>
+          <div id="fichaNotasDisplay" onclick="fichaToggleNotas()" style="font-size:0.78rem;color:#7a6840;font-style:italic;cursor:pointer;padding:6px 8px;border-radius:4px;border:0.5px solid transparent;transition:all 0.15s;" onmouseover="this.style.background='#fffdf5';this.style.borderColor='#d4b870'" onmouseout="this.style.background='transparent';this.style.borderColor='transparent'">✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.</div>
+          <textarea id="fichaNotasInput" placeholder="Notas libres..." style="display:none;width:100%;font-size:0.78rem;padding:8px 10px;border:0.5px solid #c8952a;border-radius:4px;background:#fffdf5;resize:none;min-height:70px;font-family:inherit;box-sizing:border-box;margin-top:4px;"></textarea>
+          <button id="fichaSaveNotas" onclick="fichaGuardarNotas()" style="display:none;margin-top:5px;font-size:0.7rem;padding:4px 12px;border-radius:4px;border:0.5px solid #d4b870;background:#f5f0e0;cursor:pointer;color:#5a3e10;">✓ Guardar</button>
+        </div>
+
+        <!-- RECIBOS -->
+        <div style="margin-bottom:12px;">
+          <div style="font-size:0.6rem;font-family:'DM Mono',monospace;font-weight:700;color:#7a6840;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Recibos Oficiales del Folio</div>
+          <div id="ficha-recibos-lista" style="display:flex;flex-direction:column;gap:5px;"></div>
+        </div>
+
+        <!-- GASTOS EXTRAOFICIALES -->
+        <div style="margin-bottom:12px;">
+          <div style="font-size:0.6rem;font-family:'DM Mono',monospace;font-weight:700;color:#7a6840;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">💸 Gastos Extraoficiales <span style="font-size:0.58rem;font-weight:400;text-transform:none;letter-spacing:0;">(solo interno)</span></div>
+          <div id="ficha-gastos-lista" style="display:flex;flex-direction:column;gap:5px;"></div>
+          <div id="fichaFormGasto" style="display:none;margin-top:8px;padding:10px 12px;border-radius:6px;border:0.5px solid #e8d098;background:#fffbee;">
+            <div style="font-size:0.65rem;font-family:'DM Mono',monospace;font-weight:700;color:#7a4e00;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Nuevo Gasto Extraoficial</div>
+            <input id="fichaGConcepto" type="text" placeholder="Concepto (traslado, copias, derechos...)" style="width:100%;margin-bottom:6px;box-sizing:border-box;font-size:0.78rem;padding:6px 8px;border:0.5px solid #d4b870;border-radius:4px;background:#fffdf5;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px;">
+              <input id="fichaGMonto" type="number" placeholder="Monto $" style="font-size:0.78rem;padding:6px 8px;border:0.5px solid #d4b870;border-radius:4px;background:#fffdf5;">
+              <select id="fichaGEstado" style="font-size:0.78rem;padding:6px 8px;border:0.5px solid #d4b870;border-radius:4px;background:#fffdf5;"><option>Pendiente</option><option>Pagado</option></select>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+              <span style="font-size:0.65rem;color:#7a6840;">Fecha:</span>
+              <span id="fichaGFechaDisplay" style="font-size:0.7rem;font-family:'DM Mono',monospace;color:#1a1008;background:#fffdf5;border:0.5px solid #d4b870;border-radius:4px;padding:3px 8px;min-width:100px;"></span>
+              <button onclick="fichaActivarRetroGasto()" id="fichaGBtnRetro" style="font-size:0.6rem;font-family:'DM Mono',monospace;font-weight:700;padding:3px 8px;border-radius:4px;border:1px solid #c8952a;background:#fef9ec;color:#7a4e00;cursor:pointer;letter-spacing:0.06em;">📅 RETRO</button>
+              <input type="date" id="fichaGFechaRetro" style="display:none;font-size:0.7rem;padding:3px 6px;border:0.5px solid #c8952a;border-radius:4px;background:#fffdf5;" onchange="fichaAplicarRetroGasto(this.value)">
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button onclick="fichaGuardarGasto()" style="flex:1;font-size:0.7rem;padding:6px;border-radius:4px;border:0.5px solid #c8952a;background:#fef3cc;color:#7a4e00;font-weight:700;cursor:pointer;font-family:'DM Mono',monospace;">✓ Guardar</button>
+              <button onclick="fichaResetFormGasto();document.getElementById('fichaFormGasto').style.display='none'" style="flex:1;font-size:0.7rem;padding:6px;border-radius:4px;border:0.5px solid #d4b870;background:#f5f0e0;cursor:pointer;">Cancelar</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FOOTER FIJO -->
+      <div style="flex-shrink:0;border-top:1px solid #d4b870;background:#f5f0e0;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;padding:8px 16px;border-bottom:0.5px solid #d4b870;">
+          <div><div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.06em;">Total</div><div id="ficha-total" style="font-size:0.82rem;font-weight:700;font-family:'DM Mono',monospace;color:#1a1008;"></div></div>
+          <div><div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.06em;">Abonado</div><div id="ficha-abonado" style="font-size:0.82rem;font-weight:700;font-family:'DM Mono',monospace;color:#1a7a3a;"></div></div>
+          <div><div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.06em;">Pendiente</div><div id="ficha-pendiente" style="font-size:0.82rem;font-weight:700;font-family:'DM Mono',monospace;color:#a32d2d;"></div></div>
+          <div><div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.06em;">Ext. pend.</div><div id="ficha-ext-pend" style="font-size:0.82rem;font-weight:700;font-family:'DM Mono',monospace;color:#8B6914;"></div></div>
+        </div>
+        <div style="display:flex;gap:8px;padding:8px 16px;">
+          <button id="fichaBtnGasto" onclick="var fg=document.getElementById('fichaFormGasto');fg.style.display=fg.style.display==='none'?'block':'none';fg.scrollIntoView({behavior:'smooth',block:'center'});fichaInicializarFechaGasto();" style="font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;padding:7px 14px;border-radius:4px;cursor:pointer;border:2px solid #c8952a;background:#fef9ec;color:#7a4e00;transition:all 0.2s;" onmouseover="this.style.background='#fde8a0'" onmouseout="this.style.background='#fef9ec'">💸 Gasto Extraoficial</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<!-- ═══ FIN MODAL FICHA DEL FOLIO ═══ -->
+<script>
+function abrirFichaFolio(){
+  var recibo=reciboEnConsulta;
+  if(!recibo){if(typeof toast==='function')toast('Primero consulta un folio','err');return;}
+  var folio=recibo.folio;
+  var anio=recibo.anio_folio||new Date().getFullYear();
+  var rl=recibo.letra||(typeof letraVersion==='function'?letraVersion(recibo):'A')||'A';
+  var fStr=typeof folioConLetra==='function'?folioConLetra(folio,anio,rl):folio+rl;
+  document.getElementById('ficha-folio-num').textContent=fStr;
+  document.getElementById('ficha-folio-ref').textContent=fStr;
+  document.getElementById('ficha-cliente-nombre').textContent=recibo.nombre||'—';
+  // Teléfono del primer cliente
+  var tel='';
+  if(recibo.clientes&&recibo.clientes[0])tel=recibo.clientes[0].movil||recibo.clientes[0].tel||'';
+  else if(recibo.movil)tel=recibo.movil;
+  var telEl=document.getElementById('ficha-cliente-tel');
+  if(telEl)telEl.textContent=tel?'· '+tel:'';
+  // Domicilio
+  var dom='';
+  if(recibo.clientes&&recibo.clientes[0])dom=recibo.clientes[0].domicilio||'';
+  else if(recibo.domicilio)dom=recibo.domicilio;
+  var domEl=document.getElementById('ficha-domicilio');
+  if(domEl)domEl.textContent=dom?'· '+dom:'';
+  var c0=recibo.conceptos&&recibo.conceptos[0];
+  // Concepto en mayúsculas y azul
+  document.getElementById('ficha-concepto').textContent=c0?(c0.concepto||'').toUpperCase():'—';
+
+  // Badges carpeta/expediente
+  var carpBadge=document.getElementById('ficha-carpeta-badge');
+  var expBadge=document.getElementById('ficha-expediente-badge');
+  carpBadge.style.display='none';expBadge.style.display='none';
+  if(recibo.carpetaIdx!==undefined&&recibo.carpetaIdx!==null){
+    var carpetas=appData.carpetas||[];
+    var carp=carpetas[recibo.carpetaIdx];
+    if(carp){document.getElementById('ficha-carpeta-txt').textContent=carp.nombre||('Carpeta #'+(recibo.carpetaIdx+1));carpBadge.style.display='inline-block';}
+  }
+  if(recibo.expedienteNum){document.getElementById('ficha-expediente-txt').textContent=recibo.expedienteNum;expBadge.style.display='inline-block';}
+
+  // ── Usar getAllMovs() igual que contabilidad ──
+  var todosMovs=typeof getAllMovs==='function'?getAllMovs():[];
+  // Filtrar movimientos del mismo folio base
+  var movsDelFolio=todosMovs.filter(function(m){
+    return m.folio===folio||(m.id&&m.id.indexOf('R-'+folio)===0)||(m.id&&m.id.indexOf('M-REC-NEW-'+folio)===0);
+  });
+
+  var listaEl=document.getElementById('ficha-recibos-lista');
+  listaEl.innerHTML='';
+  var totalTramite=parseFloat(recibo.total||0);
+  var totalAbonado=0;
+
+  // Ordenar por letra
+  var todosRec=(appData.recibos||[]).filter(function(r){return r.folio===folio&&!r.cancelado;});
+  todosRec.sort(function(a,b){return((a.letra||'A')).localeCompare(b.letra||'A');});
+
+  var fmt=function(v){return typeof fmtMXN==='function'?fmtMXN(parseFloat(v||0)):parseFloat(v||0).toFixed(2);};
+
+  todosRec.forEach(function(r){
+    var rletra=r.letra||(typeof letraVersion==='function'?letraVersion(r):'A')||'A';
+    var rfStr=typeof folioConLetra==='function'?folioConLetra(r.folio,r.anio_folio,rletra):r.folio+rletra;
+    var esOrig=rletra==='A'&&!r.esComplemento;
+
+    // Buscar el movimiento correspondiente en contabilidad para tener monto y descripción reales
+    var mov=null;
+    if(typeof D!=='undefined'&&Array.isArray(D.movimientos)){
+      mov=D.movimientos.find(function(m){
+        return (m.folio===folio||m.folio===String(folio))&&(m.letra||'A')===rletra;
+      });
+    }
+    // Si no está en D.movimientos buscar en sintéticos
+    if(!mov){
+      mov=movsDelFolio.find(function(m){
+        return (m.letra||'A')===rletra;
+      });
+    }
+
+    var monto=mov?parseFloat(mov.monto||0):(esOrig?parseFloat(r.anticipo||0):parseFloat(r.pago||r.anticipo||0));
+    // Construir descripción igual que contabilidad
+    var esLiqFila=parseFloat(r.saldoPendiente||0)<=0;
+    var esSinAnticipo=parseFloat(r.anticipo||0)===0&&parseFloat(r.total||0)>0&&!esOrig;
+    var prefijo=esOrig?(esLiqFila?'Liquidado — Recibo #':'Anticipo — Recibo #'):(r.esComplemento?'Complemento — Recibo #':'Abono parcial — Recibo #');
+    var rc0=r.conceptos&&r.conceptos[0];
+    var descripcion=prefijo+rfStr+' · '+r.nombre+(rc0?' · '+(rc0.concepto||''):'');
+    // Agregar responsable y fecha si existe
+    var resp=r.generadoPor||r.responsable||'';
+    var fechaDisplay=r.fecha?r.fecha.substring(5,10).replace('-','/'):'—';
+    if(resp) descripcion+=' | '+resp;
+    var descripcionCorta=descripcion.length>60?descripcion.substring(0,60)+'…':descripcion;
+
+    if(r.esComplemento){totalTramite+=parseFloat(r.total||0);}
+    else{totalAbonado+=monto;}
+
+    var saldo=parseFloat(r.saldoPendiente||0);
+    var esLiq=saldo<=0&&monto>0;
+    var tipo=esOrig?'Original':(r.esComplemento?'Serv. compl.':(esLiq?'Liquidación':'Abono'));
+    var tc=esOrig?'#1a5fa8':(r.esComplemento?'#8B4500':(esLiq?'#0f5228':'#1a7a3a'));
+    var tb=esOrig?'#e6f1fb':(r.esComplemento?'#fef0d8':(esLiq?'#d4f5e0':'#e8f5ec'));
+    var fecha=r.fecha?r.fecha.substring(5,10).replace('-','/'):'—';
+    var row=document.createElement('div');
+    row.style.cssText='display:grid;grid-template-columns:80px 1fr 90px 90px;gap:6px;align-items:center;padding:7px 10px;border-radius:4px;border:0.5px solid #e0d4a8;font-size:0.78rem;background:#fffdf5;';
+    row.innerHTML='<div style="font-weight:700;color:#1a5fa8;font-family:monospace;font-size:0.72rem;cursor:pointer;text-decoration:underline;text-underline-offset:2px;" onclick="window._fichaAbiertaAntes=true;cerrarFichaFolio();setTimeout(function(){abrirPreviaDesdeContab('+r.folio+',\''+rletra+'\');},200);" title="Ver PDF">'+rfStr+'</div>'
+      +'<div><span style="font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:20px;background:'+tb+';color:'+tc+';">'+tipo+'</span>'
+      +'<div style="font-size:0.65rem;color:#7a6840;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+descripcion+'">'+descripcionCorta+'</div></div>'
+      +(r.esComplemento
+        ?'<div style="text-align:right;font-weight:700;color:#8B4500;font-family:monospace;">+$'+fmt(parseFloat(r.total||0))+'</div><div style="text-align:right;font-size:0.68rem;color:#8B4500;">cargo</div>'
+        :'<div style="text-align:right;font-weight:700;color:#1a7a3a;font-family:monospace;">+$'+fmt(monto)+'</div><div style="text-align:right;font-size:0.68rem;color:#7a6840;">saldo $'+fmt(saldo)+'</div>'
+      );
+    listaEl.appendChild(row);
+  });
+
+  document.getElementById('ficha-total').textContent='$'+fmt(totalTramite);
+  document.getElementById('ficha-abonado').textContent='$'+fmt(totalAbonado);
+  document.getElementById('ficha-pendiente').textContent='$'+fmt(parseFloat(recibo.saldoPendiente||0));
+
+  // Notas y gastos
+  var notasKey='ficha-notas-'+folio+'-'+anio;
+  var gastosKey='ficha-gastos-'+folio+'-'+anio;
+  var nd=document.getElementById('fichaNotasDisplay');
+  var ns=localStorage.getItem(notasKey)||'';
+  nd.textContent=ns||'✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.';
+  nd.style.fontStyle=ns?'normal':'italic';nd.style.color=ns?'#1a1008':'#7a6840';
+  nd.dataset.texto=ns;
+  var gl=document.getElementById('ficha-gastos-lista');
+  gl.innerHTML='';
+  var gastos=JSON.parse(localStorage.getItem(gastosKey)||'[]');
+  var extP=0;
+  gastos.forEach(function(g,i){if(g.estado==='Pendiente')extP+=parseFloat(g.monto||0);_fichaGastoRow(g,i);});
+  document.getElementById('ficha-ext-pend').textContent='$'+fmt(extP);
+  window._fichaRef={folio:folio,anio:anio,notasKey:notasKey,gastosKey:gastosKey};
+  window._fichaLiquidado=parseFloat(recibo.saldoPendiente||0)<=0;
+  // Modo solo lectura si está liquidado
+  var liquidado=parseFloat(recibo.saldoPendiente||0)<=0;
+  // Notas — deshabilitar clic si liquidado
+  var nd2=document.getElementById('fichaNotasDisplay');
+  if(liquidado){
+    nd2.onclick=null;
+    nd2.style.cursor='default';
+    nd2.style.opacity='0.7';
+    nd2.title='Solo lectura — trámite liquidado';
+  } else {
+    nd2.onclick=fichaToggleNotas;
+    nd2.style.cursor='pointer';
+    nd2.style.opacity='1';
+    nd2.title='';
+  }
+  // Botón gasto extraoficial
+  var btnGasto=document.getElementById('fichaBtnGasto');
+  if(btnGasto){
+    btnGasto.style.display=liquidado?'none':'';
+  }
+  // Badge modo lectura
+  var badgeLiq=document.getElementById('ficha-badge-liquidado');
+  if(badgeLiq) badgeLiq.style.display=liquidado?'inline-block':'none';
+  document.getElementById('modal-ficha-folio').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+
+function cerrarFichaFolio(){
+  document.getElementById('modal-ficha-folio').style.display='none';
+  document.body.style.overflow='';
+  document.getElementById('fichaFormGasto').style.display='none';
+}
+
+function fichaToggleNotas(){
+  var d=document.getElementById('fichaNotasDisplay'),i=document.getElementById('fichaNotasInput'),b=document.getElementById('fichaSaveNotas');
+  i.value=d.dataset.texto||'';d.style.display='none';i.style.display='block';b.style.display='inline-block';i.focus();
+}
+
+function fichaGuardarNotas(){
+  var d=document.getElementById('fichaNotasDisplay'),i=document.getElementById('fichaNotasInput'),b=document.getElementById('fichaSaveNotas');
+  var t=i.value.trim();d.dataset.texto=t;
+  d.textContent=t||'✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.';
+  d.style.fontStyle=t?'normal':'italic';d.style.color=t?'#1a1008':'#7a6840';
+  d.style.display='block';i.style.display='none';b.style.display='none';
+  if(window._fichaRef)localStorage.setItem(window._fichaRef.notasKey,t);
+}
+
+function _fichaGastoRow(g,idx){
+  var gl=document.getElementById('ficha-gastos-lista');
+  var row=document.createElement('div');var pend=g.estado==='Pendiente';
+  row.style.cssText='display:grid;grid-template-columns:1fr 90px 90px 28px;gap:6px;align-items:center;padding:7px 10px;border-radius:4px;border:0.5px solid #e8d098;background:#fffbee;font-size:0.78rem;';
+  row.innerHTML='<div><div style="color:#1a1008;">'+g.concepto+'</div><div style="font-size:0.65rem;color:#7a6840;">'+(g.fecha||'')+'</div></div>'
+    +'<div><span style="font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:20px;background:'+(pend?'#fef3cc':'#d4f5e0')+';color:'+(pend?'#8B6914':'#0f6a2a')+';border:0.5px solid '+(pend?'#c8952a':'#2a9a50')+';">'+g.estado+'</span></div>'
+    +'<div style="text-align:right;font-weight:700;font-family:monospace;color:#8B6914;">$'+parseFloat(g.monto||0).toFixed(2)+'</div>'
+    +(window._fichaLiquidado?'<span style="width:20px;display:inline-block;"></span>':'<button onclick="fichaEliminarGasto('+idx+')" style="border:none;background:none;cursor:pointer;color:#7a6840;font-size:14px;padding:0;">✕</button>');
+  gl.appendChild(row);
+}
+
+function fichaGuardarGasto(){
+  var c=document.getElementById('fichaGConcepto').value.trim();
+  var m=parseFloat(document.getElementById('fichaGMonto').value||0);
+  var e=document.getElementById('fichaGEstado').value;
+  if(!c){if(typeof toast==='function')toast('Escribe un concepto','err');return;}
+  var key=window._fichaRef?window._fichaRef.gastosKey:null;
+  var gastos=key?JSON.parse(localStorage.getItem(key)||'[]'):[];
+  var fechaEl=document.getElementById('fichaGFechaDisplay');
+  var today=fechaEl&&fechaEl.textContent?fechaEl.textContent:new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+  gastos.push({concepto:c,monto:m,estado:e,fecha:today});
+  if(key)localStorage.setItem(key,JSON.stringify(gastos));
+  var gl=document.getElementById('ficha-gastos-lista');gl.innerHTML='';
+  var extP=0;var fmt=function(v){return typeof fmtMXN==='function'?fmtMXN(parseFloat(v||0)):parseFloat(v||0).toFixed(2);};
+  gastos.forEach(function(g,i){if(g.estado==='Pendiente')extP+=parseFloat(g.monto||0);_fichaGastoRow(g,i);});
+  document.getElementById('ficha-ext-pend').textContent='$'+fmt(extP);
+  document.getElementById('fichaGConcepto').value='';document.getElementById('fichaGMonto').value='';
+  fichaResetFormGasto();document.getElementById('fichaFormGasto').style.display='none';
+}
+
+function fichaEliminarGasto(idx){
+  var key=window._fichaRef?window._fichaRef.gastosKey:null;
+  var gastos=key?JSON.parse(localStorage.getItem(key)||'[]'):[];
+  gastos.splice(idx,1);if(key)localStorage.setItem(key,JSON.stringify(gastos));
+  var gl=document.getElementById('ficha-gastos-lista');gl.innerHTML='';
+  var extP=0;var fmt=function(v){return typeof fmtMXN==='function'?fmtMXN(parseFloat(v||0)):parseFloat(v||0).toFixed(2);};
+  gastos.forEach(function(g,i){if(g.estado==='Pendiente')extP+=parseFloat(g.monto||0);_fichaGastoRow(g,i);});
+  document.getElementById('ficha-ext-pend').textContent='$'+fmt(extP);
+}
+
+function fichaInicializarFechaGasto(){
+  var hoy=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+  var el=document.getElementById('fichaGFechaDisplay');
+  if(el&&!el.dataset.fecha){el.textContent=hoy;el.dataset.fecha=new Date().toISOString().substring(0,10);}
+}
+
+function fichaActivarRetroGasto(){
+  var inp=document.getElementById('fichaGFechaRetro'),btn=document.getElementById('fichaGBtnRetro');
+  if(inp.style.display==='none'||inp.style.display===''){
+    inp.style.display='block';btn.style.background='#fde8a0';btn.style.borderColor='#a05010';inp.focus();
+  }else{inp.style.display='none';btn.style.background='#fef9ec';btn.style.borderColor='#c8952a';}
+}
+
+function fichaAplicarRetroGasto(val){
+  var el=document.getElementById('fichaGFechaDisplay');
+  var parts=val.split('-');
+  var meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  el.textContent=parts[2]+'/'+meses[parseInt(parts[1])-1]+'/'+parts[0]+' (RETRO)';
+  el.dataset.fecha=val;el.style.color='#c8952a';
+  document.getElementById('fichaGFechaRetro').style.display='none';
+  document.getElementById('fichaGBtnRetro').style.background='#fef9ec';
+}
+
+function fichaResetFormGasto(){
+  var el=document.getElementById('fichaGFechaDisplay');
+  if(el){el.textContent='';el.dataset.fecha='';el.style.color='#1a1008';}
+  var inp=document.getElementById('fichaGFechaRetro');
+  if(inp){inp.value='';inp.style.display='none';}
+}
+
+function fichaImprimirHistorial(){
+  var nombre=document.getElementById('ficha-cliente-nombre').textContent;
+  var folio=document.getElementById('ficha-folio-ref').textContent;
+  var concepto=document.getElementById('ficha-concepto').textContent;
+  var notas=document.getElementById('fichaNotasDisplay').dataset.texto||'';
+  var total=document.getElementById('ficha-total').textContent;
+  var abonado=document.getElementById('ficha-abonado').textContent;
+  var pendiente=document.getElementById('ficha-pendiente').textContent;
+  var extPend=document.getElementById('ficha-ext-pend').textContent;
+  var fecha=new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  var recibosHTML='';
+  document.getElementById('ficha-recibos-lista').querySelectorAll('div[style*=grid]').forEach(function(r){
+    var celdas=r.querySelectorAll('div');
+    recibosHTML+='<tr><td>'+(celdas[0]?celdas[0].textContent.trim():'')+'</td><td>'+(celdas[1]?celdas[1].textContent.trim():'')+'</td><td>'+(celdas[2]?celdas[2].textContent.trim():'')+'</td><td>'+(celdas[3]?celdas[3].textContent.trim():'')+'</td></tr>';
+  });
+  var gastosHTML='';
+  document.getElementById('ficha-gastos-lista').querySelectorAll('div[style*=grid]').forEach(function(r){
+    var celdas=r.querySelectorAll('div');
+    gastosHTML+='<tr><td>'+(celdas[0]?celdas[0].textContent.trim():'')+'</td><td>'+(celdas[1]?celdas[1].textContent.trim():'')+'</td><td>'+(celdas[2]?celdas[2].textContent.trim():'')+'</td></tr>';
+  });
+  var win=window.open('','_blank','width=800,height=900');
+  win.document.write('<!DOCTYPE html><html><head><meta charset=UTF-8><title>Historial '+folio+'</title>'
+    +'<style>body{font-family:monospace;padding:32px;color:#1a1008;background:#fdfaf4;font-size:12px;}h1{font-size:16px;color:#c8952a;border-bottom:2px solid #c8952a;padding-bottom:8px;margin-bottom:16px;}.header{display:grid;grid-template-columns:1fr auto;gap:10px;background:#f5f0e0;padding:12px 16px;border-radius:6px;border:1px solid #d4b870;margin-bottom:16px;}.label{font-size:9px;color:#7a6840;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;}.val{font-size:14px;font-weight:700;}.notas{background:#fffdf5;border:1px solid #e0d4a8;border-radius:4px;padding:10px;margin-bottom:16px;font-size:11px;line-height:1.6;}.sec{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#7a6840;margin-bottom:8px;}table{width:100%;border-collapse:collapse;margin-bottom:16px;}th{font-size:9px;font-weight:700;text-transform:uppercase;color:#7a6840;padding:6px 8px;border-bottom:1px solid #d4b870;text-align:left;background:#f5f0e0;}td{padding:6px 8px;border-bottom:1px solid #ecdfa8;font-size:11px;}.tots{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;background:#f5f0e0;border:1px solid #d4b870;border-radius:6px;padding:10px 14px;}.tl{font-size:9px;color:#7a6840;text-transform:uppercase;}.tv{font-size:13px;font-weight:700;}.foot{margin-top:24px;border-top:1px solid #d4b870;padding-top:12px;font-size:10px;color:#7a6840;text-align:center;}</style></head><body>'
+    +'<h1>HISTORIAL DEL FOLIO - '+folio+'</h1>'
+    +'<div class=header><div><div class=label>Cliente</div><div class=val>'+nombre+'</div><div style="font-size:11px;color:#7a6840;margin-top:4px;">'+concepto+'</div></div><div style=text-align:right><div class=label>Folio</div><div class=val style=color:#1a5fa8>'+folio+'</div><div style="font-size:11px;color:#7a6840;margin-top:4px;">'+fecha+'</div></div></div>'
+    +(notas?'<div class=notas><strong>Notas:</strong><br>'+notas+'</div>':'')
+    +'<div class=sec>Recibos Oficiales</div><table><thead><tr><th>Folio</th><th>Concepto / Tipo</th><th>Pago</th><th>Saldo</th></tr></thead><tbody>'+recibosHTML+'</tbody></table>'
+    +(gastosHTML?'<div class=sec>Gastos Extraoficiales (solo interno)</div><table><thead><tr><th>Concepto</th><th>Estado</th><th>Monto</th></tr></thead><tbody>'+gastosHTML+'</tbody></table>':'')
+    +'<div class=tots><div><div class=tl>Total</div><div class=tv>'+total+'</div></div><div><div class=tl>Abonado</div><div class=tv style=color:#1a7a3a>'+abonado+'</div></div><div><div class=tl>Pendiente</div><div class=tv style=color:#a32d2d>'+pendiente+'</div></div><div><div class=tl>Ext. pend.</div><div class=tv style=color:#8B6914>'+extPend+'</div></div></div>'
+    +'<div class=foot>LEX-MEXICO Despacho Juridico - Documento interno</div>'
+    +'<script>window.onload=function(){window.print();window.addEventListener(\'afterprint\',function(){window.close();});};<'+'/script></body></html>');
+  win.document.close();
+  win.addEventListener('beforeunload',function(){
+    setTimeout(function(){if(reciboEnConsulta&&document.getElementById('modal-ficha-folio'))abrirFichaFolio();},400);
+  });
+}
+
+// cerrarContabPDF - regresar a ficha si fue abierto desde ella
+var _origCerrarContabPDF=window.cerrarContabPDF;
+document.addEventListener('DOMContentLoaded',function(){
+  if(typeof cerrarContabPDF==='function'){
+    var orig=cerrarContabPDF;
+    cerrarContabPDF=function(){
+      orig.apply(this,arguments);
+      if(window._fichaAbiertaAntes){
+        window._fichaAbiertaAntes=false;
+        setTimeout(function(){if(reciboEnConsulta)abrirFichaFolio();},400);
+      }
+    };
+  }
+});
+
+document.addEventListener('click',function(e){var m=document.getElementById('modal-ficha-folio');if(m&&e.target===m)cerrarFichaFolio();});
+
+// ═══════════════════════════════════════════════════════════════
+// CONTROL DE JUICIOS — MODAL PANTALLA COMPLETA
+// ═══════════════════════════════════════════════════════════════
+
+var _mexpIdx = -1; // índice del expediente abierto en el modal
+
+
+// ── Abrir modal de expediente ──────────────────────────────────
+function abrirDetalle(idx){
+  jdetIdx = idx;
+  _mexpIdx = idx;
+  const j = D.juicios[idx];
+  if(!j) return;
+
+  // Ocultar lista, mostrar modal
+  $('juicios-lista-view').style.display = 'none';
+  const modal = $('modal-expediente');
+  modal.style.display = 'flex';
+
+  // Header
+  $('mexp-titulo').textContent = j.cliente || '—';
+  const tagL = {'urgente':'🔴 Urgente','proceso':'🟡 En Proceso','estable':'🟢 Estable','concluido':'⚫ Concluido','inicio':'🔵 Inicio'}[j.estatus] || j.estatus;
+  $('mexp-sub').textContent = (j.tipo||'') + (j.expediente ? ' · Exp. ' + j.expediente : '') + ' · ' + tagL;
+
+  // Stats
+  cargarDocsR2(idx);
+  const histCount = (j.historial||[]).length;
+  $('mexp-stat-hist').textContent = histCount || '0';
+  const aud = j.audiencia || proximaAudienciaDeTerminos(j);
+  if(aud){
+    const diff = Math.ceil((new Date(aud+'T12:00:00') - new Date()) / 86400000);
+    $('mexp-stat-aud').textContent = diff >= 0 ? diff + 'd' : 'Vencida';
+  } else {
+    $('mexp-stat-aud').textContent = '—';
+  }
+
+  // Leyes activas
+  actualizarContadorLeyes();
+
+  // Historial
+  renderHistorialModal();
+
+  // Limpiar chat IA
+  $('mexp-ia-chat').innerHTML = '';
+  $('mexp-ia-resumen').textContent = 'Presiona «Analizar expediente con IA» para obtener el resumen.';
+}
+
+function cerrarModalExpediente(){
+  $('modal-expediente').style.display = 'none';
+  $('juicios-lista-view').style.display = '';
+  $('mexp-hist-form').style.display = 'none';
+  _mexpIdx = -1;
+  jdetIdx = -1;
+}
+
+// ── Confirmar cerrar/archivar expediente con eliminación de R2 ─
+async function confirmarCerrarExpediente(){
+  const j = D.juicios[_mexpIdx];
+  if(!j) return;
+  const nombre = j.cliente || 'este expediente';
+  if(!confirm('¿Cerrar y archivar el expediente de ' + nombre + '?\n\nSe eliminarán los documentos de R2 vinculados y el expediente quedará como Concluido.\n\nEsta acción no se puede deshacer.')) return;
+  // Eliminar docs de R2
+  const docs = j.r2Docs || [];
+  for(const doc of docs){
+    try{
+      const path = (window.SB_DESPACHO_ID||'despacho') + '/juicios/' + (_mexpIdx) + '/' + doc.nombre;
+      if(typeof window.eliminarR2 === 'function') await window.eliminarR2(path, 'juicios');
+    } catch(e){ console.warn('eliminarR2 juicio:', e); }
+  }
+  // Marcar como concluido
+  D.juicios[_mexpIdx].estatus = 'concluido';
+  D.juicios[_mexpIdx].r2Docs = [];
+  try{ backupLocal('D', D); } catch(e){}
+  saveJuicios();
+  cerrarModalExpediente();
+  renderJuicios();
+  if(typeof toast==='function') toast('Expediente cerrado y documentos eliminados de R2', 'ok');
+}
+
+// ── Documentos R2 ──────────────────────────────────────────────
+async function cargarDocsR2(idx){
+  const j = D.juicios[idx];
+  const el = $('mexp-r2-lista');
+  if(!el) return;
+  const docs = j.r2Docs || [];
+  $('mexp-stat-docs').textContent = docs.length || '0';
+  if(!docs.length){
+    el.innerHTML = '<div style="border:1px dashed var(--border-l);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;" onclick="document.getElementById(&quot;r2-file-input&quot;).click()"><div style="font-size:1.4rem;margin-bottom:6px;">☁️</div><div style="font-size:0.72rem;color:var(--muted);">Arrastra PDFs o haz clic en ＋ Subir para agregar documentos a R2</div></div>';
+    return;
+  }
+  el.innerHTML = docs.map((doc, i) => `
+    <div style="border:1px solid var(--border-l);border-radius:var(--radius-sm);margin-bottom:6px;overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--surface2);">
+        <span style="font-size:0.95rem;color:var(--rojo);">📄</span>
+        <span style="font-size:0.72rem;font-weight:700;color:var(--ink);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(doc.nombre)}</span>
+        <span style="font-size:0.6rem;padding:2px 7px;border-radius:20px;background:var(--azul-l);color:var(--azul);cursor:pointer;" onclick="verDocR2(${idx},${i})">Ver</span>
+        <span style="font-size:0.6rem;padding:2px 7px;border-radius:20px;background:var(--gold-bg);color:var(--gold-d);cursor:pointer;" onclick="ocrDocR2(${idx},${i})">OCR</span>
+        <span style="font-size:0.7rem;color:var(--muted);cursor:pointer;padding:2px 5px;" onclick="eliminarDocR2(${idx},${i})" title="Eliminar de R2">🗑</span>
+      </div>
+      <div style="padding:4px 10px;font-size:0.62rem;color:var(--muted);">📅 ${doc.fecha||'—'} · ${doc.size||'—'}</div>
+    </div>`).join('');
+}
+
+async function subirDocR2(input){
+  const file = input.files[0];
+  if(!file || _mexpIdx < 0) return;
+  const j = D.juicios[_mexpIdx];
+  if(!j.r2Docs) j.r2Docs = [];
+  if(typeof toast==='function') toast('Subiendo ' + file.name + ' a R2...', 'ok');
+  try{
+    const path = (window.SB_DESPACHO_ID||'despacho') + '/juicios/' + _mexpIdx + '/' + file.name;
+    const ok = typeof window.subirR2==='function' ? await window.subirR2(file, path, 'juicios') : false;
+    const kb = Math.round(file.size/1024);
+    const fecha = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+    j.r2Docs.push({ nombre: file.name, path: path, fecha: fecha, size: kb + ' KB' });
+    try{ backupLocal('D', D); } catch(e){}
+    saveJuicios();
+    cargarDocsR2(_mexpIdx);
+    if(typeof toast==='function') toast(ok ? '✓ ' + file.name + ' guardado en R2' : '⚠ Guardado local (R2 no disponible)', ok?'ok':'err');
+  } catch(e){
+    console.error('subirDocR2:', e);
+    if(typeof toast==='function') toast('Error al subir: ' + e.message, 'err');
+  }
+  input.value = '';
+}
+
+async function verDocR2(idx, docIdx){
+  const j = D.juicios[idx];
+  const doc = j.r2Docs[docIdx];
+  if(!doc) return;
+  if(typeof toast==='function') toast('Descargando ' + doc.nombre + '...', 'ok');
+  try{
+    const blob = typeof window.descargarR2==='function' ? await window.descargarR2(doc.path, 'juicios') : null;
+    if(!blob){ toast('No se pudo descargar el archivo', 'err'); return; }
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  } catch(e){ if(typeof toast==='function') toast('Error al descargar: ' + e.message, 'err'); }
+}
+
+async function eliminarDocR2(idx, docIdx){
+  const j = D.juicios[idx];
+  const doc = j.r2Docs[docIdx];
+  if(!confirm('¿Eliminar ' + doc.nombre + ' de R2?')) return;
+  try{
+    if(typeof window.eliminarR2==='function') await window.eliminarR2(doc.path, 'juicios');
+  } catch(e){ console.warn('eliminarR2:', e); }
+  j.r2Docs.splice(docIdx, 1);
+  try{ backupLocal('D', D); } catch(e){}
+  saveJuicios();
+  cargarDocsR2(idx);
+  if(typeof toast==='function') toast('Documento eliminado', 'ok');
+}
+
+async function ocrDocR2(idx, docIdx){
+  const j = D.juicios[idx];
+  const doc = j.r2Docs[docIdx];
+  if(!doc){ return; }
+  if(typeof toast==='function') toast('Descargando para OCR...', 'ok');
+  try{
+    const blob = typeof window.descargarR2==='function' ? await window.descargarR2(doc.path, 'juicios') : null;
+    if(!blob){ toast('No se pudo descargar para OCR', 'err'); return; }
+    // Usar Mistral si disponible
+    const mistralKey = localStorage.getItem('cfg-mistral-key') || localStorage.getItem('mistralApiKey');
+    if(!mistralKey){ toast('Configura la API Key de Mistral en Configuración', 'err'); return; }
+    if(typeof toast==='function') toast('Analizando con Mistral OCR...', 'ok');
+    const b64 = await _blobToBase64(blob);
+    const resp = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + mistralKey },
+      body: JSON.stringify({
+        model: 'mistral-ocr-latest',
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: 'Extrae y transcribe todo el texto de este documento legal. Identifica: partes, tipo de acto, fechas, prestaciones o montos. Responde en español.' },
+          { type: 'document_url', document_url: 'data:application/pdf;base64,' + b64 }
+        ]}]
+      })
+    });
+    const data = await resp.json();
+    const texto = data.choices?.[0]?.message?.content || 'Sin resultado';
+    // Agregar al chat IA
+    _agregarMensajeIA('📄 OCR de ' + doc.nombre + ':\n\n' + texto, 'assistant');
+  } catch(e){
+    console.error('ocrDocR2:', e);
+    if(typeof toast==='function') toast('Error OCR: ' + e.message, 'err');
+  }
+}
+
+function _blobToBase64(blob){
+  return new Promise((res,rej)=>{
+    const r = new FileReader();
+    r.onload = ()=> res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(blob);
+  });
+}
+
+// ── Historial ─────────────────────────────────────────────────
+function renderHistorialModal(){
+  const j = D.juicios[_mexpIdx];
+  if(!j) return;
+  const el = $('mexp-historial-lista');
+  const hist = (j.historial||[]).slice().sort((a,b)=> b.fecha.localeCompare(a.fecha));
+  $('mexp-stat-hist').textContent = hist.length || '0';
+  if(!hist.length){
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.72rem;text-align:center;padding:20px;">Sin entradas. Agrega la primera entrada cronológica.</div>';
+    return;
+  }
+  const tagColor = { escrito:'var(--verde-l)', acuerdo:'var(--azul-l)', requerimiento:'var(--amarillo-l)', notificacion:'var(--gold-bg)', audiencia:'rgba(139,92,246,0.1)', apelacion:'rgba(255,140,0,0.1)', nota:'var(--surface2)' };
+  const tagText  = { escrito:'var(--verde-d)', acuerdo:'var(--azul)', requerimiento:'var(--amarillo)', notificacion:'var(--gold-d)', audiencia:'#7c3aed', apelacion:'#d97706', nota:'var(--muted)' };
+  const tagLabel = { escrito:'✍️ Escrito', acuerdo:'⚖️ Acuerdo', requerimiento:'📋 Req.', notificacion:'📬 Notif.', audiencia:'🏛️ Audiencia', apelacion:'📤 Apelación', nota:'📌 Nota' };
+  el.innerHTML = hist.map((h,i)=>`
+    <div style="display:flex;gap:10px;margin-bottom:14px;position:relative;">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
+        <div style="width:9px;height:9px;border-radius:50%;background:${tagText[h.tipo]||'var(--muted)'};margin-top:4px;flex-shrink:0;"></div>
+        ${i < hist.length-1 ? '<div style="width:1px;flex:1;background:var(--border-l);min-height:16px;margin:3px 0;"></div>' : ''}
+      </div>
+      <div style="flex:1;">
+        <div style="display:inline-block;font-size:0.6rem;padding:2px 8px;border-radius:20px;background:${tagColor[h.tipo]||'var(--surface2)'};color:${tagText[h.tipo]||'var(--muted)'};margin-bottom:3px;">${tagLabel[h.tipo]||h.tipo}</div>
+        <div style="font-size:0.75rem;color:var(--ink);line-height:1.5;">${escHTML(h.texto)}</div>
+        <div style="font-size:0.62rem;color:var(--muted);margin-top:2px;">${h.fecha||'—'}</div>
+      </div>
+    </div>`).join('');
+}
+
+function abrirFormHistorial(){
+  const f = $('mexp-hist-form');
+  f.style.display = 'block';
+  $('mexp-hf-fecha').value = new Date().toISOString().substring(0,10);
+  $('mexp-hf-texto').value = '';
+  $('mexp-hf-texto').focus();
+}
+
+function cerrarFormHistorial(){
+  $('mexp-hist-form').style.display = 'none';
+}
+
+function guardarEntradaHistorial(){
+  const j = D.juicios[_mexpIdx];
+  if(!j) return;
+  const fecha = $('mexp-hf-fecha').value;
+  const tipo  = $('mexp-hf-tipo').value;
+  const texto = $('mexp-hf-texto').value.trim();
+  if(!texto){ if(typeof toast==='function') toast('Escribe el contenido de la entrada', 'err'); return; }
+  if(!j.historial) j.historial = [];
+  j.historial.push({ fecha, tipo, texto });
+  try{ backupLocal('D', D); } catch(e){}
+  saveJuicios();
+  cerrarFormHistorial();
+  renderHistorialModal();
+  if(typeof toast==='function') toast('Entrada guardada ✓', 'ok');
+}
+
+// ── Leyes del caso ─────────────────────────────────────────────
+// Las leyes del despacho se guardan en localStorage como array de objetos {nombre, path}
+// Cada juicio guarda en j.leyesActivas = [nombre, nombre, ...]
+
+function getLeyesDespacho(){ return JSON.parse(localStorage.getItem('lex-leyes-despacho')||'[]'); }
+function setLeyesDespacho(arr){ localStorage.setItem('lex-leyes-despacho', JSON.stringify(arr)); }
+
+function actualizarContadorLeyes(){
+  const j = D.juicios[_mexpIdx];
+  if(!j) return;
+  const activas = (j.leyesActivas||[]).length;
+  const el = $('mexp-ley-count');
+  const el2 = $('mexp-stat-leyes');
+  if(el) el.textContent = activas;
+  if(el2) el2.textContent = activas;
+}
+
+function abrirModalLeyes(){
+  const modal = $('modal-leyes-caso');
+  modal.style.display = 'flex';
+  renderListaLeyes();
+}
+
+function cerrarModalLeyes(){
+  $('modal-leyes-caso').style.display = 'none';
+  actualizarContadorLeyes();
+}
+
+function renderListaLeyes(){
+  const j = D.juicios[_mexpIdx];
+  const activas = j ? (j.leyesActivas||[]) : [];
+  const leyes = getLeyesDespacho();
+  const el = $('modal-leyes-lista');
+  if(!leyes.length){
+    el.innerHTML = '<div style="color:var(--muted);font-size:0.72rem;text-align:center;padding:20px;">Sin leyes en el despacho.<br>Sube tu primer código o ley.</div>';
+    $('modal-leyes-count-txt').textContent = '0 leyes activas';
+    return;
+  }
+  el.innerHTML = leyes.map(ley => {
+    const on = activas.includes(ley.nombre);
+    return `<div onclick="toggleLeyActiva('${escHTML(ley.nombre)}')" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid ${on?'var(--azul)':'var(--border-l)'};border-radius:var(--radius-sm);margin-bottom:6px;cursor:pointer;background:${on?'var(--azul-l)':'var(--surface)'};transition:all 0.15s;">
+      <span style="font-size:0.9rem;">📚</span>
+      <span style="flex:1;font-size:0.75rem;color:${on?'var(--azul)':'var(--ink)'};">${escHTML(ley.nombre)}</span>
+      <span style="font-size:0.62rem;color:var(--muted);">${ley.size||''}</span>
+      <div style="width:16px;height:16px;border-radius:3px;border:1px solid ${on?'var(--azul)':'var(--border-l)'};background:${on?'var(--azul)':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0;">${on?'<span style="color:#fff;font-size:0.55rem;font-weight:700;">✓</span>':''}</div>
+    </div>`;
+  }).join('');
+  const n = activas.length;
+  $('modal-leyes-count-txt').textContent = n + ' ' + (n===1?'ley activa':'leyes activas');
+}
+
+function toggleLeyActiva(nombre){
+  const j = D.juicios[_mexpIdx];
+  if(!j) return;
+  if(!j.leyesActivas) j.leyesActivas = [];
+  const idx = j.leyesActivas.indexOf(nombre);
+  if(idx >= 0) j.leyesActivas.splice(idx, 1);
+  else j.leyesActivas.push(nombre);
+  try{ backupLocal('D', D); } catch(e){}
+  saveJuicios();
+  renderListaLeyes();
+}
+
+async function subirNuevaLey(input){
+  const file = input.files[0];
+  if(!file) return;
+  if(typeof toast==='function') toast('Subiendo ' + file.name + '...', 'ok');
+  const leyes = getLeyesDespacho();
+  const kb = Math.round(file.size/1024);
+  const entry = { nombre: file.name, size: kb + ' KB', fecha: new Date().toLocaleDateString('es-MX') };
+  // Intentar subir a R2
+  try{
+    const path = (window.SB_DESPACHO_ID||'despacho') + '/leyes/' + file.name;
+    if(typeof window.subirR2==='function') await window.subirR2(file, path, 'leyes');
+    entry.path = path;
+  } catch(e){ console.warn('subirNuevaLey R2:', e); }
+  leyes.push(entry);
+  setLeyesDespacho(leyes);
+  renderListaLeyes();
+  if(typeof toast==='function') toast('✓ Ley subida al despacho', 'ok');
+  input.value = '';
+}
+
+// ── Redactar escrito ──────────────────────────────────────────
+function abrirModalEscrito(){
+  const j = D.juicios[_mexpIdx];
+  const activas = j ? (j.leyesActivas||[]) : [];
+  const chips = $('escrito-leyes-chips');
+  if(activas.length){
+    chips.innerHTML = activas.map(n=>`<span style="font-size:0.65rem;padding:3px 9px;border-radius:20px;background:var(--azul-l);color:var(--azul);border:1px solid rgba(26,74,138,0.2);">${escHTML(n.length>24?n.substring(0,24)+'…':n)}</span>`).join('');
+  } else {
+    chips.innerHTML = '<span style="font-size:0.68rem;color:var(--muted);font-style:italic;">Sin leyes seleccionadas — ve a «Leyes del caso» primero</span>';
+  }
+  $('escrito-instrucciones').value = '';
+  $('modal-redactar-escrito').style.display = 'flex';
+}
+
+function cerrarModalEscrito(){
+  $('modal-redactar-escrito').style.display = 'none';
+}
+
+async function generarEscritorIA(){
+  const j = D.juicios[_mexpIdx];
+  if(!j){ cerrarModalEscrito(); return; }
+  const tipo  = $('escrito-tipo-sel').value;
+  const tipos = { demanda:'escrito de demanda inicial', contestacion:'contestación de demanda', apelacion:'recurso de apelación', amparo:'amparo indirecto', pruebas:'escrito de ofrecimiento de pruebas', alegatos:'alegatos', promocion:'promoción general' };
+  const leyes = (j.leyesActivas||[]).join(', ') || 'sin leyes específicas';
+  const inst  = $('escrito-instrucciones').value.trim();
+  const prompt = 'Redacta un ' + (tipos[tipo]||tipo) + ' para el expediente de ' + (j.cliente||'el cliente') +
+    ', ' + (j.tipo||'') + ', Exp. ' + (j.expediente||'s/n') + ', ' + (j.juzgado||'') +
+    '. Leyes aplicables: ' + leyes + '.' + (inst ? ' Instrucciones adicionales: ' + inst : '') +
+    ' Usa formato jurídico mexicano formal.';
+  cerrarModalEscrito();
+  _agregarMensajeIA('Redacta: ' + (tipos[tipo]||tipo), 'user');
+  await _llamarGeminiIA(prompt);
+}
+
+// ── IA — Gemini 2.5 ───────────────────────────────────────────
+async function analizarExpedienteIA(){
+  const j = D.juicios[_mexpIdx];
+  if(!j) return;
+  const hist = (j.historial||[]).map(h=>`[${h.fecha} - ${h.tipo}]: ${h.texto}`).join('\n') || 'Sin historial';
+  const leyes = (j.leyesActivas||[]).join(', ') || 'Sin leyes específicas';
+  const prompt = 'Analiza este expediente jurídico y proporciona un resumen ejecutivo:\n' +
+    'Cliente: ' + (j.cliente||'—') + '\nTipo: ' + (j.tipo||'—') + '\nExpediente: ' + (j.expediente||'—') +
+    '\nJuzgado: ' + (j.juzgado||'—') + '\nEstatus: ' + (j.estatus||'—') + '\nAudiencia: ' + (j.audiencia||'—') +
+    '\nLeyes activas: ' + leyes + '\nHistorial:\n' + hist +
+    '\n\nIncluye: resumen ejecutivo, estado procesal actual, riesgos, próximos pasos recomendados. Responde en español.';
+  $('mexp-ia-resumen').textContent = '⏳ Analizando...';
+  const resultado = await _llamarGeminiIADirecto(prompt);
+  $('mexp-ia-resumen').textContent = resultado || 'No se obtuvo respuesta.';
+}
+
+function preguntaRapidaIA(tipo){
+  const j = D.juicios[_mexpIdx];
+  if(!j){ if(typeof toast==='function') toast('Abre un expediente primero', 'err'); return; }
+  const prompts = {
+    argumentos: 'Para el caso de ' + (j.cliente||'el cliente') + ' (' + (j.tipo||'') + '), ¿cuáles son los argumentos jurídicos más sólidos según el derecho mexicano? Leyes activas: ' + (j.leyesActivas||[]).join(', '),
+    riesgos: 'Analiza los riesgos procesales del expediente de ' + (j.cliente||'el cliente') + '. Estatus: ' + (j.estatus||'—') + '. Historial: ' + (j.historial||[]).map(h=>h.texto).join('; '),
+    'resumen-cliente': 'Redacta un resumen en lenguaje sencillo (no técnico) del estado actual del caso de ' + (j.cliente||'el cliente') + ' para presentar al cliente. Tipo: ' + (j.tipo||'—') + '. Estatus: ' + (j.estatus||'—')
+  };
+  const labels = { argumentos:'Argumentos clave', riesgos:'Análisis de riesgos', 'resumen-cliente':'Resumen para cliente' };
+  _agregarMensajeIA(labels[tipo]||tipo, 'user');
+  _llamarGeminiIA(prompts[tipo]||tipo);
+}
+
+async function enviarPreguntaIA(){
+  const input = $('mexp-ia-input');
+  const texto = input.value.trim();
+  if(!texto) return;
+  input.value = '';
+  const j = D.juicios[_mexpIdx];
+  const contexto = j ? 'Contexto del expediente: ' + (j.cliente||'') + ', ' + (j.tipo||'') + ', Exp. ' + (j.expediente||'') + '. ' : '';
+  _agregarMensajeIA(texto, 'user');
+  await _llamarGeminiIA(contexto + texto);
+}
+
+function _agregarMensajeIA(texto, rol){
+  const chat = $('mexp-ia-chat');
+  if(!chat) return;
+  const isUser = rol === 'user';
+  const div = document.createElement('div');
+  div.style.cssText = 'padding:8px 10px;border-radius:var(--radius-sm);font-size:0.74rem;line-height:1.6;' +
+    (isUser ? 'background:var(--azul-l);color:var(--azul);align-self:flex-end;max-width:90%;' : 'background:var(--surface2);color:var(--ink);border:1px solid var(--border-l);');
+  div.textContent = texto;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+  return div;
+}
+
+async function _llamarGeminiIA(prompt){
+  const geminiKey = localStorage.getItem('cfg-gemini-25-key') || localStorage.getItem('geminiApiKey') || localStorage.getItem('cfg-gemini-key-inline');
+  if(!geminiKey){
+    _agregarMensajeIA('⚠ Configura la API Key de Gemini 2.5 en Configuración → sección Gemini', 'assistant');
+    return '';
+  }
+  const loadingEl = _agregarMensajeIA('⏳ Analizando con Gemini 2.5...', 'assistant');
+  try{
+    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=' + geminiKey, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    });
+    const data = await resp.json();
+    const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
+    if(loadingEl) loadingEl.textContent = texto;
+    return texto;
+  } catch(e){
+    if(loadingEl) loadingEl.textContent = 'Error: ' + e.message;
+    return '';
+  }
+}
+
+async function _llamarGeminiIADirecto(prompt){
+  const geminiKey = localStorage.getItem('cfg-gemini-25-key') || localStorage.getItem('geminiApiKey') || localStorage.getItem('cfg-gemini-key-inline');
+  if(!geminiKey) return '⚠ Configura la API Key de Gemini 2.5 en Configuración';
+  try{
+    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=' + geminiKey, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    });
+    const data = await resp.json();
+    return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sin respuesta.';
+  } catch(e){ return 'Error: ' + e.message; }
+}
+
+// ── R2 eliminar helper (si no existe) ─────────────────────────
+if(typeof window.eliminarR2 === 'undefined'){
+  window.eliminarR2 = async function(path, bucket){
+    try{
+      const res = await fetch(R2_WORKER + '/r2/delete?bucket=' + encodeURIComponent(bucket||'juicios'), {
+        method: 'DELETE',
+        headers: { 'X-Auth-Token': R2_TOKEN },
+        body: JSON.stringify({ path })
+      });
+      return res.ok;
+    } catch(e){ console.error('eliminarR2:', e); return false; }
+  };
+}
+
 </script>
 </body>
 </html>

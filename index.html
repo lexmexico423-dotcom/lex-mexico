@@ -6521,36 +6521,8 @@ async function sincronizarFolio(forzarSB){
     if(typeof retroGlobalCargarSupabase==='function') retroGlobalCargarSupabase();
     // Auto-corregir letras de movimientos y paths R2 (silencioso, 8s después)
     if(typeof _autoCorregirLetrasR2 === 'function') _autoCorregirLetrasR2();
-    // Auto-reparar fechas de recibos secundarios (B, C, D…) que heredaron la fecha del A
-    // Esto corrige datos históricos ya guardados en Supabase/Drive.
-    (function _repararFechasSecundarios(){
-      try {
-        let reparados = 0;
-        (appData.recibos || []).forEach(function(r){
-          const letra = r.letra || 'A';
-          if(letra === 'A') return; // Solo secundarios
-          if(!r.esActualizacion) return; // Solo actualizaciones
-          if(!r.fechaActualizacion) return; // Sin dato de reparación
-          // Si fecha/hora principal coincide exactamente con el recibo A del mismo folio,
-          // o si fecha y fechaActualizacion difieren → reparar
-          const fechaCorrecta = r.fechaActualizacion;
-          const horaCorrecta  = r.horaActualizacion || r.hora || r.hora_recibo || '';
-          const fechaActual   = r.fecha || r.fecha_recibo || '';
-          if(fechaActual !== fechaCorrecta){
-            r.fecha        = fechaCorrecta;
-            r.fecha_recibo = fechaCorrecta;
-            r.hora         = horaCorrecta;
-            r.hora_recibo  = horaCorrecta;
-            reparados++;
-          }
-        });
-        if(reparados > 0){
-          console.log('[RepararFechas] ✓ ' + reparados + ' recibos secundarios con fecha corregida');
-          if(typeof renderHistorial === 'function') renderHistorial();
-          if(typeof actualizarArchivoControl === 'function') actualizarArchivoControl().catch(function(e){ console.warn('[RepararFechas] save:', e); });
-        }
-      } catch(e){ console.warn('[RepararFechas]', e); }
-    })();
+    // Backup diario a R2 — corre silenciosamente 3s despues de cargar datos
+    setTimeout(function(){ backupAppData().catch(function(e){ console.warn('[Backup] inicio:', e); }); }, 3000);
   } catch(e){
     console.error('[SB] sincronizarFolio error:', e);
   } finally {
@@ -9249,14 +9221,7 @@ async function _imprimirActualizacionReal(){
         estadoPlacas:     _placasCapturadas.estado,
         esActualizacion:  true,
         fechaActualizacion: _fechaActualizacion,
-        horaActualizacion:  _horaActualizacion,
-        // ── CORRECCIÓN: fecha y hora propias del recibo secundario (B, C, D…) ──
-        // Object.assign heredaría la fecha del registro original (A), haciendo
-        // que todos los recibos secundarios aparecieran con la fecha del A.
-        fecha:            _fechaActualizacion,
-        fecha_recibo:     _fechaActualizacion,
-        hora:             _horaActualizacion,
-        hora_recibo:      _horaActualizacion
+        horaActualizacion:  _horaActualizacion
       });
       // ⚠️ CRÍTICO: insertar B inmediatamente DESPUÉS de A usando splice(idx+1).
       // Esto garantiza que find(r => r.folio === n) sin filtro de letra siempre
@@ -10974,13 +10939,11 @@ function filtrarHistorial(){
   }
   // Ordenar estrictamente por fecha+hora de generación descendente (más reciente arriba)
   lista.sort(function(a, b) {
-    const fa = (a.fecha || a.fecha_recibo || '') + 'T' + (a.hora || a.hora_recibo || '00:00');
-    const fb = (b.fecha || b.fecha_recibo || '') + 'T' + (b.hora || b.hora_recibo || '00:00');
+    const fa = (a.fecha || '') + 'T' + (a.hora || '00:00');
+    const fb = (b.fecha || '') + 'T' + (b.hora || '00:00');
     if (fb !== fa) return fb.localeCompare(fa);
-    // Misma fecha y hora: folio mayor primero; mismo folio → letra ascendente (A antes que B)
-    if ((b.folio || 0) !== (a.folio || 0)) return (b.folio || 0) - (a.folio || 0);
-    var la = (a.letra || 'A'), lb = (b.letra || 'A');
-    return la < lb ? -1 : la > lb ? 1 : 0;
+    // Misma fecha y hora: folio mayor primero
+    return (b.folio || 0) - (a.folio || 0);
   });
   list.innerHTML = lista.map(r=>{
     const i = appData.recibos.indexOf(r);
@@ -12766,11 +12729,9 @@ function renderRec(){
   const recArr2=(typeof appData!=='undefined'?appData.recibos:[])||[];
   const foliosVistos=new Set();
   const rTodos=[...recArr2,...recArr1].filter(x=>{
-    // Deduplicar por folio+letra para conservar recibos secundarios (B, C, D…)
-    const key = String(x.folio || '') + '|' + (x.letra || 'A');
-    if(foliosVistos.has(key))return false;
-    foliosVistos.add(key);return true;
-  }).sort((function(a,b){ var fa=(a.fecha||a.fecha_recibo||'')+'T'+(a.hora||a.hora_recibo||'00:00'); var fb=(b.fecha||b.fecha_recibo||'')+'T'+(b.hora||b.hora_recibo||'00:00'); if(fb!==fa) return fb.localeCompare(fa); if(a.folio!==b.folio) return (b.folio||0)-(a.folio||0); var la=(a.letra||'A'),lb=(b.letra||'A'); return la<lb?-1:la>lb?1:0; }));
+    if(foliosVistos.has(x.folio))return false;
+    foliosVistos.add(x.folio);return true;
+  }).sort((function(a,b){ var fa=(a.fecha||a.fecha_recibo||'')+'T'+(a.hora||'00:00'); var fb=(b.fecha||b.fecha_recibo||'')+'T'+(b.hora||'00:00'); if(fb!==fa) return fb.localeCompare(fa); if(a.folio!==b.folio) return (b.folio||0)-(a.folio||0); var la=(a.letra||'A'),lb=(b.letra||'A'); return la<lb?-1:la>lb?1:0; }));
   // Mejora 4: aplicar filtros
   const r = aplicarFiltrosRecibos(rTodos);
   $('rTot').textContent=rTodos.length;
@@ -16731,9 +16692,153 @@ function limpiarBackupsViejos() {
 } catch(e){ registrarError('catch vacio', e); }
   });
 }
-function backupAppData() {
-  // Deshabilitado — los datos viven exclusivamente en Supabase y R2
+// ══════════════════════════════════════════════════════════════════════════════
+// SISTEMA DE BACKUP DIARIO A R2
+// Guarda un snapshot completo de app_state (recibos + D) cada dia.
+// Bucket: 'backups'   Ruta: {despacho_id}/YYYY/MM/YYYY-MM-DD.json
+// Retencion: 90 snapshots (~3 meses). El mas reciente siempre en /latest.json.
+// ══════════════════════════════════════════════════════════════════════════════
+var _backupHecho = false; // Solo una vez por sesion
+
+async function backupAppData() {
+  try {
+    if (!window.subirR2 || !window.SB_DESPACHO_ID) return;
+    if (_backupHecho) return;
+    if (!appData || !appData.recibos || appData.recibos.length === 0) return;
+
+    var hoyKey = 'lex-backup-' + new Date().toISOString().slice(0, 10);
+    try { if (localStorage.getItem(hoyKey)) { _backupHecho = true; return; } } catch(_){}
+
+    _backupHecho = true;
+
+    var ahora    = new Date();
+    var yyyy     = ahora.getFullYear();
+    var mm       = String(ahora.getMonth() + 1).padStart(2, '0');
+    var dd       = String(ahora.getDate()).padStart(2, '0');
+    var hhmm     = String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
+    var fechaStr = yyyy + '-' + mm + '-' + dd;
+
+    var snapshot = {
+      version:   2,
+      fecha:     fechaStr,
+      hora:      hhmm,
+      despacho:  window.SB_DESPACHO_ID,
+      recibos: {
+        folioActual:     appData.folioActual,
+        anioFolioActual: appData.anioFolioActual,
+        recibos:         appData.recibos || []
+      },
+      data: {
+        movimientos:          (D && D.movimientos)          || [],
+        directorio:           (D && D.directorio)           || [],
+        carpetas:             (D && D.carpetas)             || [],
+        juicios:              (D && D.juicios)              || [],
+        pendientes:           (D && D.pendientes)           || [],
+        cierres:              (D && D.cierres)              || [],
+        prestamos:            (D && D.prestamos)            || [],
+        escrituras:           (D && D.escrituras)           || [],
+        recibosExcluidosCaja: (D && D.recibosExcluidosCaja) || [],
+        saldoAcumulado:       (D && D.saldoAcumulado)       || 0
+      }
+    };
+
+    var json       = JSON.stringify(snapshot);
+    var blob       = new Blob([json], { type: 'application/json' });
+    var did        = window.SB_DESPACHO_ID;
+    var pathDia    = did + '/backups/' + yyyy + '/' + mm + '/' + fechaStr + '.json';
+    var fileDia    = new File([blob], fechaStr + '.json', { type: 'application/json' });
+    var okDia      = await window.subirR2(fileDia, pathDia, 'backups');
+
+    var pathLatest = did + '/backups/latest.json';
+    var fileLatest = new File([blob], 'latest.json', { type: 'application/json' });
+    await window.subirR2(fileLatest, pathLatest, 'backups');
+
+    if (okDia) {
+      console.log('[Backup] OK snapshot en R2:', pathDia,
+        '| recibos:', snapshot.recibos.recibos.length,
+        '| movimientos:', snapshot.data.movimientos.length,
+        '| juicios:', snapshot.data.juicios.length);
+      try {
+        localStorage.setItem(hoyKey, '1');
+        var hace7 = new Date(ahora - 7 * 86400000).toISOString().slice(0, 10);
+        Object.keys(localStorage).forEach(function(k){
+          if (k.startsWith('lex-backup-') && k < 'lex-backup-' + hace7)
+            localStorage.removeItem(k);
+        });
+      } catch(_){}
+      _limpiarBackupsViejos(did, ahora).catch(function(){});
+    } else {
+      console.warn('[Backup] No se pudo guardar en R2');
+      _backupHecho = false;
+    }
+  } catch(e) {
+    console.warn('[Backup] Error:', e);
+    _backupHecho = false;
+  }
 }
+
+async function _limpiarBackupsViejos(did, ahora) {
+  try {
+    if (!window.listarR2) return;
+    var prefix = did + '/backups/';
+    var lista  = await window.listarR2(prefix, 'backups');
+    if (!lista || !lista.length) return;
+    var corte  = new Date(ahora - 90 * 86400000).toISOString().slice(0, 10);
+    var viejos = lista.filter(function(item) {
+      var nombre = (item.key || item.name || '').split('/').pop().replace('.json', '');
+      return /^\d{4}-\d{2}-\d{2}$/.test(nombre) && nombre < corte;
+    });
+    if (!viejos.length) return;
+    var eliminados = 0;
+    for (var i = 0; i < viejos.length; i++) {
+      try {
+        var path = viejos[i].key || viejos[i].name || '';
+        if (!path) continue;
+        var url = R2_WORKER + '/r2/delete?path=' + encodeURIComponent(path)
+                + '&bucket=backups&token=' + R2_TOKEN;
+        var res = await fetch(url, { method: 'DELETE', headers: { 'X-Auth-Token': R2_TOKEN } });
+        if (res.ok) eliminados++;
+      } catch(_){}
+    }
+    if (eliminados) console.log('[Backup] Snapshots viejos eliminados:', eliminados);
+  } catch(e) { console.warn('[Backup] limpiar:', e); }
+}
+
+window.restoreFromBackup = async function(fecha) {
+  if (!window.descargarR2 || !window.SB_DESPACHO_ID) { alert('R2 no disponible'); return; }
+  var did  = window.SB_DESPACHO_ID;
+  var path = fecha
+    ? did + '/backups/' + fecha.slice(0,4) + '/' + fecha.slice(5,7) + '/' + fecha + '.json'
+    : did + '/backups/latest.json';
+  try {
+    var blob = await window.descargarR2(path, 'backups');
+    if (!blob) { alert('Backup no encontrado: ' + path); return; }
+    var snap = JSON.parse(await blob.text());
+    console.log('[Backup] Snapshot encontrado:', snap.fecha, snap.hora,
+      '| recibos:', snap.recibos.recibos.length,
+      '| movimientos:', snap.data.movimientos.length,
+      '| juicios:', snap.data.juicios.length);
+    if (!confirm(
+      'RESTAURAR BACKUP\n\n' +
+      'Fecha: ' + snap.fecha + ' ' + snap.hora + '\n' +
+      'Recibos: ' + snap.recibos.recibos.length + '\n' +
+      'Movimientos: ' + snap.data.movimientos.length + '\n' +
+      'Juicios: ' + snap.data.juicios.length + '\n\n' +
+      'Confirmar SOBREESCRIBE el estado actual en Supabase.\n' +
+      'Recarga la pagina despues de restaurar.'
+    )) return;
+    var user = (await window.SB.auth.getUser()).data.user;
+    var res  = await window.SB.from('app_state').update({
+      recibos:      snap.recibos,
+      folio_actual: snap.recibos.folioActual,
+      data:         snap.data,
+      updated_by:   user ? user.id : null
+    }).eq('despacho_id', did);
+    if (res.error) { alert('Error: ' + res.error.message); return; }
+    alert('Datos restaurados. Recarga la pagina.');
+  } catch(e) { alert('Error: ' + e.message); console.error('[Backup]', e); }
+};
+
 function saveCarpetas(){
   // Guardar solo el array de carpetas en el archivo dedicado en Drive
   syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); });

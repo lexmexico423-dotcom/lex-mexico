@@ -4032,7 +4032,7 @@ window.addEventListener('offline', ()=>{
       <!-- ── Accesos rápidos del panel ── -->
       <div class="search-row" style="margin-bottom:4px;">
         <button class="btn btn-secondary" onclick="ir('recibos')" style="border-color:var(--gold);color:var(--gold-l);">🧾 Historial de Recibos</button>
-        <button class="btn btn-secondary" onclick="ir('finanzas-internas')" style="border-color:var(--gold);color:var(--gold-l);position:relative;">💰 Finanzas Internas<span class="nav-badge amarillo" id="badgeFI" style="display:none;position:absolute;top:-6px;right:-6px;">!</span></button>
+
       </div>
       <!-- ── Barra de filtros ── -->
       <div class="filtros" style="gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
@@ -4880,7 +4880,26 @@ window.addEventListener('offline', ()=>{
       <div class="search-row">
         <input class="search-inp" placeholder="🔍 Buscar pendiente..." id="pendQ" oninput="renderPend()">
         <button class="btn btn-primary" onclick="abrirPendiente()">＋ Nuevo</button>
+        <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#2d5a1b;border:1px solid #4a8a2a;color:#a8e87a;border-radius:7px;" onclick="abrirPanelEstado('oax',this)">🌿 Oaxaca</button>
+        <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#1a3a6a;border:1px solid #2a5aaa;color:#7ab8f0;border-radius:7px;" onclick="abrirPanelEstado('mex',this)">🏔 Edo. Méx.</button>
+        <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#5a1a1a;border:1px solid #aa2a2a;color:#f07a7a;border-radius:7px;" onclick="abrirPanelEstado('cdmx',this)">🏙 CDMX</button>
+        <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#4a2a0a;border:1px solid #8a5a1a;color:#f0b860;border-radius:7px;" onclick="abrirPanelEstado('mich',this)">🎸 Michoacán</button>
       </div>
+
+      <!-- ══ MODAL PANEL DE ESTADOS ══════════════════════════════════════════════════ -->
+      <div id="modal-panel-estado" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
+        <div style="background:#ffffff;border:1px solid #e0d8c8;border-radius:14px;width:min(660px,96vw);max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+          <div style="background:#fdf8f0;border-bottom:1px solid #e8dfc8;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-radius:14px 14px 0 0;flex-wrap:wrap;gap:8px;">
+            <span id="mpe-title" style="font-size:0.8rem;font-weight:700;color:#7a5a1a;font-family:monospace;letter-spacing:0.06em;text-transform:uppercase;">📍 Panel</span>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <div id="mpe-supuesto-tabs" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+              <button onclick="cerrarPanelEstado()" style="background:transparent;border:1px solid #c8a87a;border-radius:6px;color:#7a5a1a;font-size:0.7rem;padding:4px 10px;cursor:pointer;margin-left:6px;">✕ Cerrar</button>
+            </div>
+          </div>
+          <div id="mpe-body" style="padding:16px;display:flex;flex-direction:column;gap:12px;background:#ffffff;border-radius:0 0 14px 14px;"></div>
+        </div>
+      </div>
+      <!-- ══ FIN MODAL PANEL DE ESTADOS ══════════════════════════════════════════ -->
       <!-- Secciones por categoría: ahora en el sidebar lateral -->
       <!-- Mantenemos el contenedor oculto para compatibilidad con setPSec() -->
       <div class="pend-secciones pend-secciones-5col" id="pend-secciones-row" style="display:none;">
@@ -6731,47 +6750,10 @@ async function driveGET(url){
 }
 // ── PARTE 4: GUARDAR EN DIRECTORIO (antes Sheets, ahora estado) ──
 async function guardarEnDirectorio(datos){
-  // El directorio se sincroniza automáticamente vía el array D.directorio,
-  // que se persiste como parte del estado. Esta función ahora solo
-  // agrega/actualiza contactos en memoria y dispara sync.
-  if(typeof D === 'undefined') return false;
-  try {
-    if(!Array.isArray(D.directorio)) D.directorio = [];
-    const folioStr = folioFormato(datos.folio);
-    (datos.clientes || []).forEach(c => {
-      const nombre = (c.nombre || '').trim();
-      if(!nombre) return;
-      const tel = c.movil || c.tel || '';
-      const dom = c.domicilio || '';
-      const existe = D.directorio.find(d => (d.nombre||'').trim().toLowerCase() === nombre.toLowerCase());
-      if(existe){
-        // Si hay tel nuevo, agregar al historial
-        if(tel && tel !== existe.telefono){
-          if(!Array.isArray(existe.historial)) existe.historial = [];
-          existe.historial.push({ tel: existe.telefono, fecha: new Date().toISOString().slice(0,10) });
-          existe.telefono = tel;
-        }
-        if(dom && !existe.domicilio) existe.domicilio = dom;
-        if(datos.tramites) existe.tramite = datos.tramites;
-        existe.folio_ref = folioStr;
-      } else {
-        D.directorio.push({
-          nombre, telefono: tel, domicilio: dom,
-          tramite: datos.tramites || '',
-          fecha_alta: datos.fecha_recibo || new Date().toISOString().slice(0,10),
-          folio_ref: folioStr,
-          historial: []
-        });
-      }
-    });
-    // Persistir cambios
-    try{ if(typeof save==='function') save(); }catch(e){ console.warn('guardarEnDirectorio save:',e); }
-    console.log('✓ Directorio actualizado para folio #'+folioStr);
-    return true;
-  } catch(e){
-    console.error('guardarEnDirectorio:', e);
-    return false;
-  }
+  // DESACTIVADO: el directorio ya no se llena automáticamente al generar recibos.
+  // Ahora el directorio se gestiona únicamente de forma manual.
+  console.log('[Directorio] Auto-fill desactivado. Usa el directorio manual.');
+  return false;
 }
 // ── FOLIO DISPLAY ────────────────────────────────────────────────
 // Formato: AA-NN (año 2 dígitos + número sin padding fijo, mínimo 2 dígitos)
@@ -10251,7 +10233,7 @@ async function guardarRecibo(){
     setStatus('loading','Generando PDF · Folio #'+folioConLetra(folio, appData.anioFolioActual, 'A')+'...','loading');
     // Subir PDF a Supabase Storage
     subirPDFaDrive(doc.output('blob'), nombreArchivo, _r2NombreNuevo).catch(e=>console.warn('SB upload:',e));
-    guardarEnDirectorio(datos).catch(e=>console.warn('Directorio:',e));
+    // guardarEnDirectorio: desactivado — el directorio ahora se llena solo manualmente
     // ── Guardar TODOS los campos necesarios para restaurar el formulario en modo actualización ──
     const copiasParsed = (()=>{
       try{ const p=JSON.parse(datos.copias||'{}'); return p.docs||[]; }catch(e){ return []; }
@@ -11809,7 +11791,7 @@ function mostrarAtajosAyuda() {
 // Activar atajos globales
 document.addEventListener('keydown', manejarAtajos);
 // ═══ NAVEGACIÓN ═══
-const TITULOS={sesiones:'👁 Monitor de Sesiones',caja:'🏠 Principal','registro-civil':'📋 Impresión Registro Civil',contabilidad:'📊 Contabilidad',recibos:'🧾 Recibos Oficiales','nuevo-recibo':'✍️ Nuevo Recibo','configuracion':'⚙️ Configuración',directorio:'👥 Directorio',carpetas:'🗂️ Control de Carpetas',juicios:'⚖️ Control de Juicios',pendientes:'📌 Pendientes','finanzas-internas':'💰 Finanzas Internas',escrituras:'📄 Control de Escrituras',gestiones:'📋 Recibos en Gestión'};
+const TITULOS={sesiones:'👁 Monitor de Sesiones',caja:'🏠 Principal','registro-civil':'📋 Impresión Registro Civil',contabilidad:'📊 Contabilidad',recibos:'🧾 Recibos Oficiales','nuevo-recibo':'✍️ Nuevo Recibo','configuracion':'⚙️ Configuración',directorio:'👥 Directorio',carpetas:'🗂️ Control de Carpetas',juicios:'⚖️ Control de Juicios',pendientes:'📌 Pendientes',escrituras:'📄 Control de Escrituras',gestiones:'📋 Recibos en Gestión'};
 function ir(p){
   document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(x=>x.classList.remove('active'));
@@ -11822,13 +11804,12 @@ function ir(p){
   document.querySelector(`.nav-sub-item[onclick="ir('${p}')"]`)?.classList.add('active');
   // También marcar items con data-panel (para los que tienen onclick compuesto)
   document.querySelectorAll(`.nav-item[data-panel="${p}"]`).forEach(el => el.classList.add('active'));
-  if(p==='recibos'||p==='finanzas-internas'){
+  if(p==='recibos'){
     document.querySelector(`.nav-item[onclick="ir('contabilidad')"]`)?.classList.add('active');
   }
   $('topTitle').textContent=TITULOS[p]||p;
   if(p==='contabilidad')renderContab();
   if(p==='recibos')renderRec();
-  if(p==='finanzas-internas'){initFI();FI.prestamos=D.prestamos;renderFI();fiCambiarTab(fiTabActual||'caja');}
   if(p==='directorio'){renderDir();}
   if(p==='carpetas')renderCarp();
   if(p==='juicios'){renderJuicios();$('juicio-detalle').classList.remove('visible');$('juicios-lista-view').style.display='';}
@@ -15400,7 +15381,7 @@ function pPlacasAdjuntar(event){
     if (!tiposValidos.includes(file.type)) { rechazados++; pendientes--; if(pendientes===0)_pPlacasMostrarResultadoSubida(agregados,rechazados); return; }
     if (typeof subirR2==='function' && window.SB_DESPACHO_ID) {
       const r2path = window.SB_DESPACHO_ID+'/placas/'+nombreSafe+'/'+Date.now()+'_'+file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-      subirR2(file, r2path, 'placas').then(ok => {
+      subirR2(file, r2path, 'recibos').then(ok => {
         if (ok) { _pPlacasState.documentos.push({nombre:file.name,tipo:file.type,tamano:file.size,fechaSubida:hoy(),r2path:r2path}); agregados++; }
         else rechazados++;
         pendientes--;
@@ -15477,7 +15458,7 @@ async function _pPlacasVerExpediente(){
   cont.innerHTML = '<div style="padding:12px;text-align:center;font-size:0.78rem;color:var(--muted);">Cargando...</div>';
   const nombreSafe = nombre.replace(/[^a-zA-Z0-9]/g,'_').substring(0,40);
   const prefix = window.SB_DESPACHO_ID + '/placas/' + nombreSafe + '/';
-  const archivos = await window.listarR2(prefix, 'placas');
+  const archivos = await window.listarR2(prefix, 'recibos');
   if (!archivos.length) {
     cont.innerHTML = '<div style="padding:12px;text-align:center;font-size:0.78rem;color:var(--muted);">Sin archivos en R2 para este cliente.</div>';
     return;
@@ -15500,7 +15481,7 @@ function _pPlacasAbrirR2(key, nombre){
   if (typeof window.descargarR2 !== 'function') return;
   const ext = nombre.split('.').pop().toLowerCase();
   const tipo = ext==='pdf' ? 'application/pdf' : 'image/'+ext;
-  window.descargarR2(key, 'placas').then(blob => {
+  window.descargarR2(key, 'recibos').then(blob => {
     if (!blob) { toast('No se pudo cargar el archivo','err'); return; }
     _pVerDoc({nombre:nombre, tipo:tipo, r2path:key, bucket:'placas'});
   });
@@ -16760,11 +16741,9 @@ async function sync(){
     if(typeof renderRec==='function') renderRec();
     if(typeof renderContab==='function') renderContab();
     if(typeof badges==='function') badges();
-    if(typeof actualizarStatsFI==='function') actualizarStatsFI();
     toast('Sincronización completa ✓');
     setTimeout(()=>{ if(typeof migrarConceptoCostosExtra==='function') migrarConceptoCostosExtra(); }, 200);
     setTimeout(()=>{ if(typeof migrarMovimientosRecibos==='function') migrarMovimientosRecibos(); }, 600);
-    if(typeof FI !== 'undefined' && Array.isArray(D.prestamos)) FI.prestamos = D.prestamos;
   } catch(e){
     console.warn('sync:', e);
   }
@@ -17228,8 +17207,6 @@ const _despachoRestaurado = await obtenerDespachoActivo();
       mostrarLoginSupabase();
     }
   }, 800);
-  initFI();actualizarStatsFI();
-  setTimeout(mostrarAlertaFIStartup, 3500);
   verificarLogin();
   reloj();
   setInterval(reloj,1000);
@@ -19455,492 +19432,6 @@ document.addEventListener('click',function(e){
     dd.style.display='none';
   }
 });
-// ═══ FINANZAS INTERNAS v2 ═══
-// Estructura: D.prestamos = array de objetos con campo "subtipo": 'caja' | 'anticipo'
-let FI = { prestamos: [] };
-let fiPagoTarget = null;     // id del registro en edición de pago
-let fiPagoTipo   = 'caja';   // 'caja' | 'anticipo'
-let fiFiltroCaja     = 'todos';
-let fiFiltroAnticipo = 'todos';
-let fiTabActual      = 'caja';
-function initFI() {
-  if (!D.prestamos) D.prestamos = [];
-  // Migración legacy localStorage
-  const oldSaved = localStorage.getItem('lex-fi');
-  if (oldSaved) {
-    try {
-      const old = JSON.parse(oldSaved);
-      if (old.prestamos && old.prestamos.length > 0 && D.prestamos.length === 0) {
-        D.prestamos = old.prestamos;
-        save();
-      }
-    } catch(e){ registrarError('catch vacio', e); }
-    localStorage.removeItem('lex-fi');
-  }
-  // Migración: normalizar subtipos viejos
-  D.prestamos.forEach(p => {
-    if (!p.subtipo) p.subtipo = (p.tipo === 'cliente') ? 'anticipo' : 'caja';
-    if (!p.notasSeguimiento) p.notasSeguimiento = [];
-  });
-  FI.prestamos = D.prestamos;
-  // Poblar datalists con datos del directorio y carpetas
-  _poblarDatalistsAnticipo();
-}
-// ── MEJORA 3: ALERTA AL ABRIR LA APP ──────────────────────────────────
-function mostrarAlertaFIStartup() {
-  if (!D.prestamos || !D.prestamos.length) return;
-  const hoyStr = hoy();
-  const vencidosCaja = D.prestamos.filter(p =>
-    p.subtipo === 'caja' && p.estado !== 'saldado' && p.fechaDev && p.fechaDev < hoyStr
-  );
-  const vencidosAnticipo = D.prestamos.filter(p =>
-    p.subtipo === 'anticipo' && p.estado !== 'saldado' && p.fechaDev && p.fechaDev < hoyStr
-  );
-  const pendCaja = D.prestamos.filter(p => p.subtipo === 'caja' && p.estado !== 'saldado');
-  const pendAnticipo = D.prestamos.filter(p => p.subtipo === 'anticipo' && p.estado !== 'saldado');
-  if (!pendCaja.length && !pendAnticipo.length) return;
-  const totalPend = pendCaja.reduce((a,p)=>a+(p.monto-(p.pagos||[]).reduce((b,pg)=>b+pg.monto,0)),0)
-    + pendAnticipo.reduce((a,p)=>a+(p.monto-(p.pagos||[]).reduce((b,pg)=>b+pg.monto,0)),0);
-  let lineas = [];
-  if (pendCaja.length) lineas.push(`🏦 ${pendCaja.length} préstamo${pendCaja.length>1?'s':''} a caja sin saldar`);
-  if (pendAnticipo.length) lineas.push(`📋 ${pendAnticipo.length} pago${pendAnticipo.length>1?'s':''} de derechos por cobrar`);
-  if (vencidosCaja.length + vencidosAnticipo.length > 0)
-    lineas.push(`⚠️ ${vencidosCaja.length + vencidosAnticipo.length} registro${(vencidosCaja.length+vencidosAnticipo.length)>1?'s':''} con fecha límite vencida`);
-  lineas.push(`💵 Total por recuperar: ${fmtMx(totalPend)}`);
-  const msgToast = lineas[0] + (vencidosCaja.length+vencidosAnticipo.length > 0 ? ' · ⚠️ hay vencidos' : '');
-  // Toast rápido
-  toast('💰 Finanzas: ' + msgToast, vencidosCaja.length+vencidosAnticipo.length > 0 ? 'err' : 'ok');
-}
-// ── MEJORA 1: AGREGAR NOTA DE SEGUIMIENTO ─────────────────────────────
-async function agregarNotaFI(id) {
-  const p = FI.prestamos.find(x => x.id === id);
-  if (!p) return;
-  const texto = await pedirTexto({
-    titulo: '📝 Nota de seguimiento',
-    mensaje: `Préstamo de ${escapeHtml(p.prestamista)} — $${fmtMx(p.monto)}\nAgrega una nota sobre el estado o acuerdo:`,
-    placeholder: 'Ej: Acordó pagar el viernes por transferencia...',
-    validar: v => v.trim().length > 0 ? null : 'Escribe algo en la nota'
-  });
-  if (!texto) return;
-  if (!p.notasSeguimiento) p.notasSeguimiento = [];
-  p.notasSeguimiento.push({ fecha: hoy(), texto: texto.trim() });
-  saveFI(); renderCajaFI();
-  toast('Nota guardada ✓');
-}
-function _poblarDatalistsAnticipo() {
-  // Clientes del directorio
-  const dlC = document.getElementById('anti-cliente-list');
-  if (dlC && D.directorio) {
-    dlC.innerHTML = D.directorio.map(c=>`<option value="${escH(c.nombre)}">`).join('');
-  }
-  // Expedientes del control de archivo
-  const dlE = document.getElementById('anti-exp-list');
-  if (dlE && D.carpetas) {
-    dlE.innerHTML = D.carpetas.map(c=>`<option value="${c.num} — ${escH(c.cliente||'')}">` ).join('');
-  }
-}
-function filtrarClientesAnticipo() { /* datalist nativo lo hace solo */ }
-function filtrarExpedientesAnticipo() { /* datalist nativo */ }
-function saveFI() {
-  D.prestamos = FI.prestamos;
-  save();
-  actualizarStatsFI();
-}
-// ── STATS ──────────────────────────────────────────────────────────────
-function actualizarStatsFI() {
-  const ps = FI.prestamos;
-  const cajaActivos     = ps.filter(p => p.subtipo==='caja'     && p.estado!=='saldado');
-  const antiActivos     = ps.filter(p => p.subtipo==='anticipo' && p.estado!=='saldado');
-  const totalPagado     = ps.reduce((a,p)=>(p.pagos||[]).reduce((b,pg)=>b+pg.monto,a),0);
-  const totalPrestado   = ps.reduce((a,p)=>a+p.monto,0);
-  const saldoTotal      = totalPrestado - totalPagado;
-  const e = id => document.getElementById(id);
-  if(e('fi-cnt-caja'))       e('fi-cnt-caja').textContent       = cajaActivos.length;
-  if(e('fi-cnt-cliente'))    e('fi-cnt-cliente').textContent    = antiActivos.length;
-  if(e('fi-saldo-pend'))     e('fi-saldo-pend').textContent     = '$'+fmtM2(saldoTotal);
-  if(e('fi-total-recuperado')) e('fi-total-recuperado').textContent = '$'+fmtM2(totalPagado);
-  const badge = e('badgeFI');
-  const tot = cajaActivos.length + antiActivos.length;
-  if(badge){ badge.style.display = tot>0?'':'none'; badge.textContent=tot; }
-}
-// ── TABS ───────────────────────────────────────────────────────────────
-function fiCambiarTab(tab) {
-  fiTabActual = tab;
-  const esCaja = tab==='caja';
-  document.getElementById('fi-sec-caja').style.display    = esCaja ? '' : 'none';
-  document.getElementById('fi-sec-anticipo').style.display = esCaja ? 'none' : '';
-  document.getElementById('fi-tab-caja').style.cssText    = esCaja
-    ? 'flex:1;padding:14px;border-radius:var(--radius);border:2px solid var(--gold);background:var(--gold);color:#fff;font-family:Fraunces,serif;font-size:0.95rem;cursor:pointer;transition:all 0.18s;display:flex;align-items:center;justify-content:center;gap:8px;'
-    : 'flex:1;padding:14px;border-radius:var(--radius);border:2px solid var(--border-l);background:var(--surface);color:var(--muted);font-family:Fraunces,serif;font-size:0.95rem;cursor:pointer;transition:all 0.18s;display:flex;align-items:center;justify-content:center;gap:8px;';
-  document.getElementById('fi-tab-anticipo').style.cssText = esCaja
-    ? 'flex:1;padding:14px;border-radius:var(--radius);border:2px solid var(--border-l);background:var(--surface);color:var(--muted);font-family:Fraunces,serif;font-size:0.95rem;cursor:pointer;transition:all 0.18s;display:flex;align-items:center;justify-content:center;gap:8px;'
-    : 'flex:1;padding:14px;border-radius:var(--radius);border:2px solid var(--azul);background:var(--azul);color:#fff;font-family:Fraunces,serif;font-size:0.95rem;cursor:pointer;transition:all 0.18s;display:flex;align-items:center;justify-content:center;gap:8px;';
-  if(tab==='anticipo') renderResumenClientes();
-}
-// ── RENDER CAJA ────────────────────────────────────────────────────────
-function renderFI() { renderCajaFI(); renderAnticipoFI(); actualizarStatsFI(); }
-function setFIFiltroCaja(f,el) {
-  fiFiltroCaja = f;
-  document.querySelectorAll('#fi-sec-caja .fbtn').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active'); renderCajaFI();
-}
-function setFIFiltroAnticipo(f,el) {
-  fiFiltroAnticipo = f;
-  document.querySelectorAll('#fi-sec-anticipo .fbtn').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active'); renderAnticipoFI(); renderResumenClientes();
-}
-function renderCajaFI() {
-  const tbody = document.getElementById('tbCajaBody');
-  if(!tbody) return;
-  let ps = FI.prestamos.filter(p=>p.subtipo==='caja');
-  if(fiFiltroCaja!=='todos') ps = ps.filter(p=>p.estado===fiFiltroCaja);
-  const vacio = document.getElementById('fi-caja-vacio');
-  if(!ps.length){ tbody.innerHTML=''; if(vacio) vacio.style.display=''; return; }
-  if(vacio) vacio.style.display='none';
-  tbody.innerHTML = ps.map(p=>{
-    const pagado = (p.pagos||[]).reduce((a,pg)=>a+pg.monto,0);
-    const saldo  = p.monto - pagado;
-    const estadoTag = p.estado==='saldado'
-      ? '<span class="tag tag-v">✅ Saldado</span>'
-      : p.estado==='parcial'
-        ? '<span class="tag tag-a">🔄 Parcial</span>'
-        : '<span class="tag tag-r">⏳ Pendiente</span>';
-    const devAlert = p.fechaDev && p.fechaDev < hoy() && p.estado!=='saldado'
-      ? ' <span style="color:var(--rojo);font-size:0.7rem;">⚠ Vencido</span>' : '';
-    const accPago = p.estado!=='saldado'
-      ? `<button class="btn btn-success btn-sm" onclick="abrirModalPago('${p.id}','caja')">💳 Pago</button> ` : '';
-    const notasHtml = (p.notasSeguimiento||[]).length
-      ? `<div style="font-size:0.68rem;color:var(--muted);margin-top:3px;font-style:italic;">📝 ${escH((p.notasSeguimiento[p.notasSeguimiento.length-1]||{}).texto||'')}</div>` : '';
-    return `<tr>
-      <td class="mono">${p.fecha}</td>
-      <td style="font-weight:600;">${escH(p.prestamista)}${notasHtml}</td>
-      <td style="max-width:160px;font-size:0.74rem;">${escH(p.concepto||'—')}</td>
-      <td class="monto mono egr">${fmtMx(p.monto)}</td>
-      <td class="monto mono ing">${fmtMx(pagado)}</td>
-      <td class="monto mono ${saldo>0?'egr':''}">${fmtMx(saldo)}</td>
-      <td class="mono" style="font-size:0.72rem;">${p.fechaDev||'—'}${devAlert}</td>
-      <td>${estadoTag}</td>
-      <td style="white-space:nowrap;">${accPago}<button class="btn btn-ghost btn-sm" onclick="agregarNotaFI('${p.id}')" title="Agregar nota de seguimiento">📝</button> <button class="btn btn-ghost btn-sm" onclick="verHistorialPagos('${p.id}')">📋</button> <button class="btn btn-ghost btn-sm" style="color:var(--rojo);" onclick="eliminarFI('${p.id}')">✕</button></td>
-    </tr>`;
-  }).join('');
-}
-// ── RENDER ANTICIPO ────────────────────────────────────────────────────
-function renderAnticipoFI() {
-  const tbody = document.getElementById('tbAnticipoBody');
-  if(!tbody) return;
-  let ps = FI.prestamos.filter(p=>p.subtipo==='anticipo');
-  if(fiFiltroAnticipo!=='todos') ps = ps.filter(p=>p.estado===fiFiltroAnticipo);
-  const vacio = document.getElementById('fi-anticipo-vacio');
-  if(!ps.length){ tbody.innerHTML=''; if(vacio) vacio.style.display=''; return; }
-  if(vacio) vacio.style.display='none';
-  tbody.innerHTML = ps.map(p=>{
-    const reemb  = (p.pagos||[]).reduce((a,pg)=>a+pg.monto,0);
-    const porCob = p.monto - reemb;
-    const estadoTag = p.estado==='saldado'
-      ? '<span class="tag tag-v">✅ Saldado</span>'
-      : p.estado==='parcial'
-        ? '<span class="tag tag-a">🔄 Parcial</span>'
-        : '<span class="tag tag-r">⏳ Pendiente</span>';
-    const devAlert = p.fechaDev && p.fechaDev < hoy() && p.estado!=='saldado'
-      ? ' <span style="color:var(--rojo);font-size:0.68rem;font-weight:700;">⚠ Vencido</span>' : '';
-    const expLink = p.expediente
-      ? `<span class="tag tag-b" style="cursor:pointer;" onclick="irAExpediente('${escH(p.expediente)}')" title="Ver expediente">🗂 ${escH(p.expediente)}</span>` : '—';
-    const recLink = p.recibo
-      ? `<span class="mono" style="font-size:0.72rem;">🧾 ${escH(p.recibo)}</span>` : '—';
-    const accPago = p.estado!=='saldado'
-      ? `<button class="btn btn-success btn-sm" onclick="abrirModalPago('${p.id}','anticipo')">💳 Cobrar</button> ` : '';
-    const histBtn = (p.pagos||[]).length
-      ? `<button class="btn btn-primary btn-sm" onclick="verHistorialPagos('${p.id}')" title="Ver historial de reembolsos" style="background:var(--azul);">📋 ${(p.pagos||[]).length}</button> `
-      : `<button class="btn btn-ghost btn-sm" onclick="verHistorialPagos('${p.id}')" title="Sin pagos aún">📋</button> `;
-    return `<tr>
-      <td class="mono">${p.fecha}${devAlert}</td>
-      <td style="font-weight:600;">${escH(p.cliente||p.deudor||'—')}</td>
-      <td>${expLink}</td>
-      <td>${recLink}</td>
-      <td style="font-size:0.74rem;">${escH(p.dependencia||'—')}</td>
-      <td style="max-width:160px;font-size:0.74rem;">${escH(p.concepto||'—')}</td>
-      <td class="monto mono egr">${fmtMx(p.monto)}</td>
-      <td class="monto mono ing">${fmtMx(reemb)}</td>
-      <td class="monto mono ${porCob>0?'egr':''}">${fmtMx(porCob)}</td>
-      <td>${estadoTag}</td>
-      <td style="white-space:nowrap;">${accPago}${histBtn}<button class="btn btn-ghost btn-sm" style="color:var(--rojo);" onclick="eliminarFI('${p.id}')">✕</button></td>
-    </tr>`;
-  }).join('');
-}
-// ── RESUMEN POR CLIENTE ────────────────────────────────────────────────
-function renderResumenClientes() {
-  const tbody = document.getElementById('tbResumenClientesBody');
-  if(!tbody) return;
-  const ps = FI.prestamos.filter(p=>p.subtipo==='anticipo');
-  const mapa = {};
-  ps.forEach(p=>{
-    const nom = p.cliente||p.deudor||'Sin nombre';
-    if(!mapa[nom]) mapa[nom]={total:0,reemb:0,cnt:0};
-    mapa[nom].total += p.monto;
-    mapa[nom].reemb += (p.pagos||[]).reduce((a,pg)=>a+pg.monto,0);
-    mapa[nom].cnt++;
-  });
-  const keys = Object.keys(mapa);
-  if(!keys.length){ tbody.innerHTML='<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px;">Sin anticipos a clientes.</td></tr>'; return; }
-  tbody.innerHTML = keys.sort().map(nom=>{
-    const d = mapa[nom];
-    const por = d.total - d.reemb;
-    return `<tr>
-      <td style="font-weight:600;">${escH(nom)}</td>
-      <td class="monto mono egr">${fmtMx(d.total)}</td>
-      <td class="monto mono ing">${fmtMx(d.reemb)}</td>
-      <td class="monto mono ${por>0?'egr':''}">${fmtMx(por)}</td>
-      <td class="mono" style="text-align:center;">${d.cnt}</td>
-    </tr>`;
-  }).join('');
-}
-// ── LINK a expediente ──────────────────────────────────────────────────
-function irAExpediente(numStr) {
-  const num = numStr.split('—')[0].trim();
-  ir('carpetas');
-  setTimeout(()=>{
-    const el = document.getElementById('carpQ');
-    if(el){ el.value=num; if(typeof renderCarp==='function') renderCarp(); }
-  },300);
-}
-// ── MODALES: ABRIR ─────────────────────────────────────────────────────
-function abrirModalCaja() {
-  document.getElementById('caja-prestamista').value      = '';
-  document.getElementById('caja-fecha').value            = hoy();
-  document.getElementById('caja-monto').value            = '';
-  document.getElementById('caja-fecha-dev').value        = '';
-  document.getElementById('caja-concepto').value         = '';
-  document.getElementById('caja-nota-seguimiento').value = '';
-  document.getElementById('modal-prestamo-caja').classList.add('show');
-}
-function abrirModalAnticipo() {
-  _poblarDatalistsAnticipo();
-  document.getElementById('anti-cliente').value     = '';
-  document.getElementById('anti-dependencia').value = '';
-  document.getElementById('anti-expediente').value  = '';
-  document.getElementById('anti-recibo').value      = '';
-  document.getElementById('anti-monto').value       = '';
-  document.getElementById('anti-fecha').value       = hoy();
-  document.getElementById('anti-fecha-dev').value   = '';
-  document.getElementById('anti-concepto').value    = '';
-  document.getElementById('modal-anticipo-cliente').classList.add('show');
-}
-// ── ABRIR MODAL PAGO ───────────────────────────────────────────────────
-function abrirModalPago(id, tipo) {
-  const p = FI.prestamos.find(x=>x.id===id);
-  if(!p) return;
-  fiPagoTarget = id;
-  fiPagoTipo   = tipo || p.subtipo || 'caja';
-  const pagado = (p.pagos||[]).reduce((a,pg)=>a+pg.monto,0);
-  const saldo  = p.monto - pagado;
-  const nombre = tipo==='caja'
-    ? (p.prestamista + ' → Caja')
-    : (p.cliente||p.deudor||'Cliente');
-  const titulo = tipo==='anticipo' ? '💳 Registrar Reembolso del Cliente' : '💳 Registrar Devolución a Prestamista';
-  document.getElementById('pago-fi-titulo').textContent = titulo;
-  document.getElementById('pago-fi-nombre').textContent = nombre;
-  document.getElementById('pago-fi-saldo').textContent  = fmtMx(saldo);
-  document.getElementById('pago-fi-fecha').value        = hoy();
-  document.getElementById('pago-fi-monto').value        = '';
-  document.getElementById('pago-fi-nota').value         = '';
-  // La opción de registrar en caja solo aplica cuando el cliente reembolsa al despacho
-  const optCaja = document.getElementById('pago-fi-caja-opt');
-  if(optCaja) optCaja.style.display = tipo==='anticipo' ? '' : 'none';
-  document.getElementById('modal-pago-fi').classList.add('show');
-}
-function cerrarModalPago() {
-  document.getElementById('modal-pago-fi').classList.remove('show');
-  fiPagoTarget = null;
-}
-// ── GUARDAR ────────────────────────────────────────────────────────────
-function guardarPrestamoCaja() {
-  const prest = document.getElementById('caja-prestamista').value.trim();
-  const monto = parseFloat(document.getElementById('caja-monto').value)||0;
-  const fecha = document.getElementById('caja-fecha').value;
-  const conc  = document.getElementById('caja-concepto').value.trim();
-  const fdev  = document.getElementById('caja-fecha-dev').value;
-  const nota  = document.getElementById('caja-nota-seguimiento').value.trim();
-  if(!prest){ toast('Escribe quién prestó el dinero','err'); return; }
-  if(monto<=0){ toast('Ingresa un monto válido','err'); return; }
-  FI.prestamos.unshift({
-    id: Date.now().toString(), subtipo:'caja', tipo:'caja',
-    prestamista:prest, deudor:'Caja Despacho',
-    fecha, monto, concepto:conc, fechaDev:fdev,
-    notasSeguimiento: nota ? [{fecha:hoy(), texto:nota}] : [],
-    estado:'pendiente', pagos:[]
-  });
-  saveFI(); cerrar('modal-prestamo-caja'); renderCajaFI();
-  toast('Préstamo a caja registrado ✓');
-}
-function guardarAnticipo() {
-  const cliente    = document.getElementById('anti-cliente').value.trim();
-  const dep        = document.getElementById('anti-dependencia').value.trim();
-  const exp        = document.getElementById('anti-expediente').value.trim();
-  const recibo     = document.getElementById('anti-recibo').value.trim();
-  const monto      = parseFloat(document.getElementById('anti-monto').value)||0;
-  const fecha      = document.getElementById('anti-fecha').value;
-  const fdev       = document.getElementById('anti-fecha-dev').value;
-  const pagador    = document.getElementById('anti-pagador').value;
-  const conc       = document.getElementById('anti-concepto').value.trim();
-  if(!cliente){ toast('Escribe el nombre del cliente','err'); return; }
-  if(monto<=0){ toast('Ingresa un monto válido','err'); return; }
-  FI.prestamos.unshift({
-    id: Date.now().toString(), subtipo:'anticipo', tipo:'cliente',
-    cliente, deudor:cliente, prestamista:pagador,
-    dependencia:dep, expediente:exp, recibo,
-    fecha, monto, concepto:conc, fechaDev:fdev,
-    estado:'pendiente', pagos:[]
-  });
-  saveFI(); cerrar('modal-anticipo-cliente'); renderAnticipoFI(); renderResumenClientes();
-  toast('Anticipo registrado ✓');
-}
-function guardarPagoFI() {
-  if(!fiPagoTarget) return;
-  const p = FI.prestamos.find(x=>x.id===fiPagoTarget);
-  if(!p) return;
-  const monto = parseFloat(document.getElementById('pago-fi-monto').value)||0;
-  if(monto<=0){ toast('Ingresa un monto válido','err'); return; }
-  const fecha  = document.getElementById('pago-fi-fecha').value;
-  const nota   = document.getElementById('pago-fi-nota').value.trim();
-  if(!p.pagos) p.pagos=[];
-  p.pagos.push({fecha,monto,nota});
-  const pagado = p.pagos.reduce((a,pg)=>a+pg.monto,0);
-  p.estado = pagado >= p.monto ? 'saldado' : 'parcial';
-  // Si es anticipo de cliente y el usuario quiere registrar en caja:
-  const chkCaja = document.getElementById('pago-fi-a-caja');
-  if(fiPagoTipo==='anticipo' && chkCaja && chkCaja.checked) {
-    const cliente = p.cliente||p.deudor||'Cliente';
-    const desc    = `REEMBOLSO DE ANTICIPO — ${cliente}${p.expediente?' Exp.'+p.expediente:''}`;
-    const mov = {
-      id:'M-'+Date.now(),folioCaja:generarFolioMovCaja(fecha), fecha, hora:hora(),
-      descripcion:desc, monto, tipo:'ingreso',
-      cat:'reembolso', fuente:'finanzas', responsable: p.prestamista||empNombre()
-    };
-    _registrarMovimiento(mov);
-    setTimeout(()=>syncEstadoSupabaseDebounced(),100);
-    toast(`✅ Reembolso de ${fmtMx(monto)} registrado y sumado a la caja`);
-  } else {
-    toast(`✅ Pago de ${fmtMx(monto)} registrado`);
-  }
-  saveFI(); cerrarModalPago();
-  renderCajaFI(); renderAnticipoFI(); renderResumenClientes();
-  save();
-}
-// ── HISTORIAL ──────────────────────────────────────────────────────────
-function cerrarHistorialPagos() {
-  const card = document.getElementById('fi-historial-pagos-card');
-  if (card) card.style.display = 'none';
-}
-function verHistorialPagos(id) {
-  const p = FI.prestamos.find(x=>x.id===id);
-  if(!p) return;
-  const card = document.getElementById('fi-historial-pagos-card');
-  document.getElementById('fi-hpago-nombre').textContent = p.cliente||p.prestamista||p.deudor||'—';
-  const tbody = document.getElementById('fi-hpago-body');
-  if(!p.pagos||!p.pagos.length) {
-    tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px;">Sin pagos registrados aún.</td></tr>';
-  } else {
-    tbody.innerHTML = p.pagos.map((pg,idx)=>`<tr>
-      <td class="mono">${pg.fecha}</td>
-      <td>${escH(pg.nota||'Pago')}</td>
-      <td class="monto mono ing">${fmtMx(pg.monto)}</td>
-      <td style="white-space:nowrap;">
-        <button class="btn btn-ghost btn-sm" onclick="editarPagoFI('${p.id}',${idx})" title="Editar monto">✏️</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--rojo);" onclick="eliminarPagoFI('${p.id}',${idx})" title="Eliminar pago">✕</button>
-      </td>
-    </tr>`).join('');
-  }
-  // Actualizar thead para incluir columna acciones
-  const thead = card.querySelector('thead tr');
-  if (thead && thead.children.length < 4) {
-    const th = document.createElement('th'); th.textContent = 'Acciones'; thead.appendChild(th);
-  }
-  card.style.display=''; card.scrollIntoView({behavior:'smooth'});
-}
-async function editarPagoFI(id, idx) {
-  const p = FI.prestamos.find(x=>x.id===id);
-  if(!p||!p.pagos[idx]) return;
-  const pg = p.pagos[idx];
-  const nuevoMonto = await pedirTexto({
-    titulo: '✏️ Editar monto del pago',
-    mensaje: `Pago del ${pg.fecha}\nMonto actual: ${fmtMx(pg.monto)}\n\nIngresa el monto correcto:`,
-    valorInicial: String(pg.monto),
-    placeholder: '0.00',
-    validar: v => parseFloat(v) > 0 ? null : 'Ingresa un monto válido'
-  });
-  if (!nuevoMonto) return;
-  const montoNuevo = parseFloat(nuevoMonto);
-  if (!montoNuevo || montoNuevo <= 0) return;
-  pg.monto = montoNuevo;
-  // Recalcular estado
-  const totalPagado = p.pagos.reduce((a,pg2)=>a+pg2.monto, 0);
-  p.estado = totalPagado >= p.monto ? 'saldado' : totalPagado > 0 ? 'parcial' : 'pendiente';
-  saveFI(); verHistorialPagos(id); renderCajaFI(); renderAnticipoFI();
-  toast('Monto actualizado ✓');
-}
-async function eliminarPagoFI(id, idx) {
-  const p = FI.prestamos.find(x=>x.id===id);
-  if(!p||!p.pagos[idx]) return;
-  const pg = p.pagos[idx];
-  const ok = await confirmarBonito({
-    titulo: 'Eliminar pago',
-    mensaje: `¿Eliminar el pago de ${fmtMx(pg.monto)} del ${pg.fecha}?`,
-    btnSi: 'Sí, eliminar',
-    btnNo: 'Cancelar',
-    peligro: true
-  });
-  if (!ok) return;
-  p.pagos.splice(idx, 1);
-  const totalPagado = p.pagos.reduce((a,pg2)=>a+pg2.monto, 0);
-  p.estado = totalPagado >= p.monto ? 'saldado' : totalPagado > 0 ? 'parcial' : 'pendiente';
-  saveFI(); verHistorialPagos(id); renderCajaFI(); renderAnticipoFI();
-  toast('Pago eliminado ✓');
-}
-// ── ELIMINAR ───────────────────────────────────────────────────────────
-async function eliminarFI(id) {
-  const p = FI.prestamos.find(x => x.id === id);
-  if (!p) return;
-  const nombre = p.subtipo === 'caja'
-    ? `Préstamo de ${p.prestamista} por ${fmtMx(p.monto)}`
-    : `Pago de derechos — ${p.cliente||p.deudor||'Cliente'} por ${fmtMx(p.monto)}`;
-  const ok = await confirmarBonito({
-    titulo: 'Eliminar registro',
-    mensaje: `¿Eliminar "${nombre}"?\n\nEsta acción no se puede deshacer.`,
-    btnSi: 'Sí, eliminar',
-    btnNo: 'Cancelar',
-    peligro: true
-  });
-  if (!ok) return;
-  FI.prestamos = FI.prestamos.filter(p => p.id !== id);
-  saveFI(); renderCajaFI(); renderAnticipoFI(); renderResumenClientes();
-  toast('Registro eliminado');
-}
-// ── EXPORTAR CSV ───────────────────────────────────────────────────────
-function exportarFICSV(subtipo) {
-  const ps = FI.prestamos.filter(p=>p.subtipo===subtipo);
-  let headers, rows;
-  if(subtipo==='caja') {
-    headers = ['Fecha','Prestamista','Concepto','Monto','Pagado','Saldo','Dev.Esperada','Estado'];
-    rows = ps.map(p=>{
-      const pagado=(p.pagos||[]).reduce((a,pg)=>a+pg.monto,0);
-      return [p.fecha,p.prestamista,p.concepto,p.monto,pagado,p.monto-pagado,p.fechaDev||'',p.estado];
-    });
-  } else {
-    headers = ['Fecha','Cliente','Expediente','Recibo','Dependencia','Concepto','Pagado x Despacho','Reembolsado','Por Cobrar','Estado'];
-    rows = ps.map(p=>{
-      const reemb=(p.pagos||[]).reduce((a,pg)=>a+pg.monto,0);
-      return [p.fecha,p.cliente||p.deudor,p.expediente||'',p.recibo||'',p.dependencia||'',p.concepto,p.monto,reemb,p.monto-reemb,p.estado];
-    });
-  }
-  const csv = [headers.join(','), ...rows.map(r=>r.map(v=>{
-    const s=String(v||'').replace(/"/g,'""');
-    return s.includes(',')||s.includes('"')?`"${s}"`:s;
-  }).join(','))].join('\n');
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
-  a.download=`FinanzasInternas_${subtipo}_${hoy()}.csv`; a.click();
-  toast('CSV exportado ✓');
-}
 // ── HELPERS ────────────────────────────────────────────────────────────
 function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function fmtMx(v){ return '$'+(+v||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -21239,7 +20730,7 @@ async function adminCorregirLetrasMovimientos(silencioso){
                 var nombreCliente = (p.persona||p.nombre||'cliente').replace(/[^a-zA-Z0-9_\-]/g,'_').substring(0,40);
                 var newPath = window.SB_DESPACHO_ID+'/placas/'+nombreCliente+'/'+Date.now()+'_'+doc.nombre;
                 var file = new File([blob], doc.nombre, {type: doc.tipo || blob.type});
-                var ok = await window.subirR2(file, newPath, 'placas');
+                var ok = await window.subirR2(file, newPath, 'recibos');
                 if(ok){
                   // Borrar del bucket viejo
                   if(typeof window.borrarR2 === 'function'){
@@ -21266,7 +20757,7 @@ async function adminCorregirLetrasMovimientos(silencioso){
             for(var bi=0; bi<byteChars.length; bi++) byteArr[bi] = byteChars.charCodeAt(bi);
             var blob2 = new Blob([byteArr], {type: mimeType});
             var file2 = new File([blob2], doc.nombre, {type: mimeType});
-            var ok2 = await window.subirR2(file2, newPath2, 'placas');
+            var ok2 = await window.subirR2(file2, newPath2, 'recibos');
             if(ok2){
               doc.r2path = newPath2;
               doc.bucket = 'placas';
@@ -23894,327 +23385,6 @@ function confirmarVincularRecibo() {
 </script>
 <!-- PANEL FLOTANTE: Botones de actualización en esquina inferior derecha (fuera de la hoja del recibo) -->
     </div>
-    <!-- ═══ FINANZAS INTERNAS ═══ -->
-    <!-- PANEL SESIONES (solo admin) -->
-    <div id="panel-sesiones" class="panel">
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-body">
-          <!-- Encabezado -->
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-            <div style="font-family:serif;font-size:1rem;color:var(--gold-l);">👁 Monitor de Sesiones</div>
-            <div style="display:flex;gap:8px;">
-              <button onclick="sesionesRefrescar()" style="background:rgba(200,149,42,0.08);border:1px solid rgba(200,149,42,0.2);border-radius:6px;padding:5px 12px;cursor:pointer;font-family:monospace;font-size:0.62rem;color:rgba(200,149,42,0.85);">🔄 Actualizar</button>
-              <button onclick="sesionesResetHistorial()" style="background:rgba(192,22,26,0.08);border:1px solid rgba(192,22,26,0.25);border-radius:6px;padding:5px 12px;cursor:pointer;font-family:monospace;font-size:0.62rem;color:rgba(220,80,80,0.9);">🗑 Limpiar historial</button>
-            </div>
-          </div>
-          <!-- ── SECCIÓN 1: TODOS LOS EMPLEADOS (siempre visibles) ── -->
-          <div style="font-family:monospace;font-size:0.58rem;color:rgba(200,149,42,0.55);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(200,149,42,0.12);">
-            👥 Empleados del despacho
-          </div>
-          <div id="sesiones-empleados-fijos" style="margin-bottom:22px;"></div>
-          <!-- ── SECCIÓN 2: HISTORIAL (máx. 5 entradas) ── -->
-          <div style="font-family:monospace;font-size:0.58rem;color:rgba(200,149,42,0.55);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(200,149,42,0.12);">
-            📋 Últimos accesos <span style="background:rgba(200,149,42,0.12);border:1px solid rgba(200,149,42,0.25);border-radius:10px;padding:1px 7px;font-size:0.5rem;color:rgba(200,149,42,0.7);margin-left:6px;">máx. 5</span>
-          </div>
-          <div id="sesiones-historial" style="margin-bottom:22px;"></div>
-          <!-- ── SECCIÓN 3: REGISTRO DIARIO DE CONEXIONES ── -->
-          <div style="font-family:monospace;font-size:0.58rem;color:rgba(200,149,42,0.55);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(200,149,42,0.12);">
-            🗓 Registro diario de conexiones <span style="background:rgba(26,122,58,0.1);border:1px solid rgba(26,122,58,0.25);border-radius:10px;padding:1px 7px;font-size:0.5rem;color:rgba(26,122,58,0.75);margin-left:6px;">solo empleados · inmutable</span>
-          </div>
-          <div id="sesiones-tabla-diaria"></div>
-        </div>
-      </div>
-    </div>
-    <div id="panel-finanzas-internas" class="panel">
-      <!-- STATS -->
-      <div class="stats-grid" style="margin-bottom:20px;">
-        <div class="stat gold"><div class="stat-lbl">Préstamos a Caja</div><div class="stat-val" id="fi-cnt-caja">0</div><div class="stat-sub">sin saldar</div></div>
-        <div class="stat rojo"><div class="stat-lbl">Pagos de Derechos por el Despacho</div><div class="stat-val" id="fi-cnt-cliente">0</div><div class="stat-sub">por recuperar</div></div>
-        <div class="stat azul"><div class="stat-lbl">Total por recuperar</div><div class="stat-val" id="fi-saldo-pend">$0</div><div class="stat-sub">ambos tipos</div></div>
-        <div class="stat verde"><div class="stat-lbl">Total recuperado</div><div class="stat-val" id="fi-total-recuperado">$0</div><div class="stat-sub">pagos recibidos</div></div>
-      </div>
-      <!-- TABS -->
-      <div style="display:flex;gap:8px;margin-bottom:18px;">
-        <button id="fi-tab-caja" onclick="fiCambiarTab('caja')" style="flex:1;padding:14px;border-radius:var(--radius);border:2px solid var(--gold);background:var(--gold);color:#fff;font-family:serif;font-size:0.95rem;cursor:pointer;transition:all 0.18s;display:flex;align-items:center;justify-content:center;gap:8px;">
-          🏦 Préstamos a Caja
-        </button>
-        <button id="fi-tab-anticipo" onclick="fiCambiarTab('anticipo')" style="flex:1;padding:14px;border-radius:var(--radius);border:2px solid var(--border-l);background:var(--surface);color:var(--muted);font-family:serif;font-size:0.95rem;cursor:pointer;transition:all 0.18s;display:flex;align-items:center;justify-content:center;gap:8px;">
-          📋 Pagos de Derechos por el Despacho
-        </button>
-      </div>
-      <!-- ══ SECCIÓN A: PRÉSTAMOS A CAJA ══ -->
-      <div id="fi-sec-caja">
-        <div style="background:linear-gradient(135deg,#fff8ec,#fdfaf4);border:1.5px solid #d4b870;border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;font-size:0.78rem;color:#7a4a10;line-height:1.6;">
-          <strong>¿Cuándo usar esto?</strong> Cuando la caja queda en ceros y alguien (tú, un socio, o un familiar) le presta dinero al despacho para operar. Aquí registras ese préstamo y sus pagos de devolución.
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <h2>🏦 Préstamos a Caja</h2>
-            <div style="display:flex;gap:6px;">
-              <button class="btn btn-ghost btn-sm" onclick="exportarFICSV('caja')">⬇ CSV</button>
-              <button class="btn btn-primary btn-sm" onclick="abrirModalCaja()">＋ Nuevo Préstamo</button>
-            </div>
-          </div>
-          <div class="card-body" style="padding:0;">
-            <div class="filtros" style="padding:10px 14px 0;">
-              <button class="fbtn active" id="fcaja-todos" onclick="setFIFiltroCaja('todos',this)">Todos</button>
-              <button class="fbtn" onclick="setFIFiltroCaja('pendiente',this)">⏳ Pendientes</button>
-              <button class="fbtn" onclick="setFIFiltroCaja('parcial',this)">🔄 Parciales</button>
-              <button class="fbtn" onclick="setFIFiltroCaja('saldado',this)">✅ Saldados</button>
-            </div>
-            <div style="overflow-x:auto;">
-              <table class="tabla" id="tbCaja">
-                <thead><tr>
-                  <th>Fecha</th><th>Quién prestó</th><th>Motivo</th>
-                  <th class="monto">Prestado</th><th class="monto">Pagado</th><th class="monto">Saldo</th>
-                  <th>Dev. esperada</th><th>Estado</th><th>Acciones</th>
-                </tr></thead>
-                <tbody id="tbCajaBody"></tbody>
-              </table>
-            </div>
-            <div id="fi-caja-vacio" style="padding:32px;text-align:center;color:var(--muted);font-size:0.76rem;display:none;">
-              <div style="font-size:2rem;margin-bottom:8px;">🏦</div>
-              Sin préstamos a caja registrados. Usa <strong>＋ Nuevo Préstamo</strong>.
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- ══ SECCIÓN B: ANTICIPOS A CLIENTES ══ -->
-      <div id="fi-sec-anticipo" style="display:none;">
-        <div style="background:linear-gradient(135deg,#f0f4ff,#fdfaf4);border:1.5px solid #9ab0d4;border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;font-size:0.78rem;color:#1a3a7a;line-height:1.6;">
-          <strong>¿Cuándo usar esto?</strong> Cuando el despacho paga derechos o trámites en una dependencia a nombre de un cliente, porque el cliente no puede ir a pagar (vive lejos, no tiene tiempo, etc.). Aquí registras cuánto pagaste, por quién y en qué trámite, y llevas control del reembolso.
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <h2>📋 Pagos de Derechos por el Despacho</h2>
-            <div style="display:flex;gap:6px;">
-              <button class="btn btn-ghost btn-sm" onclick="exportarFICSV('anticipo')">⬇ CSV</button>
-              <button class="btn btn-primary btn-sm" onclick="abrirModalAnticipo()">＋ Registrar Anticipo</button>
-            </div>
-          </div>
-          <div class="card-body" style="padding:0;">
-            <div class="filtros" style="padding:10px 14px 0;flex-wrap:wrap;">
-              <button class="fbtn active" id="fanti-todos" onclick="setFIFiltroAnticipo('todos',this)">Todos</button>
-              <button class="fbtn" onclick="setFIFiltroAnticipo('pendiente',this)">⏳ Pendientes</button>
-              <button class="fbtn" onclick="setFIFiltroAnticipo('parcial',this)">🔄 Parciales</button>
-              <button class="fbtn" onclick="setFIFiltroAnticipo('saldado',this)">✅ Saldados</button>
-            </div>
-            <div style="overflow-x:auto;">
-              <table class="tabla" id="tbAnticipo">
-                <thead><tr>
-                  <th>Fecha</th><th>Cliente</th><th>Expediente</th><th>Recibo</th>
-                  <th>Dependencia</th><th>Concepto</th>
-                  <th class="monto">Pagado</th><th class="monto">Reembolsado</th><th class="monto">Por cobrar</th>
-                  <th>Estado</th><th>Acciones</th>
-                </tr></thead>
-                <tbody id="tbAnticipoBody"></tbody>
-              </table>
-            </div>
-            <div id="fi-anticipo-vacio" style="padding:32px;text-align:center;color:var(--muted);font-size:0.76rem;display:none;">
-              <div style="font-size:2rem;margin-bottom:8px;">📋</div>
-              Sin anticipos registrados. Usa <strong>＋ Registrar Anticipo</strong>.
-            </div>
-          </div>
-        </div>
-        <!-- Resumen por cliente -->
-        <div class="card" id="fi-resumen-clientes-card">
-          <div class="card-header"><h2>👥 Resumen por Cliente</h2></div>
-          <div class="card-body" style="padding:0;">
-            <table class="tabla" id="tbResumenClientes">
-              <thead><tr><th>Cliente</th><th class="monto">Total Anticipado</th><th class="monto">Reembolsado</th><th class="monto">Por Cobrar</th><th>Registros</th></tr></thead>
-              <tbody id="tbResumenClientesBody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      <!-- Historial de pagos inline -->
-      <div class="card" id="fi-historial-pagos-card" style="display:none;margin-top:16px;">
-        <div class="card-header">
-          <h2>📋 Historial — <span id="fi-hpago-nombre"></span></h2>
-          <button class="btn btn-ghost btn-sm" onclick="cerrarHistorialPagos()">✕ Cerrar</button>
-        </div>
-        <div class="card-body" style="padding:0;">
-          <table class="tabla">
-            <thead><tr><th>Fecha</th><th>Concepto</th><th class="monto">Monto</th></tr></thead>
-            <tbody id="fi-hpago-body"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    <!-- ══ MODAL: PRÉSTAMO A CAJA ══ -->
-    <div class="modal-ov" id="modal-prestamo-caja">
-      <div class="modal">
-        <div class="modal-hdr">
-          <h3>🏦 Préstamo a Caja</h3>
-          <button class="modal-x" onclick="cerrar('modal-prestamo-caja')">✕</button>
-        </div>
-        <div class="modal-body">
-          <div style="background:#fff8ec;border:1px solid #d4b870;border-radius:5px;padding:10px 12px;margin-bottom:14px;font-size:0.74rem;color:#7a4a10;">
-            Registra cuando alguien presta dinero al despacho para que la caja no quede en ceros.
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="field">
-              <label>Quién prestó el dinero</label>
-              <input type="text" id="caja-prestamista" placeholder="Nombre del prestamista">
-            </div>
-            <div class="field">
-              <label>Fecha del préstamo</label>
-              <input type="date" id="caja-fecha">
-            </div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="field">
-              <label>Monto prestado</label>
-              <input type="text" id="caja-monto" placeholder="0.00" oninput="fmtFIMonto(this)">
-            </div>
-            <div class="field">
-              <label>Devolución esperada (opcional)</label>
-              <input type="date" id="caja-fecha-dev">
-            </div>
-          </div>
-          <div class="field">
-            <label>Motivo / Concepto</label>
-            <textarea id="caja-concepto" placeholder="¿Para qué se necesitó el dinero?" style="min-height:55px;"></textarea>
-          </div>
-          <div class="field">
-            <label>Nota de seguimiento (opcional)</label>
-            <textarea id="caja-nota-seguimiento" placeholder="Ej: Habló el lunes, dijo que paga el viernes. Pendiente confirmar transferencia..." style="min-height:55px;"></textarea>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:8px;">
-            <button class="btn btn-ghost" onclick="cerrar('modal-prestamo-caja')" style="flex:1;justify-content:center;">Cancelar</button>
-            <button class="btn btn-primary" onclick="guardarPrestamoCaja()" style="flex:2;justify-content:center;">💾 Guardar</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- ══ MODAL: ANTICIPO A CLIENTE ══ -->
-    <div class="modal-ov" id="modal-anticipo-cliente">
-      <div class="modal wide">
-        <div class="modal-hdr">
-          <h3>📋 Pago de Derechos por el Despacho</h3>
-          <button class="modal-x" onclick="cerrar('modal-anticipo-cliente')">✕</button>
-        </div>
-        <div class="modal-body">
-          <div style="background:#eef3ff;border:1px solid #9ab0d4;border-radius:5px;padding:10px 12px;margin-bottom:14px;font-size:0.74rem;color:#1a3a7a;">
-            Registra cuando el despacho pagó derechos o trámites por un cliente que no pudo hacerlo directamente.
-          </div>
-          <!-- Fila 1: Cliente + Dependencia -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="field">
-              <label>Cliente</label>
-              <input type="text" id="anti-cliente" placeholder="Nombre del cliente" list="anti-cliente-list" oninput="filtrarClientesAnticipo()">
-              <datalist id="anti-cliente-list"></datalist>
-            </div>
-            <div class="field">
-              <label>Dependencia donde se pagó</label>
-              <input type="text" id="anti-dependencia" placeholder="Ej: Catastro, SAT, Registro Civil..." list="anti-dep-list">
-              <datalist id="anti-dep-list">
-                <option>Catastro Municipal</option>
-                <option>Registro Civil</option>
-                <option>SAT</option>
-                <option>Registro Público de la Propiedad</option>
-                <option>IFREO</option>
-                <option>Notaría 75</option>
-                <option>Notaría 81</option>
-                <option>Juzgado Civil</option>
-                <option>Fiscalía</option>
-                <option>Tribunal Agrario</option>
-                <option>Presidencia Municipal</option>
-              </datalist>
-            </div>
-          </div>
-          <!-- Fila 2: Expediente + Recibo -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="field">
-              <label>Expediente / Carpeta (opcional)</label>
-              <input type="text" id="anti-expediente" placeholder="Ej: 325 — o busca por nombre" list="anti-exp-list" oninput="filtrarExpedientesAnticipo()">
-              <datalist id="anti-exp-list"></datalist>
-            </div>
-            <div class="field">
-              <label>N° Recibo relacionado (opcional)</label>
-              <input type="text" id="anti-recibo" placeholder="Ej: 0042">
-            </div>
-          </div>
-          <!-- Fila 3: Monto + Fecha + Pagado por -->
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
-            <div class="field">
-              <label>Monto pagado por el despacho</label>
-              <input type="text" id="anti-monto" placeholder="0.00" oninput="fmtFIMonto(this)">
-            </div>
-            <div class="field">
-              <label>Fecha del pago</label>
-              <input type="date" id="anti-fecha">
-            </div>
-            <div class="field">
-              <label>Quién lo pagó del despacho</label>
-              <select id="anti-pagador">
-                <option>Antonieta</option>
-                <option>Lic. Nahúm</option>
-                <option>Clara</option>
-                <option>Otro</option>
-              </select>
-            </div>
-          </div>
-          <!-- Fila 4: Fecha límite reembolso -->
-          <div class="field">
-            <label>Fecha límite de reembolso (opcional)</label>
-            <input type="date" id="anti-fecha-dev" placeholder="">
-          </div>
-          <div class="field">
-            <label>Concepto — qué derecho o trámite se pagó</label>
-            <textarea id="anti-concepto" placeholder="Ej: Pago de derechos de escrituración en Catastro, Trámite de rectificación de acta..." style="min-height:55px;"></textarea>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:8px;">
-            <button class="btn btn-ghost" onclick="cerrar('modal-anticipo-cliente')" style="flex:1;justify-content:center;">Cancelar</button>
-            <button class="btn btn-primary" onclick="guardarAnticipo()" style="flex:2;justify-content:center;">💾 Guardar Anticipo</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- ══ MODAL: REGISTRAR REEMBOLSO / PAGO ══ -->
-    <div class="modal-ov" id="modal-pago-fi">
-      <div class="modal">
-        <div class="modal-hdr">
-          <h3 id="pago-fi-titulo">💳 Registrar Pago / Reembolso</h3>
-          <button class="modal-x" onclick="cerrarModalPago()">✕</button>
-        </div>
-        <div class="modal-body">
-          <div style="background:var(--gold-bg);border:1px solid var(--border-l);border-radius:var(--radius-sm);padding:12px;margin-bottom:14px;font-size:0.78rem;">
-            <div style="font-family:monospace;font-size:0.58rem;color:var(--muted);margin-bottom:4px;">REGISTRO SELECCIONADO</div>
-            <strong id="pago-fi-nombre"></strong>
-            <div style="color:var(--rojo);font-family:monospace;font-weight:700;margin-top:4px;">Saldo pendiente: <span id="pago-fi-saldo"></span></div>
-          </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-            <div class="field">
-              <label>Fecha del pago</label>
-              <input type="date" id="pago-fi-fecha">
-            </div>
-            <div class="field">
-              <label>Monto</label>
-              <input type="text" id="pago-fi-monto" placeholder="0.00" oninput="fmtFIMonto(this)">
-            </div>
-          </div>
-          <div class="field">
-            <label>Nota (opcional)</label>
-            <input type="text" id="pago-fi-nota" placeholder="Ej: Pago en efectivo, transferencia...">
-          </div>
-          <!-- Opción de registrar en caja -->
-          <div id="pago-fi-caja-opt" style="background:#eef9f0;border:1px solid rgba(26,122,58,0.3);border-radius:5px;padding:10px 12px;margin-top:6px;">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.8rem;font-weight:500;color:#0f5228;">
-              <input type="checkbox" id="pago-fi-a-caja" checked style="width:16px;height:16px;">
-              ✅ Registrar automáticamente como ingreso en la Caja
-            </label>
-            <div style="font-size:0.68rem;color:var(--muted);margin-top:4px;margin-left:24px;">El monto aparecerá en el panel Principal como un ingreso de tipo "Reembolso".</div>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:12px;">
-            <button class="btn btn-ghost" onclick="cerrarModalPago()" style="flex:1;justify-content:center;">Cancelar</button>
-            <button class="btn btn-success" onclick="guardarPagoFI()" style="flex:2;justify-content:center;">✅ Confirmar Pago</button>
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- ═══ CONFIGURACIÓN ═══ -->
-    <!-- ═══ CONFIGURACIÓN — DASHBOARD ═══ -->
     <div id="panel-configuracion" class="panel">
       <!-- HERO con saludo y estado del sistema -->
       <div class="card" style="background:linear-gradient(135deg,#1a1410 0%,#2a2018 100%);color:#e8d4a8;border:none;margin-bottom:20px;overflow:hidden;position:relative;">
@@ -28519,7 +27689,7 @@ function _agConstruirContexto() {
   const juiciosPorEstatus = {};
   (D.juicios || []).forEach(j => { juiciosPorEstatus[j.estatus || 'otro'] = (juiciosPorEstatus[j.estatus || 'otro'] || 0) + 1; });
   // Panel activo
-  const panelNombres = { caja:'Principal/Caja', contabilidad:'Contabilidad', recibos:'Historial de Recibos', juicios:'Control de Juicios', pendientes:'Pendientes', carpetas:'Control de Carpetas', directorio:'Directorio', 'nuevo-recibo':'Nuevo Recibo', 'finanzas-internas':'Finanzas Internas' };
+  const panelNombres = { caja:'Principal/Caja', contabilidad:'Contabilidad', recibos:'Historial de Recibos', juicios:'Control de Juicios', pendientes:'Pendientes', carpetas:'Control de Carpetas', directorio:'Directorio', 'nuevo-recibo':'Nuevo Recibo' };
   const panelActivo = panelNombres[_agPanelActual] || _agPanelActual;
   return `Eres el asistente inteligente de LEX-MÉXICO, un sistema de gestión para un despacho de abogados en Juxtlahuaca, Oaxaca, México.
 Tienes acceso en tiempo real a toda la información del despacho. Responde de forma directa, práctica y en español.
@@ -28657,7 +27827,7 @@ const _irOriginalAg = ir;
 ir = function(p) {
   _irOriginalAg(p);
   _agPanelActual = p;
-  const nombres = { caja:'Principal', contabilidad:'Contabilidad', recibos:'Recibos', juicios:'Juicios', pendientes:'Pendientes', carpetas:'Archivo', directorio:'Directorio', 'nuevo-recibo':'Nuevo Recibo', 'finanzas-internas':'Finanzas Internas' };
+  const nombres = { caja:'Principal', contabilidad:'Contabilidad', recibos:'Recibos', juicios:'Juicios', pendientes:'Pendientes', carpetas:'Archivo', directorio:'Directorio', 'nuevo-recibo':'Nuevo Recibo' };
   const el = document.getElementById('ag-panel-nombre');
   if (el) el.textContent = nombres[p] || p;
 };
@@ -32692,6 +31862,846 @@ function abrirModalExpedienteDesdeConsulta(folio){
   abrirModalExpediente(folio, expSugerido, nombre);
 }
 // ═══ FIN MÓDULO EXPEDIENTES ══════════════════════════════════════════════
+
+// ═══ MÓDULO PANEL DE ESTADOS (PLACAS) ════════════════════════════════════
+// Botones Oaxaca / Edo.Méx. / CDMX / Michoacán junto a + Nuevo en Placas.
+// Cada estado tiene pestañas de supuesto; cada supuesto tiene 3 bloques:
+//   1) Instrucciones / Aviso (solo admin, editable)
+//   2) Ejemplo PDF (visor)
+//   3) Descarga de recursos
+
+const _MPE_CONFIG = {
+  oax:  { label:'Oaxaca',    supuestos:['Nacional','Legalizado'], subTabs:['Alta','Cambio de propietario','Renovación de tarjeta','Baja'] },
+  mex:  { label:'Edo. Méx.', supuestos:['Nacional','Legalizado'], subTabs:['Alta','Cambio de propietario','Renovación de tarjeta','Baja'] },
+  cdmx: { label:'CDMX',      supuestos:['Nacional'],              subTabs:['Alta','Cambio de propietario','Renovación de tarjeta','Baja'] },
+  mich: { label:'Michoacán', supuestos:['Nacional','Legalizado','Sin pedimento'], subTabs:['Alta','Cambio de propietario','Renovación de tarjeta','Baja'] }
+};
+
+// Estado activo del modal
+let _mpeEstado = null;
+let _mpeSupuesto = 0;
+let _mpeSubTab = 0;
+
+// ── Storage R2 para el panel de estados (placas) ─────────────────────────
+// Ruta base: {despacho_id}/placas/{estado}/{supuesto}/{subtab}/{tipo}
+// Tipos: inst.pdf, ejemplo.pdf, rec_0.pdf, rec_1.pdf ... meta.json (nombres)
+
+function _mpePath(estado, supSlug, subSlug, tipo) {
+  const did = window.SB_DESPACHO_ID || 'local';
+  return `${did}/placas/${estado}/${supSlug}/${subSlug}/${tipo}`;
+}
+
+// ── Caché en memoria para evitar descargas repetidas ────────────────────
+const _mpeCache = {};
+
+async function _mpeR2Subir(estado, supSlug, subSlug, tipo, file) {
+  if (!window.subirR2 || !window.SB_DESPACHO_ID) {
+    // Fallback localStorage
+    return new Promise(res => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        try { localStorage.setItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}`, e.target.result);
+              localStorage.setItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}_name`, file.name); } catch(err){}
+        _mpeCache[`${estado}_${supSlug}_${subSlug}_${tipo}`] = e.target.result;
+        res(true);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  const path = _mpePath(estado, supSlug, subSlug, tipo);
+  const ok = await window.subirR2(file, path, 'placas');
+  if (ok) {
+    // Guardar nombre en meta
+    await _mpeR2SubirMeta(estado, supSlug, subSlug, tipo, file.name);
+    // Actualizar caché con dataURL
+    const reader = new FileReader();
+    reader.onload = e => { _mpeCache[`${estado}_${supSlug}_${subSlug}_${tipo}`] = e.target.result; };
+    reader.readAsDataURL(file);
+  }
+  return ok;
+}
+
+async function _mpeR2Descargar(estado, supSlug, subSlug, tipo) {
+  const cacheKey = `${estado}_${supSlug}_${subSlug}_${tipo}`;
+  if (_mpeCache[cacheKey]) return _mpeCache[cacheKey];
+
+  if (!window.descargarR2 || !window.SB_DESPACHO_ID) {
+    // Fallback localStorage
+    return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}`) || null;
+  }
+  const path = _mpePath(estado, supSlug, subSlug, tipo);
+  try {
+    const blob = await window.descargarR2(path, 'placas');
+    if (!blob) return null;
+    return new Promise(res => {
+      const reader = new FileReader();
+      reader.onload = e => { _mpeCache[cacheKey] = e.target.result; res(e.target.result); };
+      reader.readAsDataURL(blob);
+    });
+  } catch(e) { return null; }
+}
+
+async function _mpeR2Quitar(estado, supSlug, subSlug, tipo) {
+  delete _mpeCache[`${estado}_${supSlug}_${subSlug}_${tipo}`];
+  try { localStorage.removeItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}`);
+        localStorage.removeItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}_name`); } catch(e){}
+  if (!window.borrarR2 || !window.SB_DESPACHO_ID) return;
+  const path = _mpePath(estado, supSlug, subSlug, tipo);
+  await window.borrarR2(path, 'placas').catch(()=>{});
+  await _mpeR2SubirMeta(estado, supSlug, subSlug, tipo, null);
+}
+
+async function _mpeR2NombreArchivo(estado, supSlug, subSlug, tipo) {
+  if (!window.SB_DESPACHO_ID)
+    return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}_name`) || '';
+  const metaKey = `${estado}_${supSlug}_${subSlug}_meta`;
+  let meta = _mpeCache[metaKey];
+  if (!meta) {
+    const path = _mpePath(estado, supSlug, subSlug, 'meta.json');
+    try {
+      const blob = await window.descargarR2(path, 'placas');
+      if (blob) { const txt = await blob.text(); meta = JSON.parse(txt); _mpeCache[metaKey] = meta; }
+    } catch(e) {}
+  }
+  return (meta && meta[tipo]) || '';
+}
+
+async function _mpeR2SubirMeta(estado, supSlug, subSlug, tipo, nombre) {
+  const metaKey = `${estado}_${supSlug}_${subSlug}_meta`;
+  let meta = _mpeCache[metaKey] || {};
+  if (nombre === null) delete meta[tipo]; else meta[tipo] = nombre;
+  _mpeCache[metaKey] = meta;
+  if (!window.subirR2 || !window.SB_DESPACHO_ID) return;
+  const path = _mpePath(estado, supSlug, subSlug, 'meta.json');
+  const blob = new Blob([JSON.stringify(meta)], {type:'application/json'});
+  const file = new File([blob], 'meta.json', {type:'application/json'});
+  await window.subirR2(file, path, 'placas').catch(()=>{});
+}
+
+// ── Lista de recursos (meta.json almacena también la lista) ──────────────
+async function _mpeR2GetRecLista(estado, supSlug, subSlug) {
+  const metaKey = `${estado}_${supSlug}_${subSlug}_meta`;
+  let meta = _mpeCache[metaKey];
+  if (!meta) {
+    if (window.descargarR2 && window.SB_DESPACHO_ID) {
+      const path = _mpePath(estado, supSlug, subSlug, 'meta.json');
+      try {
+        const blob = await window.descargarR2(path, 'placas');
+        if (blob) { const txt = await blob.text(); meta = JSON.parse(txt); _mpeCache[metaKey] = meta; }
+      } catch(e) {}
+    }
+  }
+  if (meta && meta._recLista) return meta._recLista;
+  // Defaults
+  return _mpeDefaultRecursos(estado, supSlug);
+}
+
+async function _mpeR2SetRecLista(estado, supSlug, subSlug, arr) {
+  const metaKey = `${estado}_${supSlug}_${subSlug}_meta`;
+  let meta = _mpeCache[metaKey] || {};
+  meta._recLista = arr;
+  _mpeCache[metaKey] = meta;
+  if (!window.subirR2 || !window.SB_DESPACHO_ID) {
+    try { localStorage.setItem(`mpe_reclist_${estado}_${supSlug}_${subSlug}`, JSON.stringify(arr)); } catch(e){}
+    return;
+  }
+  const path = _mpePath(estado, supSlug, subSlug, 'meta.json');
+  const blob = new Blob([JSON.stringify(meta)], {type:'application/json'});
+  const file = new File([blob], 'meta.json', {type:'application/json'});
+  await window.subirR2(file, path, 'placas').catch(()=>{});
+}
+
+function _mpeDefaultRecursos(estado, supSlug) {
+  const base = {
+    oax:  { nacional:['Portada expediente Oaxaca','Checklist de documentos','Formato de separador'],
+             legalizado:['Portada expediente Oaxaca (Legalizado)','Checklist legalizado'] },
+    mex:  { nacional:['Portada expediente Edo. Méx.','Checklist de documentos'],
+             legalizado:['Portada expediente Edo. Méx. (Legalizado)'] },
+    cdmx: { nacional:['Portada expediente CDMX','Checklist de documentos'] },
+    mich: { nacional:['Portada expediente Michoacán','Checklist de documentos'],
+             legalizado:['Portada expediente Michoacán (Legalizado)'],
+             sin_pedimento:['Portada expediente Michoacán (Sin pedimento)','Checklist sin pedimento'] }
+  };
+  return (base[estado] && base[estado][supSlug]) || [];
+}
+
+// ── Funciones obsoletas mantenidas como alias (no-op) ────────────────────
+function _mpeKey(estado, sup) { return `mpe_inst_${estado}_${sup}`; }
+function _mpeGetInst(estado, sup) { return ''; }
+function _mpeSetInst(estado, sup, val) {}
+
+function _mpeBloque(titulo, iconColor, iconChar, contenido) {
+  return `<div style="border:1px solid #e8e0d0;border-radius:10px;overflow:hidden;background:#fff;">
+    <div style="background:#fdf8f0;padding:9px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #e8e0d0;">
+      <span style="font-size:14px;">${iconChar}</span>
+      <span style="font-size:0.65rem;font-weight:700;color:#8a7a5a;text-transform:uppercase;letter-spacing:0.07em;">${titulo}</span>
+    </div>
+    <div style="padding:12px 14px;background:#fff;">${contenido}</div>
+  </div>`;
+}
+
+// Sesión local del panel de estados (independiente del login global)
+let _mpeAdminActivo = false;
+// _mpeAdminOff persiste en sessionStorage para sobrevivir refresco de página
+let _mpeAdminOff = (()=>{ try{ return sessionStorage.getItem('mpe_admin_off')==='1'; }catch(e){ return false; } })();
+
+function _mpeCheckAdmin() {
+  // Si el usuario cerró sesión explícitamente en el panel, respetar esa decisión
+  if (_mpeAdminOff) return false;
+  // Si tiene sesión global de admin activa, activar automáticamente
+  if (typeof empleadoActual !== 'undefined' && empleadoActual &&
+      typeof ADMIN_EMAIL !== 'undefined' &&
+      empleadoActual.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
+    _mpeAdminActivo = true;
+  }
+  return _mpeAdminActivo;
+}
+
+function _mpeRenderBody(estado, supIdx) {
+  const cfg = _MPE_CONFIG[estado];
+  if (!cfg) return;
+  const sup = cfg.supuestos[supIdx];
+  const supSlug = sup.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+  const isAdmin = _mpeCheckAdmin();
+
+  // ── Sub-pestañas (Alta, Cambio de propietario, etc.) ────────────────────
+  const subTabs = cfg.subTabs || [];
+  const subIdx  = Math.min(_mpeSubTab, subTabs.length - 1);
+  const subSlug = subTabs[subIdx] ? subTabs[subIdx].toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') : 'general';
+
+  const subTabsHTML = subTabs.length > 0 ? `
+    <div style="display:flex;gap:7px;flex-wrap:wrap;padding:12px 14px;">
+      ${subTabs.map((st, si) => `<button onclick="_mpeCambiarSubTab(${si})"
+        style="border:2px solid ${si===subIdx?'#c8951a':'#d8ceb8'};border-radius:20px;padding:5px 15px;font-size:0.72rem;font-weight:${si===subIdx?'700':'500'};color:${si===subIdx?'#fff':'#8a7a5a'};background:${si===subIdx?'#c8951a':'transparent'};cursor:pointer;transition:all .15s;letter-spacing:0.02em;">${st}</button>`
+      ).join('')}
+    </div>` : '';
+
+  // ── Leer SOLO de caché (síncrono — sin await) ───────────────────────────
+  const instTipo    = 'inst.pdf';
+  const instCacheKey = `${estado}_${supSlug}_${subSlug}_${instTipo}`;
+  const instPdfData  = _mpeCache[instCacheKey] ||
+    (() => { try { return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${instTipo}`) || null; } catch(e){ return null; } })();
+  const metaKey      = `${estado}_${supSlug}_${subSlug}_meta`;
+  const metaCache    = _mpeCache[metaKey] || {};
+  const instPdfName  = metaKey && metaCache[instTipo] ? metaCache[instTipo] :
+    (() => { try { return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${instTipo}_name`) || ''; } catch(e){ return ''; } })();
+  const instHasFile  = !!(instPdfData || instPdfName);
+  let instContenido;
+  if (isAdmin) {
+    instContenido = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:160px;background:#f5f2eb;border:1px solid #d8ceb0;border-radius:8px;padding:9px 13px;overflow:hidden;">
+        <span style="font-size:18px;">📄</span>
+        <span style="font-size:0.73rem;color:#5a4a2a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${instPdfName || 'Sin PDF adjunto'}</span>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+        ${instHasFile ? `<button onclick="_mpePDFVisorData('${estado}','${supSlug}','${subSlug}','${instTipo}','${instPdfName||'Instrucciones'}')" style="border:2px solid #c8951a;border-radius:8px;padding:6px 14px;font-size:0.72rem;font-weight:700;color:#7a4a00;background:#fef3d8;cursor:pointer;">👁 Ver PDF</button>` : ''}
+        <label style="border:2px solid ${instHasFile?'#888':'#c8951a'};border-radius:8px;padding:6px 13px;font-size:0.72rem;font-weight:700;color:${instHasFile?'#666':'#7a4a00'};background:${instHasFile?'#f5f5f5':'#fef3d8'};cursor:pointer;white-space:nowrap;">
+          📎 ${instHasFile ? 'Cambiar PDF' : 'Adjuntar PDF'}
+          <input type="file" accept=".pdf" style="display:none;" onchange="_mpeSubirArchivo('${estado}','${supSlug}','${subSlug}','${instTipo}',this)">
+        </label>
+        ${instHasFile ? `<button onclick="_mpeQuitarArchivo('${estado}','${supSlug}','${subSlug}','${instTipo}')" style="border:2px solid #e24b4a;border-radius:8px;padding:6px 9px;font-size:0.72rem;color:#a33;background:#fff8f8;cursor:pointer;">✕</button>` : ''}
+      </div>
+    </div>`;
+  } else {
+    instContenido = instHasFile
+      ? `<button onclick="_mpePDFVisorData('${estado}','${supSlug}','${subSlug}','${instTipo}','${instPdfName||'Instrucciones'}')"
+           style="border:2px solid #c8951a;border-radius:8px;padding:8px 20px;font-size:0.78rem;font-weight:700;color:#7a4a00;background:#fef3d8;cursor:pointer;display:flex;align-items:center;gap:8px;">
+           <span style="font-size:18px;">📄</span> Ver instrucciones / aviso
+         </button>`
+      : `<div style="font-size:0.72rem;color:#a09070;font-style:italic;padding:4px 0;">Sin instrucciones disponibles aún.</div>`;
+  }
+  const b1 = _mpeBloque('Instrucciones / Aviso', '#c8951a', '📝', instContenido);
+
+  // ── Bloque 2: Ejemplo de Expediente Digital (PDF) ─── caché síncrona ──
+  const pdfTipo = 'ejemplo.pdf';
+  const pdfCacheKey = `${estado}_${supSlug}_${subSlug}_${pdfTipo}`;
+  const pdfData = _mpeCache[pdfCacheKey] ||
+    (() => { try { return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${pdfTipo}`) || null; } catch(e){ return null; } })();
+  const pdfName = metaCache[pdfTipo] ||
+    (() => { try { return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${pdfTipo}_name`) || ''; } catch(e){ return ''; } })();
+  const pdfHasFile = !!(pdfData || pdfName);
+  let pdfContenido;
+  if (isAdmin) {
+    pdfContenido = `<div style="background:#f5f2eb;border:1px dashed #c8b890;border-radius:8px;padding:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:160px;overflow:hidden;">
+        <span style="font-size:28px;">📋</span>
+        <span style="font-size:0.72rem;color:#8a7a5a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${pdfName || 'Sin PDF adjunto'}</span>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+        ${pdfHasFile ? `<button onclick="_mpePDFVisorData('${estado}','${supSlug}','${subSlug}','${pdfTipo}','${pdfName||'Expediente'}')" style="border:2px solid #c8951a;border-radius:8px;padding:6px 14px;font-size:0.72rem;font-weight:700;color:#7a4a00;background:#fef3d8;cursor:pointer;">👁 Ver PDF</button>` : ''}
+        <label style="border:2px solid ${pdfHasFile?'#888':'#c8951a'};border-radius:8px;padding:6px 13px;font-size:0.72rem;font-weight:700;color:${pdfHasFile?'#666':'#7a4a00'};background:${pdfHasFile?'#f5f5f5':'#fef3d8'};cursor:pointer;white-space:nowrap;">
+          📎 ${pdfHasFile ? 'Cambiar PDF' : 'Adjuntar PDF'}
+          <input type="file" accept=".pdf" style="display:none;" onchange="_mpeSubirArchivo('${estado}','${supSlug}','${subSlug}','${pdfTipo}',this)">
+        </label>
+        ${pdfHasFile ? `<button onclick="_mpeQuitarArchivo('${estado}','${supSlug}','${subSlug}','${pdfTipo}')" style="border:2px solid #e24b4a;border-radius:8px;padding:6px 9px;font-size:0.72rem;color:#a33;background:#fff8f8;cursor:pointer;">✕</button>` : ''}
+      </div>
+    </div>`;
+  } else {
+    pdfContenido = pdfHasFile
+      ? `<div style="background:#f5f2eb;border:1px dashed #c8b890;border-radius:8px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:10px;">
+           <span style="font-size:36px;">📋</span>
+           <span style="font-size:0.72rem;color:#8a7a5a;">${pdfName || 'expediente.pdf'}</span>
+           <button onclick="_mpePDFVisorData('${estado}','${supSlug}','${subSlug}','${pdfTipo}','${pdfName||'Expediente'}')" style="border:2px solid #c8951a;border-radius:8px;padding:7px 20px;font-size:0.73rem;font-weight:700;color:#7a4a00;background:#fef3d8;cursor:pointer;">👁 Ver PDF</button>
+         </div>`
+      : `<div style="background:#f5f2eb;border:1px dashed #c8b890;border-radius:8px;padding:20px;display:flex;flex-direction:column;align-items:center;gap:8px;">
+           <span style="font-size:36px;">📋</span>
+           <span style="font-size:0.7rem;color:#b0a080;font-style:italic;">PDF no disponible aún</span>
+         </div>`;
+  }
+  const b2 = _mpeBloque('Ejemplo de Expediente Digital', '#e24b4a', '📄', pdfContenido);
+
+  // ── Bloque 3: Descarga de recursos ─── caché síncrona ──────────────────
+  const recLista = (() => {
+    if (metaCache._recLista) return metaCache._recLista;
+    try {
+      const raw = localStorage.getItem(`mpe_reclist_${estado}_${supSlug}_${subSlug}`);
+      if (raw) return JSON.parse(raw);
+    } catch(e){}
+    return _mpeDefaultRecursos(estado, supSlug);
+  })();
+  let listaHTML = recLista.map((r, ri) => {
+    const recTipo = `rec_${ri}.pdf`;
+    const recUrl  = _mpeCache[`${estado}_${supSlug}_${subSlug}_${recTipo}`] || null; // se cargará al ver
+    if (isAdmin) {
+      return `<div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid #ede8dc;">
+        <input value="${r.replace(/"/g,'&quot;')}" onchange="_mpeRenombrarRec('${estado}','${supSlug}','${subSlug}',${ri},this.value)"
+          style="flex:1;border:1px solid #d8ceb0;border-radius:5px;padding:4px 8px;font-size:0.75rem;color:#3a2a0a;background:#fffef8;min-width:0;">
+        <label style="border:1px solid #c8951a;border-radius:6px;padding:4px 9px;font-size:0.68rem;color:#7a4a00;background:#fef3d8;cursor:pointer;white-space:nowrap;">
+          📎 Adjuntar
+          <input type="file" style="display:none;" onchange="_mpeSubirArchivo('${estado}','${supSlug}','${subSlug}','${recTipo}',this)">
+        </label>
+        <button onclick="_mpeRecDescargarR2('${estado}','${supSlug}','${subSlug}','${recTipo}','${r}',this)" style="border:1px solid #b8a878;border-radius:6px;padding:4px 9px;font-size:0.68rem;color:#5a4010;background:#fdf8f0;cursor:pointer;">⬇</button>
+        <button onclick="_mpeEliminarRec('${estado}','${supSlug}','${subSlug}',${ri})"
+          style="border:1px solid #e24b4a;border-radius:6px;padding:4px 8px;font-size:0.68rem;color:#a33;background:#fff8f8;cursor:pointer;">✕</button>
+      </div>`;
+    } else {
+      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #ede8dc;gap:8px;">
+        <span style="font-size:0.75rem;color:#3a3020;display:flex;align-items:center;gap:7px;flex:1;min-width:0;">📄 ${r}</span>
+        <button onclick="_mpeRecDescargarR2('${estado}','${supSlug}','${subSlug}','${recTipo}','${r}',this)"
+          style="border:1px solid #b8a878;border-radius:7px;padding:5px 14px;font-size:0.7rem;color:#5a4010;background:#fdf8f0;cursor:pointer;font-weight:600;">⬇ Descargar</button>
+      </div>`;
+    }
+  }).join('');
+  if (isAdmin) {
+    listaHTML += `<div style="padding-top:10px;">
+      <button onclick="_mpeAgregarRecR2('${estado}','${supSlug}','${subSlug}')"
+        style="border:1px dashed #c8951a;border-radius:7px;padding:6px 14px;font-size:0.72rem;color:#7a4a00;background:#fef3d8;cursor:pointer;width:100%;">＋ Agregar archivo</button>
+    </div>`;
+  }
+  const b3 = _mpeBloque('Descarga de Recursos', '#1d9e75', '📥', `<div>${listaHTML}</div>`);
+
+  // ── Banner admin ────────────────────────────────────────────────────────
+  // Solo el admin ve el botón de ingresar
+  const _emailActual = (typeof empleadoActual !== 'undefined' && empleadoActual && empleadoActual.email)
+    ? empleadoActual.email.toLowerCase() : '';
+  const _esAdminEmail = (typeof ADMIN_EMAIL !== 'undefined') && _emailActual === ADMIN_EMAIL.toLowerCase();
+
+  const loginBanner = !isAdmin ? (
+    _esAdminEmail ? `
+    <div style="background:#fdf8f0;border:1px solid #e8d8b0;border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:16px;">🔐</span>
+        <span style="font-size:0.75rem;color:#7a5a1a;font-weight:600;">Modo administrador</span>
+        <span style="font-size:0.7rem;color:#a09070;">— editar y adjuntar archivos</span>
+      </div>
+      <button onclick="_mpeAbrirLogin()" style="background:#c8951a;border:none;border-radius:7px;color:#fff;font-size:0.72rem;font-weight:700;padding:6px 16px;cursor:pointer;">🔑 Ingresar</button>
+    </div>` : ''
+  ) : `
+    <div style="background:#f0faf4;border:1px solid #b8e0c8;border-radius:10px;padding:9px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <span style="font-size:0.72rem;color:#2a7a4a;font-weight:600;">✅ Modo administrador activo</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button id="mpe-btn-guardar" onclick="_mpeGuardarCambios()" style="background:#2a7a4a;border:none;border-radius:7px;color:#fff;font-size:0.72rem;font-weight:700;padding:6px 16px;cursor:pointer;">💾 Guardar cambios</button>
+        <button onclick="_mpeCerrarAdminConAviso()" style="background:transparent;border:1px solid #b8e0c8;border-radius:6px;color:#2a7a4a;font-size:0.68rem;padding:5px 12px;cursor:pointer;">Cerrar sesión</button>
+      </div>
+    </div>`;
+
+  const bodyEl = document.getElementById('mpe-body');
+  bodyEl.innerHTML = '';
+  // Insertar sub-pestañas DENTRO del body antes de los bloques
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
+  wrapper.innerHTML = loginBanner + (subTabs.length > 1 ? `<div style="background:#fafaf6;border:1px solid #e8e0d0;border-radius:10px;overflow:hidden;">${subTabsHTML.replace(/^\s*<div[^>]*>|<\/div>\s*$/g,'')}</div>` : '') + b1 + b2 + b3;
+  bodyEl.appendChild(wrapper);
+}
+
+// _mpeGetRecursosConUrls sustituida por _mpeGetRecLista
+
+function _mpeRenderTabs(estado, supActivo) {
+  const cfg = _MPE_CONFIG[estado];
+  const cont = document.getElementById('mpe-supuesto-tabs');
+  cont.innerHTML = cfg.supuestos.map((s, i) =>
+    `<button onclick="_mpeCambiarSup('${estado}',${i})" style="border:2px solid ${i===supActivo?'#c8951a':'rgba(200,149,42,0.35)'};border-radius:20px;padding:5px 15px;font-size:0.68rem;font-weight:700;letter-spacing:0.03em;color:${i===supActivo?'#fff':'rgba(200,149,42,0.8)'};background:${i===supActivo?'#c8951a':'transparent'};cursor:pointer;transition:all .15s;">${s}</button>`
+  ).join('');
+}
+
+function _mpeCambiarSup(estado, idx) {
+  _mpeSupuesto = idx;
+  _mpeSubTab   = 0;
+  _mpeRenderTabs(estado, idx);
+  _mpeRenderBody(estado, idx);          // render inmediato con caché
+  _mpePrefetchR2(estado, idx, 0);       // cargar R2 en fondo
+}
+
+function _mpeCambiarSubTab(idx) {
+  _mpeSubTab = idx;
+  _mpeRenderBody(_mpeEstado, _mpeSupuesto);   // render inmediato
+  _mpePrefetchR2(_mpeEstado, _mpeSupuesto, idx); // cargar R2 en fondo
+}
+
+// Prefetch: descarga meta.json + PDFs de R2 en segundo plano y re-renderiza si hay novedades
+async function _mpePrefetchR2(estado, supIdx, subIdx) {
+  if (!window.descargarR2 || !window.SB_DESPACHO_ID) return;
+  const cfg = _MPE_CONFIG[estado];
+  if (!cfg) return;
+  const sup     = cfg.supuestos[supIdx];
+  const supSlug = sup.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+  const subTabs = cfg.subTabs || [];
+  const subSlug = (subTabs[Math.min(subIdx, subTabs.length-1)] || '')
+    .toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'') || 'general';
+  const metaKey = `${estado}_${supSlug}_${subSlug}_meta`;
+
+  // 1. Cargar meta.json si no está en caché
+  if (!_mpeCache[metaKey]) {
+    try {
+      const path = _mpePath(estado, supSlug, subSlug, 'meta.json');
+      const blob = await window.descargarR2(path, 'placas');
+      if (blob) {
+        const txt  = await blob.text();
+        _mpeCache[metaKey] = JSON.parse(txt);
+        // Re-renderizar solo si el panel sigue en la misma vista
+        if (_mpeEstado===estado && _mpeSupuesto===supIdx && _mpeSubTab===subIdx) {
+          _mpeRenderBody(estado, supIdx);
+        }
+      }
+    } catch(e) {}
+  }
+}
+
+// Recursos: renombrar, eliminar, agregar
+async function _mpeRenombrarRec(estado, supSlug, subSlug, idx, nuevoNombre) {
+  const lista = await _mpeR2GetRecLista(estado, supSlug, subSlug);
+  lista[idx] = nuevoNombre;
+  await _mpeR2SetRecLista(estado, supSlug, subSlug, lista);
+}
+async function _mpeEliminarRec(estado, supSlug, subSlug, idx) {
+  if (!confirm('¿Eliminar este archivo de la lista?')) return;
+  const lista = await _mpeR2GetRecLista(estado, supSlug, subSlug);
+  await _mpeR2Quitar(estado, supSlug, subSlug, `rec_${idx}.pdf`);
+  lista.splice(idx, 1);
+  await _mpeR2SetRecLista(estado, supSlug, subSlug, lista);
+  await _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+}
+
+// PDF helpers con key directa
+function _mpePDFSubirKey(key, input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try { localStorage.setItem(key, e.target.result); } catch(err) {
+      alert('Archivo demasiado grande. Usa un PDF optimizado.'); return;
+    }
+    _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+  };
+  reader.readAsDataURL(file);
+}
+function _mpePDFVer(key) {
+  const dataUrl = (() => { try { return localStorage.getItem(key); } catch(e){ return null; } })();
+  if (!dataUrl) { alert('No hay PDF adjunto.'); return; }
+  const win = window.open();
+  if (win) win.document.write('<iframe src="' + dataUrl + '" style="width:100%;height:100vh;border:none;"></iframe>');
+}
+function _mpeQuitarKey(key) {
+  if (!confirm('¿Quitar el archivo adjunto?')) return;
+  try { localStorage.removeItem(key); } catch(e){}
+  _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+}
+function _mpeRecSubirKey(key, input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try { localStorage.setItem(key, e.target.result); } catch(err) {
+      alert('Archivo demasiado grande.'); return;
+    }
+    _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+  };
+  reader.readAsDataURL(file);
+}
+function _mpeRecDescargar(keyOrUrl, nombre) {
+  const dataUrl = (() => { try { return localStorage.getItem(keyOrUrl) || keyOrUrl; } catch(e){ return keyOrUrl; } })();
+  if (!dataUrl || dataUrl === keyOrUrl) { alert('No hay archivo adjunto aún.'); return; }
+  const a = document.createElement('a'); a.href = dataUrl; a.download = nombre; a.click();
+}
+
+function abrirPanelEstado(estado, btn) {
+  _mpeEstado = estado;
+  _mpeSupuesto = 0;
+  const cfg = _MPE_CONFIG[estado];
+  document.getElementById('mpe-title').textContent = '📍 ' + cfg.label;
+  _mpeRenderTabs(estado, 0);
+  _mpeRenderBody(estado, 0);        // render inmediato con caché
+  _mpePrefetchR2(estado, 0, 0);     // cargar R2 en fondo
+  const modal = document.getElementById('modal-panel-estado');
+  modal.style.display = 'flex';
+  // Resaltar botón activo (brillo sobre su propio color)
+  document.querySelectorAll('.pnl-estado-btn').forEach(b => { b.style.filter = 'none'; b.style.boxShadow = 'none'; });
+  if (btn) { btn.style.filter = 'brightness(1.35)'; btn.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.25)'; }
+}
+
+function cerrarPanelEstado() {
+  document.getElementById('modal-panel-estado').style.display = 'none';
+  document.querySelectorAll('.pnl-estado-btn').forEach(b => { b.style.filter = 'none'; b.style.boxShadow = 'none'; });
+}
+
+function _mpeGuardarInst(estado, sup, val) {
+  _mpeSetInst(estado, sup, val);
+}
+
+// helpers PDF/rec reemplazados por versiones con key directa
+
+// ── PDF: subir, visor flotante, quitar — usando R2 ──────────────────────────
+async function _mpeSubirArchivo(estado, supSlug, subSlug, tipo, input) {
+  _mpeMarcarCambio();
+  const file = input.files[0]; if (!file) return;
+  const btnLabel = input.parentElement;
+  if (btnLabel) { btnLabel.textContent = '⏳ Subiendo...'; btnLabel.style.pointerEvents = 'none'; }
+  // Leer archivo como dataURL y guardar en caché inmediatamente
+  const dataUrl = await new Promise(res => {
+    const r = new FileReader();
+    r.onload = e => res(e.target.result);
+    r.readAsDataURL(file);
+  });
+  // Guardar en caché y localStorage al instante
+  const cacheKey = `${estado}_${supSlug}_${subSlug}_${tipo}`;
+  _mpeCache[cacheKey] = dataUrl;
+  try { localStorage.setItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}`, dataUrl);
+        localStorage.setItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}_name`, file.name); } catch(e){}
+  // Actualizar meta cache con nombre
+  const metaKey = `${estado}_${supSlug}_${subSlug}_meta`;
+  const meta = _mpeCache[metaKey] || {};
+  meta[tipo] = file.name;
+  _mpeCache[metaKey] = meta;
+  try { localStorage.setItem(`mpe_reclist_${estado}_${supSlug}_${subSlug}`, JSON.stringify(meta._recLista || [])); } catch(e){}
+  // Re-renderizar inmediatamente con los datos en caché
+  _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+  // Subir a R2 en segundo plano
+  _mpeR2Subir(estado, supSlug, subSlug, tipo, file).then(ok => {
+    if (!ok) { console.warn('[mpe] No se pudo subir a R2, quedó en caché local'); }
+  }).catch(e => console.warn('[mpe] R2 upload error:', e));
+}
+
+async function _mpePDFVisorData(estado, supSlug, subSlug, tipo, titulo) {
+  // Mostrar overlay inmediato con spinner mientras carga
+  const existing = document.getElementById('mpe-pdf-visor-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'mpe-pdf-visor-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:19999;background:rgba(0,0,0,0.82);display:flex;flex-direction:column;';
+  overlay.innerHTML = `
+    <div style="background:#1a1a0e;padding:10px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(200,149,42,0.3);">
+      <span style="font-size:16px;">📄</span>
+      <span style="font-size:0.85rem;font-weight:700;color:#f0d890;flex:1;">${titulo || 'Documento'}</span>
+      <span id="mpe-visor-dl"></span>
+      <button onclick="document.getElementById('mpe-pdf-visor-overlay').remove()"
+        style="background:#c0392b;border:none;border-radius:6px;color:#fff;font-size:0.8rem;font-weight:700;padding:5px 14px;cursor:pointer;">✕ Cerrar</button>
+    </div>
+    <div id="mpe-visor-content" style="flex:1;display:flex;align-items:center;justify-content:center;background:#333;">
+      <span style="color:#aaa;font-size:0.9rem;">⏳ Cargando PDF...</span>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  const dataUrl = await _mpeR2Descargar(estado, supSlug, subSlug, tipo);
+  if (!dataUrl) {
+    document.getElementById('mpe-visor-content').innerHTML = '<span style="color:#f88;font-size:0.9rem;">No se pudo cargar el PDF.</span>';
+    return;
+  }
+  // Convertir dataURL → Blob URL para que los navegadores modernos puedan renderizarlo
+  try {
+    const byteStr = atob(dataUrl.split(',')[1]);
+    const ab = new ArrayBuffer(byteStr.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+    const blob = new Blob([ab], {type: 'application/pdf'});
+    const blobUrl = URL.createObjectURL(blob);
+    const contentEl = document.getElementById('mpe-visor-content');
+    if (contentEl) contentEl.innerHTML =
+      `<iframe src="${blobUrl}" style="width:100%;height:100%;border:none;background:#fff;" type="application/pdf"></iframe>`;
+    const dlEl = document.getElementById('mpe-visor-dl');
+    if (dlEl) dlEl.innerHTML =
+      `<a href="${blobUrl}" download="${titulo||'documento'}.pdf" style="border:1px solid #c8951a;border-radius:6px;padding:5px 14px;font-size:0.72rem;font-weight:700;color:#f0d890;text-decoration:none;background:rgba(200,149,42,0.15);">⬇ Descargar</a>`;
+    // Limpiar blob URL al cerrar el overlay
+    const overlayEl = document.getElementById('mpe-pdf-visor-overlay');
+    if (overlayEl) overlayEl._blobUrl = blobUrl;
+  } catch(e) {
+    console.error('[PDFVisor]', e);
+    document.getElementById('mpe-visor-content').innerHTML = '<span style="color:#f88;font-size:0.9rem;">Error al renderizar el PDF.</span>';
+  }
+}
+
+async function _mpeQuitarArchivo(estado, supSlug, subSlug, tipo) {
+  if (!confirm('¿Quitar el archivo adjunto?')) return;
+  await _mpeR2Quitar(estado, supSlug, subSlug, tipo);
+  await _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+}
+
+async function _mpeRecDescargarR2(estado, supSlug, subSlug, tipo, nombre, btnEl) {
+  // Intentar desde caché primero
+  const cacheKey = `${estado}_${supSlug}_${subSlug}_${tipo}`;
+  let dataUrl = _mpeCache[cacheKey] ||
+    (() => { try { return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}`) || null; } catch(e){ return null; } })();
+  if (!dataUrl) {
+    // No hay caché — mostrar spinner y cargar de R2
+    if (btnEl) { btnEl.textContent = '⏳'; btnEl.disabled = true; }
+    dataUrl = await _mpeR2Descargar(estado, supSlug, subSlug, tipo);
+    if (btnEl) { btnEl.textContent = '⬇ Descargar'; btnEl.disabled = false; }
+    if (!dataUrl) { alert('No hay archivo adjunto aún.'); return; }
+  }
+  // Detectar tipo de archivo y abrir visor o descargar
+  const ext = nombre.split('.').pop().toLowerCase();
+  if (['doc','docx'].includes(ext)) {
+    _mpeWordVisor(dataUrl, nombre);
+    return;
+  }
+  const a = document.createElement('a'); a.href = dataUrl; a.download = nombre; a.click();
+}
+
+async function _mpeAgregarRecR2(estado, supSlug, subSlug) {
+  const lista = await _mpeR2GetRecLista(estado, supSlug, subSlug);
+  lista.push('Nuevo archivo');
+  await _mpeR2SetRecLista(estado, supSlug, subSlug, lista);
+  _mpeRenderBody(_mpeEstado, _mpeSupuesto); // síncrono ahora
+}
+
+// ── Guardar cambios (feedback visual) ──────────────────────────────────────
+function _mpeGuardarCambios() {
+  _mpeCambiosPendientes = false;
+  const btn = document.getElementById('mpe-btn-guardar');
+  if (!btn) return;
+  btn.textContent = '✅ ¡Guardado!';
+  btn.style.background = '#1a5a34';
+  setTimeout(() => {
+    btn.textContent = '💾 Guardar cambios';
+    btn.style.background = '#2a7a4a';
+  }, 2000);
+  // Los datos ya están en localStorage en tiempo real;
+  // aquí se puede agregar sync a Supabase en el futuro.
+}
+
+// ── Login admin del panel — mismo diseño que Panel de Administrador ─────────
+function _mpeAbrirLogin() {
+  const existing = document.getElementById('mpe-login-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'mpe-login-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10100;background:rgba(0,0,0,0.72);display:flex;align-items:center;justify-content:center;';
+  overlay.innerHTML = `
+    <div style="background:#1a1510;border:1px solid rgba(200,149,42,0.25);border-radius:14px;width:min(480px,94vw);box-shadow:0 12px 48px rgba(0,0,0,0.7);overflow:hidden;">
+
+      <!-- HEADER igual al admin modal -->
+      <div style="border-bottom:1px solid rgba(200,149,42,0.15);padding:16px 22px;display:flex;align-items:center;gap:14px;">
+        <div style="width:36px;height:36px;background:rgba(200,149,42,0.15);border:1px solid rgba(200,149,42,0.3);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;">⚙️</div>
+        <div style="flex:1;">
+          <div style="font-family:serif;font-size:0.95rem;font-weight:700;color:rgba(200,149,42,0.9);">Panel de Administrador</div>
+          <div style="font-family:monospace;font-size:0.55rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;margin-top:2px;">LEX·MÉXICO · ACCESO RESTRINGIDO</div>
+        </div>
+        <button onclick="document.getElementById('mpe-login-overlay').remove()"
+          style="background:rgba(200,149,42,0.08);border:1px solid rgba(200,149,42,0.2);border-radius:8px;padding:7px 14px;cursor:pointer;font-family:monospace;font-size:0.65rem;color:rgba(200,149,42,0.6);letter-spacing:0.08em;">✕ CERRAR</button>
+      </div>
+
+      <!-- BODY -->
+      <div style="padding:28px 28px 24px;">
+        <div style="text-align:center;margin-bottom:22px;">
+          <div style="font-size:2.2rem;margin-bottom:8px;">🔐</div>
+          <div style="font-family:serif;font-size:0.92rem;color:rgba(200,149,42,0.85);">Ingresa tus credenciales</div>
+          <div style="font-family:monospace;font-size:0.58rem;color:rgba(200,149,42,0.4);margin-top:3px;">Solo usuarios autorizados</div>
+        </div>
+
+        <!-- Error -->
+        <div id="mpe-login-err" style="display:none;background:rgba(192,22,26,0.12);border:1px solid rgba(192,22,26,0.3);color:#e88;padding:8px 12px;border-radius:6px;font-size:0.74rem;margin-bottom:12px;text-align:center;font-family:monospace;"></div>
+
+        <!-- Correo -->
+        <div style="margin-bottom:14px;">
+          <label style="display:block;font-family:monospace;font-size:0.6rem;color:rgba(200,149,42,0.55);letter-spacing:0.1em;margin-bottom:7px;">CORREO ELECTRÓNICO</label>
+          <input id="mpe-login-email" type="email" placeholder="tu@correo.com" autocomplete="email"
+            style="width:100%;background:rgba(200,149,42,0.04);border:1px solid rgba(200,149,42,0.35);border-radius:8px;padding:11px 14px;font-size:0.85rem;color:rgba(200,149,42,0.9);outline:none;box-sizing:border-box;"
+            onfocus="this.style.borderColor='rgba(200,149,42,0.8)'" onblur="this.style.borderColor='rgba(200,149,42,0.35)'">
+        </div>
+
+        <!-- Contraseña -->
+        <div style="margin-bottom:18px;">
+          <label style="display:block;font-family:monospace;font-size:0.6rem;color:rgba(200,149,42,0.55);letter-spacing:0.1em;margin-bottom:7px;">CONTRASEÑA</label>
+          <div style="position:relative;">
+            <input id="mpe-login-pass" type="password" placeholder="••••••••••••" autocomplete="current-password"
+              style="width:100%;background:rgba(200,149,42,0.04);border:1px solid rgba(200,149,42,0.35);border-radius:8px;padding:11px 42px 11px 14px;font-size:0.85rem;color:rgba(200,149,42,0.9);outline:none;box-sizing:border-box;"
+              onfocus="this.style.borderColor='rgba(200,149,42,0.8)'" onblur="this.style.borderColor='rgba(200,149,42,0.35)'"
+              onkeydown="if(event.key==='Enter')_mpeDoLogin()">
+            <button type="button" onclick="_mpePanelTogglePass()"
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:none;cursor:pointer;padding:4px;display:flex;align-items:center;">
+              <svg id="mpe-eye-open" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="rgba(200,149,42,0.55)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+              <svg id="mpe-eye-off" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="rgba(200,149,42,0.55)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/>
+                <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </button>
+          </div>
+          <label style="display:flex;align-items:center;gap:7px;margin-top:8px;cursor:pointer;user-select:none;">
+            <input type="checkbox" onchange="_mpePanelTogglePass()"
+              style="accent-color:var(--gold,#c8951a);width:14px;height:14px;cursor:pointer;">
+            <span style="font-family:monospace;font-size:0.6rem;color:rgba(200,149,42,0.5);letter-spacing:0.05em;">VER CONTRASEÑA</span>
+          </label>
+        </div>
+
+        <!-- Botones -->
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button onclick="document.getElementById('mpe-login-overlay').remove()"
+            style="background:transparent;border:1px solid rgba(200,149,42,0.2);border-radius:8px;padding:9px 20px;font-family:monospace;font-size:0.7rem;color:rgba(200,149,42,0.5);cursor:pointer;letter-spacing:0.06em;">CANCELAR</button>
+          <button onclick="_mpeDoLogin()"
+            style="background:var(--gold-d,#b8820e);border:none;border-radius:8px;padding:9px 24px;font-family:monospace;font-size:0.72rem;font-weight:700;color:#fff;cursor:pointer;letter-spacing:0.08em;display:flex;align-items:center;gap:8px;">
+            🔓 ACCEDER
+          </button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(() => { const el = document.getElementById('mpe-login-email'); if(el) el.focus(); }, 80);
+}
+
+function _mpePanelTogglePass() {
+  const inp = document.getElementById('mpe-login-pass');
+  const eyeOpen = document.getElementById('mpe-eye-open');
+  const eyeOff  = document.getElementById('mpe-eye-off');
+  if (!inp) return;
+  const show = inp.type === 'password';
+  inp.type = show ? 'text' : 'password';
+  if (eyeOpen) eyeOpen.style.display = show ? 'none' : '';
+  if (eyeOff)  eyeOff.style.display  = show ? ''     : 'none';
+}
+
+async function _mpeDoLogin() {
+  const email = (document.getElementById('mpe-login-email').value || '').trim();
+  const pass  = (document.getElementById('mpe-login-pass').value  || '').trim();
+  const errEl = document.getElementById('mpe-login-err');
+  if (!email || !pass) { errEl.textContent = 'Completa correo y contraseña.'; errEl.style.display = 'block'; return; }
+
+  // Verificar si es el admin del sistema
+  if (typeof ADMIN_EMAIL !== 'undefined' && email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+    errEl.textContent = 'Esta cuenta no tiene permisos de administrador.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // Intentar login con Supabase
+  if (typeof sb !== 'undefined' && sb && sb.auth) {
+    errEl.textContent = 'Verificando...'; errEl.style.display = 'block';
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
+      if (error || !data.user) {
+        errEl.textContent = 'Correo o contraseña incorrectos.'; errEl.style.display = 'block';
+        return;
+      }
+      _mpeAdminActivo = true;
+      _mpeAdminOff = false;
+      try { sessionStorage.removeItem('mpe_admin_off'); } catch(e){} // Limpiar bloqueo
+      document.getElementById('mpe-login-overlay').remove();
+      _mpeRenderTabs(_mpeEstado, _mpeSupuesto);
+      _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+      return;
+    } catch(e) {
+      errEl.textContent = 'Error de conexión. Intenta de nuevo.'; errEl.style.display = 'block';
+      return;
+    }
+  }
+  // Fallback sin Supabase (solo verifica email admin)
+  _mpeAdminActivo = true;
+  _mpeAdminOff = false;
+  try { sessionStorage.removeItem('mpe_admin_off'); } catch(e){}
+  document.getElementById('mpe-login-overlay').remove();
+  _mpeRenderTabs(_mpeEstado, _mpeSupuesto);
+  _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+}
+
+// Rastrear si hay cambios sin guardar en el panel
+let _mpeCambiosPendientes = false;
+
+function _mpeMarcarCambio() { _mpeCambiosPendientes = true; }
+
+function _mpeCerrarAdminConAviso() {
+  if (_mpeCambiosPendientes) {
+    const resp = confirm('Tienes cambios sin guardar.\n\n¿Guardar antes de cerrar sesión?');
+    if (resp) {
+      _mpeGuardarCambios();
+      // Pequeña pausa para que se vea el feedback visual antes de cerrar
+      setTimeout(_mpeCerrarAdmin, 1800);
+      return;
+    }
+    // No guardó — confirmar que se perderá la info
+    const confirmar = confirm('Los cambios NO guardados se perderán. ¿Continuar de todas formas?');
+    if (!confirmar) return;
+  }
+  _mpeCerrarAdmin();
+}
+
+function _mpeCerrarAdmin() {
+  _mpeAdminActivo = false;
+  _mpeAdminOff = true;
+  _mpeCambiosPendientes = false;
+  try { sessionStorage.setItem('mpe_admin_off', '1'); } catch(e){} // Persistir para refresco
+  const visor = document.getElementById('mpe-pdf-visor-overlay');
+  if (visor) visor.remove();
+  if (_mpeEstado !== null) {
+    _mpeRenderTabs(_mpeEstado, _mpeSupuesto);
+    _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+  }
+}
+
+// Cerrar modal al hacer clic en el fondo oscuro
+document.getElementById('modal-panel-estado').addEventListener('click', function(e) {
+  if (e.target === this) cerrarPanelEstado();
+});
+// ── Visor de Word (.doc/.docx) con mammoth.js ───────────────────────────────
+async function _mpeWordVisor(dataUrl, nombre) {
+  const existing = document.getElementById('mpe-word-visor-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'mpe-word-visor-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:19999;background:rgba(0,0,0,0.82);display:flex;flex-direction:column;';
+  overlay.innerHTML = `
+    <div style="background:#1a1a0e;padding:10px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(200,149,42,0.3);">
+      <span style="font-size:16px;">📄</span>
+      <span style="font-size:0.85rem;font-weight:700;color:#f0d890;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${nombre}</span>
+      <a href="${dataUrl}" download="${nombre}" style="border:1px solid #c8951a;border-radius:6px;padding:5px 14px;font-size:0.72rem;font-weight:700;color:#f0d890;text-decoration:none;background:rgba(200,149,42,0.15);">⬇ Descargar</a>
+      <button onclick="document.getElementById('mpe-word-visor-overlay').remove()" style="background:#c0392b;border:none;border-radius:6px;color:#fff;font-size:0.8rem;font-weight:700;padding:5px 14px;cursor:pointer;">✕ Cerrar</button>
+    </div>
+    <div id="mpe-word-content" style="flex:1;overflow-y:auto;background:#fff;padding:32px 48px;font-family:Georgia,serif;font-size:1rem;line-height:1.7;color:#1a1008;">
+      <p style="color:#aaa;text-align:center;margin-top:40px;">⏳ Cargando documento...</p>
+    </div>`;
+  document.body.appendChild(overlay);
+  try {
+    if (typeof mammoth === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+        s.onload = res; s.onerror = rej;
+        document.head.appendChild(s);
+      });
+    }
+    const base64 = dataUrl.split(',')[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const result = await mammoth.convertToHtml({ arrayBuffer: bytes.buffer });
+    const el = document.getElementById('mpe-word-content');
+    if (el) el.innerHTML = result.value || '<p style="color:#aaa;text-align:center;">El documento está vacío.</p>';
+  } catch(e) {
+    console.error('[WordVisor]', e);
+    const el = document.getElementById('mpe-word-content');
+    if (el) el.innerHTML = '<p style="color:#c00;text-align:center;">No se pudo visualizar. Usa el botón Descargar.</p>';
+  }
+}
+// ═══ FIN MÓDULO PANEL DE ESTADOS ═════════════════════════════════════════
+
 // ── FIX: Garantizar que "Agregar concepto" siempre funcione ─────────────────
 // Si el body tiene recibo-frozen por algún estado residual, el botón queda
 // con pointer-events:none. Este fix lo restaura en DOM-ready y periódicamente.
@@ -34738,7 +34748,7 @@ function regresarAlFormulario(){
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->
 <div id="modal-ficha-folio" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:#fdfaf4;border:1.5px solid #c8952a;border-radius:8px;width:94%;max-width:920px;height:90vh;display:flex;flex-direction:row;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+  <div style="background:#fdfaf4;border:1.5px solid #c8952a;border-radius:8px;width:96%;max-width:1140px;height:90vh;display:flex;flex-direction:row;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
 
     <!-- PANEL LATERAL IZQUIERDO -->
     <div style="width:185px;flex-shrink:0;background:#f5f0e0;border-right:1px solid #d4b870;display:flex;flex-direction:column;padding:10px 8px;gap:5px;">
@@ -34805,7 +34815,7 @@ function regresarAlFormulario(){
               <div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">Cliente</div>
               <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
                 <div id="ficha-cliente-nombre" style="font-size:0.9rem;font-weight:700;color:#1a1008;"></div>
-                <div id="ficha-cliente-tel" style="font-size:0.72rem;color:#7a6840;white-space:nowrap;"></div>
+                <div id="ficha-cliente-tel" style="font-size:0.72rem;color:#1a7a3a;font-weight:600;white-space:nowrap;"></div>
               </div>
               <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:4px;">
                 <div id="ficha-concepto" style="font-size:0.72rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;"></div>
@@ -34818,14 +34828,14 @@ function regresarAlFormulario(){
             </div>
           </div>
           <div style="height:0.5px;background:#d4b870;margin:10px 0;"></div>
-          <div id="fichaNotasDisplay" onclick="fichaToggleNotas()" style="font-size:0.78rem;color:#7a6840;font-style:italic;cursor:pointer;padding:6px 8px;border-radius:4px;border:0.5px solid transparent;transition:all 0.15s;" onmouseover="this.style.background='#fffdf5';this.style.borderColor='#d4b870'" onmouseout="this.style.background='transparent';this.style.borderColor='transparent'">✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.</div>
+          <div id="fichaNotasDisplay" onclick="fichaToggleNotas()" style="font-size:0.78rem;color:#7a6840;font-style:italic;cursor:pointer;padding:6px 8px;border-radius:4px;border:0.5px solid transparent;transition:all 0.15s;text-align:justify;word-break:break-word;overflow-wrap:break-word;white-space:pre-wrap;" onmouseover="this.style.background='#fffdf5';this.style.borderColor='#d4b870'" onmouseout="this.style.background='transparent';this.style.borderColor='transparent'">✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.</div>
           <textarea id="fichaNotasInput" placeholder="Notas libres..." style="display:none;width:100%;font-size:0.78rem;padding:8px 10px;border:0.5px solid #c8952a;border-radius:4px;background:#fffdf5;resize:none;min-height:70px;font-family:inherit;box-sizing:border-box;margin-top:4px;"></textarea>
           <button id="fichaSaveNotas" onclick="fichaGuardarNotas()" style="display:none;margin-top:5px;font-size:0.7rem;padding:4px 12px;border-radius:4px;border:0.5px solid #d4b870;background:#f5f0e0;cursor:pointer;color:#5a3e10;">✓ Guardar</button>
         </div>
 
         <!-- RECIBOS -->
         <div style="margin-bottom:12px;">
-          <div style="font-size:0.6rem;font-family:'DM Mono',monospace;font-weight:700;color:#7a6840;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">Recibos Oficiales del Folio</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;"><span style="font-size:0.6rem;font-family:'DM Mono',monospace;font-weight:700;color:#7a6840;text-transform:uppercase;letter-spacing:0.1em;">Recibos Oficiales del Folio</span><span style="font-size:0.75rem;font-family:'DM Mono',monospace;font-weight:700;color:#1a1008;">💵 COSTO DEL TRÁMITE <span id="ficha-total-header"></span></span></div>
           <div id="ficha-recibos-lista" style="display:flex;flex-direction:column;gap:5px;"></div>
         </div>
 
@@ -34844,7 +34854,7 @@ function regresarAlFormulario(){
               <span style="font-size:0.65rem;color:#7a6840;">Fecha:</span>
               <span id="fichaGFechaDisplay" style="font-size:0.7rem;font-family:'DM Mono',monospace;color:#1a1008;background:#fffdf5;border:0.5px solid #d4b870;border-radius:4px;padding:3px 8px;min-width:100px;"></span>
               <button onclick="fichaActivarRetroGasto()" id="fichaGBtnRetro" style="font-size:0.6rem;font-family:'DM Mono',monospace;font-weight:700;padding:3px 8px;border-radius:4px;border:1px solid #c8952a;background:#fef9ec;color:#7a4e00;cursor:pointer;letter-spacing:0.06em;">📅 RETRO</button>
-              <input type="date" id="fichaGFechaRetro" style="display:none;font-size:0.7rem;padding:3px 6px;border:0.5px solid #c8952a;border-radius:4px;background:#fffdf5;" onchange="fichaAplicarRetroGasto(this.value)">
+              <input type="date" id="fichaGFechaRetro" style="display:none;font-size:0.7rem;padding:3px 6px;border:0.5px solid #c8952a;border-radius:4px;background:#fffdf5;" oninput="if(this.value&&this.value.length===10&&this.value.split('-')[0].length===4)fichaAplicarRetroGasto(this.value)" onchange="if(this.value&&this.value.length===10&&this.value.split('-')[0].length===4)fichaAplicarRetroGasto(this.value)">
             </div>
             <div style="display:flex;gap:6px;">
               <button onclick="fichaGuardarGasto()" style="flex:1;font-size:0.7rem;padding:6px;border-radius:4px;border:0.5px solid #c8952a;background:#fef3cc;color:#7a4e00;font-weight:700;cursor:pointer;font-family:'DM Mono',monospace;">✓ Guardar</button>
@@ -34860,7 +34870,7 @@ function regresarAlFormulario(){
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;padding:8px 16px;border-bottom:0.5px solid #d4b870;">
           <div><div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.06em;">Total</div><div id="ficha-total" style="font-size:0.82rem;font-weight:700;font-family:'DM Mono',monospace;color:#1a1008;"></div></div>
           <div><div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.06em;">Abonado</div><div id="ficha-abonado" style="font-size:0.82rem;font-weight:700;font-family:'DM Mono',monospace;color:#1a7a3a;"></div></div>
-          <div><div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.06em;">Pendiente</div><div id="ficha-pendiente" style="font-size:0.82rem;font-weight:700;font-family:'DM Mono',monospace;color:#a32d2d;"></div></div>
+          <div><div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.06em;">Resta</div><div id="ficha-pendiente" style="font-size:0.82rem;font-weight:700;font-family:'DM Mono',monospace;color:#a32d2d;"></div></div>
           <div><div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.06em;">Ext. pend.</div><div id="ficha-ext-pend" style="font-size:0.82rem;font-weight:700;font-family:'DM Mono',monospace;color:#8B6914;"></div></div>
         </div>
         <div style="display:flex;gap:8px;padding:8px 16px;">
@@ -34888,7 +34898,7 @@ function abrirFichaFolio(){
   if(recibo.clientes&&recibo.clientes[0])tel=recibo.clientes[0].movil||recibo.clientes[0].tel||'';
   else if(recibo.movil)tel=recibo.movil;
   var telEl=document.getElementById('ficha-cliente-tel');
-  if(telEl)telEl.textContent=tel?'· '+tel:'';
+  if(telEl&&tel){telEl.innerHTML='<span style="color:#1a7a3a;font-weight:700;">CONTACTO:</span> <span style="color:#c8701a;font-weight:700;">'+tel+'</span>';}else if(telEl){telEl.textContent='';}
   // Domicilio
   var dom='';
   if(recibo.clientes&&recibo.clientes[0])dom=recibo.clientes[0].domicilio||'';
@@ -34969,19 +34979,21 @@ function abrirFichaFolio(){
     var tc=esOrig?'#1a5fa8':(r.esComplemento?'#8B4500':(esLiq?'#0f5228':'#1a7a3a'));
     var tb=esOrig?'#e6f1fb':(r.esComplemento?'#fef0d8':(esLiq?'#d4f5e0':'#e8f5ec'));
     var fecha=r.fecha?r.fecha.substring(5,10).replace('-','/'):'—';
+    var fechaRec=(rletra!=='A'&&r.fechaActualizacion)?r.fechaActualizacion:(r.fecha_recibo||r.fecha||(mov&&mov.fecha)||'');
     var row=document.createElement('div');
     row.style.cssText='display:grid;grid-template-columns:80px 1fr 90px 90px;gap:6px;align-items:center;padding:7px 10px;border-radius:4px;border:0.5px solid #e0d4a8;font-size:0.78rem;background:#fffdf5;';
     row.innerHTML='<div style="font-weight:700;color:#1a5fa8;font-family:monospace;font-size:0.72rem;cursor:pointer;text-decoration:underline;text-underline-offset:2px;" onclick="window._fichaAbiertaAntes=true;cerrarFichaFolio();setTimeout(function(){abrirPreviaDesdeContab('+r.folio+',\''+rletra+'\');},200);" title="Ver PDF">'+rfStr+'</div>'
       +'<div><span style="font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:20px;background:'+tb+';color:'+tc+';">'+tipo+'</span>'
-      +'<div style="font-size:0.65rem;color:#7a6840;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+descripcion+'">'+descripcionCorta+'</div></div>'
+      +'<div style="font-size:0.65rem;color:#7a6840;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+descripcion+'">'+(fechaRec?new Date(fechaRec+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}):'—')+'</div></div>'
       +(r.esComplemento
         ?'<div style="text-align:right;font-weight:700;color:#8B4500;font-family:monospace;">+$'+fmt(parseFloat(r.total||0))+'</div><div style="text-align:right;font-size:0.68rem;color:#8B4500;">cargo</div>'
-        :'<div style="text-align:right;font-weight:700;color:#1a7a3a;font-family:monospace;">+$'+fmt(monto)+'</div><div style="text-align:right;font-size:0.68rem;color:#7a6840;">saldo $'+fmt(saldo)+'</div>'
+        :'<div style="text-align:right;font-weight:700;color:#1a7a3a;font-family:monospace;">+$'+fmt(monto)+'</div><div style="text-align:right;font-size:0.68rem;color:#7a6840;">resta $'+fmt(saldo)+'</div>'
       );
     listaEl.appendChild(row);
   });
 
   document.getElementById('ficha-total').textContent='$'+fmt(totalTramite);
+  var th=document.getElementById('ficha-total-header');if(th)th.textContent='$'+fmt(totalTramite);
   document.getElementById('ficha-abonado').textContent='$'+fmt(totalAbonado);
   document.getElementById('ficha-pendiente').textContent='$'+fmt(parseFloat(recibo.saldoPendiente||0));
 
@@ -34989,16 +35001,38 @@ function abrirFichaFolio(){
   var notasKey='ficha-notas-'+folio+'-'+anio;
   var gastosKey='ficha-gastos-'+folio+'-'+anio;
   var nd=document.getElementById('fichaNotasDisplay');
+  // Cargar desde localStorage primero (inmediato)
   var ns=localStorage.getItem(notasKey)||'';
   nd.textContent=ns||'✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.';
   nd.style.fontStyle=ns?'normal':'italic';nd.style.color=ns?'#1a1008':'#7a6840';
   nd.dataset.texto=ns;
+  // Intentar cargar desde R2 (puede tener versión más reciente)
+  if(window.descargarR2 && window.SB_DESPACHO_ID) {
+    var _notaPath = window.SB_DESPACHO_ID+'/notas_folio/'+anio+'/'+folio+'.txt';
+    window.descargarR2(_notaPath, 'expedientes').then(function(blob) {
+      if(!blob) return;
+      return blob.text();
+    }).then(function(txt) {
+      if(!txt) return;
+      var nd3=document.getElementById('fichaNotasDisplay');
+      if(!nd3) return;
+      localStorage.setItem(notasKey, txt);
+      nd3.textContent=txt;
+      nd3.style.fontStyle='normal';
+      nd3.style.color='#1a1008';
+      nd3.dataset.texto=txt;
+    }).catch(function(){});
+  }
   var gl=document.getElementById('ficha-gastos-lista');
   gl.innerHTML='';
-  var gastos=JSON.parse(localStorage.getItem(gastosKey)||'[]');
-  var extP=0;
-  gastos.forEach(function(g,i){if(g.estado==='Pendiente')extP+=parseFloat(g.monto||0);_fichaGastoRow(g,i);});
-  document.getElementById('ficha-ext-pend').textContent='$'+fmt(extP);
+  // Cargar gastos desde R2 (con fallback localStorage)
+  _gastoR2Cargar(folio, anio).then(function(gastos) {
+    var gl2=document.getElementById('ficha-gastos-lista'); if(!gl2) return;
+    gl2.innerHTML='';
+    var extP2=0;
+    gastos.forEach(function(g,i){if(g.estado==='Pendiente')extP2+=parseFloat(g.monto||0);_fichaGastoRow(g,i);});
+    document.getElementById('ficha-ext-pend').textContent='$'+fmt(extP2);
+  });
   window._fichaRef={folio:folio,anio:anio,notasKey:notasKey,gastosKey:gastosKey};
   window._fichaLiquidado=parseFloat(recibo.saldoPendiente||0)<=0;
   // Modo solo lectura si está liquidado
@@ -35045,8 +35079,64 @@ function fichaGuardarNotas(){
   d.textContent=t||'✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.';
   d.style.fontStyle=t?'normal':'italic';d.style.color=t?'#1a1008':'#7a6840';
   d.style.display='block';i.style.display='none';b.style.display='none';
-  if(window._fichaRef)localStorage.setItem(window._fichaRef.notasKey,t);
+  var ref = window._fichaRef;
+  if(ref) {
+    // Guardar en localStorage siempre (inmediato)
+    localStorage.setItem(ref.notasKey, t);
+    // Guardar en R2 en segundo plano
+    if(window.subirR2 && window.SB_DESPACHO_ID) {
+      var notaPath = window.SB_DESPACHO_ID+'/notas_folio/'+ref.anio+'/'+ref.folio+'.txt';
+      var blob = new Blob([t], {type:'text/plain'});
+      var file = new File([blob], ref.folio+'.txt', {type:'text/plain'});
+      window.subirR2(file, notaPath, 'expedientes').catch(function(e){ console.warn('[NotaR2]',e); });
+    }
+  }
 }
+
+
+// ── GASTOS EXTRAOFICIALES — Storage R2 ───────────────────────────────────
+// Ruta: {despacho_id}/gastos_extraoficiales/{anio}/{folio}.json
+// Completamente separado de recibos, placas, etc.
+// Fallback automático a localStorage si R2 no disponible.
+
+function _gastoR2Path(folio, anio) {
+  const did = window.SB_DESPACHO_ID || 'local';
+  return `${did}/gastos_extraoficiales/${anio}/${folio}.json`;
+}
+
+async function _gastoR2Cargar(folio, anio) {
+  // 1) Intentar R2
+  if (window.descargarR2 && window.SB_DESPACHO_ID) {
+    try {
+      const blob = await window.descargarR2(_gastoR2Path(folio, anio), 'expedientes');
+      if (blob) {
+        const txt = await blob.text();
+        const data = JSON.parse(txt);
+        // Sincronizar también en localStorage como caché
+        try { localStorage.setItem('ficha-gastos-'+folio+'-'+anio, txt); } catch(e){}
+        return data;
+      }
+    } catch(e) { console.warn('[GastoR2] Carga R2 falló, usando localStorage:', e); }
+  }
+  // 2) Fallback localStorage
+  try { return JSON.parse(localStorage.getItem('ficha-gastos-'+folio+'-'+anio) || '[]'); } catch(e) { return []; }
+}
+
+async function _gastoR2Guardar(folio, anio, gastos) {
+  const json = JSON.stringify(gastos);
+  // Siempre guardar en localStorage como caché inmediata
+  try { localStorage.setItem('ficha-gastos-'+folio+'-'+anio, json); } catch(e){}
+  // Intentar guardar en R2 en segundo plano
+  if (window.subirR2 && window.SB_DESPACHO_ID) {
+    try {
+      const blob = new Blob([json], {type:'application/json'});
+      const file = new File([blob], folio+'.json', {type:'application/json'});
+      const ok = await window.subirR2(file, _gastoR2Path(folio, anio), 'expedientes');
+      if (!ok) console.warn('[GastoR2] No se pudo guardar en R2');
+    } catch(e) { console.warn('[GastoR2] Error guardando en R2:', e); }
+  }
+}
+// ── FIN GASTOS R2 ─────────────────────────────────────────────────────────
 
 function _fichaGastoRow(g,idx){
   var gl=document.getElementById('ficha-gastos-lista');
@@ -35064,12 +35154,13 @@ function fichaGuardarGasto(){
   var m=parseFloat(document.getElementById('fichaGMonto').value||0);
   var e=document.getElementById('fichaGEstado').value;
   if(!c){if(typeof toast==='function')toast('Escribe un concepto','err');return;}
-  var key=window._fichaRef?window._fichaRef.gastosKey:null;
-  var gastos=key?JSON.parse(localStorage.getItem(key)||'[]'):[];
+  var ref=window._fichaRef;
+  var folio=ref?ref.folio:null, anio=ref?ref.anio:null;
   var fechaEl=document.getElementById('fichaGFechaDisplay');
   var today=fechaEl&&fechaEl.textContent?fechaEl.textContent:new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
+  var gastos=folio?JSON.parse(localStorage.getItem('ficha-gastos-'+folio+'-'+anio)||'[]'):[];
   gastos.push({concepto:c,monto:m,estado:e,fecha:today});
-  if(key)localStorage.setItem(key,JSON.stringify(gastos));
+  if(folio) _gastoR2Guardar(folio, anio, gastos); // guarda R2 + localStorage
   var gl=document.getElementById('ficha-gastos-lista');gl.innerHTML='';
   var extP=0;var fmt=function(v){return typeof fmtMXN==='function'?fmtMXN(parseFloat(v||0)):parseFloat(v||0).toFixed(2);};
   gastos.forEach(function(g,i){if(g.estado==='Pendiente')extP+=parseFloat(g.monto||0);_fichaGastoRow(g,i);});
@@ -35079,9 +35170,11 @@ function fichaGuardarGasto(){
 }
 
 function fichaEliminarGasto(idx){
-  var key=window._fichaRef?window._fichaRef.gastosKey:null;
-  var gastos=key?JSON.parse(localStorage.getItem(key)||'[]'):[];
-  gastos.splice(idx,1);if(key)localStorage.setItem(key,JSON.stringify(gastos));
+  var ref=window._fichaRef;
+  var folio=ref?ref.folio:null, anio=ref?ref.anio:null;
+  var gastos=folio?JSON.parse(localStorage.getItem('ficha-gastos-'+folio+'-'+anio)||'[]'):[];
+  gastos.splice(idx,1);
+  if(folio) _gastoR2Guardar(folio, anio, gastos);
   var gl=document.getElementById('ficha-gastos-lista');gl.innerHTML='';
   var extP=0;var fmt=function(v){return typeof fmtMXN==='function'?fmtMXN(parseFloat(v||0)):parseFloat(v||0).toFixed(2);};
   gastos.forEach(function(g,i){if(g.estado==='Pendiente')extP+=parseFloat(g.monto||0);_fichaGastoRow(g,i);});
@@ -35102,13 +35195,17 @@ function fichaActivarRetroGasto(){
 }
 
 function fichaAplicarRetroGasto(val){
+  if(!val||val.length!==10) return; // Año incompleto — no cerrar todavía
+  var anioNum=parseInt((val.split('-')[0])||0);
+  if(anioNum<2020||anioNum>2100) return; // Año fuera de rango — seguir esperando
   var el=document.getElementById('fichaGFechaDisplay');
   var parts=val.split('-');
   var meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  el.textContent=parts[2]+'/'+meses[parseInt(parts[1])-1]+'/'+parts[0]+' (RETRO)';
+  el.textContent=parts[2]+'/'+meses[parseInt(parts[1])-1]+'/'+parts[0];
   el.dataset.fecha=val;el.style.color='#c8952a';
   document.getElementById('fichaGFechaRetro').style.display='none';
   document.getElementById('fichaGBtnRetro').style.background='#fef9ec';
+  document.getElementById('fichaGBtnRetro').style.borderColor='#c8952a';
 }
 
 function fichaResetFormGasto(){

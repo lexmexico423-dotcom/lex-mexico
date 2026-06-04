@@ -32161,8 +32161,14 @@ function _mpeRenderBody(estado, supIdx) {
   })();
   let listaHTML = recLista.map((r, ri) => {
     const recTipo = `rec_${ri}.pdf`;
-    const recUrl  = _mpeCache[`${estado}_${supSlug}_${subSlug}_${recTipo}`] || null; // se cargará al ver
+    const recExt  = r.split('.').pop().toLowerCase();
+    const isWord  = ['doc','docx'].includes(recExt);
+    const fileIcon = isWord ? '📝' : '📄';
     if (isAdmin) {
+      const botonesAccion = isWord
+        ? `<button onclick="_mpeRecDescargarR2('${estado}','${supSlug}','${subSlug}','${recTipo}','${r}',this,'👁')" style="border:1px solid #c8951a;border-radius:6px;padding:4px 9px;font-size:0.68rem;color:#7a4a00;background:#fef3d8;cursor:pointer;" title="Ver documento">👁</button>
+           <button onclick="_mpeRecForzarDescarga('${estado}','${supSlug}','${subSlug}','${recTipo}','${r}',this)" style="border:1px solid #b8a878;border-radius:6px;padding:4px 9px;font-size:0.68rem;color:#5a4010;background:#fdf8f0;cursor:pointer;" title="Descargar">⬇</button>`
+        : `<button onclick="_mpeRecDescargarR2('${estado}','${supSlug}','${subSlug}','${recTipo}','${r}',this,'⬇')" style="border:1px solid #b8a878;border-radius:6px;padding:4px 9px;font-size:0.68rem;color:#5a4010;background:#fdf8f0;cursor:pointer;" title="Descargar">⬇</button>`;
       return `<div style="display:flex;align-items:center;gap:6px;padding:8px 0;border-bottom:1px solid #ede8dc;">
         <input value="${r.replace(/"/g,'&quot;')}" onchange="_mpeRenombrarRec('${estado}','${supSlug}','${subSlug}',${ri},this.value)"
           style="flex:1;border:1px solid #d8ceb0;border-radius:5px;padding:4px 8px;font-size:0.75rem;color:#3a2a0a;background:#fffef8;min-width:0;">
@@ -32170,15 +32176,23 @@ function _mpeRenderBody(estado, supIdx) {
           📎 Adjuntar
           <input type="file" style="display:none;" onchange="_mpeSubirArchivo('${estado}','${supSlug}','${subSlug}','${recTipo}',this)">
         </label>
-        <button onclick="_mpeRecDescargarR2('${estado}','${supSlug}','${subSlug}','${recTipo}','${r}',this)" style="border:1px solid #b8a878;border-radius:6px;padding:4px 9px;font-size:0.68rem;color:#5a4010;background:#fdf8f0;cursor:pointer;">⬇</button>
+        ${botonesAccion}
         <button onclick="_mpeEliminarRec('${estado}','${supSlug}','${subSlug}',${ri})"
           style="border:1px solid #e24b4a;border-radius:6px;padding:4px 8px;font-size:0.68rem;color:#a33;background:#fff8f8;cursor:pointer;">✕</button>
       </div>`;
     } else {
+      const botonesAccion = isWord
+        ? `<div style="display:flex;gap:5px;flex-shrink:0;">
+             <button onclick="_mpeRecDescargarR2('${estado}','${supSlug}','${subSlug}','${recTipo}','${r}',this,'👁 Ver')"
+               style="border:1px solid #c8951a;border-radius:7px;padding:5px 12px;font-size:0.7rem;color:#7a4a00;background:#fef3d8;cursor:pointer;font-weight:600;">👁 Ver</button>
+             <button onclick="_mpeRecForzarDescarga('${estado}','${supSlug}','${subSlug}','${recTipo}','${r}',this)"
+               style="border:1px solid #b8a878;border-radius:7px;padding:5px 10px;font-size:0.7rem;color:#5a4010;background:#fdf8f0;cursor:pointer;font-weight:600;" title="Descargar">⬇</button>
+           </div>`
+        : `<button onclick="_mpeRecDescargarR2('${estado}','${supSlug}','${subSlug}','${recTipo}','${r}',this,'⬇ Descargar')"
+             style="border:1px solid #b8a878;border-radius:7px;padding:5px 14px;font-size:0.7rem;color:#5a4010;background:#fdf8f0;cursor:pointer;font-weight:600;">⬇ Descargar</button>`;
       return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #ede8dc;gap:8px;">
-        <span style="font-size:0.75rem;color:#3a3020;display:flex;align-items:center;gap:7px;flex:1;min-width:0;">📄 ${r}</span>
-        <button onclick="_mpeRecDescargarR2('${estado}','${supSlug}','${subSlug}','${recTipo}','${r}',this)"
-          style="border:1px solid #b8a878;border-radius:7px;padding:5px 14px;font-size:0.7rem;color:#5a4010;background:#fdf8f0;cursor:pointer;font-weight:600;">⬇ Descargar</button>
+        <span style="font-size:0.75rem;color:#3a3020;display:flex;align-items:center;gap:7px;flex:1;min-width:0;">${fileIcon} ${r}</span>
+        ${botonesAccion}
       </div>`;
     }
   }).join('');
@@ -32443,23 +32457,35 @@ async function _mpeQuitarArchivo(estado, supSlug, subSlug, tipo) {
   await _mpeRenderBody(_mpeEstado, _mpeSupuesto);
 }
 
-async function _mpeRecDescargarR2(estado, supSlug, subSlug, tipo, nombre, btnEl) {
-  // Intentar desde caché primero
+async function _mpeRecDescargarR2(estado, supSlug, subSlug, tipo, nombre, btnEl, btnTextoReset) {
   const cacheKey = `${estado}_${supSlug}_${subSlug}_${tipo}`;
   let dataUrl = _mpeCache[cacheKey] ||
     (() => { try { return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}`) || null; } catch(e){ return null; } })();
   if (!dataUrl) {
-    // No hay caché — mostrar spinner y cargar de R2
+    const textoOrig = btnEl ? btnEl.textContent : '';
     if (btnEl) { btnEl.textContent = '⏳'; btnEl.disabled = true; }
     dataUrl = await _mpeR2Descargar(estado, supSlug, subSlug, tipo);
-    if (btnEl) { btnEl.textContent = '⬇ Descargar'; btnEl.disabled = false; }
+    if (btnEl) { btnEl.textContent = btnTextoReset || textoOrig || '⬇'; btnEl.disabled = false; }
     if (!dataUrl) { alert('No hay archivo adjunto aún.'); return; }
   }
-  // Detectar tipo de archivo y abrir visor o descargar
   const ext = nombre.split('.').pop().toLowerCase();
   if (['doc','docx'].includes(ext)) {
     _mpeWordVisor(dataUrl, nombre);
     return;
+  }
+  const a = document.createElement('a'); a.href = dataUrl; a.download = nombre; a.click();
+}
+
+async function _mpeRecForzarDescarga(estado, supSlug, subSlug, tipo, nombre, btnEl) {
+  const cacheKey = `${estado}_${supSlug}_${subSlug}_${tipo}`;
+  let dataUrl = _mpeCache[cacheKey] ||
+    (() => { try { return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}`) || null; } catch(e){ return null; } })();
+  if (!dataUrl) {
+    const textoOrig = btnEl ? btnEl.textContent : '⬇';
+    if (btnEl) { btnEl.textContent = '⏳'; btnEl.disabled = true; }
+    dataUrl = await _mpeR2Descargar(estado, supSlug, subSlug, tipo);
+    if (btnEl) { btnEl.textContent = textoOrig; btnEl.disabled = false; }
+    if (!dataUrl) { alert('No hay archivo adjunto aún.'); return; }
   }
   const a = document.createElement('a'); a.href = dataUrl; a.download = nombre; a.click();
 }

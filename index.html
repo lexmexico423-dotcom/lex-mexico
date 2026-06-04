@@ -6473,6 +6473,8 @@ async function sincronizarFolio(forzarSB){
           if(_borrados > 0){
             localStorage.setItem('lex-placas-liquidados', JSON.stringify(_lbSB));
             console.log('[LEX] Limpieza SB-load: ' + _borrados + ' pendiente(s) de placas liquidados eliminados.');
+            // Persistir en Supabase para que no vuelvan en la próxima recarga
+            setTimeout(function(){ if(typeof save === 'function') save(); }, 800);
           }
         })();
         // captura_meses: cargar desde Supabase

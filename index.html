@@ -10301,7 +10301,11 @@ async function guardarRecibo(){
     // campos de saldo actualizados.  Los datos originales (fecha, anticipo, conceptos,
     // hora, pdfBase64, etc.) del folio A quedan intactos en la nueva copia.
     if(folioAntNum){
-      const idxOrig = appData.recibos.findIndex(r=>r.folio===folioAntNum);
+      // Buscar el recibo ORIGINAL (letra A): excluir los abonos B/C/D que tienen folioAnterior
+      // Sin este filtro, el unshift() de arriba hace que findIndex() encuentre el recibo B
+      // recién insertado en lugar del A, dejando a A con saldoPendiente desactualizado
+      // en Supabase y provocando que PASO 2 de sincronizarPendientesPlacas lo recree.
+      const idxOrig = appData.recibos.findIndex(r=>r.folio===folioAntNum && !r.folioAnterior);
       if(idxOrig>=0){
         const recOrig = appData.recibos[idxOrig];
         const nuevoAbonado = (parseFloat(recOrig.totalAbonado)||0) + anticipo;

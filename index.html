@@ -6459,8 +6459,13 @@ async function sincronizarFolio(forzarSB){
           D.pendientes = D.pendientes.filter(function(p){
             if(p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
             var _versLb = appData.recibos.filter(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
-            // Eliminar si: no existe el recibo, está cancelado, o el saldo mínimo entre todas las versiones es 0
-            var saldo = _versLb.reduce(function(m,r){ var s=parseFloat(r.saldoPendiente); return isNaN(s)?m:Math.min(m,s); }, Infinity);
+            // Calcular saldo mínimo con fallback a saldoNuevo y flag liquidado
+            var saldo = _versLb.reduce(function(m,r){
+              var s=parseFloat(r.saldoPendiente); if(!isNaN(s)) return Math.min(m,s);
+              var sn=parseFloat(r.saldoNuevo);    if(!isNaN(sn)) return Math.min(m,sn);
+              if(r.liquidado===true) return Math.min(m,0);
+              return m;
+            }, Infinity);
             var _cancelLb = _versLb.some(function(r){ return r.cancelado; });
             if(_versLb.length === 0 || _cancelLb || !(saldo > 0)){
               var fs = String(p.reciboVinculadoFolio);
@@ -16773,7 +16778,12 @@ async function syncEstadoSupabase(){
     const _pendientesSinLiquidados = (D.pendientes || []).filter(function(p){
       if(p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
       var _versSave = (appData.recibos||[]).filter(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
-      var saldo = _versSave.reduce(function(m,r){ var s=parseFloat(r.saldoPendiente); return isNaN(s)?m:Math.min(m,s); }, Infinity);
+      var saldo = _versSave.reduce(function(m,r){
+        var s=parseFloat(r.saldoPendiente); if(!isNaN(s)) return Math.min(m,s);
+        var sn=parseFloat(r.saldoNuevo);   if(!isNaN(sn)) return Math.min(m,sn);
+        if(r.liquidado===true) return Math.min(m,0);
+        return m;
+      }, Infinity);
       return _versSave.length > 0 && !_versSave.some(function(r){return r.cancelado;}) && (saldo > 0);
     });
     const estado = {
@@ -22756,6 +22766,8 @@ async function guardarEdicionCompleta() {
     r.total                = total;
     r.anticipo             = String(anticipo);
     r.saldoPendiente       = saldo;
+    if (saldo <= 0 && typeof _eliminarPendientePorFolio === 'function')
+      _eliminarPendientePorFolio(r.folio);
     r.fecha                = fechaRecibo;
     r.fecha_recibo         = fechaRecibo;
     r.hora                 = horaRecibo;
@@ -22922,6 +22934,8 @@ async function adminGuardarEdicionRecibo() {
   r.saldoPendiente       = Math.max(0, nuevoTotal - nuevoAnticipo);
   r.totalAbonado         = Math.min(nuevoAnticipo, nuevoTotal);  // ← sincronizar abonado real
   r.saldoNuevo           = r.saldoPendiente;                     // ← para que PDF lo tome
+  if (r.saldoPendiente <= 0 && typeof _eliminarPendientePorFolio === 'function')
+    _eliminarPendientePorFolio(r.folio);
   if (r.clientes && r.clientes.length > 0) r.clientes[0].nombre = nuevoNombre;
   r.nombre_cliente_firma = nuevoNombre;
   r.pdfBase64            = null; // invalidar cache local
@@ -31044,7 +31058,12 @@ function sincronizarPendientesPlacas() {
     var _versSync = appData.recibos.filter(function(r) {
       return Number(r.folio) === Number(p.reciboVinculadoFolio);
     });
-    var _saldoMinSync = _versSync.reduce(function(m,r){ var s=parseFloat(r.saldoPendiente); return isNaN(s)?m:Math.min(m,s); }, Infinity);
+    var _saldoMinSync = _versSync.reduce(function(m,r){
+      var s=parseFloat(r.saldoPendiente); if(!isNaN(s)) return Math.min(m,s);
+      var sn=parseFloat(r.saldoNuevo);   if(!isNaN(sn)) return Math.min(m,sn);
+      if(r.liquidado===true) return Math.min(m,0);
+      return m;
+    }, Infinity);
     // Si el recibo ya no tiene saldo (en cualquier versión) o fue cancelado → eliminar pendiente
     if (_versSync.length === 0 || _versSync.some(function(r){return r.cancelado;}) || !(_saldoMinSync > 0)) {
       var fStr = String(p.reciboVinculadoFolio);

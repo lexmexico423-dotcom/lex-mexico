@@ -16532,6 +16532,9 @@ function badges(){
   const bj=$('badgeJ'),bp=$('badgeP');
   bj.textContent=uj||'';bj.style.display=uj?'':'none';
   bp.textContent=up||'';bp.style.display=up?'':'none';
+  const ue=(D.escrituras||[]).filter(e=>e.estado==='urgente').length;
+  const be=$('badgeEscrituras');
+  if(be){be.textContent=ue||'';be.style.display=ue?'':'none';}
 }
 // ═══ RELOJ ═══
 function reloj(){
@@ -29466,7 +29469,8 @@ function escRender(){
   let lista = D.escrituras.filter(e=>{
     if(_escFiltro!=='todos' && e.estado!==_escFiltro) return false;
     if(q){
-      const txt=[e.num||'',e.compradores?.join(' ')||'',e.vendedores?.join(' ')||'',e.tipo||'',e.notaria||'',e.descripcion||''].join(' ').toLowerCase();
+      const _gn=p=>typeof p==='string'?p:(p?.nombre||'');
+      const txt=[e.num||'',(e.compradores||[]).map(_gn).join(' '),(e.vendedores||[]).map(_gn).join(' '),e.tipo||'',e.notaria||'',e.descripcion||''].join(' ').toLowerCase();
       return txt.includes(q);
     }
     return true;
@@ -29670,7 +29674,9 @@ function escGuardar(){
 async function escEliminar(){
   if(_escIdx<0)return;
   const e=D.escrituras[_escIdx];
-  if(!confirm('¿Eliminar escritura '+e.num+' — '+(e.compradores||[])[0]+'?\n\nNo se puede deshacer.'))return;
+  const _c0=(e.compradores||[])[0];
+  const _c0nom=typeof _c0==='string'?_c0:(_c0?.nombre||'Sin nombre');
+  if(!confirm('¿Eliminar escritura '+e.num+' — '+_c0nom+'?\n\nNo se puede deshacer.'))return;
   D.escrituras.splice(_escIdx,1);
   escSyncYRefrescar();
   cerrar('mEscritura');

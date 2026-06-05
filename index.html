@@ -36469,14 +36469,14 @@ function _agregarMensajeIA(texto, rol){
 }
 
 async function _llamarGeminiIA(prompt){
-  const geminiKey = localStorage.getItem('cfg-gemini-25-key') || localStorage.getItem('geminiApiKey') || localStorage.getItem('cfg-gemini-key-inline');
+  const geminiKey = window._geminiKeyCached || localStorage.getItem('lex-gemini-key') || '';
   if(!geminiKey){
-    _agregarMensajeIA('⚠ Configura la API Key de Gemini 2.5 en Configuración → sección Gemini', 'assistant');
+    _agregarMensajeIA('⚠ Configura la API Key de Gemini en ⚙️ Configuración', 'assistant');
     return '';
   }
-  const loadingEl = _agregarMensajeIA('⏳ Analizando con Gemini 2.5...', 'assistant');
+  const loadingEl = _agregarMensajeIA('⏳ Analizando con Gemini...', 'assistant');
   try{
-    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=' + geminiKey, {
+    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + encodeURIComponent(geminiKey), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
@@ -36492,10 +36492,10 @@ async function _llamarGeminiIA(prompt){
 }
 
 async function _llamarGeminiIADirecto(prompt){
-  const geminiKey = localStorage.getItem('cfg-gemini-25-key') || localStorage.getItem('geminiApiKey') || localStorage.getItem('cfg-gemini-key-inline');
-  if(!geminiKey) return '⚠ Configura la API Key de Gemini 2.5 en Configuración';
+  const geminiKey = window._geminiKeyCached || localStorage.getItem('lex-gemini-key') || '';
+  if(!geminiKey) return '⚠ Configura la API Key de Gemini en ⚙️ Configuración';
   try{
-    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=' + geminiKey, {
+    const resp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + encodeURIComponent(geminiKey), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })

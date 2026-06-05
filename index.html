@@ -20196,19 +20196,7 @@ function cerrarAdminModal() {
   // Ocultar el overlay
   document.getElementById('adminModalOv').classList.remove('show');
   // Limpiar TODAS las zonas para que la próxima apertura inicie limpia
-  // Sin esto, una zona secundaria abierta bloquea la UI al re-abrir
-  var zonas = [
-    'adminBorrarEspecZone',
-    'adminGestionRecibosZone',
-    'adminEditarCobrosZone',
-    'adminEditarMovDesdeEditarZone',
-    'adminHistoricosZone',
-    'adminConsultarPDFZone'
-  ];
-  zonas.forEach(function(id){
-    var el = document.getElementById(id);
-    if(el) el.classList.remove('show');
-  });
+  document.querySelectorAll('#adminModal .admin-panel').forEach(function(z){ z.style.display = ''; z.classList.remove('show'); });
   // Restaurar panel principal visible para próxima apertura
   // (solo si ya hay sesión activa — si no, se muestra el login)
   if(adminSesionActiva){
@@ -20527,10 +20515,7 @@ function adminLogin() {
 }
 function adminMostrarPanel() {
   document.getElementById('adminAuthZone').style.display = 'none';
-  document.getElementById('adminBorrarEspecZone').classList.remove('show');
-  var _gz = document.getElementById('adminGestionRecibosZone'); if(_gz) _gz.classList.remove('show');
-  var _gz2 = document.getElementById('adminEditarCobrosZone'); if(_gz2) _gz2.classList.remove('show');
-  var _gz3 = document.getElementById('adminEditarMovDesdeEditarZone'); if(_gz3) _gz3.classList.remove('show');
+  document.querySelectorAll('#adminModal .admin-panel').forEach(function(z){ z.style.display = ''; z.classList.remove('show'); });
   document.getElementById('adminPanelZone').classList.add('show');
   document.getElementById('adminSessionUser').textContent = adminSesionUsuario;
   document.getElementById('adminSessionTime').textContent = 'desde ' + adminSesionHora;
@@ -21372,10 +21357,7 @@ function adminAbrirBorrarEspecifico() {
   adminRenderMovimientos('');
 }
 function adminVolverPanel() {
-  ['adminBorrarEspecZone','adminBorrarFechaZone','adminEditarCobrosZone','adminEditarMovDesdeEditarZone','adminHistoricosZone','adminCapturaMesZone','adminConsultarPDFZone'].forEach(function(id){
-    var el = document.getElementById(id);
-    if(el) el.classList.remove('show');
-  });
+  document.querySelectorAll('#adminModal .admin-panel').forEach(function(z){ z.style.display = ''; z.classList.remove('show'); });
   adminMostrarPanel();
 }
 function adminFiltrarMovimientos() {
@@ -27183,18 +27165,16 @@ function auditoriaRegistrar(tipo, detalle) {
   }
 })();
 function adminAbrirAuditoria() {
-  // Mostrar zona
-  document.querySelectorAll('#adminModal .admin-panel').forEach(z => z.style.display = 'none');
+  document.querySelectorAll('#adminModal .admin-panel').forEach(z => { z.style.display = ''; z.classList.remove('show'); });
   const zona = document.getElementById('adminAuditoriaZone');
-  if (zona) { zona.style.display = 'block'; zona.classList.add('show'); }
+  if (zona) zona.classList.add('show');
   document.getElementById('auditoria-buscar').value = '';
   document.getElementById('auditoria-tipo').value = '';
   auditoriaFiltrar();
 }
 function adminVolverDesdeAuditoria() {
-  document.querySelectorAll('#adminModal .admin-panel').forEach(z => { z.style.display = 'none'; z.classList.remove('show'); });
-  const panel = document.getElementById('adminPanelZone');
-  if (panel) { panel.style.display = 'block'; panel.classList.add('show'); }
+  document.querySelectorAll('#adminModal .admin-panel').forEach(z => { z.style.display = ''; z.classList.remove('show'); });
+  adminMostrarPanel();
 }
 function auditoriaFiltrar() {
   const q    = (document.getElementById('auditoria-buscar')?.value || '').toLowerCase().trim();

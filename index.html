@@ -11568,17 +11568,18 @@ function _acuerdosClave(juicioId) {
 // Cargar acuerdos guardados del juicio
 // Intenta Supabase primero (campo acuerdos_drive), cae a localStorage como fallback
 async function cargarAcuerdosDrive(juicioId) {
-  if (!juicioId) return [];
+  if (juicioId === undefined || juicioId === null || juicioId === '') return [];
   // Fallback: localStorage siempre disponible
   const lsKey = 'lex_acuerdos_' + juicioId;
   let lsData = [];
   try { lsData = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e) {}
-  if (!window.SB) return lsData;
+  // IDs locales (número o 'idx_N') no son UUIDs de Supabase — solo localStorage
+  const esIdLocal = typeof juicioId === 'number' || (typeof juicioId === 'string' && /^idx_/.test(juicioId));
+  if (!window.SB || esIdLocal) return lsData;
   try {
-    const { data, error } = await window.SB.from('juicios').select('acuerdos_drive').eq('id', juicioId).single();
+    const { data, error } = await window.SB.from('juicios').select('acuerdos_drive').eq('id', juicioId).maybeSingle();
     if (!error && data && data.acuerdos_drive) {
       const sbData = JSON.parse(data.acuerdos_drive);
-      // Supabase tiene datos: sincronizar a localStorage y retornar
       try { localStorage.setItem(lsKey, JSON.stringify(sbData)); } catch(e) {}
       return sbData;
     }
@@ -11588,10 +11589,11 @@ async function cargarAcuerdosDrive(juicioId) {
 
 // Guardar acuerdos — escribe en localStorage y en Supabase (si disponible)
 async function guardarAcuerdosDrive(juicioId, lista) {
-  if (!juicioId) return;
+  if (juicioId === undefined || juicioId === null || juicioId === '') return;
   const lsKey = 'lex_acuerdos_' + juicioId;
   try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e) {}
-  if (!window.SB) return;
+  const esIdLocal = typeof juicioId === 'number' || (typeof juicioId === 'string' && /^idx_/.test(juicioId));
+  if (!window.SB || esIdLocal) return;
   try {
     await window.SB.from('juicios').update({ acuerdos_drive: JSON.stringify(lista) }).eq('id', juicioId);
   } catch(e) { console.warn('[Acuerdos] Error guardando en Supabase (ok, guardado en localStorage):', e.message); }
@@ -11686,7 +11688,7 @@ async function subirAcuerdoDriveFiles(files) {
       let geminiKey = '';
       try {
         if (window.SB) {
-          const { data } = await window.SB.from('configuracion').select('valor').eq('id','gemini_key').single();
+          const { data } = await window.SB.from('configuracion').select('valor').eq('id','gemini_api_key').maybeSingle();
           if (data && data.valor) geminiKey = data.valor;
         }
         if (!geminiKey) geminiKey = localStorage.getItem('gemini_api_key') || '';
@@ -11878,7 +11880,7 @@ function verResumenAcuerdo(ac) {
 // Inicializar panel de acuerdos al abrir un juicio
 async function initAcuerdosDrive(juicioId) {
   // Usar siempre un ID estable: preferir Supabase id, fallback a índice numérico
-  const jId = (typeof juicioId === 'string' || (typeof juicioId === 'number' && juicioId > 0)) ? juicioId : (_mexpIdx >= 0 ? 'idx_' + _mexpIdx : 'idx_0');
+  const jId = (typeof juicioId === 'string' || (typeof juicioId === 'number' && juicioId >= 0)) ? juicioId : (_mexpIdx >= 0 ? 'idx_' + _mexpIdx : 'idx_0');
   window._jdetId = jId;
   const lista = await cargarAcuerdosDrive(jId);
   renderAcuerdosDrive(lista);
@@ -34606,6 +34608,13 @@ try{ localStorage.setItem('drive_token',               data.access_token); } cat
 console.log('[Drive] ✅ Token renovado');
         return data.access_token;
       }
+    } else if(resp.status === 400){
+      // Refresh token inválido o revocado — limpiar para no reintentar en bucle
+      console.warn('[Drive] Refresh token inválido (400). Limpiando — reconecta en Panel Admin.');
+      try{ localStorage.removeItem('lex-drive-refresh-token'); } catch(e){}
+      try{ localStorage.removeItem('lex-drive-token'); } catch(e){}
+      try{ localStorage.removeItem('lex-drive-token-saved-at'); } catch(e){}
+      return '';
     }
   }catch(e){console.warn('[Drive] Error renovando:', e.message);}
   // Fallback: token guardado aunque sea viejo

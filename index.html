@@ -2765,6 +2765,32 @@ window.addEventListener('offline', ()=>{
 </script>
 </head>
 <body>
+<!-- ══ SPLASH DE CARGA — oculta la app hasta confirmar sesión ══ -->
+<div id="lex-splash" style="
+  position:fixed;inset:0;z-index:99999;
+  background:#1a1008;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  font-family:'DM Mono',monospace;
+  transition:opacity 0.35s ease;
+">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:44px;height:44px;border-radius:10px;background:#c8952a;display:flex;align-items:center;justify-content:center;">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#1a1008" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    </div>
+    <div>
+      <div style="font-size:1.25rem;font-weight:700;color:#fdfaf4;letter-spacing:0.06em;">LEX·MÉXICO</div>
+      <div style="font-size:0.6rem;color:#c8952a;letter-spacing:0.18em;text-transform:uppercase;margin-top:2px;">Sistema Integral</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:7px;align-items:center;">
+    <div class="lex-splash-dot" style="width:7px;height:7px;border-radius:50%;background:#c8952a;animation:lexSplashPulse 1.2s ease-in-out infinite;"></div>
+    <div class="lex-splash-dot" style="width:7px;height:7px;border-radius:50%;background:#c8952a;animation:lexSplashPulse 1.2s ease-in-out 0.2s infinite;"></div>
+    <div class="lex-splash-dot" style="width:7px;height:7px;border-radius:50%;background:#c8952a;animation:lexSplashPulse 1.2s ease-in-out 0.4s infinite;"></div>
+  </div>
+</div>
+<style>
+@keyframes lexSplashPulse{0%,80%,100%{opacity:0.25;transform:scale(0.85);}40%{opacity:1;transform:scale(1.15);}}
+</style>
 <div style="display:flex;min-height:100vh;">
 <!-- SIDEBAR -->
 <nav class="sidebar">
@@ -6007,7 +6033,15 @@ function iniciarDriveAuth() {
   mostrarLoginSupabase();
 }
 // Modal de login con Supabase (email + password)
+function _lexSplashOcultar(){
+  var s = document.getElementById('lex-splash');
+  if(!s) return;
+  s.style.opacity = '0';
+  setTimeout(function(){ if(s && s.parentNode) s.parentNode.removeChild(s); }, 380);
+}
 function mostrarLoginSupabase(){
+  // Ocultar splash antes de mostrar login
+  _lexSplashOcultar();
   // Cierra otros modales
   document.querySelectorAll('.modal-overlay.show, .modal.show').forEach(m => m.classList.remove('show'));
   let modal = document.getElementById('sb-login-modal');
@@ -17406,6 +17440,8 @@ const _despachoRestaurado = await obtenerDespachoActivo();
       if(!_despachoRestaurado) return;
       actualizarAmbossBadges(true);
       await sincronizarFolio();
+      // Ocultar splash — sesión confirmada, app lista
+      _lexSplashOcultar();
       // Mostrar botones según rol al restaurar sesión
       const _btnCS2 = document.getElementById('btn-cerrar-sesion'); if(_btnCS2) _btnCS2.style.display = 'block';
       const _esAdm2 = empleadoActual.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
@@ -17417,6 +17453,7 @@ const _despachoRestaurado = await obtenerDespachoActivo();
       sbSession = null;
       sbExpiry = 0;
       load(); // solo en modo offline
+      // Splash se ocultará en mostrarLoginSupabase()
     }
   } catch(e){
     console.warn('[SB] init onload:', e);
@@ -17428,12 +17465,10 @@ const _despachoRestaurado = await obtenerDespachoActivo();
   // PARCHE: migración hardcodeada del recibo #120 DESACTIVADA (causa pérdida de datos)
   setTimeout(()=>{ if(typeof migrarConceptoCostosExtra==='function') migrarConceptoCostosExtra(); }, 900);
   setTimeout(()=>{ if(typeof migrarMovimientosRecibos==='function') migrarMovimientosRecibos(); }, 1600);
-  // Mostrar modal de login solo si no hay sesión activa
-  setTimeout(()=>{
-    if(!sbSession || Date.now()>=sbExpiry){
-      mostrarLoginSupabase();
-    }
-  }, 800);
+  // Login se muestra desde el flujo del splash (no necesita delay)
+  if(!sbSession || Date.now()>=sbExpiry){
+    mostrarLoginSupabase();
+  }
   verificarLogin();
   reloj();
   setInterval(reloj,1000);
@@ -35065,7 +35100,7 @@ function regresarAlFormulario(){
 
       <div style="flex:1;max-height:10px;"></div>
 
-      <button id="ficha-btn-exp-digital" onclick="" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #4a6ea8;background:#e6f1fb;color:#1a3a70;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#c8dcf4'" onmouseout="this.style.background='#e6f1fb'">
+      <button id="ficha-btn-exp-digital" disabled title="Próximamente" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #a0b8d8;background:#f0f5fc;color:#8090a8;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:not-allowed;width:100%;text-align:left;opacity:0.55;">
         <span style="font-size:15px;line-height:1;">📋</span>Exp. Digital
       </button>
 
@@ -35339,9 +35374,12 @@ function abrirFichaFolio(){
   }
   // Botón gasto extraoficial
   var btnGasto=document.getElementById('fichaBtnGasto');
-  if(btnGasto){
-    btnGasto.style.display=liquidado?'none':'';
-  }
+  if(btnGasto) btnGasto.style.display=liquidado?'none':'';
+  // Botones de pago: ocultar si ya está liquidado (mostrarían error "sin saldo")
+  var btnPP=document.getElementById('ficha-btn-pago-parcial');
+  var btnPT=document.getElementById('ficha-btn-pago-total');
+  if(btnPP) btnPP.style.display=liquidado?'none':'';
+  if(btnPT) btnPT.style.display=liquidado?'none':'';
   // Badge modo lectura
   var badgeLiq=document.getElementById('ficha-badge-liquidado');
   if(badgeLiq) badgeLiq.style.display=liquidado?'inline-block':'none';
@@ -35523,6 +35561,7 @@ function fichaImprimirHistorial(){
     gastosHTML+='<tr><td>'+(celdas[0]?celdas[0].textContent.trim():'')+'</td><td>'+(celdas[1]?celdas[1].textContent.trim():'')+'</td><td>'+(celdas[2]?celdas[2].textContent.trim():'')+'</td></tr>';
   });
   var win=window.open('','_blank','width=800,height=900');
+  if(!win){if(typeof toast==='function')toast('El navegador bloqueó la ventana de impresión — permite ventanas emergentes e intenta de nuevo','err');return;}
   win.document.write('<!DOCTYPE html><html><head><meta charset=UTF-8><title>Historial '+folio+'</title>'
     +'<style>body{font-family:monospace;padding:32px;color:#1a1008;background:#fdfaf4;font-size:12px;}h1{font-size:16px;color:#c8952a;border-bottom:2px solid #c8952a;padding-bottom:8px;margin-bottom:16px;}.header{display:grid;grid-template-columns:1fr auto;gap:10px;background:#f5f0e0;padding:12px 16px;border-radius:6px;border:1px solid #d4b870;margin-bottom:16px;}.label{font-size:9px;color:#7a6840;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;}.val{font-size:14px;font-weight:700;}.notas{background:#fffdf5;border:1px solid #e0d4a8;border-radius:4px;padding:10px;margin-bottom:16px;font-size:11px;line-height:1.6;}.sec{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#7a6840;margin-bottom:8px;}table{width:100%;border-collapse:collapse;margin-bottom:16px;}th{font-size:9px;font-weight:700;text-transform:uppercase;color:#7a6840;padding:6px 8px;border-bottom:1px solid #d4b870;text-align:left;background:#f5f0e0;}td{padding:6px 8px;border-bottom:1px solid #ecdfa8;font-size:11px;}.tots{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;background:#f5f0e0;border:1px solid #d4b870;border-radius:6px;padding:10px 14px;}.tl{font-size:9px;color:#7a6840;text-transform:uppercase;}.tv{font-size:13px;font-weight:700;}.foot{margin-top:24px;border-top:1px solid #d4b870;padding-top:12px;font-size:10px;color:#7a6840;text-align:center;}</style></head><body>'
     +'<h1>HISTORIAL DEL FOLIO - '+folio+'</h1>'

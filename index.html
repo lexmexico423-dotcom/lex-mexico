@@ -8282,6 +8282,44 @@ async function activarModoConsulta(recibo){
         }
       } catch(_e){ console.warn('[activarModoConsulta] SB Storage:', _e); }
     }
+    // ── Fallback: intentar versiones anteriores del mismo folio (B→A, C→B→A…) ──
+    // Ocurre cuando la subida del PDF de la última versión falló silenciosamente.
+    if(!_cargado){
+      var _versiones=((typeof appData!=='undefined'&&appData.recibos)||[])
+        .filter(function(r){ return r.folio===recibo.folio&&!r.esComplemento&&r.archivo&&r.archivo!==recibo.archivo; })
+        .sort(function(a,b){ return (b.letra||'A').localeCompare(a.letra||'A'); });
+      for(var _vi=0;_vi<_versiones.length&&!_cargado;_vi++){
+        var _rv=_versiones[_vi];
+        var _rvPathR2=window.SB_DESPACHO_ID+'/recibos/'+(_rv.archivoR2||_rv.archivo);
+        var _rvPathSB=window.SB_DESPACHO_ID+'/recibos/'+_rv.archivo;
+        if(typeof window.descargarR2==='function'){
+          try{
+            var _rvBlob=await window.descargarR2(_rvPathR2,'recibos');
+            if(_rvBlob&&_rvBlob.size>0){
+              var _rvUrl=URL.createObjectURL(_rvBlob);
+              iframe._blobUrl=_rvUrl; iframe.src=_rvUrl+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
+              setStatus('ok','PDF versión '+(_rv.letra||'A')+' cargado (versión más reciente no disponible)','ok');
+              _cargado=true;
+            }
+          }catch(_e2){}
+        }
+        if(!_cargado&&window.SB){
+          try{
+            var _rvSd=await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_rvPathSB,120);
+            if(!_rvSd.error&&_rvSd.data&&_rvSd.data.signedUrl){
+              var _rvRes=await fetch(_rvSd.data.signedUrl);
+              if(_rvRes.ok){
+                var _rvBlob2=await _rvRes.blob();
+                var _rvUrl2=URL.createObjectURL(_rvBlob2);
+                iframe._blobUrl=_rvUrl2; iframe.src=_rvUrl2+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
+                setStatus('ok','PDF versión '+(_rv.letra||'A')+' cargado (versión más reciente no disponible)','ok');
+                _cargado=true;
+              }
+            }
+          }catch(_e3){}
+        }
+      }
+    }
     if(!_cargado){
       setStatus('err','No se encontró el PDF del folio #'+String(recibo.folio).padStart(4,'0'),'err');
     }

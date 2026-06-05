@@ -35100,7 +35100,7 @@ function regresarAlFormulario(){
 
       <div style="flex:1;max-height:10px;"></div>
 
-      <button id="ficha-btn-exp-digital" onclick="" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #4a6ea8;background:#e6f1fb;color:#1a3a70;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#c8dcf4'" onmouseout="this.style.background='#e6f1fb'">
+      <button id="ficha-btn-exp-digital" disabled title="Próximamente" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #a0b8d8;background:#f0f5fc;color:#8090a8;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:not-allowed;width:100%;text-align:left;opacity:0.55;">
         <span style="font-size:15px;line-height:1;">📋</span>Exp. Digital
       </button>
 
@@ -35374,9 +35374,12 @@ function abrirFichaFolio(){
   }
   // Botón gasto extraoficial
   var btnGasto=document.getElementById('fichaBtnGasto');
-  if(btnGasto){
-    btnGasto.style.display=liquidado?'none':'';
-  }
+  if(btnGasto) btnGasto.style.display=liquidado?'none':'';
+  // Botones de pago: ocultar si ya está liquidado (mostrarían error "sin saldo")
+  var btnPP=document.getElementById('ficha-btn-pago-parcial');
+  var btnPT=document.getElementById('ficha-btn-pago-total');
+  if(btnPP) btnPP.style.display=liquidado?'none':'';
+  if(btnPT) btnPT.style.display=liquidado?'none':'';
   // Badge modo lectura
   var badgeLiq=document.getElementById('ficha-badge-liquidado');
   if(badgeLiq) badgeLiq.style.display=liquidado?'inline-block':'none';
@@ -35558,6 +35561,7 @@ function fichaImprimirHistorial(){
     gastosHTML+='<tr><td>'+(celdas[0]?celdas[0].textContent.trim():'')+'</td><td>'+(celdas[1]?celdas[1].textContent.trim():'')+'</td><td>'+(celdas[2]?celdas[2].textContent.trim():'')+'</td></tr>';
   });
   var win=window.open('','_blank','width=800,height=900');
+  if(!win){if(typeof toast==='function')toast('El navegador bloqueó la ventana de impresión — permite ventanas emergentes e intenta de nuevo','err');return;}
   win.document.write('<!DOCTYPE html><html><head><meta charset=UTF-8><title>Historial '+folio+'</title>'
     +'<style>body{font-family:monospace;padding:32px;color:#1a1008;background:#fdfaf4;font-size:12px;}h1{font-size:16px;color:#c8952a;border-bottom:2px solid #c8952a;padding-bottom:8px;margin-bottom:16px;}.header{display:grid;grid-template-columns:1fr auto;gap:10px;background:#f5f0e0;padding:12px 16px;border-radius:6px;border:1px solid #d4b870;margin-bottom:16px;}.label{font-size:9px;color:#7a6840;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;}.val{font-size:14px;font-weight:700;}.notas{background:#fffdf5;border:1px solid #e0d4a8;border-radius:4px;padding:10px;margin-bottom:16px;font-size:11px;line-height:1.6;}.sec{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#7a6840;margin-bottom:8px;}table{width:100%;border-collapse:collapse;margin-bottom:16px;}th{font-size:9px;font-weight:700;text-transform:uppercase;color:#7a6840;padding:6px 8px;border-bottom:1px solid #d4b870;text-align:left;background:#f5f0e0;}td{padding:6px 8px;border-bottom:1px solid #ecdfa8;font-size:11px;}.tots{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;background:#f5f0e0;border:1px solid #d4b870;border-radius:6px;padding:10px 14px;}.tl{font-size:9px;color:#7a6840;text-transform:uppercase;}.tv{font-size:13px;font-weight:700;}.foot{margin-top:24px;border-top:1px solid #d4b870;padding-top:12px;font-size:10px;color:#7a6840;text-align:center;}</style></head><body>'
     +'<h1>HISTORIAL DEL FOLIO - '+folio+'</h1>'

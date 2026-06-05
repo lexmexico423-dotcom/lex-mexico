@@ -2917,6 +2917,15 @@ window.addEventListener('offline', ()=>{
         </div>
         <!-- TARJETAS VISUALES -->
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:12px;margin-top:4px;">
+          <!-- 0. Reconectar Google Drive -->
+          <div onclick="driveIniciarOAuth()" style="position:relative;background:rgba(66,133,244,0.1);border:1.5px solid rgba(66,133,244,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#4285f4';this.style.boxShadow='0 8px 20px rgba(66,133,244,0.3)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(66,133,244,0.35)';this.style.boxShadow=''">
+            <div style="width:60px;height:60px;border-radius:14px;background:#1a3a6a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">🔗</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a8c8ff;text-align:center;line-height:1.3;">Reconectar<br>Drive</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(100,160,255,0.6);text-align:center;line-height:1.4;padding:0 4px;">Autoriza Drive con permiso de escritura para subir acuerdos PDF a la carpeta LEX-MEXICO/Juicios</div>
+            <div id="admin-drive-scope-badge" style="font-family:monospace;font-size:0.52rem;padding:2px 8px;border-radius:6px;background:rgba(66,133,244,0.2);color:#a8c8ff;">drive.file ✓</div>
+          </div>
           <!-- 1. Desbloquear Caja -->
           <div onclick="adminDesbloquearCaja()" style="position:relative;background:rgba(43,170,90,0.12);border:1.5px solid rgba(43,170,90,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
                onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#2baa5a';this.style.boxShadow='0 8px 20px rgba(43,170,90,0.25)'"
@@ -4741,7 +4750,7 @@ window.addEventListener('offline', ()=>{
         <div style="display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--border-l);flex-shrink:0;">
           <div style="padding:10px 18px;border-right:1px solid var(--border-l);">
             <div id="mexp-stat-docs" style="font-size:1.25rem;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace;">—</div>
-            <div style="font-size:0.62rem;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:0.08em;">Docs en R2</div>
+            <div style="font-size:0.62rem;color:var(--muted);margin-top:1px;text-transform:uppercase;letter-spacing:0.08em;">Acuerdos en Drive</div>
           </div>
           <div style="padding:10px 18px;border-right:1px solid var(--border-l);">
             <div id="mexp-stat-hist" style="font-size:1.25rem;font-weight:700;color:var(--ink);font-family:'JetBrains Mono',monospace;">—</div>
@@ -4760,14 +4769,25 @@ window.addEventListener('offline', ()=>{
         <!-- CUERPO 3 COLUMNAS -->
         <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);flex:1;overflow:hidden;min-height:0;">
 
-          <!-- ── COL 1: DOCUMENTOS R2 ── -->
+          <!-- ── COL 1: ACUERDOS EN DRIVE ── -->
           <div style="border-right:1px solid var(--border-l);display:flex;flex-direction:column;overflow:hidden;">
             <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border-l);flex-shrink:0;">
-              <span style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);font-weight:700;">Documentos R2</span>
-              <label style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;border:1px solid var(--border-l);background:var(--gold-bg);color:var(--gold-d);font-size:0.62rem;cursor:pointer;font-weight:700;" title="Subir PDF a R2">
-                ＋ Subir
-                <input type="file" id="r2-file-input" accept="application/pdf" style="display:none;" onchange="subirDocR2(this)">
+              <span style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);font-weight:700;">&#128194; Acuerdos en Drive</span>
+              <label style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;border:1px solid var(--border-l);background:var(--gold-bg);color:var(--gold-d);font-size:0.62rem;cursor:pointer;font-weight:700;" title="Subir acuerdo PDF a Drive">
+                &#65291; Subir
+                <input type="file" id="acuerdo-file-input" accept="application/pdf" multiple style="display:none;" onchange="subirAcuerdoDrive(this)">
               </label>
+            </div>
+            <div id="acuerdo-dropzone" style="margin:10px 12px;border:1.5px dashed var(--border-l);border-radius:8px;padding:14px 10px;text-align:center;cursor:pointer;flex-shrink:0;"
+              ondragover="event.preventDefault();this.style.background='var(--gold-bg)'"
+              ondragleave="this.style.background=''"
+              ondrop="event.preventDefault();this.style.background='';subirAcuerdoDriveFiles(event.dataTransfer.files)">
+              <div style="font-size:1.4rem;">&#128196;</div>
+              <div style="font-size:0.66rem;color:var(--muted);margin-top:4px;">Arrastra PDFs de acuerdos o usa &ldquo;&#65291; Subir&rdquo;</div>
+            </div>
+            <div id="acuerdo-procesando" style="display:none;padding:8px 12px;background:rgba(200,149,42,0.07);border-bottom:1px solid var(--border-l);font-size:0.65rem;color:var(--gold-d);align-items:center;gap:7px;flex-shrink:0;">
+              <span style="display:inline-block;width:10px;height:10px;border:2px solid var(--gold-d);border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></span>
+              <span id="acuerdo-procesando-txt">Procesando con IA&hellip;</span>
             </div>
             <div id="mexp-r2-lista" style="flex:1;overflow-y:auto;padding:10px 12px;"></div>
           </div>
@@ -4906,10 +4926,12 @@ window.addEventListener('offline', ()=>{
       <div class="search-row">
         <input class="search-inp" placeholder="🔍 Buscar pendiente..." id="pendQ" oninput="renderPend()">
         <button class="btn btn-primary" onclick="abrirPendiente()">＋ Nuevo</button>
-        <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#2d5a1b;border:1px solid #4a8a2a;color:#a8e87a;border-radius:7px;" onclick="abrirPanelEstado('oax',this)">🌿 Oaxaca</button>
-        <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#1a3a6a;border:1px solid #2a5aaa;color:#7ab8f0;border-radius:7px;" onclick="abrirPanelEstado('mex',this)">🏔 Edo. Méx.</button>
-        <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#5a1a1a;border:1px solid #aa2a2a;color:#f07a7a;border-radius:7px;" onclick="abrirPanelEstado('cdmx',this)">🏙 CDMX</button>
-        <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#4a2a0a;border:1px solid #8a5a1a;color:#f0b860;border-radius:7px;" onclick="abrirPanelEstado('mich',this)">🎸 Michoacán</button>
+        <div id="placas-estado-btns" style="display:none;gap:6px;flex-wrap:wrap;">
+          <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#2d5a1b;border:1px solid #4a8a2a;color:#a8e87a;border-radius:7px;" onclick="abrirPanelEstado('oax',this)">🌿 Oaxaca</button>
+          <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#1a3a6a;border:1px solid #2a5aaa;color:#7ab8f0;border-radius:7px;" onclick="abrirPanelEstado('mex',this)">🏔 Edo. Méx.</button>
+          <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#5a1a1a;border:1px solid #aa2a2a;color:#f07a7a;border-radius:7px;" onclick="abrirPanelEstado('cdmx',this)">🏙 CDMX</button>
+          <button class="btn pnl-estado-btn" style="font-size:0.72rem;padding:6px 13px;background:#4a2a0a;border:1px solid #8a5a1a;color:#f0b860;border-radius:7px;" onclick="abrirPanelEstado('mich',this)">🎸 Michoacán</button>
+        </div>
       </div>
 
       <!-- ══ MODAL PANEL DE ESTADOS ══════════════════════════════════════════════════ -->
@@ -11527,6 +11549,344 @@ window.borrarR2 = async function(path, bucket) {
   } catch(e) { console.error('borrarR2 excepcion', e); return false; }
 }
 // ═══ FIN R2 ═══
+// ═══ ACUERDOS EN DRIVE ═══════════════════════════════════════════════════
+// Tabla de tipos de acuerdo detectados por Gemini
+const ACUERDO_TIPOS = {
+  auto:           { label: 'Auto',         color: '#185FA5', bg: '#E6F1FB' },
+  sentencia:      { label: 'Sentencia',    color: '#27500A', bg: '#EAF3DE' },
+  notificacion:   { label: 'Notificación', color: '#633806', bg: '#FAEEDA' },
+  acuerdo:        { label: 'Acuerdo',      color: '#3C3489', bg: '#EEEDFE' },
+  requerimiento:  { label: 'Requerimiento',color: '#712B13', bg: '#FAECE7' },
+  otro:           { label: 'Otro',         color: '#5F5E5A', bg: '#F1EFE8' },
+};
+
+// Clave Supabase para guardar acuerdos del juicio activo
+function _acuerdosClave(juicioId) {
+  return 'acuerdos_drive_' + juicioId;
+}
+
+// Cargar acuerdos guardados del juicio
+// Intenta Supabase primero (campo acuerdos_drive), cae a localStorage como fallback
+async function cargarAcuerdosDrive(juicioId) {
+  if (juicioId === undefined || juicioId === null || juicioId === '') return [];
+  // Fallback: localStorage siempre disponible
+  const lsKey = 'lex_acuerdos_' + juicioId;
+  let lsData = [];
+  try { lsData = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e) {}
+  // IDs locales (número o 'idx_N') no son UUIDs de Supabase — solo localStorage
+  const esIdLocal = typeof juicioId === 'number' || (typeof juicioId === 'string' && /^idx_/.test(juicioId));
+  if (!window.SB || esIdLocal) return lsData;
+  try {
+    const { data, error } = await window.SB.from('juicios').select('acuerdos_drive').eq('id', juicioId).maybeSingle();
+    if (!error && data && data.acuerdos_drive) {
+      const sbData = JSON.parse(data.acuerdos_drive);
+      try { localStorage.setItem(lsKey, JSON.stringify(sbData)); } catch(e) {}
+      return sbData;
+    }
+  } catch(e) { console.warn('[Acuerdos] Supabase no disponible, usando localStorage'); }
+  return lsData;
+}
+
+// Guardar acuerdos — escribe en localStorage y en Supabase (si disponible)
+async function guardarAcuerdosDrive(juicioId, lista) {
+  if (juicioId === undefined || juicioId === null || juicioId === '') return;
+  const lsKey = 'lex_acuerdos_' + juicioId;
+  try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e) {}
+  const esIdLocal = typeof juicioId === 'number' || (typeof juicioId === 'string' && /^idx_/.test(juicioId));
+  if (!window.SB || esIdLocal) return;
+  try {
+    await window.SB.from('juicios').update({ acuerdos_drive: JSON.stringify(lista) }).eq('id', juicioId);
+  } catch(e) { console.warn('[Acuerdos] Error guardando en Supabase (ok, guardado en localStorage):', e.message); }
+}
+
+// Renderizar la lista de acuerdos en el panel
+function renderAcuerdosDrive(lista) {
+  const cont = document.getElementById('mexp-r2-lista');
+  if (!cont) return;
+  // Actualizar KPI
+  const kpi = document.getElementById('mexp-stat-docs');
+  if (kpi) kpi.textContent = lista.filter(a => a.estado !== 'procesando').length;
+
+  if (!lista.length) {
+    cont.innerHTML = '<div style="padding:20px 10px;text-align:center;color:var(--muted);font-size:0.72rem;line-height:1.6;">Sin acuerdos subidos.<br>Arrastra un PDF o usa <strong>＋ Subir</strong>.</div>';
+    return;
+  }
+  // Ordenar por fecha desc
+  const sorted = [...lista].sort((a,b) => {
+    const fa = a.fechaAcuerdo || a.fechaSubida || '';
+    const fb = b.fechaAcuerdo || b.fechaSubida || '';
+    return fb.localeCompare(fa);
+  });
+  cont.innerHTML = '';
+  sorted.forEach(ac => {
+    const tipo = ACUERDO_TIPOS[ac.tipo] || ACUERDO_TIPOS.otro;
+    const card = document.createElement('div');
+    card.style.cssText = 'border:1px solid var(--border-l);border-radius:7px;padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:background 0.12s;';
+    card.onmouseover = () => card.style.background = 'var(--surface2)';
+    card.onmouseleave = () => card.style.background = '';
+    const badgeEstado = ac.estado === 'procesando'
+      ? `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:#FAEEDA;color:#633806;display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:8px;height:8px;border:1.5px solid #BA7517;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></span>IA procesando</span>`
+      : ac.estado === 'error_drive'
+      ? `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:#FCEBEB;color:#A32D2D;">⚠ Sin Drive</span>`
+      : `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:#EAF3DE;color:#27500A;">Listo</span>`;
+    const badgeTipo = `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:${tipo.bg};color:${tipo.color};font-weight:600;">${tipo.label}</span>`;
+    const fechaFmt = ac.fechaAcuerdo ? new Date(ac.fechaAcuerdo + 'T12:00:00').toLocaleDateString('es-MX', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+    card.innerHTML = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;">
+        <div style="font-size:0.72rem;font-weight:600;color:var(--ink);line-height:1.3;flex:1;">${ac.nombre || ac.archivo}</div>
+        <span onclick="event.stopPropagation();verAcuerdoPDF('${ac.driveFileId}','${encodeURIComponent(ac.nombre||ac.archivo)}')" title="Ver PDF" style="font-size:1rem;cursor:pointer;color:var(--muted);flex-shrink:0;">👁</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;margin-top:5px;flex-wrap:wrap;">
+        <span style="font-size:0.62rem;color:var(--muted);">${fechaFmt}</span>
+        ${badgeTipo}
+        ${badgeEstado}
+      </div>`;
+    card.onclick = () => verResumenAcuerdo(ac);
+    cont.appendChild(card);
+  });
+}
+
+// Handler para el input file
+async function subirAcuerdoDrive(input) {
+  if (!input.files || !input.files.length) return;
+  await subirAcuerdoDriveFiles(input.files);
+  input.value = '';
+}
+
+// Subir uno o varios archivos
+async function subirAcuerdoDriveFiles(files) {
+  // _jdetId se establece en initAcuerdosDrive con el ID del juicio activo
+  const jId = window._jdetId || (_mexpIdx >= 0 ? 'idx_' + _mexpIdx : null);
+  if (!jId) { if(typeof toast==='function') toast('⚠ Abre un expediente primero','err'); return; }
+  const proc = document.getElementById('acuerdo-procesando');
+  const procTxt = document.getElementById('acuerdo-procesando-txt');
+
+  let lista = await cargarAcuerdosDrive(jId);
+
+  for (const file of Array.from(files)) {
+    if (file.type !== 'application/pdf') { if(typeof toast==='function') toast('⚠ Solo se aceptan PDFs','err'); continue; }
+
+    // Placeholder mientras procesa
+    const tmpId = 'tmp_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    const tmpAc = { id: tmpId, archivo: file.name, nombre: file.name, estado: 'procesando', tipo: 'otro', fechaSubida: new Date().toISOString().slice(0,10), driveFileId: '', fechaAcuerdo: '', resumen: '' };
+    lista.push(tmpAc);
+    renderAcuerdosDrive(lista);
+
+    if (proc) { proc.style.display = 'flex'; }
+    if (procTxt) procTxt.textContent = 'Leyendo PDF con IA…';
+
+    try {
+      // 1) Leer PDF como base64
+      const b64 = await new Promise((res, rej) => {
+        const reader = new FileReader();
+        reader.onload = e => res(e.target.result.split(',')[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+
+      // 2) Analizar con Gemini para extraer nombre, tipo y fecha
+      let geminiKey = '';
+      try {
+        if (window.SB) {
+          const { data } = await window.SB.from('configuracion').select('valor').eq('id','gemini_api_key').maybeSingle();
+          if (data && data.valor) geminiKey = data.valor;
+        }
+        if (!geminiKey) geminiKey = localStorage.getItem('gemini_api_key') || '';
+      } catch(e) {}
+
+      let nombreIA = file.name.replace(/\.pdf$/i,'');
+      let tipoIA = 'acuerdo';
+      let fechaIA = new Date().toISOString().slice(0,10);
+      let resumenIA = '';
+
+      if (geminiKey) {
+        if (procTxt) procTxt.textContent = 'Gemini analizando acuerdo…';
+        try {
+          const prompt = `Analiza este documento judicial PDF y devuelve SOLO un JSON con estos campos:
+{
+  "nombre": "Nombre descriptivo del acuerdo (ej: Auto admisorio de demanda, Notificación de audiencia inicial)",
+  "tipo": "uno de: auto | sentencia | notificacion | acuerdo | requerimiento | otro",
+  "fecha": "fecha del acuerdo en formato YYYY-MM-DD (busca la fecha del documento, no la de hoy)",
+  "resumen": "resumen ejecutivo en 2-3 oraciones: qué resuelve, partes involucradas, próxima acción requerida"
+}
+Responde SOLO el JSON, sin markdown ni texto adicional.`;
+          const gResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+encodeURIComponent(geminiKey), {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ contents: [{ parts: [
+              { inline_data: { mime_type: 'application/pdf', data: b64 } },
+              { text: prompt }
+            ]}]})
+          });
+          if (gResp.ok) {
+            const gData = await gResp.json();
+            const txt = gData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const cleanTxt = txt.replace(/```json|```/g,'').trim();
+            try {
+              const parsed = JSON.parse(cleanTxt);
+              if (parsed.nombre) nombreIA = parsed.nombre;
+              if (parsed.tipo && ACUERDO_TIPOS[parsed.tipo]) tipoIA = parsed.tipo;
+              if (parsed.fecha && /^\d{4}-\d{2}-\d{2}$/.test(parsed.fecha)) fechaIA = parsed.fecha;
+              if (parsed.resumen) resumenIA = parsed.resumen;
+            } catch(e) { console.warn('[Acuerdos] JSON Gemini inválido:', txt); }
+          }
+        } catch(e) { console.warn('[Acuerdos] Error Gemini:', e); }
+      }
+
+      // 3) Subir a Drive
+      if (procTxt) procTxt.textContent = 'Guardando en Drive…';
+      let driveFileId = '';
+      const juicioActivo = D.juicios && D.juicios[typeof jdetIdx !== 'undefined' ? jdetIdx : _mexpIdx];
+      const nombreCarpetaJuicio = (juicioActivo ? (juicioActivo.nombre || juicioActivo.cliente || 'Juicio') + ' - Exp.' + (juicioActivo.expediente || juicioActivo.num || jId) : 'Juicio-' + jId).replace(/[<>:"/\\|?*]/g,'_');
+      const nombreArchivoDrive = fechaIA + ' ' + nombreIA.replace(/[<>:"/\\|?*]/g,'_') + '.pdf';
+
+      try {
+        const token = await driveGetAccessToken();
+        if (!token) throw new Error('Sin token de Drive — reconecta en Panel Admin');
+        const DRIVE_JUICIOS_FOLDER_ID = '1TtVVL0Jbw6BFkwLw8Wo1LZfxLN0I_ndU';
+        const carpetaAcuerdosId = await driveObtenerOCrearCarpeta(token, 'Acuerdos', await driveObtenerOCrearCarpeta(token, nombreCarpetaJuicio, DRIVE_JUICIOS_FOLDER_ID));
+        const metadata = { name: nombreArchivoDrive, parents: [carpetaAcuerdosId], mimeType: 'application/pdf' };
+        const boundary = 'boundary_lex_acuerdos';
+        const bodyArr = [`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/pdf\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64}\r\n--${boundary}--`];
+        const uploadResp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{
+          method:'POST', headers:{ Authorization:'Bearer '+token, 'Content-Type':'multipart/related; boundary='+boundary }, body: bodyArr.join('')
+        });
+        if (uploadResp.ok) {
+          const ud = await uploadResp.json();
+          driveFileId = ud.id || '';
+        } else {
+          const errTxt = await uploadResp.text().catch(()=>'');
+          throw new Error('Drive HTTP ' + uploadResp.status + ' — ' + errTxt.slice(0,80));
+        }
+      } catch(e) {
+        console.error('[Acuerdos] Error subiendo a Drive:', e.message);
+        if(typeof toast==='function') toast('⚠ No se pudo subir a Drive: ' + e.message, 'err');
+      }
+
+      // 4) Actualizar lista: reemplazar placeholder
+      const idx = lista.findIndex(a => a.id === tmpId);
+      const acFinal = { id: tmpId, archivo: file.name, nombre: nombreIA, tipo: tipoIA, estado: driveFileId ? 'listo' : 'error_drive', fechaSubida: new Date().toISOString().slice(0,10), fechaAcuerdo: fechaIA, resumen: resumenIA, driveFileId };
+      if (idx >= 0) lista[idx] = acFinal; else lista.push(acFinal);
+
+      // 5) Agregar al historial cronológico automáticamente
+      await agregarEntradaHistorialDesdeAcuerdo(jId, acFinal);
+
+    } catch(e) {
+      console.error('[Acuerdos] Error procesando:', e);
+      const idx = lista.findIndex(a => a.id === tmpId);
+      if (idx >= 0) { lista[idx].estado = 'error'; lista[idx].nombre = 'Error: ' + file.name; }
+      if(typeof toast==='function') toast('❌ Error procesando ' + file.name,'err');
+    }
+
+    await guardarAcuerdosDrive(jId, lista);
+    renderAcuerdosDrive(lista);
+  }
+
+  if (proc) proc.style.display = 'none';
+  if(typeof toast==='function') toast('✅ Acuerdo(s) procesado(s) y guardados en Drive','ok');
+}
+
+// Obtener o crear carpeta en Drive (devuelve el ID)
+async function driveObtenerOCrearCarpeta(token, nombre, parentId) {
+  const q = "mimeType='application/vnd.google-apps.folder' and name='" + nombre.replace(/'/g,"\\'") + "' and trashed=false" + (parentId ? " and '" + parentId + "' in parents" : '');
+  const buscaResp = await fetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&fields=files(id,name)&pageSize=1', { headers:{ Authorization:'Bearer '+token } });
+  if (buscaResp.ok) {
+    const buscaData = await buscaResp.json();
+    if (buscaData.files && buscaData.files.length) return buscaData.files[0].id;
+  }
+  // No existe: crear
+  const meta = { name: nombre, mimeType: 'application/vnd.google-apps.folder' };
+  if (parentId) meta.parents = [parentId];
+  const crearResp = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', { method:'POST', headers:{ Authorization:'Bearer '+token, 'Content-Type':'application/json' }, body: JSON.stringify(meta) });
+  if (crearResp.ok) { const d = await crearResp.json(); return d.id; }
+  throw new Error('No se pudo crear carpeta: ' + nombre);
+}
+
+// Agregar entrada al historial cronológico desde un acuerdo analizado
+async function agregarEntradaHistorialDesdeAcuerdo(juicioId, ac) {
+  // Agregar al historial local del juicio (campo historial en D.juicios)
+  // No requiere tabla extra en Supabase
+  try {
+    const idxJuicio = typeof _mexpIdx !== 'undefined' && _mexpIdx >= 0 ? _mexpIdx :
+      (typeof jdetIdx !== 'undefined' && jdetIdx >= 0 ? jdetIdx : -1);
+    if (idxJuicio >= 0 && D && D.juicios && D.juicios[idxJuicio]) {
+      const j = D.juicios[idxJuicio];
+      if (!Array.isArray(j.historial)) j.historial = [];
+      // Evitar duplicados por nombre del acuerdo
+      const yaTiene = j.historial.some(function(h){ return h.texto === ac.nombre; });
+      if (!yaTiene) {
+        j.historial.push({
+          id: 'HJ-ACU-' + Date.now(),
+          fecha: ac.fechaAcuerdo || new Date().toISOString().slice(0,10),
+          tipo: 'acuerdo',
+          texto: ac.nombre,
+          detalle: ac.resumen || '',
+          driveFileId: ac.driveFileId || '',
+          r2path: ac.r2path || ''
+        });
+        // Refrescar panel historial
+        if (typeof renderHistorialModal === 'function') renderHistorialModal();
+        const histCount = j.historial.length;
+        const el = document.getElementById('mexp-stat-hist');
+        if (el) el.textContent = histCount || '0';
+        // Persistir
+        if (typeof saveJuicios === 'function') saveJuicios();
+        if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
+      }
+    }
+  } catch(e) { console.warn('[Acuerdos] Error en historial local:', e); }
+}
+
+// Abrir visualizador PDF de un acuerdo — intenta Drive, cae a R2
+async function verAcuerdoPDF(driveFileId, encodedNombre) {
+  const nombre = decodeURIComponent(encodedNombre || 'Acuerdo.pdf');
+  let blob = null;
+  // 1) Intentar desde Drive si hay ID
+  if (driveFileId && driveFileId !== 'undefined' && driveFileId !== '') {
+    try {
+      const token = await driveGetAccessToken();
+      if (token) {
+        const resp = await fetch('https://www.googleapis.com/drive/v3/files/' + driveFileId + '?alt=media', { headers:{ Authorization:'Bearer '+token } });
+        if (resp.ok) blob = await resp.blob();
+      }
+    } catch(e) { console.warn('[verAcuerdoPDF] Drive falló:', e.message); }
+  }
+  if (!blob) { if(typeof toast==='function') toast('⚠ PDF no disponible — verifica la conexión con Drive en Panel Admin', 'err'); return; }
+  const url = URL.createObjectURL(blob);
+  const w = window.open('', '_blank', 'width=900,height=700,menubar=no,toolbar=no');
+  if (w) {
+    w.document.write('<html><head><title>' + nombre + '</title></head><body style="margin:0;padding:0;background:#222;"><iframe src="' + url + '" style="width:100%;height:100vh;border:none;"></iframe></body></html>');
+    w.document.close();
+  } else {
+    const a = document.createElement('a'); a.href = url; a.download = nombre; a.click();
+  }
+}
+
+// Mostrar resumen del acuerdo al hacer clic en el historial o en la tarjeta
+function verResumenAcuerdo(ac) {
+  const panelIA = document.getElementById('mexp-ia-resultado');
+  if (panelIA) {
+    panelIA.innerHTML = `<div style="font-size:0.72rem;font-weight:600;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:6px;">&#128196; ${ac.nombre}</div><div style="font-size:0.7rem;color:var(--ink-l);line-height:1.65;">${ac.resumen || '<em style="color:var(--muted);">Sin resumen disponible.</em>'}</div><div style="margin-top:8px;font-size:0.6rem;color:var(--muted);">Fecha del acuerdo: ${ac.fechaAcuerdo || '—'}</div>`;
+    panelIA.style.display = 'block';
+  }
+  // También mostrar en el panel de análisis IA (columna 3)
+  const iaRes = document.getElementById('mexp-ia-result');
+  if (iaRes) {
+    iaRes.innerHTML = `<div style="font-size:0.72rem;font-weight:600;color:var(--ink);margin-bottom:6px;">&#128196; ${ac.nombre}</div><div style="font-size:0.7rem;color:var(--ink-l);line-height:1.65;">${ac.resumen || '<em style="color:var(--muted);">Sin resumen. Vuelve a subir el acuerdo para regenerarlo.</em>'}</div><div style="margin-top:8px;font-size:0.6rem;color:var(--muted);">Fecha: ${ac.fechaAcuerdo || '—'} &nbsp;|&nbsp; Tipo: ${(ACUERDO_TIPOS[ac.tipo]||{}).label||ac.tipo||'—'}</div>`;
+    iaRes.style.display = 'block';
+  }
+}
+
+// Inicializar panel de acuerdos al abrir un juicio
+async function initAcuerdosDrive(juicioId) {
+  // Usar siempre un ID estable: preferir Supabase id, fallback a índice numérico
+  const jId = (typeof juicioId === 'string' || (typeof juicioId === 'number' && juicioId >= 0)) ? juicioId : (_mexpIdx >= 0 ? 'idx_' + _mexpIdx : 'idx_0');
+  window._jdetId = jId;
+  const lista = await cargarAcuerdosDrive(jId);
+  renderAcuerdosDrive(lista);
+}
+// ═══ FIN ACUERDOS EN DRIVE ═══════════════════════════════════════════════
+
 function toast(msg,t='ok'){
   const el=$('toast');el.className='toast '+t;el.textContent=msg;el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'),3200);
@@ -14868,6 +15228,9 @@ function setPSec(sec, el){
     const btn = document.querySelector('#panel-pendientes .pend-sec-btn[data-sec="'+sec+'"]');
     if (btn) btn.classList.add('active');
   }
+  // Mostrar botones de estado solo en sección Placas
+  const estadoBtns = document.getElementById('placas-estado-btns');
+  if (estadoBtns) estadoBtns.style.display = (sec === 'placas') ? 'flex' : 'none';
   renderPend();
 }
 function renderPend(){
@@ -28908,8 +29271,8 @@ abrirDetalle = function(idx) {
   const tagL = {'urgente':'🔴 Urgente','proceso':'🟡 En Proceso','estable':'🟢 Estable','concluido':'⚫ Concluido','inicio':'🔵 Inicio'}[j.estatus] || j.estatus;
   $('mexp-sub').textContent = (j.tipo||'') + (j.expediente ? ' · Exp. ' + j.expediente : '') + ' · ' + tagL;
 
-  // Stats
-  cargarDocsR2(idx);
+  // Stats — Acuerdos en Drive (reemplaza R2)
+  initAcuerdosDrive(j.id || idx);
   const histCount = (j.historial||[]).length;
   $('mexp-stat-hist').textContent = histCount || '0';
   const aud = j.audiencia || (typeof proximaAudienciaDeTerminos === 'function' ? proximaAudienciaDeTerminos(j) : null);
@@ -34245,6 +34608,13 @@ try{ localStorage.setItem('drive_token',               data.access_token); } cat
 console.log('[Drive] ✅ Token renovado');
         return data.access_token;
       }
+    } else if(resp.status === 400){
+      // Refresh token inválido o revocado — limpiar para no reintentar en bucle
+      console.warn('[Drive] Refresh token inválido (400). Limpiando — reconecta en Panel Admin.');
+      try{ localStorage.removeItem('lex-drive-refresh-token'); } catch(e){}
+      try{ localStorage.removeItem('lex-drive-token'); } catch(e){}
+      try{ localStorage.removeItem('lex-drive-token-saved-at'); } catch(e){}
+      return '';
     }
   }catch(e){console.warn('[Drive] Error renovando:', e.message);}
   // Fallback: token guardado aunque sea viejo
@@ -34265,7 +34635,7 @@ function driveIniciarOAuth(){
     client_id:     DRIVE_CLIENT_ID,
     redirect_uri:  'https://lexmexico423-dotcom.github.io/lex-mexico/',
     response_type: 'code',
-    scope:         'https://www.googleapis.com/auth/drive.readonly',
+    scope:         'https://www.googleapis.com/auth/drive.file',
     access_type:   'offline',
     prompt:        'consent'
   });
@@ -35700,8 +36070,8 @@ function abrirDetalle(idx){
   const tagL = {'urgente':'🔴 Urgente','proceso':'🟡 En Proceso','estable':'🟢 Estable','concluido':'⚫ Concluido','inicio':'🔵 Inicio'}[j.estatus] || j.estatus;
   $('mexp-sub').textContent = (j.tipo||'') + (j.expediente ? ' · Exp. ' + j.expediente : '') + ' · ' + tagL;
 
-  // Stats
-  cargarDocsR2(idx);
+  // Stats — Acuerdos en Drive
+  initAcuerdosDrive(j.id || idx);
   const histCount = (j.historial||[]).length;
   $('mexp-stat-hist').textContent = histCount || '0';
   const aud = j.audiencia || proximaAudienciaDeTerminos(j);
@@ -35756,14 +36126,15 @@ async function confirmarCerrarExpediente(){
 }
 
 // ── Documentos R2 ──────────────────────────────────────────────
-async function cargarDocsR2(idx){
+// cargarDocsR2 — reemplazada por initAcuerdosDrive; se mantiene vacía para compatibilidad
+async function cargarDocsR2(idx){ /* obsoleta — ver initAcuerdosDrive */ return;
   const j = D.juicios[idx];
   const el = $('mexp-r2-lista');
   if(!el) return;
   const docs = j.r2Docs || [];
   $('mexp-stat-docs').textContent = docs.length || '0';
   if(!docs.length){
-    el.innerHTML = '<div style="border:1px dashed var(--border-l);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;" onclick="document.getElementById(&quot;r2-file-input&quot;).click()"><div style="font-size:1.4rem;margin-bottom:6px;">☁️</div><div style="font-size:0.72rem;color:var(--muted);">Arrastra PDFs o haz clic en ＋ Subir para agregar documentos a R2</div></div>';
+    el.innerHTML = '';
     return;
   }
   el.innerHTML = docs.map((doc, i) => `

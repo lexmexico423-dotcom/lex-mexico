@@ -2079,10 +2079,10 @@ window.console.info = function(){};
   #modal-validacion ul li { font-size: 0.78rem; color: #8a2020; background: #fff3f3; border: 1px solid #f0c0c0; border-radius: 3px; padding: 6px 10px; font-family: 'DM Sans', sans-serif; line-height: 1.4; }
   #modal-validacion .modal-btns { display: flex; gap: 10px; }
   #modal-validacion .modal-btns .btn { flex: 1; }
-  /* Modal Expediente */
-  #modal-expediente { display: none; }
-  #modal-expediente .modal { max-width: 420px; border-top: 3px solid #7a2a8a; }
-  #modal-expediente h3 { color: #5a1a6a; }
+  /* Modal Crear Expediente */
+  #modal-crear-expediente { display: none; }
+  #modal-crear-expediente .modal { max-width: 420px; border-top: 3px solid #7a2a8a; }
+  #modal-crear-expediente h3 { color: #5a1a6a; }
   /* Modal descripción trámite vehicular */
   #modal-vehicular .modal { max-width: 460px; text-align: left; }
   #modal-vehicular h3 { text-align: center; color: var(--gold-dark); }
@@ -4711,8 +4711,8 @@ window.addEventListener('offline', ()=>{
         <div id="listaJuicios" style="padding:12px 16px;"></div>
       </div>
 
-      <!-- ══ MODAL DE EXPEDIENTE — PANTALLA COMPLETA ══ -->
-      <div id="modal-expediente" style="display:none;position:absolute;inset:0;background:var(--surface);z-index:20;display:none;flex-direction:column;overflow:hidden;">
+      <!-- ══ VISOR DE EXPEDIENTE — PANTALLA COMPLETA ══ -->
+      <div id="modal-expediente" style="display:none;position:fixed;left:var(--sidebar-w);top:0;right:0;bottom:0;background:var(--surface);z-index:50;flex-direction:column;overflow:hidden;">
 
         <!-- HEADER -->
         <div style="display:flex;align-items:center;gap:10px;padding:13px 20px;border-bottom:1px solid var(--border-l);background:var(--surface);flex-shrink:0;">
@@ -5516,7 +5516,7 @@ window.addEventListener('offline', ()=>{
 </div>
 <!-- Modal: Motivo de cancelación -->
 <!-- ── MODAL CREAR EXPEDIENTE — aparece al generar recibo original por primera vez ── -->
-<div class="modal-overlay" id="modal-expediente" style="display:none;">
+<div class="modal-overlay" id="modal-crear-expediente" style="display:none;">
   <div class="modal" style="max-width:420px;">
     <h3 style="margin-bottom:4px;">📁 ¿Crear Expediente?</h3>
     <p style="font-size:0.8rem;color:var(--muted);margin-bottom:16px;">El recibo <strong id="exp-modal-folio"></strong> fue generado para <strong id="exp-modal-cliente"></strong>.<br>¿Deseas vincularlo a un número de expediente?</p>
@@ -5532,7 +5532,7 @@ window.addEventListener('offline', ()=>{
       <button class="btn" style="background:linear-gradient(135deg,#5a1a6a,#7a2a8a);color:#fff;border:none;flex:2;"
         onclick="confirmarCrearExpediente()">📁 Crear y Completar Expediente →</button>
       <button class="btn" style="background:transparent;border:1px solid var(--border);color:var(--muted);flex:1;"
-        onclick="cerrarModalExpediente()">Omitir</button>
+        onclick="cerrarModalCrearExp()">Omitir</button>
     </div>
     <div style="font-size:0.65rem;color:#8a6a9a;text-align:center;margin-top:8px;font-family:'DM Mono',monospace;">
       Te llevará a Control de Juicios para completar los datos del expediente
@@ -11963,7 +11963,7 @@ function ir(p){
   if(p==='recibos')renderRec();
   if(p==='directorio'){renderDir();}
   if(p==='carpetas')renderCarp();
-  if(p==='juicios'){renderJuicios();$('juicio-detalle').classList.remove('visible');$('juicios-lista-view').style.display='';}
+  if(p==='juicios'){renderJuicios();$('modal-expediente').style.display='none';$('juicios-lista-view').style.display='';}
   if(p==='pendientes')renderPend();
   if(p==='caja')renderCaja();
   if(p==='registro-civil')rcAbrirSubpanel('home');
@@ -14116,9 +14116,7 @@ function abrirDetalle(idx){
   renderTerminos();
 }
 function cerrarDetalle(){
-  jdetIdx=-1;
-  $('juicio-detalle').classList.remove('visible');
-  $('juicios-lista-view').style.display='';
+  cerrarModalExpediente();
   cerrarVisorPDF();
 }
 function confirmarEliminarJuicio(idx){
@@ -24030,6 +24028,37 @@ function confirmarVincularRecibo() {
         </div>
       </div>
     </div>
+    <!-- ═══ MONITOR DE SESIONES ═══ -->
+    <div id="panel-sesiones" class="panel">
+      <div style="max-width:800px;margin:0 auto;padding:20px 16px 40px;">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-family:serif;font-size:1.2rem;font-weight:700;color:var(--ink);margin-bottom:2px;">👁 Monitor de Sesiones</div>
+            <div style="font-family:monospace;font-size:0.6rem;color:var(--muted);letter-spacing:0.1em;">HISTORIAL DE ACCESOS AL SISTEMA</div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button onclick="sesionesRefrescar()" style="background:rgba(200,149,42,0.08);border:1px solid rgba(200,149,42,0.3);border-radius:8px;padding:7px 14px;cursor:pointer;font-family:monospace;font-size:0.65rem;color:var(--gold-l);letter-spacing:0.06em;transition:all 0.15s;" onmouseover="this.style.background='rgba(200,149,42,0.18)'" onmouseout="this.style.background='rgba(200,149,42,0.08)'">🔄 Refrescar</button>
+            <button onclick="abrirAdminModal()" style="background:rgba(200,149,42,0.08);border:1px solid rgba(200,149,42,0.3);border-radius:8px;padding:7px 14px;cursor:pointer;font-family:monospace;font-size:0.65rem;color:var(--gold-l);letter-spacing:0.06em;transition:all 0.15s;" onmouseover="this.style.background='rgba(200,149,42,0.18)'" onmouseout="this.style.background='rgba(200,149,42,0.08)'">← Volver al Admin</button>
+          </div>
+        </div>
+        <!-- Sección 1: Estado actual de empleados -->
+        <div style="margin-bottom:20px;">
+          <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(200,149,42,0.7);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(212,184,112,0.3);">Estado Actual de Empleados</div>
+          <div id="sesiones-empleados-fijos"><div style="color:#7a6030;font-size:0.75rem;font-family:monospace;padding:8px 0;">Cargando...</div></div>
+        </div>
+        <!-- Sección 2: Historial rápido -->
+        <div style="margin-bottom:20px;">
+          <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(200,149,42,0.7);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(212,184,112,0.3);">Últimos Accesos</div>
+          <div id="sesiones-historial"></div>
+        </div>
+        <!-- Sección 3: Registro diario -->
+        <div>
+          <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.12em;text-transform:uppercase;color:rgba(200,149,42,0.7);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid rgba(212,184,112,0.3);">Registro Diario de Conexiones</div>
+          <div id="sesiones-tabla-diaria"></div>
+        </div>
+      </div>
+    </div>
   </div><!-- /content -->
 </div><!-- /main -->
 </div><!-- /shell -->
@@ -28861,52 +28890,48 @@ function _iaConstruirContexto() {
   if (typeof jdetIdx !== 'undefined' && jdetIdx >= 0 && D.juicios[jdetIdx]) return _hjConstruirContextoIA();
   return _agConstruirContexto();
 }
-// ── Sobrescribir abrirDetalle para renderizar la nueva pantalla ───────
-const _abrirDetalleOriginal = abrirDetalle;
+// ── abrirDetalle — abre el visor full-screen de expediente ───────
 abrirDetalle = function(idx) {
   jdetIdx = idx;
+  _mexpIdx = idx;
   const j = D.juicios[idx];
   if (!j) return;
+
+  // Ocultar lista, mostrar visor
   document.getElementById('juicios-lista-view').style.display = 'none';
-  const det = document.getElementById('juicio-detalle');
-  det.classList.add('visible');
+  const modal = document.getElementById('modal-expediente');
+  if (!modal) return;
+  modal.style.display = 'flex';
+
   // Header
-  document.getElementById('jdet-nombre').textContent = j.cliente || '—';
-  document.getElementById('jdet-tipo').textContent = (j.tipo || '') + (j.expediente ? ' · Exp. ' + j.expediente : '');
-  const tagC = {'urgente':'tag-r','proceso':'tag-a','estable':'tag-v','concluido':'tag-m','inicio':'tag-b'}[j.estatus] || 'tag-m';
+  $('mexp-titulo').textContent = j.cliente || '—';
   const tagL = {'urgente':'🔴 Urgente','proceso':'🟡 En Proceso','estable':'🟢 Estable','concluido':'⚫ Concluido','inicio':'🔵 Inicio'}[j.estatus] || j.estatus;
-  const eTag = document.getElementById('jdet-estatus-tag');
-  eTag.className = 'tag ' + tagC; eTag.textContent = tagL;
-  const expBadge = document.getElementById('jdet-exp-badge');
-  if (expBadge) expBadge.textContent = j.expediente ? 'Exp. ' + j.expediente : '';
-  const folioBadge = document.getElementById('jdet-folio-badge');
-  if (folioBadge) { folioBadge.style.display = j.folioRecibo ? '' : 'none'; if (j.folioRecibo) folioBadge.textContent = '🧾 Folio #' + folioFormato(j.folioRecibo); }
-  const driveLabel = document.getElementById('jdet-drive-label');
-  const driveBadge = document.getElementById('jdet-drive-badge');
-  if (j.driveFolderId) {
-    if (driveLabel) driveLabel.textContent = '📂 ' + (j.driveFolderName || 'Drive');
-    if (driveBadge) driveBadge.onclick = () => window.open('https://drive.google.com/drive/folders/' + j.driveFolderId, '_blank');
+  $('mexp-sub').textContent = (j.tipo||'') + (j.expediente ? ' · Exp. ' + j.expediente : '') + ' · ' + tagL;
+
+  // Stats
+  cargarDocsR2(idx);
+  const histCount = (j.historial||[]).length;
+  $('mexp-stat-hist').textContent = histCount || '0';
+  const aud = j.audiencia || (typeof proximaAudienciaDeTerminos === 'function' ? proximaAudienciaDeTerminos(j) : null);
+  if (aud) {
+    const diff = Math.ceil((new Date(aud+'T12:00:00') - new Date()) / 86400000);
+    $('mexp-stat-aud').textContent = diff >= 0 ? diff + 'd' : 'Vencida';
   } else {
-    if (driveLabel) driveLabel.textContent = 'Vincular Drive';
-    if (driveBadge) driveBadge.onclick = () => abrirVinculacionDrive();
+    $('mexp-stat-aud').textContent = '—';
   }
-  // Renderizar historial y términos
-  hjRenderLista();
-  hjRenderTerminos();
+
+  // Leyes y historial
+  if (typeof actualizarContadorLeyes === 'function') actualizarContadorLeyes();
+  if (typeof renderHistorialModal === 'function') renderHistorialModal();
+
   // Resetear chat IA si cambiamos de juicio
   if (_iaJuicioIdx !== idx) {
     _iaHistorial = [];
     _iaJuicioIdx = idx;
-    const chatCont = document.getElementById('ia-chat-msgs');
-    if (chatCont) {
-      chatCont.innerHTML = '';
-      // Mensaje de bienvenida contextual
-      const bienvenida = document.createElement('div');
-      bienvenida.style.cssText = 'background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25);border-radius:10px;padding:10px 12px;font-size:0.78rem;color:#e8e0ff;line-height:1.6;';
-      const histLen = (j.historial || []).length;
-      bienvenida.textContent = `Hola. Tengo acceso al historial completo de ${j.cliente || 'este expediente'}${histLen ? ` (${histLen} entrada${histLen > 1 ? 's' : ''})` : ' (sin entradas aún)'}. Usa los botones de arriba o pregunta lo que necesites.`;
-      chatCont.appendChild(bienvenida);
-    }
+    const chatCont = document.getElementById('mexp-ia-chat');
+    if (chatCont) chatCont.innerHTML = '';
+    const resumenEl = document.getElementById('mexp-ia-resumen');
+    if (resumenEl) resumenEl.textContent = 'Presiona «Analizar expediente con IA» para obtener el resumen.';
   }
 };
 // ═══ FIN HISTORIAL CRONOLÓGICO ═══
@@ -32074,17 +32099,16 @@ function _ocrAutoDetectarTipo(texto){
 let _expedienteFolioActual = null; // folio del recibo al que se vinculará
 function abrirModalExpediente(folio, expSugerido, nombreCliente){
   _expedienteFolioActual = folio;
-  const overlay = document.getElementById('modal-expediente');
+  const overlay = document.getElementById('modal-crear-expediente');
   if(!overlay) return;
   document.getElementById('exp-modal-folio').textContent  = 'Folio #' + folioFormato(folio);
   document.getElementById('exp-modal-cliente').textContent = nombreCliente || '—';
   document.getElementById('exp-modal-input').value = expSugerido || '';
   overlay.style.display = 'flex';
-  // Foco automático para editar si se desea
   setTimeout(()=>{ const inp = document.getElementById('exp-modal-input'); if(inp) inp.focus(); }, 200);
 }
-function cerrarModalExpediente(){
-  const overlay = document.getElementById('modal-expediente');
+function cerrarModalCrearExp(){
+  const overlay = document.getElementById('modal-crear-expediente');
   if(overlay) overlay.style.display = 'none';
   _expedienteFolioActual = null;
 }
@@ -32107,7 +32131,7 @@ async function confirmarCrearExpediente(){
   const idx = (appData.recibos||[]).findIndex(r => r.folio === _expedienteFolioActual && !r.esComplemento);
   if(idx < 0){
     if(typeof toast==='function') toast('No se encontró el recibo para vincular','err');
-    cerrarModalExpediente();
+    cerrarModalCrearExp();
     return;
   }
   appData.recibos[idx].expedienteNum = numFinal;
@@ -32121,7 +32145,7 @@ async function confirmarCrearExpediente(){
     if(typeof toast==='function') toast('Expediente vinculado (sin confirmar en Drive)','warn');
   }
   const folioVinculado = _expedienteFolioActual;
-  cerrarModalExpediente();
+  cerrarModalCrearExp();
   // ── Preguntar si desea abrir el Control de Juicios para completar el expediente ──
   if(typeof abrirJuicioEdit === 'function'){
     // Pre-llenar datos disponibles del recibo
@@ -32151,10 +32175,10 @@ async function confirmarCrearExpediente(){
   // Actualizar UI
   if(typeof renderHistorial==='function') renderHistorial();
 }
-// Cerrar modal al hacer clic fuera
+// Cerrar modal de creación al hacer clic fuera
 document.addEventListener('click', function(e){
-  const overlay = document.getElementById('modal-expediente');
-  if(overlay && e.target === overlay) cerrarModalExpediente();
+  const overlay = document.getElementById('modal-crear-expediente');
+  if(overlay && e.target === overlay) cerrarModalCrearExp();
 });
 // Abrir modal de expediente desde la consulta de un folio ya existente
 function abrirModalExpedienteDesdeConsulta(folio){

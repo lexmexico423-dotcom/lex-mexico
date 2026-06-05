@@ -6489,6 +6489,43 @@ async function sincronizarFolio(forzarSB){
             // Persistir en Supabase para que no vuelvan en la próxima recarga
             setTimeout(function(){ if(typeof save === 'function') save(); }, 800);
           }
+          // Migración: propagar saldo mínimo real al registro A para folios históricos
+          // donde _imprimirActualizacionReal nunca actualizó A (bug corregido en 2026-06-04).
+          // Esto evita que PASO 2 de sincronizarPendientesPlacas recree pendientes en otros dispositivos.
+          var _migrados = 0;
+          var _foliosVistos = {};
+          appData.recibos.forEach(function(r){
+            if(!r || r.esComplemento || !r.folio) return;
+            var fk = String(r.folio);
+            if(_foliosVistos[fk]) return;
+            _foliosVistos[fk] = true;
+            var _vers = appData.recibos.filter(function(v){ return Number(v.folio) === Number(r.folio); });
+            if(_vers.length < 2) return; // sin versiones secundarias, no hay nada que migrar
+            var _saldoMin = _vers.reduce(function(m,v){
+              var s=parseFloat(v.saldoPendiente); if(!isNaN(s)) return Math.min(m,s);
+              var sn=parseFloat(v.saldoNuevo);   if(!isNaN(sn)) return Math.min(m,sn);
+              if(v.liquidado===true) return Math.min(m,0);
+              return m;
+            }, Infinity);
+            if(_saldoMin === Infinity) return;
+            var _idxA = appData.recibos.findIndex(function(v){
+              return Number(v.folio) === Number(r.folio) && !v.esComplemento && !v.esActualizacion;
+            });
+            if(_idxA < 0) return;
+            var _recA = appData.recibos[_idxA];
+            var _saldoA = parseFloat(_recA.saldoPendiente);
+            if(!isNaN(_saldoA) && _saldoA <= _saldoMin) return; // ya está correcto
+            appData.recibos[_idxA] = Object.assign({}, _recA, {
+              saldoPendiente: _saldoMin,
+              saldoNuevo:     _saldoMin,
+              liquidado:      _saldoMin <= 0 ? true : (_recA.liquidado || false)
+            });
+            _migrados++;
+          });
+          if(_migrados > 0){
+            console.log('[LEX] Migración saldo-A: ' + _migrados + ' recibo(s) originales sincronizados con saldo mínimo real.');
+            setTimeout(function(){ if(typeof save === 'function') save(); }, 1200);
+          }
         })();
         // captura_meses: cargar desde Supabase
         const sbCapturaMeses = data.data.captura_meses || {};
@@ -9237,6 +9274,18 @@ async function _imprimirActualizacionReal(){
       // con return 0 para folios distintos viola la transitividad de sort() y
       // producía que B quedara antes que A, rompiendo el display en historial y contab.
       appData.recibos.splice(idx + 1, 0, nuevoRegistro);
+      // Sincronizar saldo del registro original A para que PASO 2 de sincronizarPendientesPlacas
+      // no recree el pendiente en dispositivos sin lista negra de localStorage
+      const _idxOrigA = appData.recibos.findIndex(function(v){
+        return v.folio === recibo.folio && !v.esComplemento && !v.esActualizacion;
+      });
+      if(_idxOrigA >= 0){
+        appData.recibos[_idxOrigA] = Object.assign({}, appData.recibos[_idxOrigA], {
+          saldoPendiente: saldoNuevo,
+          saldoNuevo:     saldoNuevo,
+          liquidado:      saldoNuevo <= 0 ? true : (appData.recibos[_idxOrigA].liquidado || false)
+        });
+      }
       _guardarVersionEnSupabase(nuevoRegistro, letraActual, nombreArchivo).catch(e=>console.warn('[SB versiones] actualizacion:',e));
     }
   if(!appData.historialPagos) appData.historialPagos = {};
@@ -31257,8 +31306,17 @@ function sincronizarPendientesPlacas() {
     const esVehicular = r.tipoTramite === 'vehicular' ||
                         (r.vehiculo && typeof r.vehiculo === 'object' && r.vehiculo !== null);
     if (!esVehicular) return;
-    // Solo recibos con saldo pendiente
-    if (!(parseFloat(r.saldoPendiente) > 0)) return;
+    // Verificar saldo mínimo entre TODAS las versiones del folio (A, B, C, D)
+    // La letra A nunca actualiza su saldo en el flujo _imprimirActualizacionReal,
+    // por lo que checar solo r.saldoPendiente recrearía pendientes ya liquidados.
+    var _versPaso2 = appData.recibos.filter(function(v){ return Number(v.folio) === Number(r.folio); });
+    var _saldoMinPaso2 = _versPaso2.reduce(function(m,v){
+      var s=parseFloat(v.saldoPendiente); if(!isNaN(s)) return Math.min(m,s);
+      var sn=parseFloat(v.saldoNuevo);   if(!isNaN(sn)) return Math.min(m,sn);
+      if(v.liquidado===true) return Math.min(m,0);
+      return m;
+    }, Infinity);
+    if (!(_saldoMinPaso2 > 0)) return;
     const folio = r.folio;
     const idPend = 'PEND-REC-' + folio;
     // No recrear si ya fue liquidado/eliminado (lista negra en localStorage)

@@ -6459,13 +6459,21 @@ async function sincronizarFolio(forzarSB){
           D.pendientes = D.pendientes.filter(function(p){
             if(p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
             var _versLb = appData.recibos.filter(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
-            // Calcular saldo mínimo con fallback a saldoNuevo y flag liquidado
+            // Calcular saldo mínimo — tratar string "0", null y undefined como 0
             var saldo = _versLb.reduce(function(m,r){
-              var s=parseFloat(r.saldoPendiente); if(!isNaN(s)) return Math.min(m,s);
-              var sn=parseFloat(r.saldoNuevo);    if(!isNaN(sn)) return Math.min(m,sn);
-              if(r.liquidado===true) return Math.min(m,0);
+              var s = (r.saldoPendiente !== undefined && r.saldoPendiente !== null) ? parseFloat(r.saldoPendiente) : NaN;
+              if(!isNaN(s)) return Math.min(m, s);
+              var sn = (r.saldoNuevo !== undefined && r.saldoNuevo !== null) ? parseFloat(r.saldoNuevo) : NaN;
+              if(!isNaN(sn)) return Math.min(m, sn);
+              if(r.liquidado === true) return Math.min(m, 0);
+              // Sin dato de saldo en este recibo — asumir 0 si es versión secundaria (B,C,D)
+              // para evitar que Infinity bloquee la limpieza
+              var letra = r.letra || 'A';
+              if(letra !== 'A') return Math.min(m, 0);
               return m;
             }, Infinity);
+            // Si ningún recibo tiene saldo definido, saldo queda Infinity → no eliminar (dato faltante, no liquidado)
+            // Excepto si el folio tiene al menos un recibo secundario con saldo 0 (ya manejado arriba)
             var _cancelLb = _versLb.some(function(r){ return r.cancelado; });
             if(_versLb.length === 0 || _cancelLb || !(saldo > 0)){
               var fs = String(p.reciboVinculadoFolio);
@@ -6480,6 +6488,43 @@ async function sincronizarFolio(forzarSB){
             console.log('[LEX] Limpieza SB-load: ' + _borrados + ' pendiente(s) de placas liquidados eliminados.');
             // Persistir en Supabase para que no vuelvan en la próxima recarga
             setTimeout(function(){ if(typeof save === 'function') save(); }, 800);
+          }
+          // Migración: propagar saldo mínimo real al registro A para folios históricos
+          // donde _imprimirActualizacionReal nunca actualizó A (bug corregido en 2026-06-04).
+          // Esto evita que PASO 2 de sincronizarPendientesPlacas recree pendientes en otros dispositivos.
+          var _migrados = 0;
+          var _foliosVistos = {};
+          appData.recibos.forEach(function(r){
+            if(!r || r.esComplemento || !r.folio) return;
+            var fk = String(r.folio);
+            if(_foliosVistos[fk]) return;
+            _foliosVistos[fk] = true;
+            var _vers = appData.recibos.filter(function(v){ return Number(v.folio) === Number(r.folio); });
+            if(_vers.length < 2) return; // sin versiones secundarias, no hay nada que migrar
+            var _saldoMin = _vers.reduce(function(m,v){
+              var s=parseFloat(v.saldoPendiente); if(!isNaN(s)) return Math.min(m,s);
+              var sn=parseFloat(v.saldoNuevo);   if(!isNaN(sn)) return Math.min(m,sn);
+              if(v.liquidado===true) return Math.min(m,0);
+              return m;
+            }, Infinity);
+            if(_saldoMin === Infinity) return;
+            var _idxA = appData.recibos.findIndex(function(v){
+              return Number(v.folio) === Number(r.folio) && !v.esComplemento && !v.esActualizacion;
+            });
+            if(_idxA < 0) return;
+            var _recA = appData.recibos[_idxA];
+            var _saldoA = parseFloat(_recA.saldoPendiente);
+            if(!isNaN(_saldoA) && _saldoA <= _saldoMin) return; // ya está correcto
+            appData.recibos[_idxA] = Object.assign({}, _recA, {
+              saldoPendiente: _saldoMin,
+              saldoNuevo:     _saldoMin,
+              liquidado:      _saldoMin <= 0 ? true : (_recA.liquidado || false)
+            });
+            _migrados++;
+          });
+          if(_migrados > 0){
+            console.log('[LEX] Migración saldo-A: ' + _migrados + ' recibo(s) originales sincronizados con saldo mínimo real.');
+            setTimeout(function(){ if(typeof save === 'function') save(); }, 1200);
           }
         })();
         // captura_meses: cargar desde Supabase
@@ -6521,6 +6566,8 @@ async function sincronizarFolio(forzarSB){
     if(typeof retroGlobalCargarSupabase==='function') retroGlobalCargarSupabase();
     // Auto-corregir letras de movimientos y paths R2 (silencioso, 8s después)
     if(typeof _autoCorregirLetrasR2 === 'function') _autoCorregirLetrasR2();
+    // Backup diario a R2 — corre silenciosamente 3s despues de cargar datos
+    setTimeout(function(){ backupAppData().catch(function(e){ console.warn('[Backup] inicio:', e); }); }, 3000);
   } catch(e){
     console.error('[SB] sincronizarFolio error:', e);
   } finally {
@@ -9227,6 +9274,18 @@ async function _imprimirActualizacionReal(){
       // con return 0 para folios distintos viola la transitividad de sort() y
       // producía que B quedara antes que A, rompiendo el display en historial y contab.
       appData.recibos.splice(idx + 1, 0, nuevoRegistro);
+      // Sincronizar saldo del registro original A para que PASO 2 de sincronizarPendientesPlacas
+      // no recree el pendiente en dispositivos sin lista negra de localStorage
+      const _idxOrigA = appData.recibos.findIndex(function(v){
+        return v.folio === recibo.folio && !v.esComplemento && !v.esActualizacion;
+      });
+      if(_idxOrigA >= 0){
+        appData.recibos[_idxOrigA] = Object.assign({}, appData.recibos[_idxOrigA], {
+          saldoPendiente: saldoNuevo,
+          saldoNuevo:     saldoNuevo,
+          liquidado:      saldoNuevo <= 0 ? true : (appData.recibos[_idxOrigA].liquidado || false)
+        });
+      }
       _guardarVersionEnSupabase(nuevoRegistro, letraActual, nombreArchivo).catch(e=>console.warn('[SB versiones] actualizacion:',e));
     }
   if(!appData.historialPagos) appData.historialPagos = {};
@@ -11354,14 +11413,17 @@ window.subirR2 = async function(file, path, bucket) {
     return true;
   } catch(e) { console.error('subirR2 excepcion', e); return false; }
 }
-window.descargarR2 = async function(path, bucket) {
+window.descargarR2 = async function(path, bucket, _silencioso) {
   try {
     const url = R2_WORKER + '/r2/file?path=' + encodeURIComponent(path)
               + '&bucket=' + (bucket || 'recibos')
               + '&token=' + R2_TOKEN;
     const res = await fetch(url);
-    if (!res.ok) { console.error('descargarR2 error', res.status); return null; }
-    return await res.blob();
+    if (res.ok) return await res.blob();
+    // 404 en archivos opcionales (meta.json) es normal — no llenar consola
+    var esOpcional = path.endsWith('meta.json') || _silencioso;
+    if (!esOpcional) console.error('descargarR2 error', res.status, path);
+    return null;
   } catch(e) { console.error('descargarR2 excepcion', e); return null; }
 }
 window.listarR2 = async function(prefix, bucket) {
@@ -16690,9 +16752,153 @@ function limpiarBackupsViejos() {
 } catch(e){ registrarError('catch vacio', e); }
   });
 }
-function backupAppData() {
-  // Deshabilitado — los datos viven exclusivamente en Supabase y R2
+// ══════════════════════════════════════════════════════════════════════════════
+// SISTEMA DE BACKUP DIARIO A R2
+// Guarda un snapshot completo de app_state (recibos + D) cada dia.
+// Bucket: 'backups'   Ruta: {despacho_id}/YYYY/MM/YYYY-MM-DD.json
+// Retencion: 90 snapshots (~3 meses). El mas reciente siempre en /latest.json.
+// ══════════════════════════════════════════════════════════════════════════════
+var _backupHecho = false; // Solo una vez por sesion
+
+async function backupAppData() {
+  try {
+    if (!window.subirR2 || !window.SB_DESPACHO_ID) return;
+    if (_backupHecho) return;
+    if (!appData || !appData.recibos || appData.recibos.length === 0) return;
+
+    var hoyKey = 'lex-backup-' + new Date().toISOString().slice(0, 10);
+    try { if (localStorage.getItem(hoyKey)) { _backupHecho = true; return; } } catch(_){}
+
+    _backupHecho = true;
+
+    var ahora    = new Date();
+    var yyyy     = ahora.getFullYear();
+    var mm       = String(ahora.getMonth() + 1).padStart(2, '0');
+    var dd       = String(ahora.getDate()).padStart(2, '0');
+    var hhmm     = String(ahora.getHours()).padStart(2, '0') + ':' + String(ahora.getMinutes()).padStart(2, '0');
+    var fechaStr = yyyy + '-' + mm + '-' + dd;
+
+    var snapshot = {
+      version:   2,
+      fecha:     fechaStr,
+      hora:      hhmm,
+      despacho:  window.SB_DESPACHO_ID,
+      recibos: {
+        folioActual:     appData.folioActual,
+        anioFolioActual: appData.anioFolioActual,
+        recibos:         appData.recibos || []
+      },
+      data: {
+        movimientos:          (D && D.movimientos)          || [],
+        directorio:           (D && D.directorio)           || [],
+        carpetas:             (D && D.carpetas)             || [],
+        juicios:              (D && D.juicios)              || [],
+        pendientes:           (D && D.pendientes)           || [],
+        cierres:              (D && D.cierres)              || [],
+        prestamos:            (D && D.prestamos)            || [],
+        escrituras:           (D && D.escrituras)           || [],
+        recibosExcluidosCaja: (D && D.recibosExcluidosCaja) || [],
+        saldoAcumulado:       (D && D.saldoAcumulado)       || 0
+      }
+    };
+
+    var json       = JSON.stringify(snapshot);
+    var blob       = new Blob([json], { type: 'application/json' });
+    var did        = window.SB_DESPACHO_ID;
+    var pathDia    = did + '/backups/' + yyyy + '/' + mm + '/' + fechaStr + '.json';
+    var fileDia    = new File([blob], fechaStr + '.json', { type: 'application/json' });
+    var okDia      = await window.subirR2(fileDia, pathDia, 'backups');
+
+    var pathLatest = did + '/backups/latest.json';
+    var fileLatest = new File([blob], 'latest.json', { type: 'application/json' });
+    await window.subirR2(fileLatest, pathLatest, 'backups');
+
+    if (okDia) {
+      console.log('[Backup] OK snapshot en R2:', pathDia,
+        '| recibos:', snapshot.recibos.recibos.length,
+        '| movimientos:', snapshot.data.movimientos.length,
+        '| juicios:', snapshot.data.juicios.length);
+      try {
+        localStorage.setItem(hoyKey, '1');
+        var hace7 = new Date(ahora - 7 * 86400000).toISOString().slice(0, 10);
+        Object.keys(localStorage).forEach(function(k){
+          if (k.startsWith('lex-backup-') && k < 'lex-backup-' + hace7)
+            localStorage.removeItem(k);
+        });
+      } catch(_){}
+      _limpiarBackupsViejos(did, ahora).catch(function(){});
+    } else {
+      console.warn('[Backup] No se pudo guardar en R2');
+      _backupHecho = false;
+    }
+  } catch(e) {
+    console.warn('[Backup] Error:', e);
+    _backupHecho = false;
+  }
 }
+
+async function _limpiarBackupsViejos(did, ahora) {
+  try {
+    if (!window.listarR2) return;
+    var prefix = did + '/backups/';
+    var lista  = await window.listarR2(prefix, 'backups');
+    if (!lista || !lista.length) return;
+    var corte  = new Date(ahora - 90 * 86400000).toISOString().slice(0, 10);
+    var viejos = lista.filter(function(item) {
+      var nombre = (item.key || item.name || '').split('/').pop().replace('.json', '');
+      return /^\d{4}-\d{2}-\d{2}$/.test(nombre) && nombre < corte;
+    });
+    if (!viejos.length) return;
+    var eliminados = 0;
+    for (var i = 0; i < viejos.length; i++) {
+      try {
+        var path = viejos[i].key || viejos[i].name || '';
+        if (!path) continue;
+        var url = R2_WORKER + '/r2/delete?path=' + encodeURIComponent(path)
+                + '&bucket=backups&token=' + R2_TOKEN;
+        var res = await fetch(url, { method: 'DELETE', headers: { 'X-Auth-Token': R2_TOKEN } });
+        if (res.ok) eliminados++;
+      } catch(_){}
+    }
+    if (eliminados) console.log('[Backup] Snapshots viejos eliminados:', eliminados);
+  } catch(e) { console.warn('[Backup] limpiar:', e); }
+}
+
+window.restoreFromBackup = async function(fecha) {
+  if (!window.descargarR2 || !window.SB_DESPACHO_ID) { alert('R2 no disponible'); return; }
+  var did  = window.SB_DESPACHO_ID;
+  var path = fecha
+    ? did + '/backups/' + fecha.slice(0,4) + '/' + fecha.slice(5,7) + '/' + fecha + '.json'
+    : did + '/backups/latest.json';
+  try {
+    var blob = await window.descargarR2(path, 'backups');
+    if (!blob) { alert('Backup no encontrado: ' + path); return; }
+    var snap = JSON.parse(await blob.text());
+    console.log('[Backup] Snapshot encontrado:', snap.fecha, snap.hora,
+      '| recibos:', snap.recibos.recibos.length,
+      '| movimientos:', snap.data.movimientos.length,
+      '| juicios:', snap.data.juicios.length);
+    if (!confirm(
+      'RESTAURAR BACKUP\n\n' +
+      'Fecha: ' + snap.fecha + ' ' + snap.hora + '\n' +
+      'Recibos: ' + snap.recibos.recibos.length + '\n' +
+      'Movimientos: ' + snap.data.movimientos.length + '\n' +
+      'Juicios: ' + snap.data.juicios.length + '\n\n' +
+      'Confirmar SOBREESCRIBE el estado actual en Supabase.\n' +
+      'Recarga la pagina despues de restaurar.'
+    )) return;
+    var user = (await window.SB.auth.getUser()).data.user;
+    var res  = await window.SB.from('app_state').update({
+      recibos:      snap.recibos,
+      folio_actual: snap.recibos.folioActual,
+      data:         snap.data,
+      updated_by:   user ? user.id : null
+    }).eq('despacho_id', did);
+    if (res.error) { alert('Error: ' + res.error.message); return; }
+    alert('Datos restaurados. Recarga la pagina.');
+  } catch(e) { alert('Error: ' + e.message); console.error('[Backup]', e); }
+};
+
 function saveCarpetas(){
   // Guardar solo el array de carpetas en el archivo dedicado en Drive
   syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); });
@@ -16988,6 +17194,8 @@ function _realtimeSincronizar() {
 }
 function lexRealtimeBroadcast() {
   if (!_lexRealtimeChannel) return;
+  // Solo enviar si el canal está en estado SUBSCRIBED (evita fallback a REST y el warning de Supabase)
+  if (_lexRealtimeChannel.state !== 'joined') return;
   const usuario = empleadoActual ? empleadoActual.nombre : (NOMBRE_TITULAR || 'Usuario');
   _lexRealtimeChannel.send({
     type:    'broadcast',
@@ -29707,7 +29915,7 @@ function adminToggleRetroGlobal(){
           .update({ data: d }).eq('despacho_id', window.SB_DESPACHO_ID);
       })
       .then(function(){
-        if(window._lexRealtimeChannel){
+        if(window._lexRealtimeChannel && window._lexRealtimeChannel.state === 'joined'){
           window._lexRealtimeChannel.send({
             type: 'broadcast',
             event: 'retro_global_actualizado',
@@ -29887,7 +30095,7 @@ async function guardarCapturaMes(){
         .eq('despacho_id', window.SB_DESPACHO_ID);
       if(typeof toast==='function') toast('💾 Configuración guardada');
       // Notificar a otros dispositivos (secretaria) vía Realtime
-      if(_lexRealtimeChannel){
+      if(_lexRealtimeChannel && _lexRealtimeChannel.state === 'joined'){
         _lexRealtimeChannel.send({
           type: 'broadcast',
           event: 'captura_meses_actualizada',
@@ -31098,8 +31306,17 @@ function sincronizarPendientesPlacas() {
     const esVehicular = r.tipoTramite === 'vehicular' ||
                         (r.vehiculo && typeof r.vehiculo === 'object' && r.vehiculo !== null);
     if (!esVehicular) return;
-    // Solo recibos con saldo pendiente
-    if (!(parseFloat(r.saldoPendiente) > 0)) return;
+    // Verificar saldo mínimo entre TODAS las versiones del folio (A, B, C, D)
+    // La letra A nunca actualiza su saldo en el flujo _imprimirActualizacionReal,
+    // por lo que checar solo r.saldoPendiente recrearía pendientes ya liquidados.
+    var _versPaso2 = appData.recibos.filter(function(v){ return Number(v.folio) === Number(r.folio); });
+    var _saldoMinPaso2 = _versPaso2.reduce(function(m,v){
+      var s=parseFloat(v.saldoPendiente); if(!isNaN(s)) return Math.min(m,s);
+      var sn=parseFloat(v.saldoNuevo);   if(!isNaN(sn)) return Math.min(m,sn);
+      if(v.liquidado===true) return Math.min(m,0);
+      return m;
+    }, Infinity);
+    if (!(_saldoMinPaso2 > 0)) return;
     const folio = r.folio;
     const idPend = 'PEND-REC-' + folio;
     // No recrear si ya fue liquidado/eliminado (lista negra en localStorage)

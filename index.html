@@ -8241,7 +8241,13 @@ async function activarModoConsulta(recibo){
   } else if(recibo.archivo && window.SB_DESPACHO_ID){
     // Nueva sesión: buscar PDF en R2 y luego en Supabase Storage
     const _pathSB = window.SB_DESPACHO_ID + '/recibos/' + recibo.archivo;
-    const _pathR2 = window.SB_DESPACHO_ID + '/recibos/' + (recibo.archivoR2 || recibo.archivo);
+    // Si archivoR2 no está guardado en el registro, reconstruir el nombre descriptivo
+    // usando la misma lógica de _nombreArchivoR2() para que coincida con la subida.
+    const _archivoR2Eff = recibo.archivoR2
+      || (typeof _nombreArchivoR2 === 'function' && recibo.nombre
+          ? _nombreArchivoR2(recibo.archivo.replace(/\.pdf$/i,''), recibo.nombre)
+          : recibo.archivo);
+    const _pathR2 = window.SB_DESPACHO_ID + '/recibos/' + _archivoR2Eff;
     let _cargado = false;
     // 1) Intentar R2
     if(!_cargado && typeof window.descargarR2 === 'function'){

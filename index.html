@@ -9750,14 +9750,16 @@ async function confirmarCancelacion(){
   } catch(e){ console.warn('PDF cancelado no regenerado:', e); }
   actualizarArchivoControl().catch(e=>console.warn('Control:',e));
   renderHistorial();
+  // Capturar retro ANTES de cerrarConsulta() que limpia los globals vía limpiarFormCompleto()
+  const _retroOptsCanConf = { activo: _retroCanConf, fecha: _fechaCanConf, hora: _horaCanConf };
   cerrarConsulta();
   // Los tres tipos generan folio B — sin movimiento genera folio en $0 como precedente documental
   setTimeout(async () => {
-    await _lanzarFolioCancelacion(recibo, tipoCancelacion, tipoCancelacion==='sin' ? 0 : montoInput, motivo, auth);
+    await _lanzarFolioCancelacion(recibo, tipoCancelacion, tipoCancelacion==='sin' ? 0 : montoInput, motivo, auth, _retroOptsCanConf);
   }, 400);
 }
 
-async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth){
+async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroOpts){
   // Etiqueta del movimiento
   const etiqueta = tipo==='ingreso' ? 'Honorarios por cancelación'
     : tipo==='egreso' ? 'Reintegro por cancelación'
@@ -9772,10 +9774,11 @@ async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth){
   const letraActual = String.fromCharCode(maxLetra + 1);
   const folioLetraStr = folioConLetra(recibo.folio, recibo.anio_folio, letraActual);
 
-  // ── 2. Fecha/hora — respetar modo retro si está activo ──
-  const _retroCan = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
-  const ahora     = _retroCan ? window._reciboRetroactivoFechaPersonalizada : (typeof fechaCDMX_ISO === 'function' ? fechaCDMX_ISO() : new Date().toISOString().slice(0,10));
-  const horaAhora = _retroCan ? (window._reciboRetroactivoHoraPersonalizada || '00:00') : (typeof horaCDMX_HHMM === 'function' ? horaCDMX_HHMM() : new Date().toTimeString().slice(0,5));
+  // ── 2. Fecha/hora — retroOpts tiene prioridad (capturado antes de que limpiarFormCompleto limpie globals) ──
+  const _retroOptActivo = !!(retroOpts?.activo && retroOpts?.fecha);
+  const _retroCan = _retroOptActivo || !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+  const ahora     = _retroCan ? (_retroOptActivo ? retroOpts.fecha : window._reciboRetroactivoFechaPersonalizada) : (typeof fechaCDMX_ISO === 'function' ? fechaCDMX_ISO() : new Date().toISOString().slice(0,10));
+  const horaAhora = _retroCan ? (_retroOptActivo ? (retroOpts.hora || '00:00') : (window._reciboRetroactivoHoraPersonalizada || '00:00')) : (typeof horaCDMX_HHMM === 'function' ? horaCDMX_HHMM() : new Date().toTimeString().slice(0,5));
   const fechaHoraStr = ahora + ' ' + horaAhora + ' hrs.';
 
   // ── 3. Construir el pago parcial de cancelación (monto = 0 para no alterar saldos) ──

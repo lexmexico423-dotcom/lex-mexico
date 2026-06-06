@@ -5562,14 +5562,53 @@ window.addEventListener('offline', ()=>{
   </div>
 </div>
 <div class="modal-overlay" id="modal-cancelacion">
-  <div class="modal">
+  <div class="modal" style="max-width:480px;">
     <h3>Anular Trámite</h3>
-    <p style="margin-bottom:12px;">Indica el motivo de cancelación. Quedará registrado en el PDF y en el historial.</p>
+    <p style="margin-bottom:12px;font-size:0.8rem;">Indica el motivo y el tipo de liquidación. Se generará un folio de cancelación (B/C/D) con el historial del folio original.</p>
     <label class="modal-motivo-label">Motivo de cancelación</label>
-    <textarea id="cancelacion-motivo" placeholder="Ej: Desistimiento del cliente, error en captura, trámite duplicado..."></textarea>
+    <textarea id="cancelacion-motivo" placeholder="Ej: Desistimiento del cliente, error en captura, trámite duplicado..." style="margin-bottom:14px;"></textarea>
+    <label class="modal-motivo-label">Tipo de liquidación por cancelación</label>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+      <label id="cancel-opt-ingreso" onclick="seleccionarTipoCancelacion('ingreso')" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;transition:all 0.15s;">
+        <input type="radio" name="cancel-tipo" value="ingreso" style="margin-top:3px;accent-color:#27500A;">
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#27500A;">💰 INGRESO</div>
+          <div style="font-size:0.72rem;color:#666;margin-top:2px;">El cliente nos debe honorarios adicionales por trabajo ya realizado que excede lo pagado.</div>
+        </div>
+      </label>
+      <label id="cancel-opt-egreso" onclick="seleccionarTipoCancelacion('egreso')" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;transition:all 0.15s;">
+        <input type="radio" name="cancel-tipo" value="egreso" style="margin-top:3px;accent-color:#8a1a1a;">
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#8a1a1a;">💸 EGRESO</div>
+          <div style="font-size:0.72rem;color:#666;margin-top:2px;">El despacho debe reintegrar dinero al cliente porque se cobró más de lo efectivamente trabajado.</div>
+        </div>
+      </label>
+      <label id="cancel-opt-sin" onclick="seleccionarTipoCancelacion('sin')" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;cursor:pointer;transition:all 0.15s;">
+        <input type="radio" name="cancel-tipo" value="sin" style="margin-top:3px;accent-color:#666;">
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#555;">⚖️ SIN MOVIMIENTO</div>
+          <div style="font-size:0.72rem;color:#666;margin-top:2px;">Lo pagado cubre exactamente lo trabajado. No hay cobro ni devolución pendiente. Quedan a mano.</div>
+        </div>
+      </label>
+    </div>
+    <div id="cancel-monto-wrap" style="display:none;margin-bottom:0;">
+      <label class="modal-motivo-label" id="cancel-monto-label">Monto</label>
+      <input type="number" id="cancelacion-monto" min="0" step="0.01" placeholder="0.00"
+        style="width:100%;background:var(--field-bg);border:1.5px solid var(--gold);border-radius:4px;padding:7px 10px;font-family:'DM Mono',monospace;font-size:0.9rem;color:var(--ink);outline:none;margin-bottom:14px;">
+    </div>
+    <div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+        <label class="modal-motivo-label" style="margin-bottom:0;">Concepto interno <span style="color:#888;font-size:0.6rem;">(solo visible en Ficha del Folio — no aparece en PDF)</span></label>
+        <button id="cancel-btn-retro" type="button" onclick="cancelRetroToggle()"
+          style="font-family:'DM Mono',monospace;font-size:0.58rem;font-weight:700;padding:3px 8px;border-radius:4px;border:1px solid rgba(200,149,42,0.3);background:none;color:var(--muted);cursor:pointer;white-space:nowrap;transition:all 0.15s;letter-spacing:0.06em;">⏰ RETRO</button>
+      </div>
+      <input type="text" id="cancelacion-concepto-interno" placeholder="Ej: Honorarios devengados por gestiones realizadas..."
+        style="width:100%;background:var(--field-bg);border:1.5px solid #ccc;border-radius:4px;padding:7px 10px;font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--ink);outline:none;box-sizing:border-box;">
+      <div id="cancel-retro-info" style="display:none;font-family:'DM Mono',monospace;font-size:0.6rem;color:#8b5cf6;margin-top:4px;padding:4px 8px;background:rgba(90,58,138,0.08);border-radius:4px;border:1px solid rgba(90,58,138,0.2);">⏰ RETRO ACTIVO — <span id="cancel-retro-fecha-display"></span> · <span onclick="cancelRetroEditar()" style="cursor:pointer;text-decoration:underline;">Editar</span> · <span onclick="cancelRetroDesactivar()" style="cursor:pointer;text-decoration:underline;">Desactivar</span></div>
+    </div>
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="cerrarModalCancelacion()">✕ Cancelar</button>
-      <button class="btn btn-primary" style="background:#8a1a1a;border-color:#8a1a1a;" onclick="confirmarCancelacion()">🚫 Confirmar anulación</button>
+      <button class="btn btn-primary" style="background:#8a1a1a;border-color:#8a1a1a;" onclick="confirmarCancelacion()">🚫 Confirmar y generar folio</button>
     </div>
   </div>
 </div>
@@ -7435,9 +7474,11 @@ async function generarPDF(datos,folio,qrDataURL){
                           parseFloat(datos.totalAbonado || datos.anticipo || 0) >= parseFloat(datos.total || 0);
   const _esFinalLiq = (_esUpdate || _pagadoCompleto) && (parseFloat(datos.saldoNuevo)<=0 || parseFloat(datos.saldoPendiente)<=0);
   const _esParcial  = _esUpdate && !_esFinalLiq;
-  const _tituloRecibo = _esFinalLiq ? 'RECIBO DE LIQUIDACIÓN'
-                      : _esParcial  ? 'RECIBO DE ABONO PARCIAL'
-                      :               'RECIBO OFICIAL';
+  const _esCancelacion = !!datos.cancelado && _esUpdate;
+  const _tituloRecibo = _esCancelacion ? 'RECIBO DE CANCELACIÓN'
+                      : _esFinalLiq    ? 'RECIBO DE LIQUIDACIÓN'
+                      : _esParcial     ? 'RECIBO DE ABONO PARCIAL'
+                      :                  'RECIBO OFICIAL';
   doc.setTextColor(154,110,24); doc.setFontSize(10); doc.setFont('times','bold');
   doc.text(_tituloRecibo, margin, yAfterH);
   // Referencia al folio original (solo en versiones B+)
@@ -7955,19 +7996,54 @@ async function generarPDF(datos,folio,qrDataURL){
   // ── NOTA DE CANCELACIÓN ──
   if(datos.cancelado){
     const fechaCan = datos.fechaCancelacion
-      ? new Date(datos.fechaCancelacion).toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})
-      : new Date().toLocaleDateString('es-MX');
-    const motivo = datos.motivoCancelacion || 'Sin motivo especificado';
+      ? new Date(datos.fechaCancelacion).toLocaleString('es-MX',{day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit'})
+      : '';
+    // Motivo sin la parte de autorización (quitar desde " — Autorizó:")
+    const motivoCompleto = datos.motivoCancelacion || 'Sin motivo especificado';
+    const motivo = motivoCompleto.split(' — Autoriz')[0].trim();
+    // Concepto de liquidación (ingreso/egreso/sin movimiento)
+    const tipoCan = datos.cancelacionTipo || '';
+    const montoCan = parseFloat(datos.cancelacionMonto || 0);
+    const conceptoCan = tipoCan==='ingreso'
+      ? 'Honorarios por cancelación'
+      : tipoCan==='egreso'
+      ? 'Reintegro por cancelación'
+      : tipoCan==='sin' ? 'Cancelación sin movimiento económico' : '';
+    const montoCanStr = montoCan > 0
+      ? (tipoCan==='egreso' ? '  EGRESO: -$' : '  INGRESO: +$') + montoCan.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',')
+      : (tipoCan==='sin' ? '  Sin movimiento económico' : '');
+
+    // Calcular altura del box según contenido real
+    doc.setFontSize(6.8);
+    const motivoLines = doc.splitTextToSize('Motivo: '+motivo, cW-12);
+    const nLineas = motivoLines.length;
+    const lineH = 4.5;
     const boxY = y + 24;
-    const boxH = 22;
+    const boxH = 7 + 5.5 + 5 + (nLineas * lineH) + (conceptoCan ? 9 : 2);
+
     doc.setFillColor(255,245,245); doc.setDrawColor(180,40,40); doc.setLineWidth(0.5);
     doc.rect(margin, boxY, cW, boxH, 'FD');
+
+    // Título
     doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(160,20,20);
-    doc.text('TRAMITE CANCELADO', margin+4, boxY+6);
+    doc.text('TRÁMITE CANCELADO', margin+4, boxY+6);
+
+    // Fecha
     doc.setFont('helvetica','normal'); doc.setFontSize(6.8); doc.setTextColor(100,20,20);
-    doc.text('Fecha de cancelacion: '+fechaCan, margin+4, boxY+12);
-    const motivoLines = doc.splitTextToSize('Motivo: '+motivo, cW-10);
-    doc.text(motivoLines[0], margin+4, boxY+18);
+    let _ly = boxY + 12;
+    if(fechaCan){ doc.text('Fecha de cancelación: '+fechaCan, margin+4, _ly); _ly += lineH + 1; }
+
+    // Motivo completo — todas las líneas
+    motivoLines.forEach(function(ln){ doc.text(ln, margin+4, _ly); _ly += lineH; });
+
+    // Concepto ingreso/egreso/sin movimiento — debajo del motivo con separación
+    if(conceptoCan){
+      _ly += 2;
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(80,20,20);
+      // Concepto a la izquierda, monto a la derecha
+      doc.text(conceptoCan, margin+4, _ly);
+      if(montoCanStr.trim()) doc.text(montoCanStr.trim(), margin+cW-4, _ly, {align:'right'});
+    }
   }
   // Footer — aplicar a TODAS las páginas (en caso de salto por muchos abonos)
   const totalPaginas = doc.internal.getNumberOfPages();
@@ -9521,39 +9597,136 @@ function cerrarModalCancelacion(){
   document.getElementById('modal-cancelacion').classList.remove('show');
   document.getElementById('cancelacion-motivo').value='';
 }
+// ── Helpers del modal de cancelación ──
+
+// Retro específico para cancelación
+window._cancelRetroActivo = false;
+
+function cancelRetroToggle(){
+  if(window._cancelRetroActivo){
+    cancelRetroDesactivar();
+  } else {
+    // Reutilizar el mismo editor de fecha retro existente
+    toggleReciboRetroactivo();
+    // Cuando el usuario confirme, actualizar el display del modal
+    var _orig = window.confirmarFechaRetro;
+    window.confirmarFechaRetro = function(){
+      _orig && _orig();
+      window._cancelRetroActivo = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+      cancelRetroActualizarDisplay();
+      window.confirmarFechaRetro = _orig; // restaurar
+    };
+  }
+}
+
+function cancelRetroDesactivar(){
+  window._cancelRetroActivo = false;
+  window._reciboRetroactivoActivo = false;
+  window._reciboRetroactivoFechaPersonalizada = null;
+  window._reciboRetroactivoHoraPersonalizada = null;
+  // Restaurar botón principal retro
+  var btnRetro = document.getElementById('btn-toggle-retro');
+  if(btnRetro){ btnRetro.style.background='none'; btnRetro.style.color='var(--muted)'; btnRetro.style.borderColor='rgba(200,149,42,0.3)'; btnRetro.textContent='⏰ RETRO'; }
+  cancelRetroActualizarDisplay();
+}
+
+function cancelRetroEditar(){
+  abrirEditorFechaRetro();
+}
+
+function cancelRetroActualizarDisplay(){
+  var btn = document.getElementById('cancel-btn-retro');
+  var info = document.getElementById('cancel-retro-info');
+  var fechaDisp = document.getElementById('cancel-retro-fecha-display');
+  var activo = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+  window._cancelRetroActivo = activo;
+  if(btn){
+    btn.style.background = activo ? '#5a3a8a' : 'none';
+    btn.style.color = activo ? '#fff' : 'var(--muted)';
+    btn.style.borderColor = activo ? '#5a3a8a' : 'rgba(200,149,42,0.3)';
+    btn.textContent = activo ? '⏰ RETRO ACTIVO' : '⏰ RETRO';
+  }
+  if(info) info.style.display = activo ? 'block' : 'none';
+  if(fechaDisp && activo){
+    fechaDisp.textContent = (window._reciboRetroactivoFechaPersonalizada||'') + ' ' + (window._reciboRetroactivoHoraPersonalizada||'');
+  }
+}
+
+function seleccionarTipoCancelacion(tipo){
+  ['ingreso','egreso','sin'].forEach(t => {
+    const el = document.getElementById('cancel-opt-'+t);
+    if(el) el.style.borderColor = t===tipo ? (t==='ingreso'?'#27500A':t==='egreso'?'#8a1a1a':'#666') : '#ddd';
+  });
+  const wrap = document.getElementById('cancel-monto-wrap');
+  const lbl  = document.getElementById('cancel-monto-label');
+  if(tipo === 'sin'){
+    wrap.style.display = 'none';
+  } else {
+    wrap.style.display = 'block';
+    lbl.textContent = tipo==='ingreso' ? 'Monto a cobrar al cliente ($)' : 'Monto a reintegrar al cliente ($)';
+  }
+  const radio = document.querySelector('input[name="cancel-tipo"][value="'+tipo+'"]');
+  if(radio) radio.checked = true;
+  window._cancelTipoSeleccionado = tipo;
+}
+
 async function ejecutarTramiteCancelado(){
   if(!reciboEnConsulta){ showModal('Error','No hay un recibo en consulta.'); return; }
-  // Primero pedir autorización, luego motivo de cancelación
   const auth = await pedirAutorizacion();
-  if(auth === null){ setStatus('ok','Cancelaci\u00f3n anulada \u2014 autorizaci\u00f3n no proporcionada','ok'); return; }
+  if(auth === null){ setStatus('ok','Cancelación anulada — autorización no proporcionada','ok'); return; }
   window._autorizacionCancelacion = auth;
-  // Mostrar modal con campo de motivo
-  document.getElementById('cancelacion-motivo').value='';
+  document.getElementById('cancelacion-motivo').value = '';
+  document.getElementById('cancelacion-monto').value = '';
+  document.getElementById('cancelacion-concepto-interno').value = '';
+  document.getElementById('cancel-monto-wrap').style.display = 'none';
+  window._cancelTipoSeleccionado = null;
+  ['ingreso','egreso','sin'].forEach(t => {
+    const el = document.getElementById('cancel-opt-'+t);
+    if(el) el.style.borderColor = '#ddd';
+    const radio = document.querySelector('input[name="cancel-tipo"][value="'+t+'"]');
+    if(radio) radio.checked = false;
+  });
   document.getElementById('modal-cancelacion').classList.add('show');
   document.getElementById('cancelacion-motivo').focus();
 }
+
 async function confirmarCancelacion(){
   const recibo = reciboEnConsulta;
   if(!recibo) return;
   const motivo = document.getElementById('cancelacion-motivo').value.trim();
+  const tipoCancelacion = window._cancelTipoSeleccionado;
+  const montoInput = parseFloat(document.getElementById('cancelacion-monto').value) || 0;
+  if(!tipoCancelacion){
+    if(typeof toast==='function') toast('⚠ Selecciona el tipo de cancelación','err');
+    return;
+  }
+  if((tipoCancelacion==='ingreso' || tipoCancelacion==='egreso') && montoInput <= 0){
+    if(typeof toast==='function') toast('⚠ Ingresa el monto','err');
+    return;
+  }
   document.getElementById('modal-cancelacion').classList.remove('show');
   const auth = window._autorizacionCancelacion || null;
   window._autorizacionCancelacion = null;
   const folio = String(recibo.folio).padStart(4,'0');
+  const _retroCanConf = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+  const _fechaCanConf = _retroCanConf ? window._reciboRetroactivoFechaPersonalizada : new Date().toISOString().slice(0,10);
+  const _horaCanConf  = _retroCanConf ? (window._reciboRetroactivoHoraPersonalizada || '00:00') : new Date().toTimeString().slice(0,5);
   recibo.cancelado = true;
-  recibo.fechaCancelacion = new Date().toISOString();
+  recibo.fechaCancelacion = _retroCanConf ? (_fechaCanConf + 'T' + _horaCanConf + ':00.000') : new Date().toISOString();
   recibo.motivoCancelacion = (motivo || 'Sin motivo especificado')
-    + (auth ? ' \u2014 Autoriz\u00f3: ' + auth.iniciales + ' [' + auth.fechaHora + ']' : '');
+    + (auth ? ' — Autorizó: ' + auth.iniciales + ' [' + auth.fechaHora + ']' : '');
+  recibo.cancelacionTipo = tipoCancelacion;
+  recibo.cancelacionMonto = montoInput;
+  recibo.cancelacionConceptoInterno = (document.getElementById('cancelacion-concepto-interno')?.value || '').trim();
   if(!appData.historialPagos) appData.historialPagos = {};
   if(!appData.historialPagos[recibo.folio]) appData.historialPagos[recibo.folio] = [];
   appData.historialPagos[recibo.folio].push({
     folio: recibo.folio,
-    fecha: new Date().toLocaleDateString('es-MX'),
+    fecha: _retroCanConf ? new Date(_fechaCanConf + 'T12:00:00').toLocaleDateString('es-MX') : new Date().toLocaleDateString('es-MX'),
     tipo: 'CANCELADO',
     pago: 0,
     saldoRestante: recibo.saldoPendiente || 0
   });
-  // Regenerar el PDF con marca de agua CANCELADO, nota y motivo
   try {
     const clientes = recibo.clientes || [{nombre: recibo.nombre, movil:'', tel:'', domicilio:''}];
     const primerNombre = clientes[0].nombre || recibo.nombre;
@@ -9578,23 +9751,188 @@ async function confirmarCancelacion(){
   actualizarArchivoControl().catch(e=>console.warn('Control:',e));
   renderHistorial();
   cerrarConsulta();
-  showModal('Trámite Cancelado','El recibo #'+folio+' ('+recibo.nombre+') ha sido marcado como CANCELADO y registrado en el historial.');
+  // Los tres tipos generan folio B — sin movimiento genera folio en $0 como precedente documental
+  setTimeout(async () => {
+    await _lanzarFolioCancelacion(recibo, tipoCancelacion, tipoCancelacion==='sin' ? 0 : montoInput, motivo, auth);
+  }, 400);
 }
+
+async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth){
+  // Etiqueta del movimiento
+  const etiqueta = tipo==='ingreso' ? 'Honorarios por cancelación'
+    : tipo==='egreso' ? 'Reintegro por cancelación'
+    : 'Cancelación sin movimiento económico';
+
+  // ── 1. Calcular letra del folio B/C/D ──
+  const letrasUsadas = (appData.recibos||[])
+    .filter(_r => _r.folio === recibo.folio && !_r.esComplemento)
+    .map(_r => (_r.letra||'A').toUpperCase().charCodeAt(0));
+  const letraBase = (recibo.letra||'A').toUpperCase().charCodeAt(0);
+  const maxLetra  = letrasUsadas.length > 0 ? Math.max(...letrasUsadas) : letraBase;
+  const letraActual = String.fromCharCode(maxLetra + 1);
+  const folioLetraStr = folioConLetra(recibo.folio, recibo.anio_folio, letraActual);
+
+  // ── 2. Fecha/hora — respetar modo retro si está activo ──
+  const _retroCan = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+  const ahora     = _retroCan ? window._reciboRetroactivoFechaPersonalizada : (typeof fechaCDMX_ISO === 'function' ? fechaCDMX_ISO() : new Date().toISOString().slice(0,10));
+  const horaAhora = _retroCan ? (window._reciboRetroactivoHoraPersonalizada || '00:00') : (typeof horaCDMX_HHMM === 'function' ? horaCDMX_HHMM() : new Date().toTimeString().slice(0,5));
+  const fechaHoraStr = ahora + ' ' + horaAhora + ' hrs.';
+
+  // ── 3. Construir el pago parcial de cancelación (monto = 0 para no alterar saldos) ──
+  // El movimiento va en pagosParciales como registro histórico al final del PDF
+  // SIN sumar ni restar al total del trámite original
+  const ppCancelacion = {
+    concepto: etiqueta,
+    descripcion: '',  // descripción vacía — el motivo solo va en el bloque rojo
+    cantidad: '0',  // siempre 0 — no afecta sumas
+    fechaHora: fechaHoraStr,
+    locked: false,
+    folioLetra: letraActual,
+    _hasAuthInline: true
+  };
+
+  // ── 4. Fechas de impresión ──
+  const fechasImpresion = (recibo.fechasImpresion && recibo.fechasImpresion.length)
+    ? recibo.fechasImpresion.slice()
+    : [{ fecha: recibo.fecha||recibo.fecha_recibo||'', hora: recibo.hora||recibo.hora_recibo||'', etiqueta:'Original' }];
+  fechasImpresion.push({ fecha: ahora, hora: horaAhora, etiqueta: 'Cancelación' });
+
+  // ── 5. Generar PDF ──
+  setStatus('loading', 'Generando folio de cancelación ' + folioLetraStr + '...', 'loading');
+  try {
+    const clientes = recibo.clientes || [{nombre:recibo.nombre,movil:'',tel:'',domicilio:''}];
+    const primerNombre = clientes[0].nombre || recibo.nombre;
+    const qrTexto = 'LEX-MEXICO|Folio:'+folioLetraStr+'|'+primerNombre+'|CANCELACION';
+    const qrDataURL = await qrToDataURL(qrTexto);
+
+    const pagosPrevios = (recibo.pagosParciales||[]).map(p=>Object.assign({},p,{locked:true}));
+    const costosPrevios = (recibo.costosExtra||[]).map(c=>Object.assign({},c,{locked:true}));
+
+    // Auth tag solo para auditoría interna — NO se agrega a pagosParciales del PDF
+    const authTag = 'Autorizó: ' + (auth ? auth.iniciales : '') + ' [' + (auth ? auth.fechaHora : '') + ']';
+
+    const datos = Object.assign({}, recibo, {
+      clientes,
+      tramites: recibo.tramites||'',
+      fecha_recibo: recibo.fecha||recibo.fecha_recibo||'',
+      hora_recibo:  recibo.hora||recibo.hora_recibo||'',
+      anticipo: String(recibo.anticipo||0),
+      conceptos: recibo.conceptos||[],
+      costosExtra: costosPrevios,
+      pagosParciales: pagosPrevios,  // sin línea de cancelación — va solo en bloque rojo
+      // Saldos: NO cambian — cancelación no afecta la deuda del trámite
+      total: recibo.total,
+      saldoPendiente: recibo.saldoPendiente,
+      totalAbonado: recibo.totalAbonado||recibo.anticipo||0,
+      fechasImpresion,
+      letra: letraActual,
+      esActualizacion: true,
+      cancelado: true,
+      fechaCancelacion: recibo.fechaCancelacion,
+      motivoCancelacion: recibo.motivoCancelacion,
+      responsable: recibo.responsable||'',
+      nombre_cliente_firma: recibo.nombre_cliente_firma||''
+    });
+
+    const doc = await generarPDF(datos, recibo.folio, qrDataURL);
+    const nombreArchivo = 'Recibo_' + folioLetraStr + '_' + primerNombre.replace(/\s+/g,'_') + '.pdf';
+    const pdfBase64 = doc.output('datauristring');
+
+    // ── 6. Guardar el nuevo registro B en appData.recibos ──
+    const idx = appData.recibos.findIndex(r => r.folio === recibo.folio && !r.esActualizacion && !r.esComplemento);
+    if(idx >= 0){
+      const nuevoRegistro = Object.assign({}, appData.recibos[idx], datos, {
+        pdfBase64,
+        archivo: nombreArchivo,
+        letra: letraActual,
+        esActualizacion: true,
+        fechaActualizacion: ahora,
+        horaActualizacion: horaAhora,
+        cancelado: true,
+        cancelacionTipo: tipo,
+        cancelacionMonto: monto
+      });
+      appData.recibos.splice(idx + 1, 0, nuevoRegistro);
+
+      // Sincronizar el recibo original con estado cancelado
+      appData.recibos[idx] = Object.assign({}, appData.recibos[idx], {
+        cancelado: true,
+        fechaCancelacion: recibo.fechaCancelacion,
+        motivoCancelacion: recibo.motivoCancelacion,
+        cancelacionTipo: tipo,
+        cancelacionMonto: monto,
+        cancelacionConceptoInterno: recibo.cancelacionConceptoInterno||''
+      });
+
+      if(typeof _guardarVersionEnSupabase === 'function')
+        _guardarVersionEnSupabase(nuevoRegistro, letraActual, nombreArchivo).catch(e=>console.warn('[SB cancelacion]:',e));
+    }
+
+    // ── 7. Registrar en contabilidad ──
+    if(typeof D !== 'undefined' && Array.isArray(D.movimientos) && monto > 0){
+      const tipoMov = tipo === 'ingreso' ? 'ingreso' : 'egreso';
+      const mov = {
+        id: 'M-CAN-' + recibo.folio + '-' + Date.now(),
+        folioCaja: '',
+        fecha: ahora,
+        hora: horaAhora,
+        descripcion: etiqueta + ' · Recibo #' + folioLetraStr + ' · ' + (recibo.nombre||''),
+        nombre: recibo.nombre||'',
+        folio: recibo.folio,
+        letra: letraActual,
+        monto: monto,
+        tipo: tipoMov,
+        cat: etiqueta + ' · #' + folioLetraStr,
+        estatus: 'Cancelación',
+        fuente: 'recibo',
+        responsable: typeof empNombre === 'function' ? empNombre() : (recibo.responsable||'')
+      };
+      _registrarMovimiento(mov);
+    }
+
+    // ── 8. Guardar y renderizar ──
+    if(typeof actualizarArchivoControl === 'function')
+      await actualizarArchivoControl().catch(e=>console.warn('[Control cancelacion]:',e));
+    if(typeof save === 'function') save();
+    if(typeof renderHistorial === 'function') renderHistorial();
+    if(typeof renderCaja === 'function') renderCaja();
+    if(typeof renderContab === 'function') renderContab();
+    try { await syncEstadoSupabase(); } catch(e){ syncEstadoSupabaseDebounced().catch(()=>{}); }
+
+    // ── 9. Imprimir ──
+    reemplazarPDFenDrive(doc.output('blob'), nombreArchivo).catch(e=>console.warn('[Drive cancelacion]:',e));
+    setStatus('ok', 'Folio ' + folioLetraStr + ' de cancelación generado', 'ok');
+    imprimirDesdeBlob(doc.output('blob'), nombreArchivo);
+
+    if(typeof siguienteFolio === 'function'){
+      setTimeout(()=>{ try{ siguienteFolio(); }catch(e){} }, 700);
+    }
+
+  } catch(e){
+    console.error('[Cancelacion folio B]', e);
+    setStatus('err', 'Error al generar folio de cancelación: ' + e.message, 'err');
+    showModal('Error', 'No se pudo generar el folio de cancelación: ' + e.message);
+  }
+}
+
 async function _confirmarCancelacionReal(recibo, motivo, auth){
   window._autorizacionCancelacion = null;
   const folio = folioConLetra(recibo.folio, recibo.anio_folio, recibo.letra||letraVersion(recibo)||'A');
   // Restaurar status-bar antes de operar
   const _sbCanR = document.querySelector('.status-bar');
   if(_sbCanR) _sbCanR.removeAttribute('style');
+  const _retroCanReal = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+  const _fechaCanReal = _retroCanReal ? window._reciboRetroactivoFechaPersonalizada : new Date().toISOString().slice(0,10);
+  const _horaCanReal  = _retroCanReal ? (window._reciboRetroactivoHoraPersonalizada || '00:00') : new Date().toTimeString().slice(0,5);
   recibo.cancelado = true;
-  recibo.fechaCancelacion = new Date().toISOString();
+  recibo.fechaCancelacion = _retroCanReal ? (_fechaCanReal + 'T' + _horaCanReal + ':00.000') : new Date().toISOString();
   recibo.motivoCancelacion = (motivo || 'Sin motivo especificado')
     + (auth ? ' \u2014 Autoriz\u00f3: ' + auth.iniciales + ' [' + auth.fechaHora + ']' : '');
   if(!appData.historialPagos) appData.historialPagos = {};
   if(!appData.historialPagos[recibo.folio]) appData.historialPagos[recibo.folio] = [];
   appData.historialPagos[recibo.folio].push({
     folio: recibo.folio,
-    fecha: new Date().toLocaleDateString('es-MX'),
+    fecha: _retroCanReal ? new Date(_fechaCanReal + 'T12:00:00').toLocaleDateString('es-MX') : new Date().toLocaleDateString('es-MX'),
     tipo: 'CANCELADO',
     pago: 0,
     saldoRestante: recibo.saldoPendiente || 0
@@ -9811,14 +10149,33 @@ function pedirAutorizacion(){
     _autorizacionPromiseResolver = resolve;
     const emailActual = (empleadoActual && empleadoActual.email) ? empleadoActual.email.toLowerCase() : '';
     const esAdmin = emailActual === ADMIN_EMAIL.toLowerCase();
-    // Timestamp
+    // Timestamp — si hay modo retro activo, mostrar la fecha retroactiva
     const tsPreview = document.getElementById('auth-timestamp-preview');
-    const nowStr = new Date().toLocaleString('es-MX', {
-      timeZone:'America/Mexico_City',
-      weekday:'short', day:'numeric', month:'short', year:'numeric',
-      hour:'2-digit', minute:'2-digit', second:'2-digit'
-    });
-    tsPreview.textContent = '\ud83d\udcc5 Se registrar\u00e1: ' + nowStr.toUpperCase() + ' (CDMX)';
+    const _retroActivo = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+    let tsStr;
+    if(_retroActivo){
+      const _rf = window._reciboRetroactivoFechaPersonalizada; // YYYY-MM-DD
+      const _rh = window._reciboRetroactivoHoraPersonalizada || '00:00';
+      const _retroDate = new Date(_rf + 'T' + _rh + ':00');
+      tsStr = _retroDate.toLocaleString('es-MX', {
+        weekday:'short', day:'numeric', month:'short', year:'numeric',
+        hour:'2-digit', minute:'2-digit'
+      });
+      tsPreview.style.background = '#fff8e0';
+      tsPreview.style.borderColor = '#c8952a';
+      tsPreview.style.color = '#7a4010';
+      tsPreview.textContent = '\ud83d\udcc5 Se registrar\u00e1 (RETRO): ' + tsStr.toUpperCase();
+    } else {
+      const nowStr = new Date().toLocaleString('es-MX', {
+        timeZone:'America/Mexico_City',
+        weekday:'short', day:'numeric', month:'short', year:'numeric',
+        hour:'2-digit', minute:'2-digit', second:'2-digit'
+      });
+      tsPreview.style.background = '';
+      tsPreview.style.borderColor = '';
+      tsPreview.style.color = '';
+      tsPreview.textContent = '\ud83d\udcc5 Se registrar\u00e1: ' + nowStr.toUpperCase() + ' (CDMX)';
+    }
     tsPreview.style.display = 'block';
     if(esAdmin){
       // Admin: mostrar selector de empleados
@@ -11569,21 +11926,8 @@ function _acuerdosClave(juicioId) {
 // Intenta Supabase primero (campo acuerdos_drive), cae a localStorage como fallback
 async function cargarAcuerdosDrive(juicioId) {
   if (!juicioId) return [];
-  // Fallback: localStorage siempre disponible
   const lsKey = 'lex_acuerdos_' + juicioId;
-  let lsData = [];
-  try { lsData = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e) {}
-  if (!window.SB) return lsData;
-  try {
-    const { data, error } = await window.SB.from('juicios').select('acuerdos_drive').eq('id', juicioId).single();
-    if (!error && data && data.acuerdos_drive) {
-      const sbData = JSON.parse(data.acuerdos_drive);
-      // Supabase tiene datos: sincronizar a localStorage y retornar
-      try { localStorage.setItem(lsKey, JSON.stringify(sbData)); } catch(e) {}
-      return sbData;
-    }
-  } catch(e) { console.warn('[Acuerdos] Supabase no disponible, usando localStorage'); }
-  return lsData;
+  try { return JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e) { return []; }
 }
 
 // Guardar acuerdos — escribe en localStorage y en Supabase (si disponible)
@@ -11591,10 +11935,6 @@ async function guardarAcuerdosDrive(juicioId, lista) {
   if (!juicioId) return;
   const lsKey = 'lex_acuerdos_' + juicioId;
   try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e) {}
-  if (!window.SB) return;
-  try {
-    await window.SB.from('juicios').update({ acuerdos_drive: JSON.stringify(lista) }).eq('id', juicioId);
-  } catch(e) { console.warn('[Acuerdos] Error guardando en Supabase (ok, guardado en localStorage):', e.message); }
 }
 
 // Renderizar la lista de acuerdos en el panel
@@ -22625,6 +22965,18 @@ async function adminEliminarRecibo(idx) {
     var _fs = String(r.folio);
     if (!D.recibosExcluidosCaja.map(String).includes(_fs)) D.recibosExcluidosCaja.push(_fs);
   }
+  // 6b. Eliminar de tabla versiones_recibo en Supabase — evita que se restaure en el siguiente sync
+  if (window.SB && window.SB_DESPACHO_ID) {
+    try {
+      await window.SB.from('versiones_recibo')
+        .delete()
+        .eq('despacho_id', window.SB_DESPACHO_ID)
+        .eq('folio_base', r.folio)
+        .eq('letra', letra);
+      console.log('[adminEliminarRecibo] versiones_recibo eliminado — folio:', r.folio, 'letra:', letra);
+    } catch(e) { console.warn('[adminEliminarRecibo] Error borrando versiones_recibo:', e); }
+  }
+
   // 7. Eliminar PDF de R2 (Cloudflare) y de Supabase Storage
   if (r.archivo) {
     if (typeof window.borrarR2 === 'function' && window.SB_DESPACHO_ID) {
@@ -27322,6 +27674,7 @@ function confirmarFechaRetro(){
   window._reciboRetroactivoFechaPersonalizada = fecha;
   window._reciboRetroactivoHoraPersonalizada = hr;
   window._reciboRetroactivoMotivo = motivo || '(sin motivo)';
+  window._reciboRetroactivoActivo = true;  // ← CRÍTICO: marcar como activo
   // Aplicar al formulario
   var fHidden = document.getElementById('fecha_recibo');
   var hHidden = document.getElementById('hora_recibo');
@@ -27355,6 +27708,8 @@ function confirmarFechaRetro(){
     }
   });
   if(typeof toast === 'function') toast('✅ Fecha retroactiva aplicada: ' + fecha, 'ok');
+  // Si el modal de cancelación está visible, actualizar su display de retro
+  if(typeof cancelRetroActualizarDisplay === 'function') cancelRetroActualizarDisplay();
 }
 // Hook al guardado de recibo: si modo retro está activo, agregar auditoría
 // Esto se aprovecha de que guardarReciboInterno usa fecha_recibo.value cuando está seteado.
@@ -35507,7 +35862,7 @@ function regresarAlFormulario(){
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->
 <div id="modal-ficha-folio" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:#fdfaf4;border:1.5px solid #c8952a;border-radius:8px;width:96%;max-width:1140px;height:90vh;display:flex;flex-direction:row;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);">
+  <div style="background:#fdfaf4;border:1.5px solid #c8952a;border-radius:8px;width:96%;max-width:1140px;height:90vh;display:flex;flex-direction:row;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.4);position:relative;">
 
     <!-- PANEL LATERAL IZQUIERDO -->
     <div style="width:185px;flex-shrink:0;background:#f5f0e0;border-right:1px solid #d4b870;display:flex;flex-direction:column;padding:10px 8px;gap:5px;">
@@ -35552,6 +35907,13 @@ function regresarAlFormulario(){
     <!-- CONTENIDO PRINCIPAL -->
     <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
 
+      <!-- MARCA DE AGUA CANCELADO — solo visible si el folio está cancelado -->
+      <div id="ficha-watermark-cancelado" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;overflow:hidden;border-radius:12px;">
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.10);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
+        <div style="position:absolute;top:25%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
+        <div style="position:absolute;top:75%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
+      </div>
+
       <!-- HEADER -->
       <div style="background:#f5f0e0;border-bottom:1px solid #d4b870;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
@@ -35590,6 +35952,18 @@ function regresarAlFormulario(){
           <div id="fichaNotasDisplay" onclick="fichaToggleNotas()" style="font-size:0.78rem;color:#7a6840;font-style:italic;cursor:pointer;padding:6px 8px;border-radius:4px;border:0.5px solid transparent;transition:all 0.15s;text-align:justify;word-break:break-word;overflow-wrap:break-word;white-space:pre-wrap;" onmouseover="this.style.background='#fffdf5';this.style.borderColor='#d4b870'" onmouseout="this.style.background='transparent';this.style.borderColor='transparent'">✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.</div>
           <textarea id="fichaNotasInput" placeholder="Notas libres..." style="display:none;width:100%;font-size:0.78rem;padding:8px 10px;border:0.5px solid #c8952a;border-radius:4px;background:#fffdf5;resize:none;min-height:70px;font-family:inherit;box-sizing:border-box;margin-top:4px;"></textarea>
           <button id="fichaSaveNotas" onclick="fichaGuardarNotas()" style="display:none;margin-top:5px;font-size:0.7rem;padding:4px 12px;border-radius:4px;border:0.5px solid #d4b870;background:#f5f0e0;cursor:pointer;color:#5a3e10;">✓ Guardar</button>
+        </div>
+
+        <!-- BANDA CANCELACIÓN — solo visible si está cancelado -->
+        <div id="ficha-banda-cancelacion" style="display:none;border-radius:6px;overflow:hidden;margin-bottom:12px;border:1px solid rgba(180,20,20,0.25);">
+          <div style="background:rgba(180,20,20,0.08);padding:8px 14px;border-bottom:1px solid rgba(180,20,20,0.15);">
+            <div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#8a1a1a;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:3px;">⚠ Motivo de cancelación</div>
+            <div id="ficha-cancelacion-motivo" style="font-size:0.78rem;color:#8a1a1a;font-weight:600;line-height:1.4;"></div>
+          </div>
+          <div id="ficha-cancelacion-concepto-wrap" style="display:none;background:rgba(26,95,168,0.05);padding:8px 14px;">
+            <div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:3px;">📋 Concepto interno</div>
+            <div id="ficha-cancelacion-concepto" style="font-size:0.78rem;color:#1a3a7a;font-weight:500;line-height:1.4;"></div>
+          </div>
         </div>
 
         <!-- RECIBOS -->
@@ -35833,6 +36207,32 @@ function abrirFichaFolio(){
   // Badge modo lectura
   var badgeLiq=document.getElementById('ficha-badge-liquidado');
   if(badgeLiq) badgeLiq.style.display=liquidado?'inline-block':'none';
+
+  // ── Cancelación: marca de agua + banda motivo/concepto ──
+  var cancelado = !!(r && r.cancelado);
+  var watermark = document.getElementById('ficha-watermark-cancelado');
+  var banda = document.getElementById('ficha-banda-cancelacion');
+  var elMotivo = document.getElementById('ficha-cancelacion-motivo');
+  var elConcepto = document.getElementById('ficha-cancelacion-concepto');
+  var elConceptoWrap = document.getElementById('ficha-cancelacion-concepto-wrap');
+  if(watermark) watermark.style.display = cancelado ? 'block' : 'none';
+
+  if(banda) banda.style.display = cancelado ? 'block' : 'none';
+  if(cancelado && elMotivo){
+    // Mostrar solo el motivo sin la parte de autorización para que quede limpio
+    var motivoCompleto = r.motivoCancelacion || 'Sin motivo especificado';
+    elMotivo.textContent = motivoCompleto;
+  }
+  if(cancelado && elConcepto){
+    var concepto = r.cancelacionConceptoInterno || '';
+    if(concepto && elConceptoWrap){
+      elConceptoWrap.style.display = 'block';
+      elConcepto.textContent = concepto;
+    } else if(elConceptoWrap){
+      elConceptoWrap.style.display = 'none';
+    }
+  }
+
   document.getElementById('modal-ficha-folio').style.display='flex';
   document.body.style.overflow='hidden';
 }

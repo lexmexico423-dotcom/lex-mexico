@@ -4872,7 +4872,7 @@ window.addEventListener('offline', ()=>{
             <button onclick="cerrarVisorAcuerdo()" style="padding:5px 12px;border-radius:4px;border:1px solid #555;background:#333;color:#ccc;font-size:0.72rem;cursor:pointer;font-family:'JetBrains Mono',monospace;">← Cerrar</button>
             <span id="acuerdo-visor-nombre" style="color:#e0e0e0;font-size:0.75rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'JetBrains Mono',monospace;"></span>
           </div>
-          <iframe id="acuerdo-visor-iframe" src="" style="flex:1;border:none;width:100%;background:#fff;"></iframe>
+          <iframe id="acuerdo-visor-iframe" src="about:blank" style="flex:1;border:none;width:100%;background:#fff;"></iframe>
         </div>
       </div>
 
@@ -12250,7 +12250,7 @@ function cerrarVisorAcuerdo() {
   const overlay = document.getElementById('acuerdo-visor-overlay');
   const iframe  = document.getElementById('acuerdo-visor-iframe');
   if (overlay) overlay.style.display = 'none';
-  if (iframe) { try { URL.revokeObjectURL(iframe.src); } catch(e){} iframe.src = ''; }
+  if (iframe) { try { URL.revokeObjectURL(iframe.src); } catch(e){} iframe.src = 'about:blank'; }
 }
 
 // Mostrar resumen del acuerdo al hacer clic en el historial o en la tarjeta
@@ -36216,7 +36216,7 @@ function abrirFichaFolio(){
   // Intentar cargar desde R2 (puede tener versión más reciente)
   if(window.descargarR2 && window.SB_DESPACHO_ID) {
     var _notaPath = window.SB_DESPACHO_ID+'/notas_folio/'+anio+'/'+folio+'.txt';
-    window.descargarR2(_notaPath, 'expedientes').then(function(blob) {
+    window.descargarR2(_notaPath, 'expedientes', true).then(function(blob) {
       if(!blob) return;
       return blob.text();
     }).then(function(txt) {
@@ -36371,7 +36371,7 @@ async function _gastoR2Cargar(folio, anio) {
   // 1) Intentar R2
   if (window.descargarR2 && window.SB_DESPACHO_ID) {
     try {
-      const blob = await window.descargarR2(_gastoR2Path(folio, anio), 'expedientes');
+      const blob = await window.descargarR2(_gastoR2Path(folio, anio), 'expedientes', true);
       if (blob) {
         const txt = await blob.text();
         const data = JSON.parse(txt);

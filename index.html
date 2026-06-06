@@ -2553,7 +2553,8 @@ window.console.info = function(){};
   body.modo-consulta.folio-cancelado .btn-pago-parcial { display: none !important; }
   body.modo-consulta.folio-cancelado .btn-liquidacion  { display: none !important; }
   body.modo-consulta.folio-cancelado .btn-cancelado    { display: none !important; }
-  /* Folio cancelado: deshabilitar Servicios Complementarios (Vincular Archivo siempre disponible) */
+  /* Folio cancelado: deshabilitar Vincular Archivo y Servicios Complementarios */
+  body.modo-consulta.folio-cancelado #btn-vincular-archivo { opacity: 0.38; pointer-events: none; cursor: not-allowed; }
   body.modo-consulta.folio-cancelado button[onclick*="agregarCostoExtra"] { display: none !important; }
   body.modo-consulta.folio-cancelado .btn-serv-comp { opacity: 0.38 !important; pointer-events: none !important; cursor: not-allowed !important; }
   /* Folio liquidado: deshabilitar Servicios Complementarios */
@@ -35945,7 +35946,7 @@ function regresarAlFormulario(){
 
       <div style="flex:1;max-height:10px;"></div>
 
-      <button id="ficha-btn-exp-digital" disabled title="Próximamente" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #a0b8d8;background:#f0f5fc;color:#8090a8;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:not-allowed;width:100%;text-align:left;opacity:0.55;">
+      <button id="ficha-btn-exp-digital" onclick="cerrarFichaFolio();setTimeout(abrirVincularArchivo,200);" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #4a6ea8;background:#e6f1fb;color:#1a3a70;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#c8dcf4'" onmouseout="this.style.background='#e6f1fb'">
         <span style="font-size:15px;line-height:1;">📋</span>Exp. Digital
       </button>
 
@@ -36296,14 +36297,14 @@ function abrirFichaFolio(){
   var _bloquear = _bloquearAcciones;
   var _motivoBloqueo = cancelado ? 'folio cancelado' : 'folio liquidado';
   if(_bloquear){
-    if(btnSC){  btnSC.disabled=true;  btnSC.style.opacity='0.38'; btnSC.style.cursor='not-allowed'; btnSC.title='No disponible — '+_motivoBloqueo; btnSC.onmouseover=null; btnSC.onmouseout=null; }
-    if(btnExp){ btnExp.disabled=false; btnExp.style.opacity='1';  btnExp.style.cursor='pointer'; btnExp.title=''; }
+    if(btnSC){   btnSC.disabled=true;   btnSC.style.opacity='0.38'; btnSC.style.cursor='not-allowed'; btnSC.title='No disponible — '+_motivoBloqueo; btnSC.onmouseover=null; btnSC.onmouseout=null; }
+    if(btnVinc){ btnVinc.disabled=true; btnVinc.style.opacity='0.38'; btnVinc.style.cursor='not-allowed'; btnVinc.title='No disponible — '+_motivoBloqueo; btnVinc.onmouseover=null; btnVinc.onmouseout=null; }
   } else {
-    if(btnSC){  btnSC.disabled=false; btnSC.style.opacity='1'; btnSC.style.cursor='pointer'; btnSC.title=''; btnSC.onmouseover=function(){ this.style.background='#fde8cc'; }; btnSC.onmouseout=function(){ this.style.background='#fff0e0'; }; }
-    if(btnExp){ btnExp.disabled=true; btnExp.style.opacity='0.55'; btnExp.style.cursor='not-allowed'; btnExp.title='Próximamente'; }
+    if(btnSC){   btnSC.disabled=false;  btnSC.style.opacity='1'; btnSC.style.cursor='pointer'; btnSC.title=''; btnSC.onmouseover=function(){ this.style.background='#fde8cc'; }; btnSC.onmouseout=function(){ this.style.background='#fff0e0'; }; }
+    if(btnVinc){ btnVinc.disabled=false; btnVinc.style.opacity='1'; btnVinc.style.cursor='pointer'; btnVinc.title=''; btnVinc.onmouseover=function(){ this.style.background='#fde8a0'; }; btnVinc.onmouseout=function(){ this.style.background='#fff8e0'; }; }
   }
-  // Vincular Archivo: siempre habilitado sin importar el estado del folio
-  if(btnVinc){ btnVinc.disabled=false; btnVinc.style.opacity='1'; btnVinc.style.cursor='pointer'; btnVinc.title=''; btnVinc.onmouseover=function(){ this.style.background='#fde8a0'; }; btnVinc.onmouseout=function(){ this.style.background='#fff8e0'; }; }
+  // Exp. Digital: siempre habilitado sin importar el estado del folio
+  if(btnExp){ btnExp.disabled=false; btnExp.style.opacity='1'; btnExp.style.cursor='pointer'; btnExp.title=''; }
   // Badge modo lectura
   var badgeLiq=document.getElementById('ficha-badge-liquidado');
   if(badgeLiq){

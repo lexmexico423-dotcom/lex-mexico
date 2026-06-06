@@ -2556,6 +2556,9 @@ window.console.info = function(){};
   /* Folio cancelado: deshabilitar Vincular Archivo y Servicios Complementarios */
   body.modo-consulta.folio-cancelado #btn-vincular-archivo { opacity: 0.38; pointer-events: none; cursor: not-allowed; }
   body.modo-consulta.folio-cancelado button[onclick*="agregarCostoExtra"] { display: none !important; }
+  body.modo-consulta.folio-cancelado .btn-serv-comp { opacity: 0.38 !important; pointer-events: none !important; cursor: not-allowed !important; }
+  /* Folio liquidado: deshabilitar Servicios Complementarios */
+  body.modo-consulta.folio-liquidado .btn-serv-comp { opacity: 0.38 !important; pointer-events: none !important; cursor: not-allowed !important; }
   /* Cuadro "Estado del folio anterior" — aspecto cancelado */
   #info-folio-anterior.cancelado-box {
     filter: grayscale(1);
@@ -5600,14 +5603,9 @@ window.addEventListener('offline', ()=>{
         style="width:100%;background:var(--field-bg);border:1.5px solid var(--gold);border-radius:4px;padding:7px 10px;font-family:'DM Mono',monospace;font-size:0.9rem;color:var(--ink);outline:none;margin-bottom:14px;">
     </div>
     <div style="margin-bottom:14px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
-        <label class="modal-motivo-label" style="margin-bottom:0;">Concepto interno <span style="color:#888;font-size:0.6rem;">(solo visible en Ficha del Folio — no aparece en PDF)</span></label>
-        <button id="cancel-btn-retro" type="button" onclick="cancelRetroToggle()"
-          style="font-family:'DM Mono',monospace;font-size:0.58rem;font-weight:700;padding:3px 8px;border-radius:4px;border:1px solid rgba(200,149,42,0.3);background:none;color:var(--muted);cursor:pointer;white-space:nowrap;transition:all 0.15s;letter-spacing:0.06em;">⏰ RETRO</button>
-      </div>
+      <label class="modal-motivo-label">Concepto interno <span style="color:#888;font-size:0.6rem;">(solo visible en Ficha del Folio — no aparece en PDF)</span></label>
       <input type="text" id="cancelacion-concepto-interno" placeholder="Ej: Honorarios devengados por gestiones realizadas..."
         style="width:100%;background:var(--field-bg);border:1.5px solid #ccc;border-radius:4px;padding:7px 10px;font-family:'DM Mono',monospace;font-size:0.78rem;color:var(--ink);outline:none;box-sizing:border-box;">
-      <div id="cancel-retro-info" style="display:none;font-family:'DM Mono',monospace;font-size:0.6rem;color:#8b5cf6;margin-top:4px;padding:4px 8px;background:rgba(90,58,138,0.08);border-radius:4px;border:1px solid rgba(90,58,138,0.2);">⏰ RETRO ACTIVO — <span id="cancel-retro-fecha-display"></span> · <span onclick="cancelRetroEditar()" style="cursor:pointer;text-decoration:underline;">Editar</span> · <span onclick="cancelRetroDesactivar()" style="cursor:pointer;text-decoration:underline;">Desactivar</span></div>
     </div>
     <div class="modal-btns">
       <button class="btn btn-secondary" onclick="cerrarModalCancelacion()">✕ Cancelar</button>
@@ -9600,60 +9598,46 @@ function cerrarModalCancelacion(){
   document.getElementById('modal-cancelacion').classList.remove('show');
   document.getElementById('cancelacion-motivo').value='';
 }
-// ── Helpers del modal de cancelación ──
-
-// Retro específico para cancelación
-window._cancelRetroActivo = false;
-
-function cancelRetroToggle(){
-  if(window._cancelRetroActivo){
-    cancelRetroDesactivar();
+// ── Helpers de retro para la Ficha del Folio ──
+function fichaRetroToggle(){
+  if(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada){
+    fichaRetroDesactivar();
   } else {
-    // Reutilizar el mismo editor de fecha retro existente
-    toggleReciboRetroactivo();
-    // Cuando el usuario confirme, actualizar el display del modal
-    var _orig = window.confirmarFechaRetro;
-    window.confirmarFechaRetro = function(){
-      _orig && _orig();
-      window._cancelRetroActivo = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
-      cancelRetroActualizarDisplay();
-      window.confirmarFechaRetro = _orig; // restaurar
-    };
+    // Usar el mismo editor de fecha retro
+    abrirEditorFechaRetro();
   }
 }
-
-function cancelRetroDesactivar(){
-  window._cancelRetroActivo = false;
+function fichaRetroDesactivar(){
   window._reciboRetroactivoActivo = false;
   window._reciboRetroactivoFechaPersonalizada = null;
   window._reciboRetroactivoHoraPersonalizada = null;
-  // Restaurar botón principal retro
+  // Restaurar botón principal retro del formulario si existe
   var btnRetro = document.getElementById('btn-toggle-retro');
   if(btnRetro){ btnRetro.style.background='none'; btnRetro.style.color='var(--muted)'; btnRetro.style.borderColor='rgba(200,149,42,0.3)'; btnRetro.textContent='⏰ RETRO'; }
-  cancelRetroActualizarDisplay();
+  fichaRetroActualizarDisplay();
+  if(typeof toast==='function') toast('Modo retroactivo desactivado','ok');
 }
-
-function cancelRetroEditar(){
+function fichaRetroEditar(){
   abrirEditorFechaRetro();
 }
-
-function cancelRetroActualizarDisplay(){
-  var btn = document.getElementById('cancel-btn-retro');
-  var info = document.getElementById('cancel-retro-info');
-  var fechaDisp = document.getElementById('cancel-retro-fecha-display');
+function fichaRetroActualizarDisplay(){
+  var btn = document.getElementById('ficha-btn-retro');
+  var bar = document.getElementById('ficha-retro-bar');
+  var fechaDisp = document.getElementById('ficha-retro-fecha-display');
   var activo = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
-  window._cancelRetroActivo = activo;
   if(btn){
     btn.style.background = activo ? '#5a3a8a' : 'none';
-    btn.style.color = activo ? '#fff' : 'var(--muted)';
+    btn.style.color = activo ? '#fff' : '#7a6840';
     btn.style.borderColor = activo ? '#5a3a8a' : 'rgba(200,149,42,0.3)';
     btn.textContent = activo ? '⏰ RETRO ACTIVO' : '⏰ RETRO';
   }
-  if(info) info.style.display = activo ? 'block' : 'none';
+  if(bar){ bar.style.display = activo ? 'flex' : 'none'; }
   if(fechaDisp && activo){
     fechaDisp.textContent = (window._reciboRetroactivoFechaPersonalizada||'') + ' ' + (window._reciboRetroactivoHoraPersonalizada||'');
   }
 }
+
+// ── Helpers del modal de cancelación ──
 
 function seleccionarTipoCancelacion(tipo){
   ['ingreso','egreso','sin'].forEach(t => {
@@ -11457,16 +11441,29 @@ function filtrarHistorial(){
     list.innerHTML='<div class="empty-hist">'+(total?'Sin resultados para la búsqueda':'Aún no hay recibos generados')+'</div>';
     return;
   }
-  // Ordenar estrictamente por fecha+hora de generación descendente (más reciente arriba)
+  // Fecha efectiva de cada versión: B/C/D usan fechasImpresion[última] o fechaActualizacion
+  function _fechaEfRec(r){
+    if(r.fechasImpresion && r.fechasImpresion.length > 1){
+      var fp = r.fechasImpresion[r.fechasImpresion.length - 1];
+      return { f: fp.fecha || r.fechaActualizacion || r.fecha || '', h: fp.hora || r.horaActualizacion || r.hora || '00:00' };
+    }
+    if(r.fechaActualizacion) return { f: r.fechaActualizacion, h: r.horaActualizacion || r.hora || '00:00' };
+    return { f: r.fecha || '', h: r.hora || '00:00' };
+  }
+  // Ordenar por fecha+hora efectiva descendente (más reciente arriba)
   lista.sort(function(a, b) {
-    const fa = (a.fecha || '') + 'T' + (a.hora || '00:00');
-    const fb = (b.fecha || '') + 'T' + (b.hora || '00:00');
+    const da = _fechaEfRec(a), db = _fechaEfRec(b);
+    const fa = da.f + 'T' + da.h;
+    const fb = db.f + 'T' + db.h;
     if (fb !== fa) return fb.localeCompare(fa);
-    // Misma fecha y hora: folio mayor primero
+    // Misma fecha y hora: letra mayor primero (D > C > B > A), luego folio mayor
+    const la = (a.letra || 'A'), lb = (b.letra || 'A');
+    if(la !== lb) return lb.localeCompare(la);
     return (b.folio || 0) - (a.folio || 0);
   });
   list.innerHTML = lista.map(r=>{
     const i = appData.recibos.indexOf(r);
+    const ef = _fechaEfRec(r);
     const folioStr='#'+folioConLetra(r.folio, r.anio_folio, r.letra || 'A');
     const compTag=r.esComplemento?'<span style="color:#b07f1e;font-size:0.58rem;margin-left:3px">↳ ref #'+folioFormato(r.folioRef)+'</span>':'';
     const cancelTag=r.cancelado?'<span style="color:#8a1a1a;font-size:0.58rem;margin-left:5px;background:#fff0f0;border:1px solid #c04040;border-radius:3px;padding:1px 5px;font-family:DM Mono,monospace;letter-spacing:0.06em;">🚫 CANCELADO</span>':'';
@@ -11476,7 +11473,7 @@ function filtrarHistorial(){
     return '<div class="historial-item"'+(r.cancelado?' style="opacity:0.65;"':'')+' >'
       +'<span class="folio-num">'+folioStr+'</span>'+compTag+cancelTag
       +'<span class="client-name">'+escHTML((r.nombre||'').toUpperCase())+'</span>'
-      +'<span class="fecha-item">'+(r.fecha||'—')+' '+(r.hora||'')+'</span>'
+      +'<span class="fecha-item">'+(ef.f||'—')+' '+(ef.h||'')+'</span>'
       +(r.generadoPor?'<span style="font-family:\'DM Mono\',monospace;font-size:0.58rem;color:#7a6040;white-space:nowrap;margin-left:4px;" title="Generado por">👤 '+escHTML(r.generadoPor)+'</span>':'')
       +saldoTag
       +'<button class="download-btn" onclick="reDescargar('+i+')">⬇ PDF</button>'
@@ -27715,7 +27712,7 @@ function confirmarFechaRetro(){
   });
   if(typeof toast === 'function') toast('✅ Fecha retroactiva aplicada: ' + fecha, 'ok');
   // Si el modal de cancelación está visible, actualizar su display de retro
-  if(typeof cancelRetroActualizarDisplay === 'function') cancelRetroActualizarDisplay();
+  if(typeof fichaRetroActualizarDisplay === 'function') fichaRetroActualizarDisplay();
 }
 // Hook al guardado de recibo: si modo retro está activo, agregar auditoría
 // Esto se aprovecha de que guardarReciboInterno usa fecha_recibo.value cuando está seteado.
@@ -35929,7 +35926,17 @@ function regresarAlFormulario(){
           <span id="ficha-expediente-badge" style="display:none;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#1a3a7a;background:#dce8ff;padding:2px 10px;border-radius:20px;border:0.5px solid #4a6ea8;">📂 <span id="ficha-expediente-txt"></span></span>
           <span id="ficha-badge-liquidado" style="display:none;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#0f5228;background:#d4f5e0;padding:2px 10px;border-radius:20px;border:0.5px solid #2a9a50;">✅ LIQUIDADO · Solo lectura</span>
         </div>
-        <button onclick="cerrarFichaFolio()" style="background:none;border:none;cursor:pointer;color:#7a6840;font-size:1.4rem;line-height:1;padding:2px 6px;border-radius:4px;" onmouseover="this.style.background='#e8dcc0'" onmouseout="this.style.background='none'">✕</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button id="ficha-btn-retro" onclick="fichaRetroToggle()" type="button"
+            style="font-family:'DM Mono',monospace;font-size:0.58rem;font-weight:700;padding:3px 10px;border-radius:4px;border:1px solid rgba(200,149,42,0.3);background:none;color:#7a6840;cursor:pointer;white-space:nowrap;letter-spacing:0.06em;transition:all 0.15s;">⏰ RETRO</button>
+          <button onclick="cerrarFichaFolio()" style="background:none;border:none;cursor:pointer;color:#7a6840;font-size:1.4rem;line-height:1;padding:2px 6px;border-radius:4px;" onmouseover="this.style.background='#e8dcc0'" onmouseout="this.style.background='none'">✕</button>
+        </div>
+      </div>
+      <!-- RETRO ACTIVO INFO BAR — visible cuando retro está activo -->
+      <div id="ficha-retro-bar" style="display:none;background:rgba(90,58,138,0.12);border-bottom:1px solid rgba(90,58,138,0.3);padding:5px 16px;font-family:'DM Mono',monospace;font-size:0.62rem;color:#8b5cf6;display:none;align-items:center;gap:8px;flex-shrink:0;">
+        ⏰ RETRO ACTIVO — <span id="ficha-retro-fecha-display" style="font-weight:700;"></span>
+        <span onclick="fichaRetroEditar()" style="cursor:pointer;text-decoration:underline;margin-left:4px;">Editar</span>
+        <span onclick="fichaRetroDesactivar()" style="cursor:pointer;text-decoration:underline;margin-left:4px;">Desactivar</span>
       </div>
 
       <!-- SCROLL AREA -->
@@ -36193,16 +36200,17 @@ function abrirFichaFolio(){
     nd2.style.opacity='1';
     nd2.title='';
   }
-  // Botón gasto extraoficial
+  // Botones de acción: ocultar/deshabilitar si liquidado o cancelado
+  var _reciboCancelado = !!(recibo && recibo.cancelado);
+  var _bloquearAcciones = liquidado || _reciboCancelado;
   var btnGasto=document.getElementById('fichaBtnGasto');
-  if(btnGasto) btnGasto.style.display=liquidado?'none':'';
-  // Botones de pago: ocultar si ya está liquidado (mostrarían error "sin saldo")
+  if(btnGasto) btnGasto.style.display=_bloquearAcciones?'none':'';
   var btnPP=document.getElementById('ficha-btn-pago-parcial');
   var btnPT=document.getElementById('ficha-btn-pago-total');
-  if(btnPP) btnPP.style.display=liquidado?'none':'';
-  if(btnPT) btnPT.style.display=liquidado?'none':'';
+  if(btnPP) btnPP.style.display=_bloquearAcciones?'none':'';
+  if(btnPT) btnPT.style.display=_bloquearAcciones?'none':'';
   // ── Cancelación: marca de agua + banda motivo/concepto ──
-  var cancelado = !!(recibo && recibo.cancelado);
+  var cancelado = _reciboCancelado;
   var watermark = document.getElementById('ficha-watermark-cancelado');
   var banda = document.getElementById('ficha-banda-cancelacion');
   var elMotivo = document.getElementById('ficha-cancelacion-motivo');
@@ -36227,7 +36235,7 @@ function abrirFichaFolio(){
   var btnSC  = document.getElementById('ficha-btn-serv-comp');
   var btnVinc= document.getElementById('ficha-btn-vincular');
   var btnExp = document.getElementById('ficha-btn-exp-digital');
-  var _bloquear = liquidado || cancelado;
+  var _bloquear = _bloquearAcciones;
   var _motivoBloqueo = cancelado ? 'folio cancelado' : 'folio liquidado';
   if(_bloquear){
     if(btnSC){   btnSC.disabled=true;   btnSC.style.opacity='0.38'; btnSC.style.cursor='not-allowed'; btnSC.title='No disponible — '+_motivoBloqueo; btnSC.onmouseover=null; btnSC.onmouseout=null; }
@@ -36252,6 +36260,8 @@ function abrirFichaFolio(){
     }
   }
 
+  // Actualizar display del botón retro según estado actual
+  if(typeof fichaRetroActualizarDisplay === 'function') fichaRetroActualizarDisplay();
   document.getElementById('modal-ficha-folio').style.display='flex';
   document.body.style.overflow='hidden';
 }

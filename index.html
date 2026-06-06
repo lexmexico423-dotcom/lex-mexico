@@ -36216,7 +36216,7 @@ function abrirFichaFolio(){
   // Intentar cargar desde R2 (puede tener versión más reciente)
   if(window.descargarR2 && window.SB_DESPACHO_ID) {
     var _notaPath = window.SB_DESPACHO_ID+'/notas_folio/'+anio+'/'+folio+'.txt';
-    window.descargarR2(_notaPath, 'expedientes', true).then(function(blob) {
+    window.descargarR2(_notaPath, 'lex-expedientes', true).then(function(blob) {
       if(!blob) return;
       return blob.text();
     }).then(function(txt) {
@@ -36351,7 +36351,7 @@ function fichaGuardarNotas(){
       var notaPath = window.SB_DESPACHO_ID+'/notas_folio/'+ref.anio+'/'+ref.folio+'.txt';
       var blob = new Blob([t], {type:'text/plain'});
       var file = new File([blob], ref.folio+'.txt', {type:'text/plain'});
-      window.subirR2(file, notaPath, 'expedientes').catch(function(e){ console.warn('[NotaR2]',e); });
+      window.subirR2(file, notaPath, 'lex-expedientes').catch(function(e){ console.warn('[NotaR2]',e); });
     }
   }
 }
@@ -36371,7 +36371,7 @@ async function _gastoR2Cargar(folio, anio) {
   // 1) Intentar R2
   if (window.descargarR2 && window.SB_DESPACHO_ID) {
     try {
-      const blob = await window.descargarR2(_gastoR2Path(folio, anio), 'expedientes', true);
+      const blob = await window.descargarR2(_gastoR2Path(folio, anio), 'lex-expedientes', true);
       if (blob) {
         const txt = await blob.text();
         const data = JSON.parse(txt);
@@ -36394,7 +36394,7 @@ async function _gastoR2Guardar(folio, anio, gastos) {
     try {
       const blob = new Blob([json], {type:'application/json'});
       const file = new File([blob], folio+'.json', {type:'application/json'});
-      const ok = await window.subirR2(file, _gastoR2Path(folio, anio), 'expedientes');
+      const ok = await window.subirR2(file, _gastoR2Path(folio, anio), 'lex-expedientes');
       if (!ok) console.warn('[GastoR2] No se pudo guardar en R2');
     } catch(e) { console.warn('[GastoR2] Error guardando en R2:', e); }
   }

@@ -4866,6 +4866,14 @@ window.addEventListener('offline', ()=>{
           </div>
 
         </div>
+        <!-- VISOR PDF INLINE -->
+        <div id="acuerdo-visor-overlay" style="display:none;position:absolute;inset:0;background:#1a1a1a;z-index:60;flex-direction:column;">
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:#2a2a2a;flex-shrink:0;border-bottom:1px solid #444;">
+            <button onclick="cerrarVisorAcuerdo()" style="padding:5px 12px;border-radius:4px;border:1px solid #555;background:#333;color:#ccc;font-size:0.72rem;cursor:pointer;font-family:'JetBrains Mono',monospace;">← Cerrar</button>
+            <span id="acuerdo-visor-nombre" style="color:#e0e0e0;font-size:0.75rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:'JetBrains Mono',monospace;"></span>
+          </div>
+          <iframe id="acuerdo-visor-iframe" src="" style="flex:1;border:none;width:100%;background:#fff;"></iframe>
+        </div>
       </div>
 
       <!-- MODAL SELECTOR DE LEYES -->
@@ -12025,7 +12033,17 @@ async function subirAcuerdoDriveFiles(files) {
         reader.readAsDataURL(file);
       });
 
-      // 2) Analizar con Gemini para extraer nombre, tipo y fecha
+      // 1b) Extraer texto con Mistral OCR (mejora calidad del análisis Gemini)
+      let textoOCR = '';
+      if (procTxt) procTxt.textContent = 'Extrayendo texto con Mistral OCR…';
+      try {
+        if (typeof _ocrExtraerTexto === 'function') {
+          const ocrRes = await _ocrExtraerTexto(file, (msg) => { if (procTxt) procTxt.textContent = msg; });
+          textoOCR = (ocrRes && ocrRes.texto) ? ocrRes.texto.slice(0, 14000) : '';
+        }
+      } catch(e) { console.warn('[Acuerdos] OCR falló, usará PDF base64:', e.message); }
+
+      // 2) Analizar con Gemini para extraer nombre, tipo, fecha y resumen
       let geminiKey = '';
       try {
         if (window.SB) {
@@ -12036,6 +12054,7 @@ async function subirAcuerdoDriveFiles(files) {
       } catch(e) {}
 
       let nombreIA = file.name.replace(/\.pdf$/i,'');
+      let nombreCortoIA = '';
       let tipoIA = 'acuerdo';
       let fechaIA = new Date().toISOString().slice(0,10);
       let resumenIA = '';
@@ -12043,21 +12062,23 @@ async function subirAcuerdoDriveFiles(files) {
       if (geminiKey) {
         if (procTxt) procTxt.textContent = 'Gemini analizando acuerdo…';
         try {
-          const prompt = `Analiza este documento judicial PDF y devuelve SOLO un JSON con estos campos:
+          const prompt = `Analiza este documento judicial y devuelve SOLO un JSON con estos campos:
 {
-  "nombre": "Nombre descriptivo del acuerdo (ej: Auto admisorio de demanda, Notificación de audiencia inicial)",
+  "nombre": "Nombre descriptivo completo del acuerdo (ej: Auto admisorio de demanda, Notificación de audiencia inicial)",
+  "nombre_corto": "Máximo 25 caracteres, solo el tipo de acuerdo abreviado en MAYÚSCULAS sin la fecha (ej: AUTO ADMISORIO, AUD. PRUEBAS, SENT. DEFINITIVA, NOTIF. AUDIENCIA, REQ. PAGO, ACUERDO INICIAL)",
   "tipo": "uno de: auto | sentencia | notificacion | acuerdo | requerimiento | otro",
   "fecha": "fecha del acuerdo en formato YYYY-MM-DD (busca la fecha del documento, no la de hoy)",
   "resumen": "resumen ejecutivo en 2-3 oraciones: qué resuelve, partes involucradas, próxima acción requerida"
 }
 Responde SOLO el JSON, sin markdown ni texto adicional.`;
+          let gBody;
+          if (textoOCR) {
+            gBody = JSON.stringify({ contents: [{ parts: [{ text: textoOCR + '\n\n---\n' + prompt }]}]});
+          } else {
+            gBody = JSON.stringify({ contents: [{ parts: [{ inline_data: { mime_type: 'application/pdf', data: b64 }}, { text: prompt }]}]});
+          }
           const gResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+encodeURIComponent(geminiKey), {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ contents: [{ parts: [
-              { inline_data: { mime_type: 'application/pdf', data: b64 } },
-              { text: prompt }
-            ]}]})
+            method: 'POST', headers: {'Content-Type':'application/json'}, body: gBody
           });
           if (gResp.ok) {
             const gData = await gResp.json();
@@ -12066,6 +12087,7 @@ Responde SOLO el JSON, sin markdown ni texto adicional.`;
             try {
               const parsed = JSON.parse(cleanTxt);
               if (parsed.nombre) nombreIA = parsed.nombre;
+              if (parsed.nombre_corto) nombreCortoIA = parsed.nombre_corto.toUpperCase().trim().slice(0,25);
               if (parsed.tipo && ACUERDO_TIPOS[parsed.tipo]) tipoIA = parsed.tipo;
               if (parsed.fecha && /^\d{4}-\d{2}-\d{2}$/.test(parsed.fecha)) fechaIA = parsed.fecha;
               if (parsed.resumen) resumenIA = parsed.resumen;
@@ -12074,12 +12096,19 @@ Responde SOLO el JSON, sin markdown ni texto adicional.`;
         } catch(e) { console.warn('[Acuerdos] Error Gemini:', e); }
       }
 
+      // Construir nombre en formato DD/MMM/YY TIPO para mostrar en historial
+      const _mesAbrevAc = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+      const [_anioAc, _mesAc, _diaAc] = fechaIA.split('-');
+      const _fechaCortaAc = (_diaAc||'00')+'/'+(_mesAbrevAc[parseInt(_mesAc||1)-1]||'ENE')+'/'+(_anioAc||'00').slice(-2);
+      const _sufijoAc = nombreCortoIA || nombreIA.replace(/[<>:"/\\|?*]/g,'_').slice(0,25).toUpperCase();
+      const nombreMostrar = _fechaCortaAc + ' ' + _sufijoAc;
+
       // 3) Subir a Drive
       if (procTxt) procTxt.textContent = 'Guardando en Drive…';
       let driveFileId = '';
       const juicioActivo = D.juicios && D.juicios[typeof jdetIdx !== 'undefined' ? jdetIdx : _mexpIdx];
       const nombreCarpetaJuicio = (juicioActivo ? (juicioActivo.nombre || juicioActivo.cliente || 'Juicio') + ' - Exp.' + (juicioActivo.expediente || juicioActivo.num || jId) : 'Juicio-' + jId).replace(/[<>:"/\\|?*]/g,'_');
-      const nombreArchivoDrive = fechaIA + ' ' + nombreIA.replace(/[<>:"/\\|?*]/g,'_') + '.pdf';
+      const nombreArchivoDrive = (_diaAc||'00')+'-'+(_mesAbrevAc[parseInt(_mesAc||1)-1]||'ENE')+'-'+(_anioAc||'00').slice(-2)+' '+_sufijoAc.replace(/[<>:"/\\|?*]/g,'_')+'.pdf';
 
       try {
         const token = await driveGetAccessToken();
@@ -12106,7 +12135,7 @@ Responde SOLO el JSON, sin markdown ni texto adicional.`;
 
       // 4) Actualizar lista: reemplazar placeholder
       const idx = lista.findIndex(a => a.id === tmpId);
-      const acFinal = { id: tmpId, archivo: file.name, nombre: nombreIA, tipo: tipoIA, estado: driveFileId ? 'listo' : 'error_drive', fechaSubida: new Date().toISOString().slice(0,10), fechaAcuerdo: fechaIA, resumen: resumenIA, driveFileId };
+      const acFinal = { id: tmpId, archivo: file.name, nombre: nombreMostrar, nombreLargo: nombreIA, tipo: tipoIA, estado: driveFileId ? 'listo' : 'error_drive', fechaSubida: new Date().toISOString().slice(0,10), fechaAcuerdo: fechaIA, resumen: resumenIA, driveFileId };
       if (idx >= 0) lista[idx] = acFinal; else lista.push(acFinal);
 
       // 5) Agregar al historial cronológico automáticamente
@@ -12178,42 +12207,53 @@ async function agregarEntradaHistorialDesdeAcuerdo(juicioId, ac) {
   } catch(e) { console.warn('[Acuerdos] Error en historial local:', e); }
 }
 
-// Abrir visualizador PDF de un acuerdo — intenta Drive, cae a R2
+// Abrir visualizador PDF inline dentro del modal
 async function verAcuerdoPDF(driveFileId, encodedNombre) {
   const nombre = decodeURIComponent(encodedNombre || 'Acuerdo.pdf');
+  if (!driveFileId || driveFileId === 'undefined' || driveFileId === '') {
+    if(typeof toast==='function') toast('⚠ Este acuerdo no tiene archivo en Drive', 'err'); return;
+  }
+  const overlay = document.getElementById('acuerdo-visor-overlay');
+  const iframe  = document.getElementById('acuerdo-visor-iframe');
+  const nombreEl = document.getElementById('acuerdo-visor-nombre');
+  if (nombreEl) nombreEl.textContent = '⏳ Cargando ' + nombre + '…';
+  if (overlay) overlay.style.display = 'flex';
   let blob = null;
-  // 1) Intentar desde Drive si hay ID
-  if (driveFileId && driveFileId !== 'undefined' && driveFileId !== '') {
-    try {
-      const token = await driveGetAccessToken();
-      if (token) {
-        const resp = await fetch('https://www.googleapis.com/drive/v3/files/' + driveFileId + '?alt=media', { headers:{ Authorization:'Bearer '+token } });
-        if (resp.ok) blob = await resp.blob();
-      }
-    } catch(e) { console.warn('[verAcuerdoPDF] Drive falló:', e.message); }
+  try {
+    const token = await driveGetAccessToken();
+    if (token) {
+      const resp = await fetch('https://www.googleapis.com/drive/v3/files/' + driveFileId + '?alt=media', { headers:{ Authorization:'Bearer '+token } });
+      if (resp.ok) blob = await resp.blob();
+    }
+  } catch(e) { console.warn('[verAcuerdoPDF] Drive falló:', e.message); }
+  if (!blob) {
+    if (overlay) overlay.style.display = 'none';
+    if(typeof toast==='function') toast('⚠ PDF no disponible — verifica conexión con Drive en Panel Admin', 'err'); return;
   }
-  if (!blob) { if(typeof toast==='function') toast('⚠ PDF no disponible — verifica la conexión con Drive en Panel Admin', 'err'); return; }
   const url = URL.createObjectURL(blob);
-  const w = window.open('', '_blank', 'width=900,height=700,menubar=no,toolbar=no');
-  if (w) {
-    w.document.write('<html><head><title>' + nombre + '</title></head><body style="margin:0;padding:0;background:#222;"><iframe src="' + url + '" style="width:100%;height:100vh;border:none;"></iframe></body></html>');
-    w.document.close();
-  } else {
-    const a = document.createElement('a'); a.href = url; a.download = nombre; a.click();
-  }
+  if (nombreEl) nombreEl.textContent = nombre;
+  if (iframe) iframe.src = url;
+}
+
+function cerrarVisorAcuerdo() {
+  const overlay = document.getElementById('acuerdo-visor-overlay');
+  const iframe  = document.getElementById('acuerdo-visor-iframe');
+  if (overlay) overlay.style.display = 'none';
+  if (iframe) { try { URL.revokeObjectURL(iframe.src); } catch(e){} iframe.src = ''; }
 }
 
 // Mostrar resumen del acuerdo al hacer clic en el historial o en la tarjeta
 function verResumenAcuerdo(ac) {
+  const subtitulo = ac.nombreLargo && ac.nombreLargo !== ac.nombre
+    ? `<div style="font-size:0.65rem;color:var(--muted);margin-bottom:5px;">${escHTML(ac.nombreLargo)}</div>` : '';
   const panelIA = document.getElementById('mexp-ia-resultado');
   if (panelIA) {
-    panelIA.innerHTML = `<div style="font-size:0.72rem;font-weight:600;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:6px;">&#128196; ${ac.nombre}</div><div style="font-size:0.7rem;color:var(--ink-l);line-height:1.65;">${ac.resumen || '<em style="color:var(--muted);">Sin resumen disponible.</em>'}</div><div style="margin-top:8px;font-size:0.6rem;color:var(--muted);">Fecha del acuerdo: ${ac.fechaAcuerdo || '—'}</div>`;
+    panelIA.innerHTML = `<div style="font-size:0.72rem;font-weight:600;color:var(--ink);margin-bottom:2px;display:flex;align-items:center;gap:6px;">&#128196; ${escHTML(ac.nombre||'')}</div>${subtitulo}<div style="font-size:0.7rem;color:var(--ink-l);line-height:1.65;">${ac.resumen || '<em style="color:var(--muted);">Sin resumen disponible.</em>'}</div><div style="margin-top:8px;font-size:0.6rem;color:var(--muted);">Fecha del acuerdo: ${ac.fechaAcuerdo || '—'}</div>`;
     panelIA.style.display = 'block';
   }
-  // También mostrar en el panel de análisis IA (columna 3)
   const iaRes = document.getElementById('mexp-ia-result');
   if (iaRes) {
-    iaRes.innerHTML = `<div style="font-size:0.72rem;font-weight:600;color:var(--ink);margin-bottom:6px;">&#128196; ${ac.nombre}</div><div style="font-size:0.7rem;color:var(--ink-l);line-height:1.65;">${ac.resumen || '<em style="color:var(--muted);">Sin resumen. Vuelve a subir el acuerdo para regenerarlo.</em>'}</div><div style="margin-top:8px;font-size:0.6rem;color:var(--muted);">Fecha: ${ac.fechaAcuerdo || '—'} &nbsp;|&nbsp; Tipo: ${(ACUERDO_TIPOS[ac.tipo]||{}).label||ac.tipo||'—'}</div>`;
+    iaRes.innerHTML = `<div style="font-size:0.72rem;font-weight:600;color:var(--ink);margin-bottom:2px;">&#128196; ${escHTML(ac.nombre||'')}</div>${subtitulo}<div style="font-size:0.7rem;color:var(--ink-l);line-height:1.65;">${ac.resumen || '<em style="color:var(--muted);">Sin resumen. Vuelve a subir el acuerdo para regenerarlo.</em>'}</div><div style="margin-top:8px;font-size:0.6rem;color:var(--muted);">Fecha: ${ac.fechaAcuerdo || '—'} &nbsp;|&nbsp; Tipo: ${(ACUERDO_TIPOS[ac.tipo]||{}).label||ac.tipo||'—'}</div>`;
     iaRes.style.display = 'block';
   }
 }
@@ -36675,8 +36715,11 @@ function _blobToBase64(blob){
 function renderHistorialModal(){
   const j = D.juicios[_mexpIdx];
   if(!j) return;
+  if(!Array.isArray(j.historial)) j.historial = [];
+  // Asegurar id en cada entrada (necesario para guardar fecha de notificación)
+  j.historial.forEach(h => { if(!h.id) h.id = 'HJ-'+Date.now()+'-'+Math.random().toString(36).slice(2,7); });
   const el = $('mexp-historial-lista');
-  const hist = (j.historial||[]).slice().sort((a,b)=> b.fecha.localeCompare(a.fecha));
+  const hist = j.historial.slice().sort((a,b)=> b.fecha.localeCompare(a.fecha));
   $('mexp-stat-hist').textContent = hist.length || '0';
   if(!hist.length){
     el.innerHTML = '<div style="color:var(--muted);font-size:0.72rem;text-align:center;padding:20px;">Sin entradas. Agrega la primera entrada cronológica.</div>';
@@ -36685,18 +36728,55 @@ function renderHistorialModal(){
   const tagColor = { escrito:'var(--verde-l)', acuerdo:'var(--azul-l)', requerimiento:'var(--amarillo-l)', notificacion:'var(--gold-bg)', audiencia:'rgba(139,92,246,0.1)', apelacion:'rgba(255,140,0,0.1)', nota:'var(--surface2)' };
   const tagText  = { escrito:'var(--verde-d)', acuerdo:'var(--azul)', requerimiento:'var(--amarillo)', notificacion:'var(--gold-d)', audiencia:'#7c3aed', apelacion:'#d97706', nota:'var(--muted)' };
   const tagLabel = { escrito:'✍️ Escrito', acuerdo:'⚖️ Acuerdo', requerimiento:'📋 Req.', notificacion:'📬 Notif.', audiencia:'🏛️ Audiencia', apelacion:'📤 Apelación', nota:'📌 Nota' };
-  el.innerHTML = hist.map((h,i)=>`
+  el.innerHTML = hist.map((h,i)=>{
+    const tieneDetalle = !!(h.detalle || h.driveFileId);
+    const hId = (h.id||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const notifVal = (h.fechaNotificacion||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+    return `
     <div style="display:flex;gap:10px;margin-bottom:14px;position:relative;">
       <div style="display:flex;flex-direction:column;align-items:center;gap:0;">
         <div style="width:9px;height:9px;border-radius:50%;background:${tagText[h.tipo]||'var(--muted)'};margin-top:4px;flex-shrink:0;"></div>
         ${i < hist.length-1 ? '<div style="width:1px;flex:1;background:var(--border-l);min-height:16px;margin:3px 0;"></div>' : ''}
       </div>
       <div style="flex:1;">
-        <div style="display:inline-block;font-size:0.6rem;padding:2px 8px;border-radius:20px;background:${tagColor[h.tipo]||'var(--surface2)'};color:${tagText[h.tipo]||'var(--muted)'};margin-bottom:3px;">${tagLabel[h.tipo]||h.tipo}</div>
-        <div style="font-size:0.75rem;color:var(--ink);line-height:1.5;">${escHTML(h.texto)}</div>
+        <div style="display:flex;align-items:center;gap:5px;margin-bottom:3px;flex-wrap:wrap;">
+          <div style="display:inline-block;font-size:0.6rem;padding:2px 8px;border-radius:20px;background:${tagColor[h.tipo]||'var(--surface2)'};color:${tagText[h.tipo]||'var(--muted)'};">${tagLabel[h.tipo]||h.tipo}</div>
+          <input type="text" value="${notifVal}" placeholder="Fecha notif." title="Fecha de notificación"
+            onclick="event.stopPropagation()"
+            onchange="guardarFechaNotificacion('${hId}',this.value)"
+            style="font-size:0.58rem;padding:1px 7px;border:1px solid var(--border-l);border-radius:20px;background:var(--surface2);color:var(--ink);font-family:'JetBrains Mono',monospace;width:100px;min-width:0;">
+        </div>
+        <div onclick="${tieneDetalle ? `abrirResumenDesdeHistorial('${hId}')` : ''}" style="font-size:0.75rem;color:var(--ink);line-height:1.5;${tieneDetalle?'cursor:pointer;text-decoration:underline dotted;text-decoration-color:var(--muted);':''}">${escHTML(h.texto)}</div>
         <div style="font-size:0.62rem;color:var(--muted);margin-top:2px;">${h.fecha||'—'}</div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+function guardarFechaNotificacion(entradaId, valor){
+  const j = D.juicios[_mexpIdx];
+  if(!j || !j.historial) return;
+  const entry = j.historial.find(h => h.id === entradaId);
+  if(!entry) return;
+  entry.fechaNotificacion = valor.trim();
+  try{ backupLocal('D',D); } catch(e){}
+  saveJuicios();
+}
+
+async function abrirResumenDesdeHistorial(entradaId){
+  const j = D.juicios[_mexpIdx];
+  if(!j || !j.historial) return;
+  const h = j.historial.find(e => e.id === entradaId);
+  if(!h) return;
+  if(h.driveFileId){
+    const jId = window._jdetId || 'idx_'+_mexpIdx;
+    try {
+      const lista = await cargarAcuerdosDrive(jId);
+      const ac = lista.find(a => a.driveFileId === h.driveFileId);
+      if(ac){ verResumenAcuerdo(ac); return; }
+    } catch(e){}
+  }
+  verResumenAcuerdo({ nombre: h.texto, resumen: h.detalle||'', fechaAcuerdo: h.fecha, tipo: h.tipo });
 }
 
 function abrirFormHistorial(){

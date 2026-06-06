@@ -2553,6 +2553,9 @@ window.console.info = function(){};
   body.modo-consulta.folio-cancelado .btn-pago-parcial { display: none !important; }
   body.modo-consulta.folio-cancelado .btn-liquidacion  { display: none !important; }
   body.modo-consulta.folio-cancelado .btn-cancelado    { display: none !important; }
+  /* Folio cancelado: deshabilitar Vincular Archivo y Servicios Complementarios */
+  body.modo-consulta.folio-cancelado #btn-vincular-archivo { opacity: 0.38; pointer-events: none; cursor: not-allowed; }
+  body.modo-consulta.folio-cancelado button[onclick*="agregarCostoExtra"] { display: none !important; }
   /* Cuadro "Estado del folio anterior" — aspecto cancelado */
   #info-folio-anterior.cancelado-box {
     filter: grayscale(1);
@@ -36069,7 +36072,7 @@ function abrirFichaFolio(){
   var totalAbonado=0;
 
   // Ordenar por letra
-  var todosRec=(appData.recibos||[]).filter(function(r){return r.folio===folio&&!r.cancelado;});
+  var todosRec=(appData.recibos||[]).filter(function(r){return r.folio===folio&&!r.esComplemento;});
   todosRec.sort(function(a,b){return((a.letra||'A')).localeCompare(b.letra||'A');});
 
   var fmt=function(v){return typeof fmtMXN==='function'?fmtMXN(parseFloat(v||0)):parseFloat(v||0).toFixed(2);};
@@ -36111,19 +36114,23 @@ function abrirFichaFolio(){
 
     var saldo=parseFloat(r.saldoPendiente||0);
     var esLiq=saldo<=0&&monto>0;
-    var tipo=esOrig?'Original':(r.esComplemento?'Serv. compl.':(esLiq?'Liquidación':'Abono'));
-    var tc=esOrig?'#1a5fa8':(r.esComplemento?'#8B4500':(esLiq?'#0f5228':'#1a7a3a'));
-    var tb=esOrig?'#e6f1fb':(r.esComplemento?'#fef0d8':(esLiq?'#d4f5e0':'#e8f5ec'));
+    var esCan=!!r.cancelado;
+    var tipo=esCan?'Cancelado':(esOrig?'Original':(r.esComplemento?'Serv. compl.':(esLiq?'Liquidación':'Abono')));
+    var tc=esCan?'#8a1a1a':(esOrig?'#1a5fa8':(r.esComplemento?'#8B4500':(esLiq?'#0f5228':'#1a7a3a')));
+    var tb=esCan?'#ffe0e0':(esOrig?'#e6f1fb':(r.esComplemento?'#fef0d8':(esLiq?'#d4f5e0':'#e8f5ec')));
     var fecha=r.fecha?r.fecha.substring(5,10).replace('-','/'):'—';
     var fechaRec=(rletra!=='A'&&r.fechaActualizacion)?r.fechaActualizacion:(r.fecha_recibo||r.fecha||(mov&&mov.fecha)||'');
     var row=document.createElement('div');
-    row.style.cssText='display:grid;grid-template-columns:80px 1fr 90px 90px;gap:6px;align-items:center;padding:7px 10px;border-radius:4px;border:0.5px solid #e0d4a8;font-size:0.78rem;background:#fffdf5;';
-    row.innerHTML='<div style="font-weight:700;color:#1a5fa8;font-family:monospace;font-size:0.72rem;cursor:pointer;text-decoration:underline;text-underline-offset:2px;" onclick="window._fichaAbiertaAntes=true;cerrarFichaFolio();setTimeout(function(){abrirPreviaDesdeContab('+r.folio+',\''+rletra+'\');},200);" title="Ver PDF">'+rfStr+'</div>'
+    row.style.cssText='display:grid;grid-template-columns:80px 1fr 90px 90px;gap:6px;align-items:center;padding:7px 10px;border-radius:4px;border:0.5px solid '+(esCan?'#e0a8a8':'#e0d4a8')+';font-size:0.78rem;background:'+(esCan?'#fff8f8':'#fffdf5')+';'+(esCan?'opacity:0.75;':'');
+    row.innerHTML='<div style="font-weight:700;color:'+(esCan?'#8a1a1a':'#1a5fa8')+';font-family:monospace;font-size:0.72rem;cursor:pointer;text-decoration:underline;text-underline-offset:2px;" onclick="window._fichaAbiertaAntes=true;cerrarFichaFolio();setTimeout(function(){abrirPreviaDesdeContab('+r.folio+',\''+rletra+'\');},200);" title="Ver PDF">'+rfStr+'</div>'
       +'<div><span style="font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:20px;background:'+tb+';color:'+tc+';">'+tipo+'</span>'
       +'<div style="font-size:0.65rem;color:#7a6840;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+descripcion+'">'+(fechaRec?new Date(fechaRec+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}):'—')+'</div></div>'
       +(r.esComplemento
         ?'<div style="text-align:right;font-weight:700;color:#8B4500;font-family:monospace;">+$'+fmt(parseFloat(r.total||0))+'</div><div style="text-align:right;font-size:0.68rem;color:#8B4500;">cargo</div>'
-        :'<div style="text-align:right;font-weight:700;color:#1a7a3a;font-family:monospace;">+$'+fmt(monto)+'</div><div style="text-align:right;font-size:0.68rem;color:#7a6840;">resta $'+fmt(saldo)+'</div>'
+        :(esCan
+          ?'<div style="text-align:right;font-weight:700;color:#8a1a1a;font-family:monospace;text-decoration:line-through;">$'+fmt(monto)+'</div><div style="text-align:right;font-size:0.68rem;color:#c04040;">🚫 cancelado</div>'
+          :'<div style="text-align:right;font-weight:700;color:#1a7a3a;font-family:monospace;">+$'+fmt(monto)+'</div><div style="text-align:right;font-size:0.68rem;color:#7a6840;">resta $'+fmt(saldo)+'</div>'
+        )
       );
     listaEl.appendChild(row);
   });
@@ -36194,13 +36201,37 @@ function abrirFichaFolio(){
   var btnPT=document.getElementById('ficha-btn-pago-total');
   if(btnPP) btnPP.style.display=liquidado?'none':'';
   if(btnPT) btnPT.style.display=liquidado?'none':'';
-  // Liquidado: deshabilitar Servicio Complementario y Vincular Arch., habilitar Exp. Digital
+  // ── Cancelación: marca de agua + banda motivo/concepto ──
+  var cancelado = !!(recibo && recibo.cancelado);
+  var watermark = document.getElementById('ficha-watermark-cancelado');
+  var banda = document.getElementById('ficha-banda-cancelacion');
+  var elMotivo = document.getElementById('ficha-cancelacion-motivo');
+  var elConcepto = document.getElementById('ficha-cancelacion-concepto');
+  var elConceptoWrap = document.getElementById('ficha-cancelacion-concepto-wrap');
+  if(watermark) watermark.style.display = cancelado ? 'block' : 'none';
+  if(banda) banda.style.display = cancelado ? 'block' : 'none';
+  if(cancelado && elMotivo){
+    elMotivo.textContent = recibo.motivoCancelacion || 'Sin motivo especificado';
+  }
+  if(cancelado && elConcepto){
+    var concepto = recibo.cancelacionConceptoInterno || '';
+    if(concepto && elConceptoWrap){
+      elConceptoWrap.style.display = 'block';
+      elConcepto.textContent = concepto;
+    } else if(elConceptoWrap){
+      elConceptoWrap.style.display = 'none';
+    }
+  }
+
+  // Liquidado/Cancelado: deshabilitar Servicio Complementario y Vincular Arch.
   var btnSC  = document.getElementById('ficha-btn-serv-comp');
   var btnVinc= document.getElementById('ficha-btn-vincular');
   var btnExp = document.getElementById('ficha-btn-exp-digital');
-  if(liquidado){
-    if(btnSC){   btnSC.disabled=true;   btnSC.style.opacity='0.38'; btnSC.style.cursor='not-allowed'; btnSC.title='No disponible — folio liquidado'; btnSC.onmouseover=null; btnSC.onmouseout=null; }
-    if(btnVinc){ btnVinc.disabled=true; btnVinc.style.opacity='0.38'; btnVinc.style.cursor='not-allowed'; btnVinc.title='No disponible — folio liquidado'; btnVinc.onmouseover=null; btnVinc.onmouseout=null; }
+  var _bloquear = liquidado || cancelado;
+  var _motivoBloqueo = cancelado ? 'folio cancelado' : 'folio liquidado';
+  if(_bloquear){
+    if(btnSC){   btnSC.disabled=true;   btnSC.style.opacity='0.38'; btnSC.style.cursor='not-allowed'; btnSC.title='No disponible — '+_motivoBloqueo; btnSC.onmouseover=null; btnSC.onmouseout=null; }
+    if(btnVinc){ btnVinc.disabled=true; btnVinc.style.opacity='0.38'; btnVinc.style.cursor='not-allowed'; btnVinc.title='No disponible — '+_motivoBloqueo; btnVinc.onmouseover=null; btnVinc.onmouseout=null; }
     if(btnExp){  btnExp.disabled=false; btnExp.style.opacity='1'; btnExp.style.cursor='pointer'; btnExp.title=''; }
   } else {
     if(btnSC){   btnSC.disabled=false;  btnSC.style.opacity='1'; btnSC.style.cursor='pointer'; btnSC.title=''; btnSC.onmouseover=function(){ this.style.background='#fde8cc'; }; btnSC.onmouseout=function(){ this.style.background='#fff0e0'; }; }
@@ -36209,30 +36240,15 @@ function abrirFichaFolio(){
   }
   // Badge modo lectura
   var badgeLiq=document.getElementById('ficha-badge-liquidado');
-  if(badgeLiq) badgeLiq.style.display=liquidado?'inline-block':'none';
-
-  // ── Cancelación: marca de agua + banda motivo/concepto ──
-  var cancelado = !!(r && r.cancelado);
-  var watermark = document.getElementById('ficha-watermark-cancelado');
-  var banda = document.getElementById('ficha-banda-cancelacion');
-  var elMotivo = document.getElementById('ficha-cancelacion-motivo');
-  var elConcepto = document.getElementById('ficha-cancelacion-concepto');
-  var elConceptoWrap = document.getElementById('ficha-cancelacion-concepto-wrap');
-  if(watermark) watermark.style.display = cancelado ? 'block' : 'none';
-
-  if(banda) banda.style.display = cancelado ? 'block' : 'none';
-  if(cancelado && elMotivo){
-    // Mostrar solo el motivo sin la parte de autorización para que quede limpio
-    var motivoCompleto = r.motivoCancelacion || 'Sin motivo especificado';
-    elMotivo.textContent = motivoCompleto;
-  }
-  if(cancelado && elConcepto){
-    var concepto = r.cancelacionConceptoInterno || '';
-    if(concepto && elConceptoWrap){
-      elConceptoWrap.style.display = 'block';
-      elConcepto.textContent = concepto;
-    } else if(elConceptoWrap){
-      elConceptoWrap.style.display = 'none';
+  if(badgeLiq){
+    if(cancelado){
+      badgeLiq.textContent='🚫 CANCELADO · Solo lectura';
+      badgeLiq.style.color='#8a1a1a'; badgeLiq.style.background='#ffe0e0'; badgeLiq.style.borderColor='#c04040';
+      badgeLiq.style.display='inline-block';
+    } else {
+      badgeLiq.textContent='✅ LIQUIDADO · Solo lectura';
+      badgeLiq.style.color='#0f5228'; badgeLiq.style.background='#d4f5e0'; badgeLiq.style.borderColor='#2a9a50';
+      badgeLiq.style.display=liquidado?'inline-block':'none';
     }
   }
 

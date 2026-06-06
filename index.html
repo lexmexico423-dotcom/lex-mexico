@@ -2553,8 +2553,7 @@ window.console.info = function(){};
   body.modo-consulta.folio-cancelado .btn-pago-parcial { display: none !important; }
   body.modo-consulta.folio-cancelado .btn-liquidacion  { display: none !important; }
   body.modo-consulta.folio-cancelado .btn-cancelado    { display: none !important; }
-  /* Folio cancelado: deshabilitar Vincular Archivo y Servicios Complementarios */
-  body.modo-consulta.folio-cancelado #btn-vincular-archivo { opacity: 0.38; pointer-events: none; cursor: not-allowed; }
+  /* Folio cancelado: deshabilitar Servicios Complementarios (Vincular Archivo siempre disponible) */
   body.modo-consulta.folio-cancelado button[onclick*="agregarCostoExtra"] { display: none !important; }
   body.modo-consulta.folio-cancelado .btn-serv-comp { opacity: 0.38 !important; pointer-events: none !important; cursor: not-allowed !important; }
   /* Folio liquidado: deshabilitar Servicios Complementarios */
@@ -10242,11 +10241,22 @@ function confirmarAutorizacion(){
   }
   errBox.classList.remove('show');
   const iniciales = calcularIniciales(nombreCapturado);
-  const fechaHora = new Date().toLocaleString('es-MX', {
-    timeZone:'America/Mexico_City',
-    day:'2-digit', month:'2-digit', year:'numeric',
-    hour:'2-digit', minute:'2-digit', second:'2-digit'
-  });
+  const _retroActAuth = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+  let fechaHora;
+  if(_retroActAuth){
+    const _rf = window._reciboRetroactivoFechaPersonalizada;
+    const _rh = window._reciboRetroactivoHoraPersonalizada || '00:00';
+    fechaHora = new Date(_rf + 'T' + _rh + ':00').toLocaleString('es-MX', {
+      day:'2-digit', month:'2-digit', year:'numeric',
+      hour:'2-digit', minute:'2-digit', second:'2-digit'
+    });
+  } else {
+    fechaHora = new Date().toLocaleString('es-MX', {
+      timeZone:'America/Mexico_City',
+      day:'2-digit', month:'2-digit', year:'numeric',
+      hour:'2-digit', minute:'2-digit', second:'2-digit'
+    });
+  }
   // Restaurar visibilidad original del modal para la próxima vez
   $('auth-nombre-completo').style.display = '';
   const inicialesRow = document.getElementById('auth-iniciales-display');
@@ -35956,6 +35966,12 @@ function regresarAlFormulario(){
         <div style="position:absolute;top:25%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
         <div style="position:absolute;top:75%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
       </div>
+      <!-- MARCA DE AGUA PAGADO — solo visible si el folio está liquidado -->
+      <div id="ficha-watermark-liquidado" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;overflow:hidden;border-radius:12px;">
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(26,122,58,0.10);letter-spacing:0.15em;white-space:nowrap;user-select:none;">PAGADO</div>
+        <div style="position:absolute;top:25%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(26,122,58,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">PAGADO</div>
+        <div style="position:absolute;top:75%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(26,122,58,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">PAGADO</div>
+      </div>
 
       <!-- HEADER -->
       <div style="background:#f5f0e0;border-bottom:1px solid #d4b870;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
@@ -36257,6 +36273,8 @@ function abrirFichaFolio(){
   var elConcepto = document.getElementById('ficha-cancelacion-concepto');
   var elConceptoWrap = document.getElementById('ficha-cancelacion-concepto-wrap');
   if(watermark) watermark.style.display = cancelado ? 'block' : 'none';
+  var watermarkLiq = document.getElementById('ficha-watermark-liquidado');
+  if(watermarkLiq) watermarkLiq.style.display = (liquidado && !cancelado) ? 'block' : 'none';
   if(banda) banda.style.display = cancelado ? 'block' : 'none';
   if(cancelado && elMotivo){
     elMotivo.textContent = recibo.motivoCancelacion || 'Sin motivo especificado';
@@ -36278,14 +36296,14 @@ function abrirFichaFolio(){
   var _bloquear = _bloquearAcciones;
   var _motivoBloqueo = cancelado ? 'folio cancelado' : 'folio liquidado';
   if(_bloquear){
-    if(btnSC){   btnSC.disabled=true;   btnSC.style.opacity='0.38'; btnSC.style.cursor='not-allowed'; btnSC.title='No disponible — '+_motivoBloqueo; btnSC.onmouseover=null; btnSC.onmouseout=null; }
-    if(btnVinc){ btnVinc.disabled=true; btnVinc.style.opacity='0.38'; btnVinc.style.cursor='not-allowed'; btnVinc.title='No disponible — '+_motivoBloqueo; btnVinc.onmouseover=null; btnVinc.onmouseout=null; }
-    if(btnExp){  btnExp.disabled=false; btnExp.style.opacity='1'; btnExp.style.cursor='pointer'; btnExp.title=''; }
+    if(btnSC){  btnSC.disabled=true;  btnSC.style.opacity='0.38'; btnSC.style.cursor='not-allowed'; btnSC.title='No disponible — '+_motivoBloqueo; btnSC.onmouseover=null; btnSC.onmouseout=null; }
+    if(btnExp){ btnExp.disabled=false; btnExp.style.opacity='1';  btnExp.style.cursor='pointer'; btnExp.title=''; }
   } else {
-    if(btnSC){   btnSC.disabled=false;  btnSC.style.opacity='1'; btnSC.style.cursor='pointer'; btnSC.title=''; btnSC.onmouseover=function(){ this.style.background='#fde8cc'; }; btnSC.onmouseout=function(){ this.style.background='#fff0e0'; }; }
-    if(btnVinc){ btnVinc.disabled=false; btnVinc.style.opacity='1'; btnVinc.style.cursor='pointer'; btnVinc.title=''; btnVinc.onmouseover=function(){ this.style.background='#fde8a0'; }; btnVinc.onmouseout=function(){ this.style.background='#fff8e0'; }; }
-    if(btnExp){  btnExp.disabled=true;  btnExp.style.opacity='0.55'; btnExp.style.cursor='not-allowed'; btnExp.title='Próximamente'; }
+    if(btnSC){  btnSC.disabled=false; btnSC.style.opacity='1'; btnSC.style.cursor='pointer'; btnSC.title=''; btnSC.onmouseover=function(){ this.style.background='#fde8cc'; }; btnSC.onmouseout=function(){ this.style.background='#fff0e0'; }; }
+    if(btnExp){ btnExp.disabled=true; btnExp.style.opacity='0.55'; btnExp.style.cursor='not-allowed'; btnExp.title='Próximamente'; }
   }
+  // Vincular Archivo: siempre habilitado sin importar el estado del folio
+  if(btnVinc){ btnVinc.disabled=false; btnVinc.style.opacity='1'; btnVinc.style.cursor='pointer'; btnVinc.title=''; btnVinc.onmouseover=function(){ this.style.background='#fde8a0'; }; btnVinc.onmouseout=function(){ this.style.background='#fff8e0'; }; }
   // Badge modo lectura
   var badgeLiq=document.getElementById('ficha-badge-liquidado');
   if(badgeLiq){

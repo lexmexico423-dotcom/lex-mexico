@@ -11441,16 +11441,29 @@ function filtrarHistorial(){
     list.innerHTML='<div class="empty-hist">'+(total?'Sin resultados para la búsqueda':'Aún no hay recibos generados')+'</div>';
     return;
   }
-  // Ordenar estrictamente por fecha+hora de generación descendente (más reciente arriba)
+  // Fecha efectiva de cada versión: B/C/D usan fechasImpresion[última] o fechaActualizacion
+  function _fechaEfRec(r){
+    if(r.fechasImpresion && r.fechasImpresion.length > 1){
+      var fp = r.fechasImpresion[r.fechasImpresion.length - 1];
+      return { f: fp.fecha || r.fechaActualizacion || r.fecha || '', h: fp.hora || r.horaActualizacion || r.hora || '00:00' };
+    }
+    if(r.fechaActualizacion) return { f: r.fechaActualizacion, h: r.horaActualizacion || r.hora || '00:00' };
+    return { f: r.fecha || '', h: r.hora || '00:00' };
+  }
+  // Ordenar por fecha+hora efectiva descendente (más reciente arriba)
   lista.sort(function(a, b) {
-    const fa = (a.fecha || '') + 'T' + (a.hora || '00:00');
-    const fb = (b.fecha || '') + 'T' + (b.hora || '00:00');
+    const da = _fechaEfRec(a), db = _fechaEfRec(b);
+    const fa = da.f + 'T' + da.h;
+    const fb = db.f + 'T' + db.h;
     if (fb !== fa) return fb.localeCompare(fa);
-    // Misma fecha y hora: folio mayor primero
+    // Misma fecha y hora: letra mayor primero (D > C > B > A), luego folio mayor
+    const la = (a.letra || 'A'), lb = (b.letra || 'A');
+    if(la !== lb) return lb.localeCompare(la);
     return (b.folio || 0) - (a.folio || 0);
   });
   list.innerHTML = lista.map(r=>{
     const i = appData.recibos.indexOf(r);
+    const ef = _fechaEfRec(r);
     const folioStr='#'+folioConLetra(r.folio, r.anio_folio, r.letra || 'A');
     const compTag=r.esComplemento?'<span style="color:#b07f1e;font-size:0.58rem;margin-left:3px">↳ ref #'+folioFormato(r.folioRef)+'</span>':'';
     const cancelTag=r.cancelado?'<span style="color:#8a1a1a;font-size:0.58rem;margin-left:5px;background:#fff0f0;border:1px solid #c04040;border-radius:3px;padding:1px 5px;font-family:DM Mono,monospace;letter-spacing:0.06em;">🚫 CANCELADO</span>':'';
@@ -11460,7 +11473,7 @@ function filtrarHistorial(){
     return '<div class="historial-item"'+(r.cancelado?' style="opacity:0.65;"':'')+' >'
       +'<span class="folio-num">'+folioStr+'</span>'+compTag+cancelTag
       +'<span class="client-name">'+escHTML((r.nombre||'').toUpperCase())+'</span>'
-      +'<span class="fecha-item">'+(r.fecha||'—')+' '+(r.hora||'')+'</span>'
+      +'<span class="fecha-item">'+(ef.f||'—')+' '+(ef.h||'')+'</span>'
       +(r.generadoPor?'<span style="font-family:\'DM Mono\',monospace;font-size:0.58rem;color:#7a6040;white-space:nowrap;margin-left:4px;" title="Generado por">👤 '+escHTML(r.generadoPor)+'</span>':'')
       +saldoTag
       +'<button class="download-btn" onclick="reDescargar('+i+')">⬇ PDF</button>'

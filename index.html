@@ -9708,8 +9708,11 @@ async function confirmarCancelacion(){
   const auth = window._autorizacionCancelacion || null;
   window._autorizacionCancelacion = null;
   const folio = String(recibo.folio).padStart(4,'0');
+  const _retroCanConf = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+  const _fechaCanConf = _retroCanConf ? window._reciboRetroactivoFechaPersonalizada : new Date().toISOString().slice(0,10);
+  const _horaCanConf  = _retroCanConf ? (window._reciboRetroactivoHoraPersonalizada || '00:00') : new Date().toTimeString().slice(0,5);
   recibo.cancelado = true;
-  recibo.fechaCancelacion = new Date().toISOString();
+  recibo.fechaCancelacion = _retroCanConf ? (_fechaCanConf + 'T' + _horaCanConf + ':00.000') : new Date().toISOString();
   recibo.motivoCancelacion = (motivo || 'Sin motivo especificado')
     + (auth ? ' — Autorizó: ' + auth.iniciales + ' [' + auth.fechaHora + ']' : '');
   recibo.cancelacionTipo = tipoCancelacion;
@@ -9719,7 +9722,7 @@ async function confirmarCancelacion(){
   if(!appData.historialPagos[recibo.folio]) appData.historialPagos[recibo.folio] = [];
   appData.historialPagos[recibo.folio].push({
     folio: recibo.folio,
-    fecha: new Date().toLocaleDateString('es-MX'),
+    fecha: _retroCanConf ? new Date(_fechaCanConf + 'T12:00:00').toLocaleDateString('es-MX') : new Date().toLocaleDateString('es-MX'),
     tipo: 'CANCELADO',
     pago: 0,
     saldoRestante: recibo.saldoPendiente || 0
@@ -9918,15 +9921,18 @@ async function _confirmarCancelacionReal(recibo, motivo, auth){
   // Restaurar status-bar antes de operar
   const _sbCanR = document.querySelector('.status-bar');
   if(_sbCanR) _sbCanR.removeAttribute('style');
+  const _retroCanReal = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+  const _fechaCanReal = _retroCanReal ? window._reciboRetroactivoFechaPersonalizada : new Date().toISOString().slice(0,10);
+  const _horaCanReal  = _retroCanReal ? (window._reciboRetroactivoHoraPersonalizada || '00:00') : new Date().toTimeString().slice(0,5);
   recibo.cancelado = true;
-  recibo.fechaCancelacion = new Date().toISOString();
+  recibo.fechaCancelacion = _retroCanReal ? (_fechaCanReal + 'T' + _horaCanReal + ':00.000') : new Date().toISOString();
   recibo.motivoCancelacion = (motivo || 'Sin motivo especificado')
     + (auth ? ' \u2014 Autoriz\u00f3: ' + auth.iniciales + ' [' + auth.fechaHora + ']' : '');
   if(!appData.historialPagos) appData.historialPagos = {};
   if(!appData.historialPagos[recibo.folio]) appData.historialPagos[recibo.folio] = [];
   appData.historialPagos[recibo.folio].push({
     folio: recibo.folio,
-    fecha: new Date().toLocaleDateString('es-MX'),
+    fecha: _retroCanReal ? new Date(_fechaCanReal + 'T12:00:00').toLocaleDateString('es-MX') : new Date().toLocaleDateString('es-MX'),
     tipo: 'CANCELADO',
     pago: 0,
     saldoRestante: recibo.saldoPendiente || 0

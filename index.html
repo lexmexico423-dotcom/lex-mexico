@@ -6545,11 +6545,12 @@ async function sincronizarFolio(forzarSB){
         folios_eliminados: _tombstones,
         recibos:          recibosFinales
       };
-      // Si conservamos versiones locales que SB no tenía → re-subir
-      // Comparar contra SB ya filtrado por tombstones para no contar falsos positivos
-      const _sbFiltCount = sbRecibos.filter(function(r){ return !_esTombstone(r); }).length;
-      if (recibosFinales.length > _sbFiltCount) {
-        console.warn('[merge recibos] local tiene más versiones que SB — re-subiendo...');
+      // Re-subir si local tiene más recibos que SB (conservación de versiones locales)
+      // O si local tiene tombstones que SB no tiene (propagación de tombstones a otros clientes)
+      const _sbFiltCount    = sbRecibos.filter(function(r){ return !_esTombstone(r); }).length;
+      const _hayTombsNuevos = _tombstones.length > _sbTombs.length;
+      if (recibosFinales.length > _sbFiltCount || _hayTombsNuevos) {
+        console.warn('[merge recibos] re-subiendo — recibos extra:', recibosFinales.length - _sbFiltCount, '| tombstones nuevos:', _tombstones.length - _sbTombs.length);
         setTimeout(function(){ if(typeof actualizarArchivoControl==='function') actualizarArchivoControl().catch(function(e){ console.warn('re-upload recibos:', e); }); }, 800);
       }
       // Reconstruir D — PROTECCIÓN TOTAL CONTRA PÉRDIDA DE DATOS
@@ -18015,8 +18016,10 @@ async function syncEstadoSupabase(){
       _juiciosModTs:         D._juiciosModTs         || 0
     };
     const recibos = {
-      folioActual: (typeof REC !== 'undefined' && REC.folioActual) ? REC.folioActual : (appData.folioActual || 100),
-      recibos:     appData.recibos || []
+      folioActual:       (typeof REC !== 'undefined' && REC.folioActual) ? REC.folioActual : (appData.folioActual || 100),
+      anioFolioActual:   (appData.anioFolioActual || new Date().getFullYear()),
+      folios_eliminados: appData.folios_eliminados || [],
+      recibos:           (appData.recibos || []).filter(function(r){ return !(appData.folios_eliminados||[]).some(function(t){ return String(t.folio)===String(r.folio) && t.letra===(r.letra||'A'); }); })
     };
     const user = (await window.SB.auth.getUser()).data.user;
     const { error } = await window.SB

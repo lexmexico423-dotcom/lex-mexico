@@ -6813,7 +6813,10 @@ async function actualizarArchivoControl(){
         esVersionAnterior: r.esVersionAnterior||false,
         esActualizacion: r.esActualizacion||false,
         fechaActualizacion: r.fechaActualizacion||null,
-        horaActualizacion: r.horaActualizacion||null
+        horaActualizacion: r.horaActualizacion||null,
+        cancelacionConceptoInterno: r.cancelacionConceptoInterno||'',
+        cancelacionTipo: r.cancelacionTipo||'',
+        cancelacionMonto: r.cancelacionMonto||0
       }))
     };
     const { error } = await window.SB
@@ -9923,7 +9926,20 @@ async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroO
       _registrarMovimiento(mov);
     }
 
-    // ── 8. Guardar y renderizar ──
+    // ── 8a. Persistir concepto interno en R2 (lex-expedientes) ──
+    // Se guarda como archivo .txt separado para que sobreviva syncs ligeros.
+    // Ruta: {despacho_id}/concepto_cancelacion/{anio}/{folio}.txt
+    if(recibo.cancelacionConceptoInterno && window.subirR2 && window.SB_DESPACHO_ID){
+      try{
+        const _anioConc  = recibo.anio_folio || new Date().getFullYear();
+        const _pathConc  = window.SB_DESPACHO_ID+'/concepto_cancelacion/'+_anioConc+'/'+recibo.folio+'.txt';
+        const _blobConc  = new Blob([recibo.cancelacionConceptoInterno],{type:'text/plain'});
+        const _fileConc  = new File([_blobConc], recibo.folio+'.txt',{type:'text/plain'});
+        window.subirR2(_fileConc, _pathConc, 'lex-expedientes').catch(e=>console.warn('[ConceptoCancelR2]',e));
+      }catch(e){ console.warn('[ConceptoCancelR2 init]',e); }
+    }
+
+    // ── 8b. Guardar y renderizar ──
     if(typeof actualizarArchivoControl === 'function')
       await actualizarArchivoControl().catch(e=>console.warn('[Control cancelacion]:',e));
     if(typeof save === 'function') save();
@@ -23014,6 +23030,10 @@ async function adminEliminarRecibo(idx) {
   var lineasEliminar = '• PDF en R2 (Cloudflare)\n• PDF en Supabase Storage\n• Backups de localStorage';
   if (!hayOtras) lineasEliminar = '• Contabilidad y movimientos\n• Historial de pagos\n' + lineasEliminar;
   if (!confirm('☢️ ELIMINAR RECIBO #' + folioConLetraStr + '\n\nCliente: ' + nombre + '\nFecha: ' + (r.fecha||'') + avisoVersiones + '\n\nSe eliminará de:\n• Recibos\n' + lineasEliminar + '\n\n⚠️ Esta acción NO se puede deshacer.')) return;
+  // Bloquear inmediatamente cualquier sincronización descendente mientras dura el borrado.
+  // Si _ultimoSyncPropio se establece tarde (antes solo estaba en el paso 9), el Realtime
+  // puede disparar sincronizarFolio(true) durante las operaciones async y restaurar el recibo.
+  _ultimoSyncPropio = Date.now();
   // 1. Eliminar recibo del array (solo el específico por índice)
   recibos.splice(idx, 1);
   // 2. Recalcular folioActual al primer hueco disponible (incluye el hueco que dejó este recibo)

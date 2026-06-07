@@ -18046,6 +18046,30 @@ async function syncEstadoSupabase(){
                              : (D.retro_global || null),
       _juiciosModTs:         D._juiciosModTs         || 0
     };
+    // ── Protección multi-usuario: leer tombstones de SB antes de escribir ──────
+    // Si este browser aún no tiene los tombstones del admin (ej: empleada que no ha
+    // sincronizado), su save() sobreescribiría folios_eliminados con [] y restauraría
+    // los folios eliminados. Igual que actualizarArchivoControl(), se fusionan los
+    // tombstones de SB antes de construir el objeto que se va a subir.
+    try {
+      const { data: _sbPreSync } = await window.SB
+        .from('app_state').select('recibos')
+        .eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+      const _sbTombsPreSync = (_sbPreSync && _sbPreSync.recibos && _sbPreSync.recibos.folios_eliminados) || [];
+      if (_sbTombsPreSync.length > 0) {
+        if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
+        _sbTombsPreSync.forEach(function(t){
+          if(!appData.folios_eliminados.some(function(x){
+            return String(x.folio)===String(t.folio) && x.letra===t.letra;
+          })) appData.folios_eliminados.push(t);
+        });
+        appData.recibos = (appData.recibos||[]).filter(function(r){
+          return !appData.folios_eliminados.some(function(t){
+            return String(t.folio)===String(r.folio) && t.letra===(r.letra||'A');
+          });
+        });
+      }
+    } catch(_ePreSync){ /* fallo silencioso — se usarán tombstones locales */ }
     const recibos = {
       folioActual:       (typeof REC !== 'undefined' && REC.folioActual) ? REC.folioActual : (appData.folioActual || 100),
       anioFolioActual:   (appData.anioFolioActual || new Date().getFullYear()),

@@ -23205,22 +23205,33 @@ async function adminEliminarRecibo(idx) {
   }
 
   // 7. Eliminar PDF de R2 (Cloudflare) y de Supabase Storage
-  if (r.archivo) {
-    if (typeof window.borrarR2 === 'function' && window.SB_DESPACHO_ID) {
-      try { await window.borrarR2(window.SB_DESPACHO_ID + '/recibos/' + r.archivo, 'recibos'); } catch(e) { console.warn('R2 delete:', e); }
-    }
-    if (typeof borrarPDFdeDrive === 'function') {
-      try { await borrarPDFdeDrive(r.archivo); } catch(e) { console.warn('PDF storage:', e); }
-    }
-  }
-  // También intentar por nombre construido
+  // Se intentan todos los nombres posibles sin duplicados:
+  //   • r.archivo  — nombre almacenado en el registro (puede ser corto o descriptivo)
+  //   • r.archivoR2 — nombre descriptivo exclusivo de R2 (solo recibos normales)
+  //   • folioConLetraStr + '.pdf' — nombre corto canónico (26-043B.pdf)
+  //   • Recibo_{folioConLetraStr}_{nombre}.pdf — nombre descriptivo construido CON letra
   try {
-    var nombrePDF = 'Recibo_' + folioStr + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf';
-    if (typeof window.borrarR2 === 'function' && window.SB_DESPACHO_ID) {
-      await window.borrarR2(window.SB_DESPACHO_ID + '/recibos/' + nombrePDF, 'recibos');
+    const _pathsBorrar = new Set();
+    if (r.archivo)                        _pathsBorrar.add(r.archivo);
+    if (r.archivoR2 && r.archivoR2 !== r.archivo) _pathsBorrar.add(r.archivoR2);
+    // Nombre corto con letra (ej. 26-043B.pdf)
+    var _archCorto = folioConLetraStr + '.pdf';
+    _pathsBorrar.add(_archCorto);
+    // Nombre descriptivo construido CON letra (corrección: antes usaba folioStr sin letra)
+    if (typeof _nombreArchivoR2 === 'function') {
+      var _archDesc = _nombreArchivoR2(folioConLetraStr, r.nombre||'');
+      _pathsBorrar.add(_archDesc);
     }
-    if (typeof borrarPDFdeDrive === 'function') await borrarPDFdeDrive(nombrePDF);
-  } catch(e){ registrarError('catch vacio', e); }
+    for (var _pn of _pathsBorrar) {
+      if (typeof window.borrarR2 === 'function' && window.SB_DESPACHO_ID) {
+        try { await window.borrarR2(window.SB_DESPACHO_ID + '/recibos/' + _pn, 'recibos'); } catch(e) { /* silencioso — path puede no existir */ }
+      }
+      if (typeof borrarPDFdeDrive === 'function') {
+        try { await borrarPDFdeDrive(_pn); } catch(e) { /* silencioso */ }
+      }
+    }
+    console.log('[adminEliminarRecibo] R2/Storage limpiados — paths intentados:', [..._pathsBorrar]);
+  } catch(e){ console.warn('[adminEliminarRecibo] Error en limpieza R2:', e); }
   // 8. Limpiar backups de localStorage — solo el registro específico (folio + letra)
   try {
     ['D','appData'].forEach(function(tipo) {

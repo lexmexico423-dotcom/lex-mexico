@@ -2953,6 +2953,15 @@ window.addEventListener('offline', ()=>{
             <div style="font-family:monospace;font-size:0.5rem;color:rgba(232,85,85,0.6);text-align:center;line-height:1.4;padding:0 4px;">Ej: capturaste todos los cobros del día en la computadora equivocada o duplicados. Borra todo lo de hoy y vuelves a empezar desde cero. ⚠ No se puede deshacer</div>
             <div style="font-family:monospace;font-size:0.52rem;color:rgba(200,149,42,0.5);">Hoy: <strong id="adminMovHoyCnt" style="color:var(--gold-l);">0</strong> movs.</div>
           </div>
+          <!-- 2b. Eliminar Movimiento Individual -->
+          <div onclick="adminAbrirEliminarMovimiento()" style="position:relative;background:rgba(192,22,26,0.12);border:1.5px solid rgba(192,22,26,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#c0161a';this.style.boxShadow='0 8px 20px rgba(192,22,26,0.25)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(192,22,26,0.35)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:#c0161a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">👻</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#ffe0e0;text-align:center;line-height:1.3;">Eliminar Folios<br>Huérfanos</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(232,85,85,0.6);text-align:center;line-height:1.4;padding:0 4px;">Movimientos que aparecen en contabilidad pero cuyo recibo ya no existe en el sistema — duplicados, registros de error o folios eliminados que dejaron rastro. Se eliminan uno por uno con autorización.</div>
+          </div>
           <!-- 2c. Regenerar PDFs Históricos -->
           <div onclick="adminRegenerarPDFsHistoricos()" style="position:relative;background:rgba(42,100,42,0.08);border:1.5px solid rgba(42,100,42,0.28);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
                onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#2a642a';this.style.boxShadow='0 8px 20px rgba(42,100,42,0.25)'"
@@ -3199,6 +3208,21 @@ window.addEventListener('offline', ()=>{
       </div>
     </div>
     <!-- ZONA: BORRAR MOVIMIENTOS POR FECHA -->
+    <!-- ═══ ZONA: Eliminar Movimiento Individual ═══ -->
+    <div id="adminEliminarMovZone" class="admin-panel">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;">
+        <button onclick="adminVolverPanel()" style="background:none;border:none;cursor:pointer;color:var(--gold-l);font-size:0.85rem;padding:4px 8px;border-radius:4px;">← Volver</button>
+        <span style="font-family:serif;font-size:0.9rem;color:var(--gold-l);">👻 Eliminar Folios Huérfanos</span>
+      </div>
+      <p style="font-family:monospace;font-size:0.62rem;color:rgba(232,85,85,0.8);margin-bottom:14px;">Movimientos registrados en contabilidad cuyo recibo ya no existe en el sistema. Pueden ser folios eliminados que dejaron rastro, duplicados o registros generados por error. Los marcados <strong style="color:#e85555;">SIN RECIBO</strong> son los huérfanos. Requiere autorización para eliminar.</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px;">
+        <input id="adminElimMovBuscar" type="text" placeholder="Buscar por folio, nombre o descripción..." onkeydown="if(event.key==='Enter') adminElimMovRender()"
+          style="flex:1;box-sizing:border-box;background:#1a1008;border:1px solid rgba(200,149,42,0.4);color:var(--gold-l);border-radius:8px;padding:9px 12px;font-family:monospace;font-size:0.72rem;">
+        <button onclick="adminElimMovRender()" style="background:rgba(200,149,42,0.15);border:1px solid rgba(200,149,42,0.4);color:var(--gold-l);border-radius:8px;padding:9px 16px;cursor:pointer;font-family:monospace;font-size:0.72rem;white-space:nowrap;">🔍 Buscar</button>
+      </div>
+      <div id="adminElimMovLista" style="max-height:420px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;"></div>
+      <div id="adminElimMovStatus" style="margin-top:10px;font-family:monospace;font-size:0.65rem;text-align:center;min-height:18px;color:var(--gold-l);"></div>
+    </div>
     <div id="adminBorrarFechaZone" class="admin-panel">
       <div class="admin-modal-body">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
@@ -7775,12 +7799,17 @@ async function generarPDF(datos,folio,qrDataURL){
     doc.setTextColor(160,80,16); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
     doc.text('+ SERVICIO COMPLEMENTARIO',margin+1,y); y+=2.5;
     datos.costosExtra.forEach(c=>{
-      const p=parseFloat(c.precio)||0; totalCostosExtra+=p; total+=p;
+      const p=parseFloat(c.precio)||0;
+      const esLiquidado = !!(c.liquidadoAlMomento);
+      const esExactoPDF = esLiquidado && (parseFloat(c.montoLiquidado)||0) === p;
+      // Solo suma al total si NO es liquidado exacto
+      if(!esExactoPDF){ totalCostosExtra+=p; total+=p; }
       doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(20,10,5);
       const cLines = doc.splitTextToSize(c.concepto||'', colConceptoW);
       const _vTagCE = '['+folioConLetra(folio, datos.anio_folio, c.folioLetra||datos.letra||'A')+(c.fechaHora?' '+c.fechaHora:'')+']';
       const dLines = doc.splitTextToSize((c.descripcion ? c.descripcion+' ' : '')+_vTagCE, colDescripW);
-      const maxLines = Math.max(cLines.length, dLines.length, 1);
+      const liqLine = esExactoPDF ? doc.splitTextToSize('✔ LIQUIDADO — $'+fmtMXN(parseFloat(c.montoLiquidado)||p)+' — '+c.fechaHora, colDescripW+colConceptoW) : null;
+      const maxLines = Math.max(cLines.length, dLines.length, 1) + (liqLine ? liqLine.length : 0);
       const rowH = maxLines * 3.6 + 1.2;
       asegurarEspacioCE(rowH);
       doc.text(cLines, margin, y);
@@ -7788,6 +7817,12 @@ async function generarPDF(datos,folio,qrDataURL){
       doc.text(dLines, margin+cW*0.38, y);
       doc.setFontSize(8); doc.setTextColor(20,10,5);
       doc.text('$'+fmtMXN(p), margin+cW, y, {align:'right'});
+      if(esExactoPDF && liqLine){
+        const yLiq = y + Math.max(cLines.length, dLines.length) * 3.6;
+        doc.setFontSize(7); doc.setFont('helvetica','bolditalic'); doc.setTextColor(42,122,58);
+        doc.text(liqLine, margin, yLiq);
+        doc.setFont('helvetica','normal'); doc.setTextColor(20,10,5);
+      }
       doc.setDrawColor(220,180,120); doc.setLineWidth(0.2);
       doc.line(margin, y+rowH-1, margin+cW, y+rowH-1);
       y += rowH;
@@ -8998,26 +9033,83 @@ function agregarCostoExtra(data){
   const isLocked   = !!(data && data.locked);
   const isExisting = !!(data && data.fechaHora);
   const fechaHora  = isExisting ? data.fechaHora : nuevaFechaHoraStr();
-  tr.dataset.fechaHora = fechaHora;
+  // Modo retro: solo para filas NUEVAS (no locked, no cargadas del historial)
+  const retroActivo = !isLocked && !isExisting && !!window._reciboRetroactivoActivo;
+  const retroFecha  = (retroActivo && window._reciboRetroactivoFechaPersonalizada) || fechaCDMX_ISO();
+  const retroHora   = (retroActivo && window._reciboRetroactivoHoraPersonalizada)  || horaCDMX_HHMM();
+  tr.dataset.fechaHora = retroActivo ? (retroFecha + ' ' + retroHora) : fechaHora;
   if(isLocked) tr.dataset.locked = '1';
   if(isLocked){
     tr.classList.add('ce-row-locked');
+    const _liqEsExacto = (data && data.liquidadoAlMomento) && (parseFloat(data.montoLiquidado)||0) === (parseFloat(data.precio)||0);
+    const _liqTag = _liqEsExacto
+      ? '<div style="margin-top:3px;font-size:0.65rem;color:#2a7a3a;font-style:italic;">✔ LIQUIDADO — $'+fmtMXN(parseFloat(data.montoLiquidado)||0)+'</div>'
+      : ((data && data.liquidadoAlMomento && parseFloat(data.montoLiquidado) > 0)
+          ? '<div style="margin-top:3px;font-size:0.65rem;color:#c8952a;font-style:italic;">⚡ Abono $'+fmtMXN(parseFloat(data.montoLiquidado)||0)+' aplicado al saldo</div>'
+          : '');
     tr.innerHTML =
         '<td><textarea class="ce-concepto concepto-ta ce-locked-field" rows="1" readonly>'+escHTML((data&&data.concepto)||'')+'</textarea></td>'
       + '<td><textarea class="ce-descripcion concepto-ta ce-locked-field" rows="1" readonly>'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
-      + '<td><input type="text" class="ce-precio price-input ce-locked-field" readonly value="'+escHTML(fmtMXN(parseFloat(data.precio)||0))+'"></td>'
+      + '<td style="vertical-align:top"><input type="text" class="ce-precio price-input ce-locked-field" readonly value="'+escHTML(fmtMXN(parseFloat(data.precio)||0))+'">'+_liqTag+'</td>'
       + '<td style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#7a6840;">'+fechaHora+'</td>'
       + '<td></td>';
-  } else {
+  } else if(retroActivo){
+    // Fila editable con fecha/hora manual para captura retroactiva
+    const _liqChecked = !!(data && data.liquidadoAlMomento);
+    const _liqMonto   = (data && data.montoLiquidado) ? String(data.montoLiquidado) : '';
     tr.innerHTML =
         '<td><textarea class="ce-concepto concepto-ta" rows="1" placeholder="Escribe el concepto...">'+escHTML((data&&data.concepto)||'')+'</textarea></td>'
-      + '<td><textarea class="ce-descripcion concepto-ta" rows="1" placeholder="Descripci\u00f3n">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
-      + '<td><input type="text" class="ce-precio price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.precio)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()"></td>'
+      + '<td><textarea class="ce-descripcion concepto-ta" rows="1" placeholder="Descripción">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
+      + '<td style="vertical-align:top">'
+      +   '<input type="text" class="ce-precio price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.precio)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()">'
+      +   '<div style="margin-top:4px;display:flex;align-items:center;gap:4px;">'
+      +     '<input type="checkbox" class="ce-liq-check" id="liq-'+id+'" '+(_liqChecked?'checked':'')+' onchange="toggleCeLiquidado(\''+id+'\');recalcularResumenActualizacion()" style="cursor:pointer;accent-color:#2a7a3a;">'
+      +     '<label for="liq-'+id+'" style="font-size:0.65rem;color:#2a7a3a;cursor:pointer;font-family:\'DM Mono\',monospace;">Liquidar ahora</label>'
+      +   '</div>'
+      +   '<div class="ce-liq-monto-wrap" style="margin-top:3px;display:'+(_liqChecked?'block':'none')+';">'
+      +     '<input type="text" class="ce-liq-monto price-input" placeholder="Monto liq." inputmode="decimal" value="'+escHTML(_liqMonto)+'" oninput="formatPrecio(this);recalcularResumenActualizacion()" style="width:100%;font-size:0.72rem;border-color:#2a7a3a;">'
+      +   '</div>'
+      + '</td>'
+      + '<td style="padding:2px 4px;">'
+        + '<input type="date" class="ce-fecha-retro" value="'+escHTML(retroFecha)+'" oninput="_ceSyncFechaRetro(this)" style="font-family:\'DM Mono\',monospace;font-size:0.65rem;background:#1a1208;border:1px solid rgba(200,149,42,0.5);border-radius:4px;color:#e8d4a8;padding:2px 4px;width:108px;">'
+        + '<input type="time" class="ce-hora-retro"  value="'+escHTML(retroHora)+'"  oninput="_ceSyncFechaRetro(this)" style="font-family:\'DM Mono\',monospace;font-size:0.65rem;background:#1a1208;border:1px solid rgba(200,149,42,0.5);border-radius:4px;color:#e8d4a8;padding:2px 4px;width:68px;margin-left:3px;">'
+      + '</td>'
+      + '<td><button class="del-concept" onclick="quitarCostoExtra(\''+id+'\')">✕</button></td>';
+  } else {
+    const _liqChecked = !!(data && data.liquidadoAlMomento);
+    const _liqMonto   = (data && data.montoLiquidado) ? String(data.montoLiquidado) : '';
+    tr.innerHTML =
+        '<td><textarea class="ce-concepto concepto-ta" rows="1" placeholder="Escribe el concepto...">'+escHTML((data&&data.concepto)||'')+'</textarea></td>'
+      + '<td><textarea class="ce-descripcion concepto-ta" rows="1" placeholder="Descripción">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
+      + '<td style="vertical-align:top">'
+      +   '<input type="text" class="ce-precio price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.precio)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()">'
+      +   '<div style="margin-top:4px;display:flex;align-items:center;gap:4px;">'
+      +     '<input type="checkbox" class="ce-liq-check" id="liq-'+id+'" '+(_liqChecked?'checked':'')+' onchange="toggleCeLiquidado(\''+id+'\');recalcularResumenActualizacion()" style="cursor:pointer;accent-color:#2a7a3a;">'
+      +     '<label for="liq-'+id+'" style="font-size:0.65rem;color:#2a7a3a;cursor:pointer;font-family:\'DM Mono\',monospace;">Liquidar ahora</label>'
+      +   '</div>'
+      +   '<div class="ce-liq-monto-wrap" style="margin-top:3px;display:'+(_liqChecked?'block':'none')+';">'
+      +     '<input type="text" class="ce-liq-monto price-input" placeholder="Monto liq." inputmode="decimal" value="'+escHTML(_liqMonto)+'" oninput="formatPrecio(this);recalcularResumenActualizacion()" style="width:100%;font-size:0.72rem;border-color:#2a7a3a;">'
+      +   '</div>'
+      + '</td>'
       + '<td style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#7a6840;">'+fechaHora+'</td>'
-      + '<td><button class="del-concept" onclick="quitarCostoExtra(\''+id+'\')">\u2715</button></td>';
+      + '<td><button class="del-concept" onclick="quitarCostoExtra(\''+id+'\')">✕</button></td>';
   }
   tbody.appendChild(tr);
   recalcularResumenActualizacion();
+}
+function toggleCeLiquidado(id){
+  const row = document.getElementById('costo-extra-row-'+id);
+  if(!row) return;
+  const chk  = row.querySelector('.ce-liq-check');
+  const wrap = row.querySelector('.ce-liq-monto-wrap');
+  const monto = row.querySelector('.ce-liq-monto');
+  if(!chk || !wrap) return;
+  wrap.style.display = chk.checked ? 'block' : 'none';
+  if(chk.checked && monto && !monto.value){
+    // Pre-llenar con el precio capturado
+    const precio = row.querySelector('.ce-precio');
+    if(precio) monto.value = precio.value;
+  }
 }
 function quitarCostoExtra(id){
   const r = document.getElementById('costo-extra-row-'+id);
@@ -9025,13 +9117,21 @@ function quitarCostoExtra(id){
 }
 function getCostosExtra(){
   const filas = document.querySelectorAll('#costos-extra-tbody tr');
-  return Array.from(filas).map(tr => ({
-    concepto:    tr.querySelector('.ce-concepto').value || '',
-    descripcion: tr.querySelector('.ce-descripcion').value || '',
-    precio:      String(parsePrecio(tr.querySelector('.ce-precio').value)),
-    fechaHora:   tr.dataset.fechaHora || '',
-    locked:      tr.dataset.locked === '1'
-  })).filter(c => c.concepto || parseFloat(c.precio) > 0);
+  return Array.from(filas).map(tr => {
+    const chk = tr.querySelector('.ce-liq-check');
+    const liqMonto = tr.querySelector('.ce-liq-monto');
+    const liquidadoAlMomento = chk ? chk.checked : (tr.dataset.liquidadoAlMomento === '1');
+    const montoLiquidado = (liquidadoAlMomento && liqMonto) ? parsePrecio(liqMonto.value) : 0;
+    return {
+      concepto:            tr.querySelector('.ce-concepto').value || '',
+      descripcion:         tr.querySelector('.ce-descripcion').value || '',
+      precio:              String(parsePrecio(tr.querySelector('.ce-precio').value)),
+      fechaHora:           tr.dataset.fechaHora || '',
+      locked:              tr.dataset.locked === '1',
+      liquidadoAlMomento:  liquidadoAlMomento,
+      montoLiquidado:      montoLiquidado
+    };
+  }).filter(c => c.concepto || parseFloat(c.precio) > 0);
 }
 // ── PAGOS PARCIALES ──────────────────────────────────────────────
 pagoParcialCount = 0;
@@ -9115,6 +9215,13 @@ function _ppSyncFechaRetro(el){
   if(!tr) return;
   const f = (tr.querySelector('.pp-fecha-retro')||{}).value || '';
   const h = (tr.querySelector('.pp-hora-retro')||{}).value  || '';
+  if(f && h) tr.dataset.fechaHora = f + ' ' + h;
+}
+function _ceSyncFechaRetro(el){
+  const tr = el.closest('tr');
+  if(!tr) return;
+  const f = (tr.querySelector('.ce-fecha-retro')||{}).value || '';
+  const h = (tr.querySelector('.ce-hora-retro')||{}).value  || '';
   if(f && h) tr.dataset.fechaHora = f + ' ' + h;
 }
 function getPagosParciales(){
@@ -9301,9 +9408,19 @@ function recalcularResumenActualizacion(){
   if(!reciboEnActualizacion) return;
   const totalOriginal = parseFloat(reciboEnActualizacion.total) || 0;
   // Solo costos NUEVOS (no locked) — recibo.total ya incluye los de versiones anteriores
-  const sumaCostosExtra = getCostosExtra()
-    .filter(c => c.locked !== true)
+  // Solo costos NUEVOS — exacto=precio==monto (independiente); parcial/exceso=suma a deuda
+  const _costosExtraNuevos = getCostosExtra().filter(c => c.locked !== true);
+  const _esExacto = c => c.liquidadoAlMomento && (parseFloat(c.montoLiquidado)||0) === (parseFloat(c.precio)||0);
+  const sumaCostosExtra = _costosExtraNuevos
+    .filter(c => !_esExacto(c))
     .reduce((s,c)=>s+(parseFloat(c.precio)||0), 0);
+  // Abonos implícitos: lo pagado en complementarios NO exactos descuenta del saldo
+  const sumaAbonosImplicitos = _costosExtraNuevos
+    .filter(c => c.liquidadoAlMomento && !_esExacto(c))
+    .reduce((s,c)=>s+(parseFloat(c.montoLiquidado)||0), 0);
+  const sumaLiquidadosAhora = _costosExtraNuevos
+    .filter(c => _esExacto(c))
+    .reduce((s,c)=>s+(parseFloat(c.montoLiquidado)||0), 0);
   const todosLosPagos = getPagosParciales();
   const sumaAbonosNuevos = todosLosPagos
     .filter(p => p.locked !== true)
@@ -9312,7 +9429,7 @@ function recalcularResumenActualizacion(){
   const saldoAnterior = parseFloat(reciboEnActualizacion.saldoPendiente) || 0;
   const totalGeneral = totalOriginal + sumaCostosExtra;
   // El nuevo saldo = saldo anterior + costos nuevos ahora - abonos nuevos de esta sesion
-  const nuevoSaldo = Math.max(0, saldoAnterior + sumaCostosExtra - sumaAbonosNuevos);
+  const nuevoSaldo = Math.max(0, saldoAnterior + sumaCostosExtra - sumaAbonosNuevos - sumaAbonosImplicitos);
   const totalAbonado = totalGeneral - nuevoSaldo;
   const box = document.getElementById('resumen-pagos-parciales');
   box.style.display = '';
@@ -9327,6 +9444,12 @@ function recalcularResumenActualizacion(){
     + '<span style="color:#a05010;">Saldo anterior (resta):</span><span style="text-align:right;color:#a05010;">$'+fmtMXN(saldoAnterior)+'</span>'
     + (sumaAbonosNuevos > 0
         ? '<span style="font-weight:700;color:#2a7a3a;">\u2212 Nuevo abono:</span><span style="text-align:right;font-weight:700;color:#2a7a3a;">$'+fmtMXN(sumaAbonosNuevos)+'</span>'
+        : '')
+    + (sumaAbonosImplicitos > 0
+        ? '<span style="font-weight:700;color:#2a7a3a;">\u2212 Abono (complementario):</span><span style="text-align:right;font-weight:700;color:#2a7a3a;">$'+fmtMXN(sumaAbonosImplicitos)+'</span>'
+        : '')
+    + (sumaLiquidadosAhora > 0
+        ? '<span style="color:#2a7a3a;font-style:italic;">✔ Complementario liquidado:</span><span style="text-align:right;color:#2a7a3a;font-style:italic;">$'+fmtMXN(sumaLiquidadosAhora)+'</span>'
         : '')
     + '<span style="border-top:1.5px solid #2a7a3a;padding-top:5px;font-weight:700;font-size:0.95rem;">SALDO RESTANTE (RESTA):</span>'
     + '<span style="border-top:1.5px solid #2a7a3a;padding-top:5px;text-align:right;font-weight:700;font-size:1rem;color:'+(nuevoSaldo>0?'#b01010':'#2a7a3a')+'">$'+fmtMXN(nuevoSaldo)+'</span>'
@@ -9430,16 +9553,23 @@ async function _imprimirActualizacionReal(){
   const totalOriginal = parseFloat(recibo.total) || 0;
   const anticipoOriginal = parseFloat(recibo.anticipo) || 0;
   // Solo costos NUEVOS (no locked) — recibo.total ya incluye los de versiones anteriores
-  const sumaCostosExtra = costosExtra
-    .filter(c => c.locked !== true)
+  // Separar complementarios: exacto(precio==monto)=independiente; parcial/exceso=suma a deuda
+  const _costosNuevos = costosExtra.filter(c => c.locked !== true);
+  const _esExactoImp = c => c.liquidadoAlMomento && (parseFloat(c.montoLiquidado)||0) === (parseFloat(c.precio)||0);
+  const sumaCostosExtra = _costosNuevos
+    .filter(c => !_esExactoImp(c))
     .reduce((s,c)=>s+(parseFloat(c.precio)||0), 0);
+  // Abonos implícitos: lo pagado en complementarios no exactos descuenta del saldo
+  const sumaAbonosImplicitos = _costosNuevos
+    .filter(c => c.liquidadoAlMomento && !_esExactoImp(c))
+    .reduce((s,c)=>s+(parseFloat(c.montoLiquidado)||0), 0);
   // Usar saldoPendiente como base — ya incluye anticipo original y todos los abonos anteriores
   const saldoAnterior = parseFloat(recibo.saldoPendiente) || 0;
   const sumaAbonosNuevos = pagosParciales
     .filter(p => p.locked !== true)
     .reduce((s,p)=>s+(parseFloat(p.cantidad)||0), 0);
   const totalGeneral = totalOriginal + sumaCostosExtra;
-  const saldoNuevo = Math.max(0, saldoAnterior + sumaCostosExtra - sumaAbonosNuevos);
+  const saldoNuevo = Math.max(0, saldoAnterior + sumaCostosExtra - sumaAbonosNuevos - sumaAbonosImplicitos);
   const totalAbonado = totalGeneral - saldoNuevo;
   const fechasImpresion = (recibo.fechasImpresion && recibo.fechasImpresion.length)
     ? recibo.fechasImpresion.slice()
@@ -9616,6 +9746,35 @@ async function _imprimirActualizacionReal(){
         if(typeof renderContab === 'function') renderContab();
         // Sync inmediato a Supabase (no debounced) para pagos retroactivos
         try { await syncEstadoSupabase(); } catch(e){ syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); }); }
+      }
+      // ── REGISTRAR COMPLEMENTARIOS LIQUIDADOS AL MOMENTO ────────────
+      const _esExactoC = c => c.liquidadoAlMomento && (parseFloat(c.montoLiquidado)||0) === (parseFloat(c.precio)||0);
+      const _liqAhora = costosExtra.filter(c => !c.locked && c.liquidadoAlMomento && parseFloat(c.montoLiquidado) > 0);
+      _liqAhora.forEach(function(ce){
+        const montoLiq = parseFloat(ce.montoLiquidado) || 0;
+        const esExacto = _esExactoC(ce);
+        const movLiq = {
+          id: 'M-LIQ-CE-' + recibo.folio + '-' + Date.now() + '-' + Math.random().toString(36).slice(2,6),
+          folioCaja: '',
+          fecha: _retroActivo ? _fechaActualizacion : (typeof hoy  === 'function' ? hoy()  : new Date().toISOString().split('T')[0]),
+          hora:  _retroActivo ? _horaActualizacion  : (typeof hora === 'function' ? hora() : new Date().toTimeString().slice(0,5)),
+          descripcion: (esExacto ? 'Complementario liquidado' : 'Abono parcial') + ' · ' + (ce.concepto||'Servicio') + ' · Recibo #' + folioConLetra(recibo.folio, recibo.anio_folio, letraActual) + ' · ' + (recibo.nombre||''),
+          nombre: recibo.nombre || '',
+          folio: recibo.folio,
+          monto: montoLiq,
+          tipo: 'ingreso',
+          cat: (esExacto ? 'Complementario' : 'Abono parcial') + ' · #' + folioConLetra(recibo.folio, recibo.anio_folio, letraActual),
+          estatus: esExacto ? 'Complementario' : 'Abono parcial',
+          fuente: 'recibo',
+          letra: letraActual,
+          responsable: typeof empNombre === 'function' ? empNombre() : (recibo.responsable||'')
+        };
+        _registrarMovimiento(movLiq);
+      });
+      if(_liqAhora.length > 0){
+        if(typeof save === 'function') save();
+        if(typeof renderCaja === 'function') renderCaja();
+        if(typeof renderContab === 'function') renderContab();
       }
     }
     // ── ESCRITURA BLOQUEANTE en Drive antes de imprimir ──────────────
@@ -13078,7 +13237,28 @@ function renderCaja(){
   </tr>`).join('');
 }
 function delMov(id){
-  toast('Solo el administrador puede eliminar movimientos. Usa ⚙ Configuración → Administración.','err');
+  const mov = (D.movimientos||[]).find(function(m){ return m && m.id === id; });
+  if(!mov){ toast('Movimiento no encontrado','err'); return; }
+  // Verificar si el recibo vinculado existe
+  const tieneRecibo = mov.fuente === 'recibo' && mov.folio != null
+    ? (appData.recibos||[]).some(function(r){ return r && r.folio == mov.folio; })
+    : true;
+  const esHuerfano = mov.fuente === 'recibo' && !tieneRecibo;
+  const _desc = (mov.descripcion||'').substring(0,60);
+  const _monto = (mov.tipo==='ingreso'?'+':'−') + '$' + fmt(mov.monto);
+  const _msg = esHuerfano
+    ? '⚠️ Este movimiento no tiene recibo vinculado.\n\n' + _desc + '\n' + _monto + '\n\n¿Eliminar movimiento huérfano?'
+    : '¿Eliminar este movimiento de contabilidad?\n\n' + _desc + '\n' + _monto + '\n\n⚠️ No se puede deshacer.';
+  pedirAutorizacion().then(function(auth){
+    if(auth === null) return;
+    if(!confirm(_msg)) return;
+    D.movimientos = (D.movimientos||[]).filter(function(m){ return m && m.id !== id; });
+    if(typeof save === 'function') save();
+    if(typeof renderCaja   === 'function') renderCaja();
+    if(typeof renderContab === 'function') renderContab();
+    syncEstadoSupabase().catch(function(e){ syncEstadoSupabaseDebounced().catch(function(){}); });
+    toast('✅ Movimiento eliminado','ok');
+  });
 }
 // ═══ CONTABILIDAD ═══
 // ═══════════════════════════════════════════════════════════════════
@@ -13450,6 +13630,12 @@ function renderContab() {
     return nombre.trim().split(/\s+/).map(p => p[0]||'').join('').toUpperCase().substring(0,3);
   }
   function _badgeEstatus(m) {
+    // Movimientos de Captura Rápida (caja): mostrar solo Ingreso/Egreso
+    if(m.fuente === 'caja'){
+      const _lbl = m.tipo === 'egreso' ? 'Egreso' : 'Ingreso';
+      const _cls = m.tipo === 'egreso' ? 'tag-m' : 'tag-b';
+      return `<span class="tag ${_cls}" style="font-size:0.54rem;">${_lbl}</span>`;
+    }
     // Fallback: monto>0 sin estatus → 'Anticipo'; monto=0 → 'Pendiente'
     const est = m.estatus || (m.monto > 0 ? 'Anticipo' : 'Pendiente');
     // Etiquetas visibles al usuario — los valores internos no cambian
@@ -13460,13 +13646,15 @@ function renderContab() {
       'Abono parcial':'Abonado',
       'Abono':        'Abonado',
       'Pendiente':    'Pendiente',
-      'Sin Anticipo': 'Sin Anticipo'
+      'Sin Anticipo': 'Sin Anticipo',
+      'Complementario': 'Complementario'
     };
     const label = labelMap[est] || est || m.cat || '—';
     const cls = (est === 'Liquidado' || est === 'Liquidación') ? 'tag-v' :
                 est === 'Anticipo'     ? 'tag-b' :
                 est === 'Sin Anticipo' ? 'tag-sa' :
                 (est === 'Abono parcial' || est === 'Abono') ? 'tag-a' :
+                est === 'Complementario' ? 'tag-a' :
                 'tag-m';
     return `<span class="tag ${cls}" style="font-size:0.54rem;">${esc(label)}</span>`;
   }
@@ -18056,6 +18244,8 @@ async function syncEstadoSupabase(){
         .from('app_state').select('recibos')
         .eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
       const _sbTombsPreSync = (_sbPreSync && _sbPreSync.recibos && _sbPreSync.recibos.folios_eliminados) || [];
+      const _sbRecibosPreSync = (_sbPreSync && _sbPreSync.recibos && Array.isArray(_sbPreSync.recibos.recibos)) ? _sbPreSync.recibos.recibos : [];
+      // Fusionar tombstones
       if (_sbTombsPreSync.length > 0) {
         if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
         _sbTombsPreSync.forEach(function(t){
@@ -18063,12 +18253,27 @@ async function syncEstadoSupabase(){
             return String(x.folio)===String(t.folio) && x.letra===t.letra;
           })) appData.folios_eliminados.push(t);
         });
-        appData.recibos = (appData.recibos||[]).filter(function(r){
-          return !appData.folios_eliminados.some(function(t){
-            return String(t.folio)===String(r.folio) && t.letra===(r.letra||'A');
-          });
-        });
       }
+      // Fusionar recibos de SB con los locales: conservar recibos que solo están en un lado
+      if (_sbRecibosPreSync.length > 0) {
+        const _mapaLocal = {};
+        (appData.recibos||[]).forEach(function(r){ if(r) _mapaLocal[r.folio+'|'+(r.letra||'A')] = r; });
+        const _mapaSB = {};
+        _sbRecibosPreSync.forEach(function(r){ if(r) _mapaSB[r.folio+'|'+(r.letra||'A')] = r; });
+        const _claves = new Set([...Object.keys(_mapaSB), ...Object.keys(_mapaLocal)]);
+        const _merged = [];
+        _claves.forEach(function(k){
+          // Local gana sobre SB (tiene datos más frescos como pdfBase64, costosExtra, etc.)
+          _merged.push(_mapaLocal[k] || _mapaSB[k]);
+        });
+        appData.recibos = _merged;
+      }
+      // Aplicar tombstones al resultado fusionado
+      appData.recibos = (appData.recibos||[]).filter(function(r){
+        return !( appData.folios_eliminados||[]).some(function(t){
+          return String(t.folio)===String(r.folio) && t.letra===(r.letra||'A');
+        });
+      });
     } catch(_ePreSync){ /* fallo silencioso — se usarán tombstones locales */ }
     const recibos = {
       folioActual:       (typeof REC !== 'undefined' && REC.folioActual) ? REC.folioActual : (appData.folioActual || 100),
@@ -18795,8 +19000,9 @@ async function guardarReciboInterno() {
     await guardarFolioEnDrive(folio + 1);
     await subirPDFaD(blob, 'LEX-Recibo-' + folioFormato(folio) + '-' + datos.nombre.replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf');
     save();
-    // Refrescar contabilidad con el nuevo recibo
+    // Refrescar contabilidad e historial con el nuevo recibo
     if(typeof renderContab==='function') renderContab();
+    if(typeof renderHistorial==='function') renderHistorial();
     // ── Actualizar Directorio desde recibo nuevo ──────────────────
     // Revisa cada cliente del recibo: si existe por nombre, compara teléfono.
     // Si el tel ya coincide → no hace nada.
@@ -19083,15 +19289,14 @@ function _folioSiguienteUnico(folioBase) {
 // Devuelve el primer número de folio libre (≥1). Úsalo para recalcular folioActual
 // después de eliminar un recibo o al activar el modo "llenar huecos".
 function _recalcularFolioActual() {
-  var usados = new Set(
-    ((appData && appData.recibos) ? appData.recibos : [])
-      .concat((typeof REC !== 'undefined' && REC.recibos) ? REC.recibos : [])
-      .filter(function(r){ return r && r.folio; })
-      .map(function(r){ return Number(r.folio); })
-  );
-  var f = 1;
-  while (usados.has(f)) f++;
-  return f;
+  var folios = ((appData && appData.recibos) ? appData.recibos : [])
+    .concat((typeof REC !== 'undefined' && REC.recibos) ? REC.recibos : [])
+    .filter(function(r){ return r && r.folio; })
+    .map(function(r){ return Number(r.folio); });
+  // Siguiente = máximo existente + 1 (no rellena huecos intermedios)
+  // Solo si se eliminó el último folio queda disponible ese número.
+  if(!folios.length) return 1;
+  return Math.max.apply(null, folios) + 1;
 }
 // ── Lock de folio: evita que dos generaciones simultáneas tomen el mismo ──
 let _folioEnUso = false;
@@ -21840,6 +22045,88 @@ function adminDesbloquearCaja() {
   if (cajaEl) { cajaEl.textContent = '✅ Caja abierta'; cajaEl.style.color = '#4dca6a'; }
   if (btnDesbloquear) { btnDesbloquear.disabled = true; btnDesbloquear.textContent = '✓ Ya abierta'; }
 }
+function adminAbrirEliminarMovimiento(){
+  document.querySelectorAll('#adminModal .admin-panel').forEach(function(z){ z.classList.remove('show'); });
+  var zona = document.getElementById('adminEliminarMovZone');
+  if(zona) zona.classList.add('show');
+  var input = document.getElementById('adminElimMovBuscar');
+  if(input){ input.value = ''; setTimeout(function(){ input.focus(); }, 100); }
+  var lista = document.getElementById('adminElimMovLista');
+  if(lista) lista.innerHTML = '<div style="text-align:center;color:var(--muted);font-family:monospace;font-size:0.65rem;padding:20px;">Ingresa un folio o término y presiona Buscar — o deja vacío para detectar huérfanos automáticamente.</div>';
+}
+function adminElimMovRender(){
+  var q = ((document.getElementById('adminElimMovBuscar')||{}).value||'').toLowerCase().trim();
+  var lista = document.getElementById('adminElimMovLista');
+  if(!lista) return;
+  var todos = (D.movimientos||[]).filter(function(m){ return m && !m.borrado; });
+  // Identificar huérfanos: fuente recibo pero sin recibo en appData
+  function esHuerfano(m){
+    return m.fuente === 'recibo' && m.folio != null &&
+      !(appData.recibos||[]).some(function(r){ return r && r.folio == m.folio; });
+  }
+  var movs;
+  if(q){
+    // Con búsqueda: filtrar todos los movimientos
+    movs = todos.filter(function(m){
+      return (String(m.folio||'')).includes(q)
+          || (m.nombre||m.descripcion||m.cat||'').toLowerCase().includes(q)
+          || (m.fecha||'').includes(q);
+    });
+  } else {
+    // Sin búsqueda: mostrar SOLO huérfanos primero
+    movs = todos.filter(esHuerfano);
+  }
+  movs = movs.slice().sort(function(a,b){ return (b.fecha+b.hora).localeCompare(a.fecha+a.hora); }).slice(0,50);
+  var status = document.getElementById('adminElimMovStatus');
+  if(!movs.length){
+    var msg = q ? 'Sin movimientos que coincidan' : '✅ No hay folios huérfanos en contabilidad';
+    lista.innerHTML = '<div style="text-align:center;color:var(--muted);font-family:monospace;font-size:0.65rem;padding:20px;">'+msg+'</div>';
+    if(status) status.textContent = '';
+    return;
+  }
+  if(status) status.textContent = movs.length + ' movimiento(s) encontrado(s)' + (q ? '' : ' — mostrando solo huérfanos');
+  // Guardar IDs en un mapa global para acceder sin comillas en onclick
+  window._adminElimMovMap = {};
+  lista.innerHTML = movs.map(function(m, i){
+    window._adminElimMovMap['mov_'+i] = m.id;
+    var huerfano = esHuerfano(m);
+    var colorBg = huerfano ? 'rgba(192,22,26,0.08)' : 'rgba(255,255,255,0.03)';
+    var colorBorder = huerfano ? 'rgba(192,22,26,0.35)' : 'rgba(200,149,42,0.15)';
+    var etiq = huerfano ? ' <span style="background:rgba(192,22,26,0.2);color:#e85555;border-radius:3px;padding:1px 5px;font-size:0.55rem;">SIN RECIBO</span>' : '';
+    var monto = (m.tipo==='ingreso'?'+':'−') + '$' + fmt(m.monto);
+    var color = m.tipo==='ingreso'?'#4dca6a':'#e85555';
+    var desc = esc((m.descripcion||m.nombre||m.cat||'').substring(0,70));
+    return '<div style="background:'+colorBg+';border:1px solid '+colorBorder+';border-radius:8px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+      + '<div style="flex:1;min-width:0;">'
+      +   '<div style="font-family:monospace;font-size:0.68rem;color:var(--gold-l);font-weight:700;">'+esc(m.fecha||'')+' '+esc(m.hora||'')+etiq+'</div>'
+      +   '<div style="font-family:monospace;font-size:0.62rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+desc+'</div>'
+      + '</div>'
+      + '<div style="font-family:monospace;font-size:0.72rem;font-weight:700;color:'+color+';white-space:nowrap;">'+esc(monto)+'</div>'
+      + '<button data-movkey="mov_'+i+'" onclick="adminElimMovConfirmar(this.dataset.movkey)" '
+      + 'style="background:rgba(192,22,26,0.15);border:1px solid rgba(192,22,26,0.4);color:#e85555;border-radius:6px;padding:5px 10px;cursor:pointer;font-family:monospace;font-size:0.62rem;white-space:nowrap;">✕ Eliminar</button>'
+      + '</div>';
+  }).join('');
+}
+function adminElimMovConfirmar(movkey){
+  var id = (window._adminElimMovMap||{})[movkey];
+  if(!id){ toast('Referencia no encontrada','err'); return; }
+  var mov = (D.movimientos||[]).find(function(m){ return m && m.id === id; });
+  if(!mov){ toast('Movimiento no encontrado','err'); return; }
+  var huerfano = mov.fuente === 'recibo' && mov.folio != null &&
+    !(appData.recibos||[]).some(function(r){ return r && r.folio == mov.folio; });
+  var desc = (mov.descripcion||'').substring(0,80);
+  var monto = (mov.tipo==='ingreso'?'+':'−') + '$' + fmt(mov.monto);
+  var msg = (huerfano ? '⚠️ Folio huérfano — sin recibo vinculado:\n\n' : '¿Eliminar este movimiento?\n\n')
+    + desc + '\n' + monto + '\n\n¿Está de acuerdo?';
+  if(!confirm(msg)) return;
+  D.movimientos = (D.movimientos||[]).filter(function(m){ return m && m.id !== id; });
+  if(typeof save === 'function') save();
+  if(typeof renderCaja   === 'function') renderCaja();
+  if(typeof renderContab === 'function') renderContab();
+  syncEstadoSupabase().catch(function(){ syncEstadoSupabaseDebounced().catch(function(){}); });
+  toast('✅ Movimiento eliminado y sincronizado','ok');
+  adminElimMovRender();
+}
 function adminBorrarCobrosHoy() {
   const movHoy = (D.movimientos || []).filter(m => m.fecha === hoy() && !m.borrado);
   if (!movHoy.length) { toast('No hay movimientos de hoy para eliminar', 'err'); return; }
@@ -22946,7 +23233,14 @@ async function adminConfirmarReordenarFolios() {
 // Apunta folioActual al primer hueco disponible sin renumerar nada.
 // Los nuevos recibos irán llenando huecos de forma natural.
 async function adminUsarSiguienteHueco() {
-  var siguiente = _recalcularFolioActual();
+  // Esta función SÍ llena huecos explícitamente (acción manual del admin)
+  var usados = new Set(
+    ((appData && appData.recibos) ? appData.recibos : [])
+      .concat((typeof REC !== 'undefined' && REC.recibos) ? REC.recibos : [])
+      .filter(function(r){ return r && r.folio; })
+      .map(function(r){ return Number(r.folio); })
+  );
+  var siguiente = 1; while(usados.has(siguiente)) siguiente++;
   var anio = (typeof appData !== 'undefined' && appData.anioFolioActual) || new Date().getFullYear();
   var folioStr = typeof folioConLetra === 'function' ? folioConLetra(siguiente, anio, 'A') : String(siguiente);
   appData.folioActual = siguiente;
@@ -23031,7 +23325,7 @@ function adminRenderRecibos(q) {
       'style="background:#5a3a8a;border:none;border-radius:4px;color:#fff;',
       'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;">',
       '📅 Fecha</button>',
-      '<button onclick="adminEliminarRecibo(' + idx + ')" ',
+      '<button onclick="adminEliminarReciboPorFolio(this,' + r.folio + ',\'' + (r.letra||letraVersion(r)||'A') + '\')" ',
       'style="background:#c0161a;border:none;border-radius:4px;color:#fff;',
       'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;">',
       '🗑 Eliminar</button>',
@@ -23198,6 +23492,21 @@ function adminCrearPendientePlacas(idx) {
 }
 // También accesible desde consola
 window.lexCrearPendientePlacas = adminCrearPendientePlacas;
+function adminEliminarReciboPorFolio(btn, folio, letra){
+  // Deshabilitar botón inmediatamente para evitar doble clic
+  if(btn){ btn.disabled = true; btn.style.opacity = '0.5'; btn.style.cursor = 'not-allowed'; }
+  var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
+  var idx = recibos.findIndex(function(r){ return r && r.folio === folio && (r.letra||letraVersion(r)||'A') === letra; });
+  if(idx < 0){
+    if(typeof toast === 'function') toast('❌ Recibo no encontrado', 'err');
+    if(btn){ btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+    return;
+  }
+  adminEliminarRecibo(idx).finally(function(){
+    // Re-habilitar solo si el recibo no fue eliminado (el usuario canceló)
+    if(btn && btn.isConnected){ btn.disabled = false; btn.style.opacity = ''; btn.style.cursor = ''; }
+  });
+}
 async function adminEliminarRecibo(idx) {
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
   var r = recibos[idx];
@@ -23243,7 +23552,7 @@ async function adminEliminarRecibo(idx) {
   } catch(e) { console.warn('[folio_eliminado broadcast]', e); }
   // 1. Eliminar recibo del array (solo el específico por índice)
   recibos.splice(idx, 1);
-  // 2. Recalcular folioActual al primer hueco disponible (incluye el hueco que dejó este recibo)
+  // 2. Recalcular folioActual: máximo existente + 1 (solo reutiliza si era el último)
   if (!hayOtras && typeof appData !== 'undefined') {
     appData.folioActual = _recalcularFolioActual();
     if (typeof REC !== 'undefined') REC.folioActual = appData.folioActual;
@@ -23296,113 +23605,94 @@ async function adminEliminarRecibo(idx) {
     var _fs = String(r.folio);
     if (!D.recibosExcluidosCaja.map(String).includes(_fs)) D.recibosExcluidosCaja.push(_fs);
   }
-  // 6b. Eliminar de tabla versiones_recibo en Supabase — evita que se restaure en el siguiente sync
-  if (window.SB && window.SB_DESPACHO_ID) {
-    try {
-      await window.SB.from('versiones_recibo')
-        .delete()
-        .eq('despacho_id', window.SB_DESPACHO_ID)
-        .eq('folio_base', r.folio)
-        .eq('letra', letra);
-      console.log('[adminEliminarRecibo] versiones_recibo eliminado — folio:', r.folio, 'letra:', letra);
-    } catch(e) { console.warn('[adminEliminarRecibo] Error borrando versiones_recibo:', e); }
-  }
-
-  // 7. Eliminar PDF de R2 (Cloudflare) y de Supabase Storage
-  // Se intentan todos los nombres posibles sin duplicados:
-  //   • r.archivo  — nombre almacenado en el registro (puede ser corto o descriptivo)
-  //   • r.archivoR2 — nombre descriptivo exclusivo de R2 (solo recibos normales)
-  //   • folioConLetraStr + '.pdf' — nombre corto canónico (26-043B.pdf)
-  //   • Recibo_{folioConLetraStr}_{nombre}.pdf — nombre descriptivo construido CON letra
-  try {
-    const _pathsBorrar = new Set();
-    if (r.archivo)                        _pathsBorrar.add(r.archivo);
-    if (r.archivoR2 && r.archivoR2 !== r.archivo) _pathsBorrar.add(r.archivoR2);
-    // Nombre corto con letra (ej. 26-043B.pdf)
-    var _archCorto = folioConLetraStr + '.pdf';
-    _pathsBorrar.add(_archCorto);
-    // Nombre descriptivo construido CON letra (corrección: antes usaba folioStr sin letra)
-    if (typeof _nombreArchivoR2 === 'function') {
-      var _archDesc = _nombreArchivoR2(folioConLetraStr, r.nombre||'');
-      _pathsBorrar.add(_archDesc);
-    }
-    for (var _pn of _pathsBorrar) {
-      if (typeof window.borrarR2 === 'function' && window.SB_DESPACHO_ID) {
-        try { await window.borrarR2(window.SB_DESPACHO_ID + '/recibos/' + _pn, 'recibos'); } catch(e) { /* silencioso — path puede no existir */ }
-      }
-      if (typeof borrarPDFdeDrive === 'function') {
-        try { await borrarPDFdeDrive(_pn); } catch(e) { /* silencioso */ }
-      }
-    }
-    console.log('[adminEliminarRecibo] R2/Storage limpiados — paths intentados:', [..._pathsBorrar]);
-  } catch(e){ console.warn('[adminEliminarRecibo] Error en limpieza R2:', e); }
-  // 8. Limpiar backups de localStorage — solo el registro específico (folio + letra)
-  try {
-    ['D','appData'].forEach(function(tipo) {
-      var idxStr = localStorage.getItem('lex_backup_idx_' + tipo);
-      if (!idxStr) return;
-      var idxArr = JSON.parse(idxStr);
-      idxArr.forEach(function(item) {
-        try {
-          var bk = JSON.parse(localStorage.getItem(item.clave)||'null');
-          if (!bk || !bk.datos) return;
-          if (Array.isArray(bk.datos.recibos)) {
-            bk.datos.recibos = bk.datos.recibos.filter(function(rec){
-              return !(rec && rec.folio === r.folio && (rec.letra || letraVersion(rec) || 'A') === letra);
-            });
-          }
-          if (!hayOtras && Array.isArray(bk.datos.movimientos)) {
-            bk.datos.movimientos = bk.datos.movimientos.filter(function(m){
-              return m && !(m.fuente==='recibo' && m.folio==r.folio);
-            });
-          }
-          try{ localStorage.setItem(item.clave, JSON.stringify(bk)); } catch(e){ registrarError('localStorage.setItem', e); }
-        } catch(e2) {}
-      });
-    });
-    console.log('[adminEliminarRecibo] Backups de localStorage limpiados');
-  } catch(eLs) { console.warn('localStorage cleanup:', eLs); }
-  // 9. Subir a Supabase — sync inmediato
-  _ultimoSyncPropio = Date.now();
-  try {
-    await actualizarArchivoControl();
-    await syncEstadoSupabase();
-  } catch(e) { console.warn('sync eliminar:', e); }
-  // 9b. Purga directa y autoritativa en SB — READ-MODIFY-WRITE final
-  // Aunque actualizarArchivoControl y syncEstadoSupabase ya subieron el estado,
-  // la empleada pudo haber escrito entre medias. Esta operación lee el estado
-  // ACTUAL de SB, elimina el folio si regresó y consolida el tombstone.
-  // Al ser la última escritura del admin, queda como estado definitivo en SB.
-  try {
-    const { data: _sbPurgaRow } = await window.SB
-      .from('app_state').select('recibos')
-      .eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
-    if (_sbPurgaRow?.recibos) {
-      var _sbPurgaDat = JSON.parse(JSON.stringify(_sbPurgaRow.recibos)); // copia profunda
-      // Eliminar el folio de la lista
-      _sbPurgaDat.recibos = (_sbPurgaDat.recibos||[]).filter(function(rec){
-        return !(String(rec.folio)===String(r.folio) && (rec.letra||'A')===letra);
-      });
-      // Garantizar tombstone en SB
-      if (!Array.isArray(_sbPurgaDat.folios_eliminados)) _sbPurgaDat.folios_eliminados = [];
-      if (!_sbPurgaDat.folios_eliminados.some(function(t){
-        return String(t.folio)===String(r.folio) && t.letra===letra;
-      })) _sbPurgaDat.folios_eliminados.push({ folio: r.folio, letra: letra, ts: Date.now() });
-      await window.SB.from('app_state')
-        .update({ recibos: _sbPurgaDat })
-        .eq('despacho_id', window.SB_DESPACHO_ID);
-      console.log('[adminEliminarRecibo] Purga directa SB completada —', folioConLetraStr);
-    }
-  } catch(_ePurga){ console.warn('[adminEliminarRecibo] Purga directa SB:', _ePurga); }
-  // 10. Refrescar UI
-  var q = (document.getElementById('adminBuscarRecibo')||{}).value||'';
-  adminRenderRecibos(q);
+  // ── UI INMEDIATA: refrescar antes de cualquier operación de red ──
+  var _q = (document.getElementById('adminBuscarRecibo')||{}).value||'';
+  adminRenderRecibos(_q);
   if (typeof renderRec       === 'function') renderRec();
   if (typeof renderHistorial === 'function') renderHistorial();
   if (typeof renderCaja      === 'function') renderCaja();
   if (typeof renderContab    === 'function') renderContab();
   if (typeof badges          === 'function') badges();
-  if (typeof toast === 'function') toast('✅ Recibo #' + folioConLetraStr + ' eliminado — R2, Supabase Storage, contabilidad y backups.', 'ok');
+  if (typeof toast === 'function') toast('✅ Recibo #' + folioConLetraStr + ' eliminado.', 'ok');
+
+  // ── OPERACIONES DE RED EN BACKGROUND (no bloquean la UI) ──
+  (async function _eliminarBackground(){
+    // 6b. Borrar de versiones_recibo en SB
+    if (window.SB && window.SB_DESPACHO_ID) {
+      try {
+        await window.SB.from('versiones_recibo')
+          .delete()
+          .eq('despacho_id', window.SB_DESPACHO_ID)
+          .eq('folio_base', r.folio)
+          .eq('letra', letra);
+      } catch(e) { console.warn('[eliminar] versiones_recibo:', e); }
+    }
+    // 7. Borrar PDFs de R2 y Drive en paralelo
+    try {
+      const _pathsBorrar = new Set();
+      if (r.archivo) _pathsBorrar.add(r.archivo);
+      if (r.archivoR2 && r.archivoR2 !== r.archivo) _pathsBorrar.add(r.archivoR2);
+      _pathsBorrar.add(folioConLetraStr + '.pdf');
+      if (typeof _nombreArchivoR2 === 'function') _pathsBorrar.add(_nombreArchivoR2(folioConLetraStr, r.nombre||''));
+      await Promise.allSettled([...(_pathsBorrar)].flatMap(function(_pn){
+        var ops = [];
+        if (typeof window.borrarR2 === 'function' && window.SB_DESPACHO_ID)
+          ops.push(window.borrarR2(window.SB_DESPACHO_ID + '/recibos/' + _pn, 'recibos').catch(function(){}));
+        if (typeof borrarPDFdeDrive === 'function')
+          ops.push(borrarPDFdeDrive(_pn).catch(function(){}));
+        return ops;
+      }));
+    } catch(e){ console.warn('[eliminar] R2/Drive:', e); }
+    // 8. Limpiar backups de localStorage
+    try {
+      ['D','appData'].forEach(function(tipo) {
+        var idxStr = localStorage.getItem('lex_backup_idx_' + tipo);
+        if (!idxStr) return;
+        var idxArr = JSON.parse(idxStr);
+        idxArr.forEach(function(item) {
+          try {
+            var bk = JSON.parse(localStorage.getItem(item.clave)||'null');
+            if (!bk || !bk.datos) return;
+            if (Array.isArray(bk.datos.recibos))
+              bk.datos.recibos = bk.datos.recibos.filter(function(rec){
+                return !(rec && rec.folio === r.folio && (rec.letra||letraVersion(rec)||'A') === letra);
+              });
+            if (!hayOtras && Array.isArray(bk.datos.movimientos))
+              bk.datos.movimientos = bk.datos.movimientos.filter(function(m){
+                return m && !(m.fuente==='recibo' && m.folio==r.folio);
+              });
+            try{ localStorage.setItem(item.clave, JSON.stringify(bk)); } catch(e){ registrarError('localStorage.setItem', e); }
+          } catch(e2) {}
+        });
+      });
+    } catch(eLs) { console.warn('localStorage cleanup:', eLs); }
+    // 9. Sync a Supabase + purga directa (secuencial para consistencia)
+    _ultimoSyncPropio = Date.now();
+    try { await actualizarArchivoControl(); } catch(e){ console.warn('[eliminar] archivoControl:', e); }
+    try { await syncEstadoSupabase(); } catch(e){ console.warn('[eliminar] sync:', e); }
+    // 9b. Purga directa autoritativa en SB
+    try {
+      if (window.SB && window.SB_DESPACHO_ID) {
+        const { data: _sbPurgaRow } = await window.SB
+          .from('app_state').select('recibos')
+          .eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+        if (_sbPurgaRow?.recibos) {
+          var _sbPurgaDat = JSON.parse(JSON.stringify(_sbPurgaRow.recibos));
+          _sbPurgaDat.recibos = (_sbPurgaDat.recibos||[]).filter(function(rec){
+            return !(String(rec.folio)===String(r.folio) && (rec.letra||'A')===letra);
+          });
+          if (!Array.isArray(_sbPurgaDat.folios_eliminados)) _sbPurgaDat.folios_eliminados = [];
+          if (!_sbPurgaDat.folios_eliminados.some(function(t){
+            return String(t.folio)===String(r.folio) && t.letra===letra;
+          })) _sbPurgaDat.folios_eliminados.push({ folio: r.folio, letra: letra, ts: Date.now() });
+          await window.SB.from('app_state')
+            .update({ recibos: _sbPurgaDat })
+            .eq('despacho_id', window.SB_DESPACHO_ID);
+          console.log('[adminEliminarRecibo] Purga directa SB completada —', folioConLetraStr);
+        }
+      }
+    } catch(_ePurga){ console.warn('[adminEliminarRecibo] Purga directa SB:', _ePurga); }
+  })();
 }
 // ── CAMBIAR FECHA DE RECIBO v2 (con checkboxes individuales por movimiento) ──
 function adminAbrirCambiarFecha(idx) {
@@ -24237,6 +24527,7 @@ async function guardarEdicionCompleta() {
       toast('✅ Recibo #' + folioStrFinal + ' editado y PDF regenerado.');
     if (typeof setStatus === 'function')
       setStatus('ok','Recibo #' + folioStrFinal + ' actualizado correctamente','ok');
+    imprimirDesdeBlob(doc.output('blob'), nombreArchivo);
     // ─── Salir del modo edición ─────────────────────────────────────
     _reciboEnEdicionCompleta = null;
     window._reciboEdicionBackup = null;
@@ -24397,6 +24688,7 @@ async function adminGuardarEdicionRecibo() {
         // Subir a Storage (no bloqueante)
         subirPDFaDrive(_blob, _nombrePDF).catch(e => console.warn('[Admin] PDF upload:', e));
         console.log('[Admin] PDF regenerado y subido:', _nombrePDF);
+        imprimirDesdeBlob(_blob, _nombrePDF);
       }
     } catch(_ePDF) {
       console.warn('[Admin] PDF no regenerado (se regenerará al consultar):', _ePDF.message);
@@ -27895,6 +28187,7 @@ async function guardarRestauracion(){
     document.getElementById('actions-normal').style.display='flex';
     if(typeof toast==='function') toast('✅ Recibo #'+fs+' restaurado');
     if(typeof setStatus==='function') setStatus('ok','Recibo #'+fs+' restaurado — PDF regenerado','ok');
+    imprimirDesdeBlob(doc.output('blob'), nombreArchivo);
     if(_placasRest.placas && typeof mostrarPlacasEnPantalla==='function')
       mostrarPlacasEnPantalla(_placasRest.placas, _placasRest.estado);
     alert('✅ Recibo #'+fs+' restaurado.\n\n📋 '+primerNombre+'\n📅 '+fechaOrig
@@ -32251,6 +32544,7 @@ async function gestConfirmarRecibo(gid){
     document.getElementById('modal-gest-recibo')?.remove();
     _gestGuardarYRefrescar(g);
     if(typeof toast==='function') toast('✅ Recibo #'+folioFormato(folio)+' generado y registrado','ok');
+    imprimirBlob(pdfBlob);
   } catch(e){
     console.error('[Gestión] Error generando recibo:',e);
     if(statusEl) statusEl.textContent='❌ Error: '+e.message;

@@ -6838,12 +6838,24 @@ async function actualizarArchivoControl(){
             return String(x.folio)===String(t.folio) && x.letra===t.letra;
           })) appData.folios_eliminados.push(t);
         });
-        // Aplicar tombstones a los recibos locales también
-        appData.recibos = (appData.recibos||[]).filter(function(r){
-          return !appData.folios_eliminados.some(function(t){
-            return String(t.folio)===String(r.folio) && t.letra===(r.letra||'A');
+        // Restauraciones explícitas ganan sobre tombstones: limpiar tombstone de folios_eliminados
+        // para que no se re-escriba en SB ni bloquee futuras sincronizaciones.
+        (appData.recibos||[]).forEach(function(r){
+          if(!r.esRestaurado) return;
+          appData.folios_eliminados = appData.folios_eliminados.filter(function(t){
+            return !(String(t.folio)===String(r.folio) && t.letra===(r.letra||'A'));
           });
         });
+        // Proteger el folio que se está guardando AHORA MISMO (modo retro, abono de folio eliminado).
+        // _folioGuardandose se establece en guardarRecibo() justo antes de llamar aquí.
+        if (window._folioGuardandose != null) {
+          appData.folios_eliminados = (appData.folios_eliminados||[]).filter(function(t){
+            return !(String(t.folio)===String(window._folioGuardandose) && t.letra===(window._letraGuardandose||'A'));
+          });
+        }
+        // ⚠ NO filtrar appData.recibos en memoria — solo filtrar en el payload de escritura.
+        // Filtrar aquí elimina recibos recién creados de la memoria local si su folio
+        // coincide con un tombstone (modo retro, abono eliminado, contador reseteado).
       }
     } catch(_eTombPre){ /* fallo silencioso — se usarán tombstones locales */ }
 
@@ -6852,7 +6864,11 @@ async function actualizarArchivoControl(){
       folioActual: appData.folioActual,
       anioFolioActual: appData.anioFolioActual || new Date().getFullYear(),
       folios_eliminados: appData.folios_eliminados || [],
-      recibos: appData.recibos.map(r=>({
+      recibos: (appData.recibos||[]).filter(function(r){
+        return !(appData.folios_eliminados||[]).some(function(t){
+          return String(t.folio)===String(r.folio) && t.letra===(r.letra||'A');
+        });
+      }).map(r=>({
         folio:r.folio, anio_folio:r.anio_folio||new Date().getFullYear(),
         nombre:r.nombre, fecha:r.fecha, hora:r.hora,
         archivo:r.archivo, saldoPendiente:r.saldoPendiente,
@@ -11049,14 +11065,27 @@ async function guardarRecibo(){
     // ── ESCRITURA BLOQUEANTE: esperar confirmación de Drive antes de continuar ──
     // Sin este await, una segunda impresión inmediata podría leer el JSON antes de que
     // esta escritura termine y sobrescribir borrando este recibo del historial.
+    // Registrar folio/letra para protegerlos de tombstones durante actualizarArchivoControl()
+    window._folioGuardandose = folio;
+    window._letraGuardandose = window._letraAbonoRetroactivo || 'A';
     setStatus('loading','Guardando recibo #'+folioFormato(folio)+'...','loading');
+    let _guardarFallo = false;
     try {
       await actualizarArchivoControl();
     } catch(eControl) {
       console.error('❌ Error crítico al guardar:', eControl);
       // Reintentar una vez más antes de continuar
-      try { await actualizarArchivoControl(); } catch(e2){ console.error('❌ Segundo intento fallido:', e2); }
+      try {
+        await actualizarArchivoControl();
+      } catch(e2){
+        console.error('❌ Segundo intento fallido:', e2);
+        _guardarFallo = true;
+        // Rescate: sync completo AWAITED mientras _folioGuardandose sigue activo
+        try { await syncEstadoSupabase(); } catch(e3){ console.warn('[rescate sync guardarRecibo]', e3); }
+      }
     }
+    window._folioGuardandose = null;
+    window._letraGuardandose = null;
     // El folio ya fue reservado e incrementado en Drive al inicio de guardarRecibo().
     pendingNextFolio = null;
     // ── Guardar versión inicial A en Supabase versiones_recibo ──
@@ -11099,7 +11128,11 @@ async function guardarRecibo(){
     const _letraGuardada = window._letraAbonoRetroactivo || 'A';
     // Mostrar el folio del recibo impreso con la letra correcta (A para nuevos, B/C/… para abonos)
     $('folio-display').textContent = folioConLetra(folio, null, _letraGuardada);
-    setStatus('ok','Recibo #'+folioConLetra(folio, null, _letraGuardada)+' guardado — abriendo impresora...','ok');
+    if (_guardarFallo) {
+      setStatus('err','⚠️ RECIBO #'+folioConLetra(folio, null, _letraGuardada)+' GENERADO PERO NO REGISTRADO — verifica conexión y recarga','err');
+    } else {
+      setStatus('ok','Recibo #'+folioConLetra(folio, null, _letraGuardada)+' guardado — abriendo impresora...','ok');
+    }
     // Guardar blob para reimprimir sin cambiar folio
     lastPdfBlob = new Blob([doc.output('arraybuffer')], {type:'application/pdf'});
     // Abrir nueva pestaña con el PDF para que el empleado configure la impresora
@@ -18230,6 +18263,20 @@ async function syncEstadoSupabase(){
             return String(x.folio)===String(t.folio) && x.letra===t.letra;
           })) appData.folios_eliminados.push(t);
         });
+        // Restauraciones explícitas ganan sobre tombstones recién fusionados
+        (appData.recibos||[]).forEach(function(r){
+          if(!r.esRestaurado) return;
+          appData.folios_eliminados = appData.folios_eliminados.filter(function(t){
+            return !(String(t.folio)===String(r.folio) && t.letra===(r.letra||'A'));
+          });
+        });
+        // En rescate (actualizarArchivoControl() falló), _folioGuardandose sigue activo.
+        // Proteger el folio en curso para que el tombstone de SB no lo elimine aquí.
+        if (window._folioGuardandose != null) {
+          appData.folios_eliminados = (appData.folios_eliminados||[]).filter(function(t){
+            return !(String(t.folio)===String(window._folioGuardandose) && t.letra===(window._letraGuardandose||'A'));
+          });
+        }
       }
       // Fusionar recibos de SB con los locales: conservar recibos que solo están en un lado
       if (_sbRecibosPreSync.length > 0) {

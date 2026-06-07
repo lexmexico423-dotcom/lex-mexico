@@ -6479,20 +6479,40 @@ async function sincronizarFolio(forzarSB){
       const recibosData = data.recibos || {};
       const sbRecibos = recibosData.recibos || [];
       const recibosActuales = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
+      // ── Tombstones: unión de folios eliminados en SB y en memoria local ────────
+      // Cuando el admin elimina un folio, se registra en folios_eliminados.
+      // Todos los clientes reciben esta lista al sincronizar y filtran antes de fusionar,
+      // lo que evita que un browser con estado viejo re-suba folios ya eliminados.
+      const _sbTombs  = recibosData.folios_eliminados || [];
+      const _locTombs = (typeof appData !== 'undefined' && Array.isArray(appData.folios_eliminados)) ? appData.folios_eliminados : [];
+      // Unión: ningún tombstone se pierde nunca
+      const _tombstones = [..._sbTombs];
+      _locTombs.forEach(function(t){
+        if(!_tombstones.some(function(x){ return String(x.folio)===String(t.folio) && x.letra===t.letra; }))
+          _tombstones.push(t);
+      });
+      function _esTombstone(r){
+        return _tombstones.some(function(t){ return String(t.folio)===String(r.folio) && t.letra===(r.letra||'A'); });
+      }
+
       // ⚠️ CRÍTICO: proteger recibos igual que movimientos.
       // Si Supabase trae MENOS versiones del mismo folio que memoria → conservar memoria.
       // Esto evita que una sync tardía sobreescriba el B recién generado con solo el A.
+      // Los tombstones se filtran ANTES de fusionar para que ningún cliente re-suba eliminados.
       function _mergeRecibos(sbArr, localArr) {
-        if (!localArr.length) return sbArr;
-        if (!sbArr.length) return localArr;
+        // Filtrar tombstones de ambos lados antes de cualquier fusión
+        const sbFilt    = sbArr.filter(function(r){ return !_esTombstone(r); });
+        const localFilt = localArr.filter(function(r){ return !_esTombstone(r); });
+        if (!localFilt.length) return sbFilt;
+        if (!sbFilt.length)   return localFilt;
         // Construir mapa de versiones: folio+letra → recibo
         const mapaLocal = {};
-        localArr.forEach(function(r) {
+        localFilt.forEach(function(r) {
           var k = r.folio + '|' + (r.letra || 'A');
           mapaLocal[k] = r;
         });
         const mapaSB = {};
-        sbArr.forEach(function(r) {
+        sbFilt.forEach(function(r) {
           var k = r.folio + '|' + (r.letra || 'A');
           mapaSB[k] = r;
         });
@@ -6520,12 +6540,15 @@ async function sincronizarFolio(forzarSB){
       // por reservar_folio_atomico), no del campo recibos que puede llegar tarde.
       // data.folio_actual es siempre el más actualizado.
       appData = {
-        folioActual:     data.folio_actual || recibosData.folioActual || 1,
-        anioFolioActual: recibosData.anioFolioActual || new Date().getFullYear(),
-        recibos:         recibosFinales
+        folioActual:      data.folio_actual || recibosData.folioActual || 1,
+        anioFolioActual:  recibosData.anioFolioActual || new Date().getFullYear(),
+        folios_eliminados: _tombstones,
+        recibos:          recibosFinales
       };
       // Si conservamos versiones locales que SB no tenía → re-subir
-      if (recibosFinales.length > sbRecibos.length) {
+      // Comparar contra SB ya filtrado por tombstones para no contar falsos positivos
+      const _sbFiltCount = sbRecibos.filter(function(r){ return !_esTombstone(r); }).length;
+      if (recibosFinales.length > _sbFiltCount) {
         console.warn('[merge recibos] local tiene más versiones que SB — re-subiendo...');
         setTimeout(function(){ if(typeof actualizarArchivoControl==='function') actualizarArchivoControl().catch(function(e){ console.warn('re-upload recibos:', e); }); }, 800);
       }
@@ -6778,6 +6801,7 @@ async function actualizarArchivoControl(){
     const ligero = {
       folioActual: appData.folioActual,
       anioFolioActual: appData.anioFolioActual || new Date().getFullYear(),
+      folios_eliminados: appData.folios_eliminados || [],
       recibos: appData.recibos.map(r=>({
         folio:r.folio, anio_folio:r.anio_folio||new Date().getFullYear(),
         nombre:r.nombre, fecha:r.fecha, hora:r.hora,
@@ -23107,9 +23131,12 @@ async function adminEliminarRecibo(idx) {
   if (!hayOtras) lineasEliminar = '• Contabilidad y movimientos\n• Historial de pagos\n' + lineasEliminar;
   if (!confirm('☢️ ELIMINAR RECIBO #' + folioConLetraStr + '\n\nCliente: ' + nombre + '\nFecha: ' + (r.fecha||'') + avisoVersiones + '\n\nSe eliminará de:\n• Recibos\n' + lineasEliminar + '\n\n⚠️ Esta acción NO se puede deshacer.')) return;
   // Bloquear inmediatamente cualquier sincronización descendente mientras dura el borrado.
-  // Si _ultimoSyncPropio se establece tarde (antes solo estaba en el paso 9), el Realtime
-  // puede disparar sincronizarFolio(true) durante las operaciones async y restaurar el recibo.
   _ultimoSyncPropio = Date.now();
+  // Registrar tombstone ANTES de cualquier await para que todos los clientes filtren
+  // este folio+letra durante el merge, incluso si tienen el recibo en su memoria local.
+  if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
+  if (!appData.folios_eliminados.some(function(t){ return String(t.folio)===String(r.folio) && t.letra===letra; }))
+    appData.folios_eliminados.push({ folio: r.folio, letra: letra, ts: Date.now() });
   // 1. Eliminar recibo del array (solo el específico por índice)
   recibos.splice(idx, 1);
   // 2. Recalcular folioActual al primer hueco disponible (incluye el hueco que dejó este recibo)
@@ -23178,22 +23205,33 @@ async function adminEliminarRecibo(idx) {
   }
 
   // 7. Eliminar PDF de R2 (Cloudflare) y de Supabase Storage
-  if (r.archivo) {
-    if (typeof window.borrarR2 === 'function' && window.SB_DESPACHO_ID) {
-      try { await window.borrarR2(window.SB_DESPACHO_ID + '/recibos/' + r.archivo, 'recibos'); } catch(e) { console.warn('R2 delete:', e); }
-    }
-    if (typeof borrarPDFdeDrive === 'function') {
-      try { await borrarPDFdeDrive(r.archivo); } catch(e) { console.warn('PDF storage:', e); }
-    }
-  }
-  // También intentar por nombre construido
+  // Se intentan todos los nombres posibles sin duplicados:
+  //   • r.archivo  — nombre almacenado en el registro (puede ser corto o descriptivo)
+  //   • r.archivoR2 — nombre descriptivo exclusivo de R2 (solo recibos normales)
+  //   • folioConLetraStr + '.pdf' — nombre corto canónico (26-043B.pdf)
+  //   • Recibo_{folioConLetraStr}_{nombre}.pdf — nombre descriptivo construido CON letra
   try {
-    var nombrePDF = 'Recibo_' + folioStr + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf';
-    if (typeof window.borrarR2 === 'function' && window.SB_DESPACHO_ID) {
-      await window.borrarR2(window.SB_DESPACHO_ID + '/recibos/' + nombrePDF, 'recibos');
+    const _pathsBorrar = new Set();
+    if (r.archivo)                        _pathsBorrar.add(r.archivo);
+    if (r.archivoR2 && r.archivoR2 !== r.archivo) _pathsBorrar.add(r.archivoR2);
+    // Nombre corto con letra (ej. 26-043B.pdf)
+    var _archCorto = folioConLetraStr + '.pdf';
+    _pathsBorrar.add(_archCorto);
+    // Nombre descriptivo construido CON letra (corrección: antes usaba folioStr sin letra)
+    if (typeof _nombreArchivoR2 === 'function') {
+      var _archDesc = _nombreArchivoR2(folioConLetraStr, r.nombre||'');
+      _pathsBorrar.add(_archDesc);
     }
-    if (typeof borrarPDFdeDrive === 'function') await borrarPDFdeDrive(nombrePDF);
-  } catch(e){ registrarError('catch vacio', e); }
+    for (var _pn of _pathsBorrar) {
+      if (typeof window.borrarR2 === 'function' && window.SB_DESPACHO_ID) {
+        try { await window.borrarR2(window.SB_DESPACHO_ID + '/recibos/' + _pn, 'recibos'); } catch(e) { /* silencioso — path puede no existir */ }
+      }
+      if (typeof borrarPDFdeDrive === 'function') {
+        try { await borrarPDFdeDrive(_pn); } catch(e) { /* silencioso */ }
+      }
+    }
+    console.log('[adminEliminarRecibo] R2/Storage limpiados — paths intentados:', [..._pathsBorrar]);
+  } catch(e){ console.warn('[adminEliminarRecibo] Error en limpieza R2:', e); }
   // 8. Limpiar backups de localStorage — solo el registro específico (folio + letra)
   try {
     ['D','appData'].forEach(function(tipo) {

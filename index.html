@@ -6838,6 +6838,14 @@ async function actualizarArchivoControl(){
             return String(x.folio)===String(t.folio) && x.letra===t.letra;
           })) appData.folios_eliminados.push(t);
         });
+        // Las restauraciones explícitas ganan sobre tombstones: quitar de folios_eliminados
+        // cualquier tombstone cuyo folio+letra esté siendo restaurado ahora mismo.
+        (appData.recibos||[]).forEach(function(r){
+          if(!r.esRestaurado) return;
+          appData.folios_eliminados = appData.folios_eliminados.filter(function(t){
+            return !(String(t.folio)===String(r.folio) && t.letra===(r.letra||'A'));
+          });
+        });
         // Aplicar tombstones a los recibos locales también
         appData.recibos = (appData.recibos||[]).filter(function(r){
           return !appData.folios_eliminados.some(function(t){
@@ -18253,6 +18261,13 @@ async function syncEstadoSupabase(){
             return String(x.folio)===String(t.folio) && x.letra===t.letra;
           })) appData.folios_eliminados.push(t);
         });
+        // Restauraciones explícitas ganan sobre tombstones
+        (appData.recibos||[]).forEach(function(r){
+          if(!r.esRestaurado) return;
+          appData.folios_eliminados = appData.folios_eliminados.filter(function(t){
+            return !(String(t.folio)===String(r.folio) && t.letra===(r.letra||'A'));
+          });
+        });
       }
       // Fusionar recibos de SB con los locales: conservar recibos que solo están en un lado
       if (_sbRecibosPreSync.length > 0) {
@@ -28106,6 +28121,13 @@ async function guardarRestauracion(){
       estadoPlacas:_placasRest.estado||null,
       notas:'⚠ Restaurado el '+new Date().toLocaleDateString('es-MX')+' — PDF regenerado'
     };
+    // Limpiar el tombstone de este folio ANTES de insertar y llamar actualizarArchivoControl,
+    // para que el pre-read de tombstones de SB no vuelva a filtrar el recibo restaurado.
+    if(Array.isArray(appData.folios_eliminados)){
+      appData.folios_eliminados = appData.folios_eliminados.filter(function(t){
+        return !(String(t.folio)===String(folio) && t.letra===letra);
+      });
+    }
     // Insertar en posición correcta considerando folio Y letra (A < B < C...)
     const _letraOrd = l => (l||'A').charCodeAt(0);
     const idx = appData.recibos.findIndex(r =>

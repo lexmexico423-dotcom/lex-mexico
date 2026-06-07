@@ -6798,6 +6798,31 @@ async function actualizarArchivoControl(){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
   syncStart();
   try {
+    // ── Leer tombstones actuales de SB antes de escribir ────────────────────
+    // CRÍTICO en multi-usuario: si el admin eliminó un folio y guardó el tombstone
+    // en SB, este cliente (empleada) debe leerlo y fusionarlo ANTES de subir,
+    // de lo contrario su upload sobreescribiría el tombstone y el folio volvería.
+    try {
+      const { data: _sbPreRead } = await window.SB
+        .from('app_state').select('recibos')
+        .eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+      const _sbTombsPre = (_sbPreRead?.recibos?.folios_eliminados) || [];
+      if (_sbTombsPre.length > 0) {
+        if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
+        _sbTombsPre.forEach(function(t){
+          if(!appData.folios_eliminados.some(function(x){
+            return String(x.folio)===String(t.folio) && x.letra===t.letra;
+          })) appData.folios_eliminados.push(t);
+        });
+        // Aplicar tombstones a los recibos locales también
+        appData.recibos = (appData.recibos||[]).filter(function(r){
+          return !appData.folios_eliminados.some(function(t){
+            return String(t.folio)===String(r.folio) && t.letra===(r.letra||'A');
+          });
+        });
+      }
+    } catch(_eTombPre){ /* fallo silencioso — se usarán tombstones locales */ }
+
     // Estructura compatible con la versión anterior
     const ligero = {
       folioActual: appData.folioActual,
@@ -8393,20 +8418,26 @@ async function activarModoConsulta(recibo){
   } else if(recibo.archivo && window.SB_DESPACHO_ID){
     // Nueva sesión: buscar PDF en R2 y luego en Supabase Storage
     const _pathSB = window.SB_DESPACHO_ID + '/recibos/' + recibo.archivo;
-    // Si archivoR2 no está guardado en el registro, reconstruir el nombre descriptivo
-    // usando la misma lógica de _nombreArchivoR2() para que coincida con la subida.
-    const _archivoR2Eff = recibo.archivoR2
-      || (typeof _nombreArchivoR2 === 'function' && recibo.nombre
-          ? _nombreArchivoR2(recibo.archivo.replace(/\.pdf$/i,''), recibo.nombre)
-          : recibo.archivo);
+    // Igual que Contabilidad y reDescargar: archivoR2 si existe, sino el nombre corto.
+    // Para folios antiguos (archivoR2 nulo) el PDF está en R2 bajo el nombre corto.
+    const _archivoR2Eff = recibo.archivoR2 || recibo.archivo;
+    // Nombre descriptivo alternativo (por si el archivo se subió con ese nombre pero archivoR2 no se guardó)
+    const _archivoR2Alt = (!recibo.archivoR2 && typeof _nombreArchivoR2 === 'function' && recibo.nombre)
+      ? _nombreArchivoR2(recibo.archivo.replace(/\.pdf$/i,''), recibo.nombre)
+      : null;
     const _pathR2 = window.SB_DESPACHO_ID + '/recibos/' + _archivoR2Eff;
     let _cargado = false;
     // 1) Intentar R2
     if(!_cargado && typeof window.descargarR2 === 'function'){
       try {
         setStatus('loading','Cargando PDF…','loading');
-        const _blob = await window.descargarR2(_pathR2, 'recibos');
+        let _blob = await window.descargarR2(_pathR2, 'recibos');
         if(myToken !== _modoConsultaToken) return; // folio cambió mientras descargaba
+        // Intento secundario: nombre descriptivo (folios donde archivoR2 no se guardó pero se subió así)
+        if((!_blob || _blob.size === 0) && _archivoR2Alt && _archivoR2Alt !== _archivoR2Eff){
+          _blob = await window.descargarR2(window.SB_DESPACHO_ID + '/recibos/' + _archivoR2Alt, 'recibos');
+          if(myToken !== _modoConsultaToken) return;
+        }
         if(_blob && _blob.size > 0){
           const _url = URL.createObjectURL(_blob);
           if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_url);}catch(e){} return; }
@@ -23313,6 +23344,32 @@ async function adminEliminarRecibo(idx) {
     await actualizarArchivoControl();
     await syncEstadoSupabase();
   } catch(e) { console.warn('sync eliminar:', e); }
+  // 9b. Purga directa y autoritativa en SB — READ-MODIFY-WRITE final
+  // Aunque actualizarArchivoControl y syncEstadoSupabase ya subieron el estado,
+  // la empleada pudo haber escrito entre medias. Esta operación lee el estado
+  // ACTUAL de SB, elimina el folio si regresó y consolida el tombstone.
+  // Al ser la última escritura del admin, queda como estado definitivo en SB.
+  try {
+    const { data: _sbPurgaRow } = await window.SB
+      .from('app_state').select('recibos')
+      .eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+    if (_sbPurgaRow?.recibos) {
+      var _sbPurgaDat = JSON.parse(JSON.stringify(_sbPurgaRow.recibos)); // copia profunda
+      // Eliminar el folio de la lista
+      _sbPurgaDat.recibos = (_sbPurgaDat.recibos||[]).filter(function(rec){
+        return !(String(rec.folio)===String(r.folio) && (rec.letra||'A')===letra);
+      });
+      // Garantizar tombstone en SB
+      if (!Array.isArray(_sbPurgaDat.folios_eliminados)) _sbPurgaDat.folios_eliminados = [];
+      if (!_sbPurgaDat.folios_eliminados.some(function(t){
+        return String(t.folio)===String(r.folio) && t.letra===letra;
+      })) _sbPurgaDat.folios_eliminados.push({ folio: r.folio, letra: letra, ts: Date.now() });
+      await window.SB.from('app_state')
+        .update({ recibos: _sbPurgaDat })
+        .eq('despacho_id', window.SB_DESPACHO_ID);
+      console.log('[adminEliminarRecibo] Purga directa SB completada —', folioConLetraStr);
+    }
+  } catch(_ePurga){ console.warn('[adminEliminarRecibo] Purga directa SB:', _ePurga); }
   // 10. Refrescar UI
   var q = (document.getElementById('adminBuscarRecibo')||{}).value||'';
   adminRenderRecibos(q);

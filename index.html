@@ -11995,19 +11995,91 @@ function _acuerdosClave(juicioId) {
   return 'acuerdos_drive_' + juicioId;
 }
 
-// Cargar acuerdos guardados del juicio
-// Intenta Supabase primero (campo acuerdos_drive), cae a localStorage como fallback
-async function cargarAcuerdosDrive(juicioId) {
-  if (!juicioId) return [];
-  const lsKey = 'lex_acuerdos_' + juicioId;
-  try { return JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e) { return []; }
+// Buscar carpeta en Drive sin crearla. Devuelve id o null.
+async function driveBuscarCarpetaId(token, nombre, parentId) {
+  const q = "mimeType='application/vnd.google-apps.folder' and name='" + nombre.replace(/'/g,"\\'") + "' and trashed=false" + (parentId ? " and '"+parentId+"' in parents" : '');
+  try {
+    const r = await fetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&fields=files(id)&pageSize=1', {headers:{Authorization:'Bearer '+token}});
+    if (!r.ok) return null;
+    const d = await r.json();
+    return (d.files && d.files.length) ? d.files[0].id : null;
+  } catch(e) { return null; }
 }
 
-// Guardar acuerdos — escribe en localStorage y en Supabase (si disponible)
+// Listar PDFs en una carpeta de Drive.
+async function driveListarArchivosCarpeta(token, carpetaId) {
+  const q = "'"+carpetaId+"' in parents and mimeType='application/pdf' and trashed=false";
+  try {
+    const r = await fetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&fields=files(id,name,description,createdTime)&orderBy=name+desc&pageSize=200', {headers:{Authorization:'Bearer '+token}});
+    if (!r.ok) return [];
+    const d = await r.json();
+    return d.files || [];
+  } catch(e) { return []; }
+}
+
+// Convertir un archivo de Drive en objeto acuerdo para la lista.
+function _parsearArchivoAcuerdoDrive(f) {
+  const stem = (f.name || '').replace(/\.pdf$/i,'');
+  let fechaAcuerdo = '', nombreCorto = stem;
+  // Formato nuevo: DD-MM-AAAA NOMBRE (ej: "15-01-2025 AUTO ADMISORIO")
+  const mN = stem.match(/^(\d{2})-(\d{2})-(\d{4})\s+(.+)$/);
+  if (mN) { fechaAcuerdo = mN[3]+'-'+mN[2]+'-'+mN[1]; nombreCorto = mN[4]; }
+  else {
+    // Formato anterior: DD-MES-AA NOMBRE (ej: "15-ENE-25 AUTO ADMISORIO")
+    const meses = {ENE:'01',FEB:'02',MAR:'03',ABR:'04',MAY:'05',JUN:'06',JUL:'07',AGO:'08',SEP:'09',OCT:'10',NOV:'11',DIC:'12'};
+    const mV = stem.match(/^(\d{2})-([A-Z]{3})-(\d{2})\s+(.+)$/);
+    if (mV) { fechaAcuerdo = '20'+mV[3]+'-'+(meses[mV[2]]||'01')+'-'+mV[1]; nombreCorto = mV[4]; }
+  }
+  const desc = f.description || '';
+  return {
+    id: f.id, driveFileId: f.id,
+    archivo: f.name || '', nombre: nombreCorto || stem,
+    descripcion: desc,
+    tipo: 'otro', estado: 'listo',
+    fechaAcuerdo, fechaSubida: (f.createdTime||'').slice(0,10),
+    resumen: desc, sha256: ''
+  };
+}
+
+// Cargar acuerdos: Drive primero, localStorage como respaldo.
+async function cargarAcuerdosDrive(juicioId, nombreCarpetaJuicio) {
+  if (!juicioId) return [];
+  const lsKey = 'lex_acuerdos_' + juicioId;
+  if (nombreCarpetaJuicio) {
+    try {
+      const token = await driveGetAccessToken();
+      if (token) {
+        const DRIVE_JUICIOS_FOLDER_ID = '1TtVVL0Jbw6BFkwLw8Wo1LZfxLN0I_ndU';
+        const carpetaJuicioId = await driveBuscarCarpetaId(token, nombreCarpetaJuicio, DRIVE_JUICIOS_FOLDER_ID);
+        if (carpetaJuicioId) {
+          const carpetaAcuerdosId = await driveBuscarCarpetaId(token, 'Acuerdos', carpetaJuicioId);
+          if (carpetaAcuerdosId) {
+            const archivos = await driveListarArchivosCarpeta(token, carpetaAcuerdosId);
+            if (archivos.length) {
+              const lista = archivos.map(_parsearArchivoAcuerdoDrive);
+              // Enriquecer con metadata local (sha256, tipo, resumen largo)
+              try {
+                const local = JSON.parse(localStorage.getItem(lsKey) || '[]');
+                lista.forEach(ac => {
+                  const m = local.find(l => l.driveFileId === ac.driveFileId);
+                  if (m) { ac.sha256 = m.sha256||''; ac.tipo = m.tipo||ac.tipo; if(m.resumen && !ac.resumen) ac.resumen = m.resumen; }
+                });
+              } catch(e){}
+              try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){}
+              return lista;
+            }
+          }
+        }
+      }
+    } catch(e){ console.warn('[Acuerdos] Sin Drive, usando caché local:', e.message); }
+  }
+  try { return JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){ return []; }
+}
+
+// Guardar acuerdos — persiste en localStorage (Drive es la fuente de verdad).
 async function guardarAcuerdosDrive(juicioId, lista) {
   if (!juicioId) return;
-  const lsKey = 'lex_acuerdos_' + juicioId;
-  try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e) {}
+  try { localStorage.setItem('lex_acuerdos_'+juicioId, JSON.stringify(lista)); } catch(e){}
 }
 
 // Renderizar la lista de acuerdos en el panel
@@ -12042,11 +12114,13 @@ function renderAcuerdosDrive(lista) {
       : `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:#EAF3DE;color:#27500A;">Listo</span>`;
     const badgeTipo = `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:${tipo.bg};color:${tipo.color};font-weight:600;">${tipo.label}</span>`;
     const fechaFmt = ac.fechaAcuerdo ? new Date(ac.fechaAcuerdo + 'T12:00:00').toLocaleDateString('es-MX', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+    const _descRow = ac.descripcion ? `<div style="font-size:0.62rem;color:var(--muted);margin-top:3px;line-height:1.4;">${escHTML(ac.descripcion)}</div>` : '';
     card.innerHTML = `
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;">
         <div style="font-size:0.72rem;font-weight:600;color:var(--ink);line-height:1.3;flex:1;">${ac.nombre || ac.archivo}</div>
         <span onclick="event.stopPropagation();verAcuerdoPDF('${ac.driveFileId}','${encodeURIComponent(ac.nombre||ac.archivo)}')" title="Ver PDF" style="font-size:1rem;cursor:pointer;color:var(--muted);flex-shrink:0;">👁</span>
       </div>
+      ${_descRow}
       <div style="display:flex;align-items:center;gap:5px;margin-top:5px;flex-wrap:wrap;">
         <span style="font-size:0.62rem;color:var(--muted);">${fechaFmt}</span>
         ${badgeTipo}
@@ -12135,19 +12209,17 @@ async function subirAcuerdoDriveFiles(files) {
       let tipoIA = 'acuerdo';
       let fechaIA = new Date().toISOString().slice(0,10);
       let resumenIA = '';
+      let descripcionIA = '';
 
       if (geminiKey) {
         if (procTxt) procTxt.textContent = 'Gemini analizando acuerdo…';
         try {
-          const prompt = `Analiza este documento judicial y devuelve SOLO un JSON con estos campos:
-{
-  "nombre": "Nombre descriptivo completo del acuerdo (ej: Auto admisorio de demanda, Notificación de audiencia inicial)",
-  "nombre_corto": "Máximo 25 caracteres, solo el tipo de acuerdo abreviado en MAYÚSCULAS sin la fecha (ej: AUTO ADMISORIO, AUD. PRUEBAS, SENT. DEFINITIVA, NOTIF. AUDIENCIA, REQ. PAGO, ACUERDO INICIAL)",
-  "tipo": "uno de: auto | sentencia | notificacion | acuerdo | requerimiento | otro",
-  "fecha": "fecha del acuerdo en formato YYYY-MM-DD (busca la fecha del documento, no la de hoy)",
-  "resumen": "resumen ejecutivo en 2-3 oraciones: qué resuelve, partes involucradas, próxima acción requerida"
-}
-Responde SOLO el JSON, sin markdown ni texto adicional.`;
+          const prompt = `Del siguiente texto de un acuerdo judicial mexicano, extrae:
+(a) la fecha del acuerdo en formato DD-MM-AAAA,
+(b) un nombre de archivo corto y descriptivo en MAYUSCULAS sin acentos ni caracteres especiales (max 40 chars),
+(c) una descripcion breve en español (max 80 chars),
+(d) el tipo: uno de auto|sentencia|notificacion|acuerdo|requerimiento|otro.
+Responde solo en JSON: {"fecha":"DD-MM-AAAA","nombre":"NOMBRE ARCHIVO","descripcion":"descripcion breve","tipo":"tipo"}`;
           let gBody;
           if (textoOCR) {
             gBody = JSON.stringify({ contents: [{ parts: [{ text: textoOCR + '\n\n---\n' + prompt }]}]});
@@ -12163,36 +12235,37 @@ Responde SOLO el JSON, sin markdown ni texto adicional.`;
             const cleanTxt = txt.replace(/```json|```/g,'').trim();
             try {
               const parsed = JSON.parse(cleanTxt);
-              if (parsed.nombre) nombreIA = parsed.nombre;
-              if (parsed.nombre_corto) nombreCortoIA = parsed.nombre_corto.toUpperCase().trim().slice(0,25);
+              if (parsed.nombre) nombreCortoIA = parsed.nombre.toUpperCase().replace(/[^A-Z0-9\s\-\.]/g,'').trim().slice(0,40);
+              if (parsed.descripcion) { descripcionIA = parsed.descripcion.trim().slice(0,80); resumenIA = descripcionIA; }
               if (parsed.tipo && ACUERDO_TIPOS[parsed.tipo]) tipoIA = parsed.tipo;
-              if (parsed.fecha && /^\d{4}-\d{2}-\d{2}$/.test(parsed.fecha)) fechaIA = parsed.fecha;
-              if (parsed.resumen) resumenIA = parsed.resumen;
+              if (parsed.fecha) {
+                if (/^\d{2}-\d{2}-\d{4}$/.test(parsed.fecha)) {
+                  const [dd,mm,aaaa] = parsed.fecha.split('-'); fechaIA = aaaa+'-'+mm+'-'+dd;
+                } else if (/^\d{4}-\d{2}-\d{2}$/.test(parsed.fecha)) { fechaIA = parsed.fecha; }
+              }
             } catch(e) { console.warn('[Acuerdos] JSON Gemini inválido:', txt); }
           }
         } catch(e) { console.warn('[Acuerdos] Error Gemini:', e); }
       }
 
-      // Construir nombre en formato DD/MMM/YY TIPO para mostrar en historial
-      const _mesAbrevAc = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+      // Nombre del archivo en Drive: DD-MM-AAAA NOMBRE.pdf; la tarjeta muestra solo NOMBRE
       const [_anioAc, _mesAc, _diaAc] = fechaIA.split('-');
-      const _fechaCortaAc = (_diaAc||'00')+'/'+(_mesAbrevAc[parseInt(_mesAc||1)-1]||'ENE')+'/'+(_anioAc||'00').slice(-2);
-      const _sufijoAc = nombreCortoIA || nombreIA.replace(/[<>:"/\\|?*]/g,'_').slice(0,25).toUpperCase();
-      const nombreMostrar = _fechaCortaAc + ' ' + _sufijoAc;
+      const _sufijoAc = (nombreCortoIA || nombreIA.replace(/[^A-Z0-9\s\-]/gi,'').trim().slice(0,40)).toUpperCase().replace(/[<>:"/\\|?*]/g,'').trim();
+      const nombreMostrar = _sufijoAc || nombreIA;
 
       // 3) Subir a Drive
       if (procTxt) procTxt.textContent = 'Guardando en Drive…';
       let driveFileId = '';
       const juicioActivo = D.juicios && D.juicios[typeof jdetIdx !== 'undefined' ? jdetIdx : _mexpIdx];
       const nombreCarpetaJuicio = (juicioActivo ? (juicioActivo.nombre || juicioActivo.cliente || 'Juicio') + ' - Exp.' + (juicioActivo.expediente || juicioActivo.num || jId) : 'Juicio-' + jId).replace(/[<>:"/\\|?*]/g,'_');
-      const nombreArchivoDrive = (_diaAc||'00')+'-'+(_mesAbrevAc[parseInt(_mesAc||1)-1]||'ENE')+'-'+(_anioAc||'00').slice(-2)+' '+_sufijoAc.replace(/[<>:"/\\|?*]/g,'_')+'.pdf';
+      const nombreArchivoDrive = (_diaAc||'00')+'-'+(_mesAc||'01')+'-'+(_anioAc||new Date().getFullYear())+' '+_sufijoAc.replace(/\s+/g,'_')+'.pdf';
 
       try {
         const token = await driveGetAccessToken();
         if (!token) throw new Error('Sin token de Drive — reconecta en Panel Admin');
         const DRIVE_JUICIOS_FOLDER_ID = '1TtVVL0Jbw6BFkwLw8Wo1LZfxLN0I_ndU';
         const carpetaAcuerdosId = await driveObtenerOCrearCarpeta(token, 'Acuerdos', await driveObtenerOCrearCarpeta(token, nombreCarpetaJuicio, DRIVE_JUICIOS_FOLDER_ID));
-        const metadata = { name: nombreArchivoDrive, parents: [carpetaAcuerdosId], mimeType: 'application/pdf' };
+        const metadata = { name: nombreArchivoDrive, parents: [carpetaAcuerdosId], mimeType: 'application/pdf', description: descripcionIA };
         const boundary = 'boundary_lex_acuerdos';
         const bodyArr = [`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/pdf\r\nContent-Transfer-Encoding: base64\r\n\r\n${b64}\r\n--${boundary}--`];
         const uploadResp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{
@@ -12212,7 +12285,7 @@ Responde SOLO el JSON, sin markdown ni texto adicional.`;
 
       // 4) Actualizar lista: reemplazar placeholder
       const idx = lista.findIndex(a => a.id === tmpId);
-      const acFinal = { id: tmpId, archivo: file.name, nombre: nombreMostrar, nombreLargo: nombreIA, tipo: tipoIA, estado: driveFileId ? 'listo' : 'error_drive', fechaSubida: new Date().toISOString().slice(0,10), fechaAcuerdo: fechaIA, resumen: resumenIA, driveFileId, sha256: fileSha256 };
+      const acFinal = { id: tmpId, archivo: file.name, nombre: nombreMostrar, nombreLargo: nombreIA, descripcion: descripcionIA, tipo: tipoIA, estado: driveFileId ? 'listo' : 'error_drive', fechaSubida: new Date().toISOString().slice(0,10), fechaAcuerdo: fechaIA, resumen: resumenIA, driveFileId, sha256: fileSha256 };
       if (idx >= 0) lista[idx] = acFinal; else lista.push(acFinal);
 
       // 5) Agregar al historial cronológico automáticamente
@@ -12340,7 +12413,10 @@ async function initAcuerdosDrive(juicioId) {
   // Usar siempre un ID estable: preferir Supabase id, fallback a índice numérico
   const jId = (typeof juicioId === 'string' || (typeof juicioId === 'number' && juicioId > 0)) ? juicioId : (_mexpIdx >= 0 ? 'idx_' + _mexpIdx : 'idx_0');
   window._jdetId = jId;
-  const lista = await cargarAcuerdosDrive(jId);
+  // Calcular nombre de carpeta (igual que en upload) para buscar en Drive sin crear
+  const _juicioActivo = D && D.juicios && D.juicios[typeof jdetIdx !== 'undefined' ? jdetIdx : _mexpIdx];
+  const _nombreCarpeta = (_juicioActivo ? (_juicioActivo.nombre || _juicioActivo.cliente || 'Juicio') + ' - Exp.' + (_juicioActivo.expediente || _juicioActivo.num || jId) : 'Juicio-' + jId).replace(/[<>:"/\\|?*]/g,'_');
+  const lista = await cargarAcuerdosDrive(jId, _nombreCarpeta);
   renderAcuerdosDrive(lista);
 }
 // ═══ FIN ACUERDOS EN DRIVE ═══════════════════════════════════════════════

@@ -9033,7 +9033,11 @@ function agregarCostoExtra(data){
   const isLocked   = !!(data && data.locked);
   const isExisting = !!(data && data.fechaHora);
   const fechaHora  = isExisting ? data.fechaHora : nuevaFechaHoraStr();
-  tr.dataset.fechaHora = fechaHora;
+  // Modo retro: solo para filas NUEVAS (no locked, no cargadas del historial)
+  const retroActivo = !isLocked && !isExisting && !!window._reciboRetroactivoActivo;
+  const retroFecha  = (retroActivo && window._reciboRetroactivoFechaPersonalizada) || fechaCDMX_ISO();
+  const retroHora   = (retroActivo && window._reciboRetroactivoHoraPersonalizada)  || horaCDMX_HHMM();
+  tr.dataset.fechaHora = retroActivo ? (retroFecha + ' ' + retroHora) : fechaHora;
   if(isLocked) tr.dataset.locked = '1';
   if(isLocked){
     tr.classList.add('ce-row-locked');
@@ -9049,12 +9053,34 @@ function agregarCostoExtra(data){
       + '<td style="vertical-align:top"><input type="text" class="ce-precio price-input ce-locked-field" readonly value="'+escHTML(fmtMXN(parseFloat(data.precio)||0))+'">'+_liqTag+'</td>'
       + '<td style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#7a6840;">'+fechaHora+'</td>'
       + '<td></td>';
+  } else if(retroActivo){
+    // Fila editable con fecha/hora manual para captura retroactiva
+    const _liqChecked = !!(data && data.liquidadoAlMomento);
+    const _liqMonto   = (data && data.montoLiquidado) ? String(data.montoLiquidado) : '';
+    tr.innerHTML =
+        '<td><textarea class="ce-concepto concepto-ta" rows="1" placeholder="Escribe el concepto...">'+escHTML((data&&data.concepto)||'')+'</textarea></td>'
+      + '<td><textarea class="ce-descripcion concepto-ta" rows="1" placeholder="Descripción">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
+      + '<td style="vertical-align:top">'
+      +   '<input type="text" class="ce-precio price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.precio)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()">'
+      +   '<div style="margin-top:4px;display:flex;align-items:center;gap:4px;">'
+      +     '<input type="checkbox" class="ce-liq-check" id="liq-'+id+'" '+(_liqChecked?'checked':'')+' onchange="toggleCeLiquidado(\''+id+'\');recalcularResumenActualizacion()" style="cursor:pointer;accent-color:#2a7a3a;">'
+      +     '<label for="liq-'+id+'" style="font-size:0.65rem;color:#2a7a3a;cursor:pointer;font-family:\'DM Mono\',monospace;">Liquidar ahora</label>'
+      +   '</div>'
+      +   '<div class="ce-liq-monto-wrap" style="margin-top:3px;display:'+(_liqChecked?'block':'none')+';">'
+      +     '<input type="text" class="ce-liq-monto price-input" placeholder="Monto liq." inputmode="decimal" value="'+escHTML(_liqMonto)+'" oninput="formatPrecio(this);recalcularResumenActualizacion()" style="width:100%;font-size:0.72rem;border-color:#2a7a3a;">'
+      +   '</div>'
+      + '</td>'
+      + '<td style="padding:2px 4px;">'
+        + '<input type="date" class="ce-fecha-retro" value="'+escHTML(retroFecha)+'" oninput="_ceSyncFechaRetro(this)" style="font-family:\'DM Mono\',monospace;font-size:0.65rem;background:#1a1208;border:1px solid rgba(200,149,42,0.5);border-radius:4px;color:#e8d4a8;padding:2px 4px;width:108px;">'
+        + '<input type="time" class="ce-hora-retro"  value="'+escHTML(retroHora)+'"  oninput="_ceSyncFechaRetro(this)" style="font-family:\'DM Mono\',monospace;font-size:0.65rem;background:#1a1208;border:1px solid rgba(200,149,42,0.5);border-radius:4px;color:#e8d4a8;padding:2px 4px;width:68px;margin-left:3px;">'
+      + '</td>'
+      + '<td><button class="del-concept" onclick="quitarCostoExtra(\''+id+'\')">✕</button></td>';
   } else {
     const _liqChecked = !!(data && data.liquidadoAlMomento);
     const _liqMonto   = (data && data.montoLiquidado) ? String(data.montoLiquidado) : '';
     tr.innerHTML =
         '<td><textarea class="ce-concepto concepto-ta" rows="1" placeholder="Escribe el concepto...">'+escHTML((data&&data.concepto)||'')+'</textarea></td>'
-      + '<td><textarea class="ce-descripcion concepto-ta" rows="1" placeholder="Descripci\u00f3n">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
+      + '<td><textarea class="ce-descripcion concepto-ta" rows="1" placeholder="Descripción">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
       + '<td style="vertical-align:top">'
       +   '<input type="text" class="ce-precio price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.precio)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()">'
       +   '<div style="margin-top:4px;display:flex;align-items:center;gap:4px;">'
@@ -9189,6 +9215,13 @@ function _ppSyncFechaRetro(el){
   if(!tr) return;
   const f = (tr.querySelector('.pp-fecha-retro')||{}).value || '';
   const h = (tr.querySelector('.pp-hora-retro')||{}).value  || '';
+  if(f && h) tr.dataset.fechaHora = f + ' ' + h;
+}
+function _ceSyncFechaRetro(el){
+  const tr = el.closest('tr');
+  if(!tr) return;
+  const f = (tr.querySelector('.ce-fecha-retro')||{}).value || '';
+  const h = (tr.querySelector('.ce-hora-retro')||{}).value  || '';
   if(f && h) tr.dataset.fechaHora = f + ' ' + h;
 }
 function getPagosParciales(){
@@ -18967,8 +19000,9 @@ async function guardarReciboInterno() {
     await guardarFolioEnDrive(folio + 1);
     await subirPDFaD(blob, 'LEX-Recibo-' + folioFormato(folio) + '-' + datos.nombre.replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf');
     save();
-    // Refrescar contabilidad con el nuevo recibo
+    // Refrescar contabilidad e historial con el nuevo recibo
     if(typeof renderContab==='function') renderContab();
+    if(typeof renderHistorial==='function') renderHistorial();
     // ── Actualizar Directorio desde recibo nuevo ──────────────────
     // Revisa cada cliente del recibo: si existe por nombre, compara teléfono.
     // Si el tel ya coincide → no hace nada.
@@ -24493,6 +24527,7 @@ async function guardarEdicionCompleta() {
       toast('✅ Recibo #' + folioStrFinal + ' editado y PDF regenerado.');
     if (typeof setStatus === 'function')
       setStatus('ok','Recibo #' + folioStrFinal + ' actualizado correctamente','ok');
+    imprimirDesdeBlob(doc.output('blob'), nombreArchivo);
     // ─── Salir del modo edición ─────────────────────────────────────
     _reciboEnEdicionCompleta = null;
     window._reciboEdicionBackup = null;
@@ -24653,6 +24688,7 @@ async function adminGuardarEdicionRecibo() {
         // Subir a Storage (no bloqueante)
         subirPDFaDrive(_blob, _nombrePDF).catch(e => console.warn('[Admin] PDF upload:', e));
         console.log('[Admin] PDF regenerado y subido:', _nombrePDF);
+        imprimirDesdeBlob(_blob, _nombrePDF);
       }
     } catch(_ePDF) {
       console.warn('[Admin] PDF no regenerado (se regenerará al consultar):', _ePDF.message);
@@ -28151,6 +28187,7 @@ async function guardarRestauracion(){
     document.getElementById('actions-normal').style.display='flex';
     if(typeof toast==='function') toast('✅ Recibo #'+fs+' restaurado');
     if(typeof setStatus==='function') setStatus('ok','Recibo #'+fs+' restaurado — PDF regenerado','ok');
+    imprimirDesdeBlob(doc.output('blob'), nombreArchivo);
     if(_placasRest.placas && typeof mostrarPlacasEnPantalla==='function')
       mostrarPlacasEnPantalla(_placasRest.placas, _placasRest.estado);
     alert('✅ Recibo #'+fs+' restaurado.\n\n📋 '+primerNombre+'\n📅 '+fechaOrig
@@ -32507,6 +32544,7 @@ async function gestConfirmarRecibo(gid){
     document.getElementById('modal-gest-recibo')?.remove();
     _gestGuardarYRefrescar(g);
     if(typeof toast==='function') toast('✅ Recibo #'+folioFormato(folio)+' generado y registrado','ok');
+    imprimirBlob(pdfBlob);
   } catch(e){
     console.error('[Gestión] Error generando recibo:',e);
     if(statusEl) statusEl.textContent='❌ Error: '+e.message;

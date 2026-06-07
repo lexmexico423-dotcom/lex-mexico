@@ -6838,20 +6838,24 @@ async function actualizarArchivoControl(){
             return String(x.folio)===String(t.folio) && x.letra===t.letra;
           })) appData.folios_eliminados.push(t);
         });
-        // Las restauraciones explícitas ganan sobre tombstones: quitar de folios_eliminados
-        // cualquier tombstone cuyo folio+letra esté siendo restaurado ahora mismo.
+        // Restauraciones explícitas ganan sobre tombstones: limpiar tombstone de folios_eliminados
+        // para que no se re-escriba en SB ni bloquee futuras sincronizaciones.
         (appData.recibos||[]).forEach(function(r){
           if(!r.esRestaurado) return;
           appData.folios_eliminados = appData.folios_eliminados.filter(function(t){
             return !(String(t.folio)===String(r.folio) && t.letra===(r.letra||'A'));
           });
         });
-        // Aplicar tombstones a los recibos locales también
-        appData.recibos = (appData.recibos||[]).filter(function(r){
-          return !appData.folios_eliminados.some(function(t){
-            return String(t.folio)===String(r.folio) && t.letra===(r.letra||'A');
+        // Proteger el folio que se está guardando AHORA MISMO (modo retro, abono de folio eliminado).
+        // _folioGuardandose se establece en guardarRecibo() justo antes de llamar aquí.
+        if (window._folioGuardandose != null) {
+          appData.folios_eliminados = (appData.folios_eliminados||[]).filter(function(t){
+            return !(String(t.folio)===String(window._folioGuardandose) && t.letra===(window._letraGuardandose||'A'));
           });
-        });
+        }
+        // ⚠ NO filtrar appData.recibos en memoria — solo filtrar en el payload de escritura.
+        // Filtrar aquí elimina recibos recién creados de la memoria local si su folio
+        // coincide con un tombstone (modo retro, abono eliminado, contador reseteado).
       }
     } catch(_eTombPre){ /* fallo silencioso — se usarán tombstones locales */ }
 
@@ -6860,7 +6864,11 @@ async function actualizarArchivoControl(){
       folioActual: appData.folioActual,
       anioFolioActual: appData.anioFolioActual || new Date().getFullYear(),
       folios_eliminados: appData.folios_eliminados || [],
-      recibos: appData.recibos.map(r=>({
+      recibos: (appData.recibos||[]).filter(function(r){
+        return !(appData.folios_eliminados||[]).some(function(t){
+          return String(t.folio)===String(r.folio) && t.letra===(r.letra||'A');
+        });
+      }).map(r=>({
         folio:r.folio, anio_folio:r.anio_folio||new Date().getFullYear(),
         nombre:r.nombre, fecha:r.fecha, hora:r.hora,
         archivo:r.archivo, saldoPendiente:r.saldoPendiente,
@@ -9040,12 +9048,13 @@ function agregarCostoExtra(data){
   const tr = document.createElement('tr'); tr.id = 'costo-extra-row-'+id;
   const isLocked   = !!(data && data.locked);
   const isExisting = !!(data && data.fechaHora);
-  const fechaHora  = isExisting ? data.fechaHora : nuevaFechaHoraStr();
-  // Modo retro: solo para filas NUEVAS (no locked, no cargadas del historial)
-  const retroActivo = !isLocked && !isExisting && !!window._reciboRetroactivoActivo;
-  const retroFecha  = (retroActivo && window._reciboRetroactivoFechaPersonalizada) || fechaCDMX_ISO();
-  const retroHora   = (retroActivo && window._reciboRetroactivoHoraPersonalizada)  || horaCDMX_HHMM();
-  tr.dataset.fechaHora = retroActivo ? (retroFecha + ' ' + retroHora) : fechaHora;
+  // Modo retro: solo para filas nuevas
+  const _ceRetroActivo = !isLocked && !isExisting && !!window._reciboRetroactivoActivo && !!window._reciboRetroactivoFechaPersonalizada;
+  const _ceRetroFecha  = _ceRetroActivo ? window._reciboRetroactivoFechaPersonalizada : null;
+  const _ceRetroHora   = _ceRetroActivo ? (window._reciboRetroactivoHoraPersonalizada || horaCDMX_HHMM()) : null;
+  const fechaHora = isExisting ? data.fechaHora
+    : (_ceRetroActivo ? (_ceRetroFecha + ' ' + _ceRetroHora + ' hrs.') : nuevaFechaHoraStr());
+  tr.dataset.fechaHora = fechaHora;
   if(isLocked) tr.dataset.locked = '1';
   if(isLocked){
     tr.classList.add('ce-row-locked');
@@ -9061,34 +9070,12 @@ function agregarCostoExtra(data){
       + '<td style="vertical-align:top"><input type="text" class="ce-precio price-input ce-locked-field" readonly value="'+escHTML(fmtMXN(parseFloat(data.precio)||0))+'">'+_liqTag+'</td>'
       + '<td style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#7a6840;">'+fechaHora+'</td>'
       + '<td></td>';
-  } else if(retroActivo){
-    // Fila editable con fecha/hora manual para captura retroactiva
-    const _liqChecked = !!(data && data.liquidadoAlMomento);
-    const _liqMonto   = (data && data.montoLiquidado) ? String(data.montoLiquidado) : '';
-    tr.innerHTML =
-        '<td><textarea class="ce-concepto concepto-ta" rows="1" placeholder="Escribe el concepto...">'+escHTML((data&&data.concepto)||'')+'</textarea></td>'
-      + '<td><textarea class="ce-descripcion concepto-ta" rows="1" placeholder="Descripción">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
-      + '<td style="vertical-align:top">'
-      +   '<input type="text" class="ce-precio price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.precio)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()">'
-      +   '<div style="margin-top:4px;display:flex;align-items:center;gap:4px;">'
-      +     '<input type="checkbox" class="ce-liq-check" id="liq-'+id+'" '+(_liqChecked?'checked':'')+' onchange="toggleCeLiquidado(\''+id+'\');recalcularResumenActualizacion()" style="cursor:pointer;accent-color:#2a7a3a;">'
-      +     '<label for="liq-'+id+'" style="font-size:0.65rem;color:#2a7a3a;cursor:pointer;font-family:\'DM Mono\',monospace;">Liquidar ahora</label>'
-      +   '</div>'
-      +   '<div class="ce-liq-monto-wrap" style="margin-top:3px;display:'+(_liqChecked?'block':'none')+';">'
-      +     '<input type="text" class="ce-liq-monto price-input" placeholder="Monto liq." inputmode="decimal" value="'+escHTML(_liqMonto)+'" oninput="formatPrecio(this);recalcularResumenActualizacion()" style="width:100%;font-size:0.72rem;border-color:#2a7a3a;">'
-      +   '</div>'
-      + '</td>'
-      + '<td style="padding:2px 4px;">'
-        + '<input type="date" class="ce-fecha-retro" value="'+escHTML(retroFecha)+'" oninput="_ceSyncFechaRetro(this)" style="font-family:\'DM Mono\',monospace;font-size:0.65rem;background:#1a1208;border:1px solid rgba(200,149,42,0.5);border-radius:4px;color:#e8d4a8;padding:2px 4px;width:108px;">'
-        + '<input type="time" class="ce-hora-retro"  value="'+escHTML(retroHora)+'"  oninput="_ceSyncFechaRetro(this)" style="font-family:\'DM Mono\',monospace;font-size:0.65rem;background:#1a1208;border:1px solid rgba(200,149,42,0.5);border-radius:4px;color:#e8d4a8;padding:2px 4px;width:68px;margin-left:3px;">'
-      + '</td>'
-      + '<td><button class="del-concept" onclick="quitarCostoExtra(\''+id+'\')">✕</button></td>';
   } else {
     const _liqChecked = !!(data && data.liquidadoAlMomento);
     const _liqMonto   = (data && data.montoLiquidado) ? String(data.montoLiquidado) : '';
     tr.innerHTML =
         '<td><textarea class="ce-concepto concepto-ta" rows="1" placeholder="Escribe el concepto...">'+escHTML((data&&data.concepto)||'')+'</textarea></td>'
-      + '<td><textarea class="ce-descripcion concepto-ta" rows="1" placeholder="Descripción">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
+      + '<td><textarea class="ce-descripcion concepto-ta" rows="1" placeholder="Descripci\u00f3n">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
       + '<td style="vertical-align:top">'
       +   '<input type="text" class="ce-precio price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.precio)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()">'
       +   '<div style="margin-top:4px;display:flex;align-items:center;gap:4px;">'
@@ -9225,13 +9212,6 @@ function _ppSyncFechaRetro(el){
   const h = (tr.querySelector('.pp-hora-retro')||{}).value  || '';
   if(f && h) tr.dataset.fechaHora = f + ' ' + h;
 }
-function _ceSyncFechaRetro(el){
-  const tr = el.closest('tr');
-  if(!tr) return;
-  const f = (tr.querySelector('.ce-fecha-retro')||{}).value || '';
-  const h = (tr.querySelector('.ce-hora-retro')||{}).value  || '';
-  if(f && h) tr.dataset.fechaHora = f + ' ' + h;
-}
 function getPagosParciales(){
   const filas = document.querySelectorAll('#pagos-parciales-tbody tr');
   return Array.from(filas).map(tr => ({
@@ -9244,7 +9224,12 @@ function getPagosParciales(){
   })).filter(p => parseFloat(p.cantidad) > 0);
 }
 function nuevaFechaHoraStr(){
-  // Usar hora CDMX sincronizada (cae al local si no hay conexión)
+  // En modo RETRO usar la fecha/hora retroactiva configurada
+  if(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada){
+    var _f = window._reciboRetroactivoFechaPersonalizada;
+    var _h = window._reciboRetroactivoHoraPersonalizada || horaCDMX_HHMM();
+    return _f + ' ' + _h + ' hrs.';
+  }
   return fechaHoraCDMX_Str();
 }
 // Devuelve la fecha local en formato ISO (YYYY-MM-DD) sin desfase por zona horaria
@@ -11080,14 +11065,27 @@ async function guardarRecibo(){
     // ── ESCRITURA BLOQUEANTE: esperar confirmación de Drive antes de continuar ──
     // Sin este await, una segunda impresión inmediata podría leer el JSON antes de que
     // esta escritura termine y sobrescribir borrando este recibo del historial.
+    // Registrar folio/letra para protegerlos de tombstones durante actualizarArchivoControl()
+    window._folioGuardandose = folio;
+    window._letraGuardandose = window._letraAbonoRetroactivo || 'A';
     setStatus('loading','Guardando recibo #'+folioFormato(folio)+'...','loading');
+    let _guardarFallo = false;
     try {
       await actualizarArchivoControl();
     } catch(eControl) {
       console.error('❌ Error crítico al guardar:', eControl);
       // Reintentar una vez más antes de continuar
-      try { await actualizarArchivoControl(); } catch(e2){ console.error('❌ Segundo intento fallido:', e2); }
+      try {
+        await actualizarArchivoControl();
+      } catch(e2){
+        console.error('❌ Segundo intento fallido:', e2);
+        _guardarFallo = true;
+        // Rescate: sync completo AWAITED mientras _folioGuardandose sigue activo
+        try { await syncEstadoSupabase(); } catch(e3){ console.warn('[rescate sync guardarRecibo]', e3); }
+      }
     }
+    window._folioGuardandose = null;
+    window._letraGuardandose = null;
     // El folio ya fue reservado e incrementado en Drive al inicio de guardarRecibo().
     pendingNextFolio = null;
     // ── Guardar versión inicial A en Supabase versiones_recibo ──
@@ -11130,7 +11128,11 @@ async function guardarRecibo(){
     const _letraGuardada = window._letraAbonoRetroactivo || 'A';
     // Mostrar el folio del recibo impreso con la letra correcta (A para nuevos, B/C/… para abonos)
     $('folio-display').textContent = folioConLetra(folio, null, _letraGuardada);
-    setStatus('ok','Recibo #'+folioConLetra(folio, null, _letraGuardada)+' guardado — abriendo impresora...','ok');
+    if (_guardarFallo) {
+      setStatus('err','⚠️ RECIBO #'+folioConLetra(folio, null, _letraGuardada)+' GENERADO PERO NO REGISTRADO — verifica conexión y recarga','err');
+    } else {
+      setStatus('ok','Recibo #'+folioConLetra(folio, null, _letraGuardada)+' guardado — abriendo impresora...','ok');
+    }
     // Guardar blob para reimprimir sin cambiar folio
     lastPdfBlob = new Blob([doc.output('arraybuffer')], {type:'application/pdf'});
     // Abrir nueva pestaña con el PDF para que el empleado configure la impresora
@@ -18261,13 +18263,20 @@ async function syncEstadoSupabase(){
             return String(x.folio)===String(t.folio) && x.letra===t.letra;
           })) appData.folios_eliminados.push(t);
         });
-        // Restauraciones explícitas ganan sobre tombstones
+        // Restauraciones explícitas ganan sobre tombstones recién fusionados
         (appData.recibos||[]).forEach(function(r){
           if(!r.esRestaurado) return;
           appData.folios_eliminados = appData.folios_eliminados.filter(function(t){
             return !(String(t.folio)===String(r.folio) && t.letra===(r.letra||'A'));
           });
         });
+        // En rescate (actualizarArchivoControl() falló), _folioGuardandose sigue activo.
+        // Proteger el folio en curso para que el tombstone de SB no lo elimine aquí.
+        if (window._folioGuardandose != null) {
+          appData.folios_eliminados = (appData.folios_eliminados||[]).filter(function(t){
+            return !(String(t.folio)===String(window._folioGuardandose) && t.letra===(window._letraGuardandose||'A'));
+          });
+        }
       }
       // Fusionar recibos de SB con los locales: conservar recibos que solo están en un lado
       if (_sbRecibosPreSync.length > 0) {
@@ -19015,9 +19024,8 @@ async function guardarReciboInterno() {
     await guardarFolioEnDrive(folio + 1);
     await subirPDFaD(blob, 'LEX-Recibo-' + folioFormato(folio) + '-' + datos.nombre.replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf');
     save();
-    // Refrescar contabilidad e historial con el nuevo recibo
+    // Refrescar contabilidad con el nuevo recibo
     if(typeof renderContab==='function') renderContab();
-    if(typeof renderHistorial==='function') renderHistorial();
     // ── Actualizar Directorio desde recibo nuevo ──────────────────
     // Revisa cada cliente del recibo: si existe por nombre, compara teléfono.
     // Si el tel ya coincide → no hace nada.
@@ -24542,7 +24550,6 @@ async function guardarEdicionCompleta() {
       toast('✅ Recibo #' + folioStrFinal + ' editado y PDF regenerado.');
     if (typeof setStatus === 'function')
       setStatus('ok','Recibo #' + folioStrFinal + ' actualizado correctamente','ok');
-    imprimirDesdeBlob(doc.output('blob'), nombreArchivo);
     // ─── Salir del modo edición ─────────────────────────────────────
     _reciboEnEdicionCompleta = null;
     window._reciboEdicionBackup = null;
@@ -24703,7 +24710,6 @@ async function adminGuardarEdicionRecibo() {
         // Subir a Storage (no bloqueante)
         subirPDFaDrive(_blob, _nombrePDF).catch(e => console.warn('[Admin] PDF upload:', e));
         console.log('[Admin] PDF regenerado y subido:', _nombrePDF);
-        imprimirDesdeBlob(_blob, _nombrePDF);
       }
     } catch(_ePDF) {
       console.warn('[Admin] PDF no regenerado (se regenerará al consultar):', _ePDF.message);
@@ -28121,13 +28127,6 @@ async function guardarRestauracion(){
       estadoPlacas:_placasRest.estado||null,
       notas:'⚠ Restaurado el '+new Date().toLocaleDateString('es-MX')+' — PDF regenerado'
     };
-    // Limpiar el tombstone de este folio ANTES de insertar y llamar actualizarArchivoControl,
-    // para que el pre-read de tombstones de SB no vuelva a filtrar el recibo restaurado.
-    if(Array.isArray(appData.folios_eliminados)){
-      appData.folios_eliminados = appData.folios_eliminados.filter(function(t){
-        return !(String(t.folio)===String(folio) && t.letra===letra);
-      });
-    }
     // Insertar en posición correcta considerando folio Y letra (A < B < C...)
     const _letraOrd = l => (l||'A').charCodeAt(0);
     const idx = appData.recibos.findIndex(r =>
@@ -28209,7 +28208,6 @@ async function guardarRestauracion(){
     document.getElementById('actions-normal').style.display='flex';
     if(typeof toast==='function') toast('✅ Recibo #'+fs+' restaurado');
     if(typeof setStatus==='function') setStatus('ok','Recibo #'+fs+' restaurado — PDF regenerado','ok');
-    imprimirDesdeBlob(doc.output('blob'), nombreArchivo);
     if(_placasRest.placas && typeof mostrarPlacasEnPantalla==='function')
       mostrarPlacasEnPantalla(_placasRest.placas, _placasRest.estado);
     alert('✅ Recibo #'+fs+' restaurado.\n\n📋 '+primerNombre+'\n📅 '+fechaOrig
@@ -32566,7 +32564,6 @@ async function gestConfirmarRecibo(gid){
     document.getElementById('modal-gest-recibo')?.remove();
     _gestGuardarYRefrescar(g);
     if(typeof toast==='function') toast('✅ Recibo #'+folioFormato(folio)+' generado y registrado','ok');
-    imprimirBlob(pdfBlob);
   } catch(e){
     console.error('[Gestión] Error generando recibo:',e);
     if(statusEl) statusEl.textContent='❌ Error: '+e.message;

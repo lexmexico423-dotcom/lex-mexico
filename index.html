@@ -18163,6 +18163,40 @@ function lexRealtimeConectar() {
         console.log('[Realtime] retro_global:', activo);
       } catch(e){ registrarError('catch retro_global_actualizado', e); }
     })
+    // ── Eliminación inmediata de folio en todos los clientes conectados ──────
+    // El admin elimina → broadcast → empleada borra de su memoria local al instante,
+    // sin esperar el ciclo de sync (que llegaría demasiado tarde y permitía que
+    // la empleada re-subiera el folio eliminado antes de recibir el tombstone).
+    .on('broadcast', { event: 'folio_eliminado' }, function(payload) {
+      if (!payload || !payload.payload) return;
+      try {
+        var _folioEl = payload.payload.folio;
+        var _letraEl = payload.payload.letra || 'A';
+        // 1. Agregar tombstone local
+        if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
+        if (!appData.folios_eliminados.some(function(t){ return String(t.folio)===String(_folioEl) && t.letra===_letraEl; }))
+          appData.folios_eliminados.push({ folio: _folioEl, letra: _letraEl, ts: Date.now() });
+        // 2. Eliminar de recibos locales
+        if (Array.isArray(appData.recibos)) {
+          appData.recibos = appData.recibos.filter(function(rec){
+            return !(String(rec.folio)===String(_folioEl) && (rec.letra||'A')===_letraEl);
+          });
+        }
+        // 3. Persistir tombstone en Supabase para que otros clientes que aún no
+        //    recibieron el broadcast también respeten la eliminación al syncar.
+        setTimeout(function(){
+          if (typeof actualizarArchivoControl === 'function')
+            actualizarArchivoControl().catch(function(e){ console.warn('[folio_eliminado] re-upload tombstone:', e); });
+        }, 500);
+        // 4. Refrescar UI
+        if (typeof adminRenderRecibos === 'function') adminRenderRecibos((document.getElementById('adminBuscarRecibo')||{}).value||'');
+        if (typeof renderRec       === 'function') renderRec();
+        if (typeof renderCaja      === 'function') renderCaja();
+        if (typeof renderContab    === 'function') renderContab();
+        if (typeof badges          === 'function') badges();
+        console.log('[Realtime] folio_eliminado aplicado localmente — folio:', _folioEl, 'letra:', _letraEl);
+      } catch(e){ console.warn('[Realtime] folio_eliminado error:', e); }
+    })
     .subscribe(function(status) {
       console.log('[Realtime] Estado canal:', status);
       if (status === 'SUBSCRIBED') lexPollingIniciar();
@@ -23140,6 +23174,18 @@ async function adminEliminarRecibo(idx) {
   if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
   if (!appData.folios_eliminados.some(function(t){ return String(t.folio)===String(r.folio) && t.letra===letra; }))
     appData.folios_eliminados.push({ folio: r.folio, letra: letra, ts: Date.now() });
+  // Notificar a TODOS los clientes conectados para que eliminen el folio de su memoria local
+  // inmediatamente, sin esperar al ciclo de sync (que podría ser muy tardío si la empleada
+  // tiene el folio en memoria y lo re-sube antes de recibir el tombstone).
+  try {
+    if (typeof _lexRealtimeChannel !== 'undefined' && _lexRealtimeChannel && _lexRealtimeChannel.state === 'joined') {
+      _lexRealtimeChannel.send({
+        type:    'broadcast',
+        event:   'folio_eliminado',
+        payload: { folio: r.folio, letra: letra, ts: Date.now() }
+      }).catch(function(){});
+    }
+  } catch(e) { console.warn('[folio_eliminado broadcast]', e); }
   // 1. Eliminar recibo del array (solo el específico por índice)
   recibos.splice(idx, 1);
   // 2. Recalcular folioActual al primer hueco disponible (incluye el hueco que dejó este recibo)

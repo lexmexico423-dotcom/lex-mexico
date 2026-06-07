@@ -5131,7 +5131,7 @@ window.addEventListener('offline', ()=>{
           <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
             <div class="field-group" style="margin:0;flex-shrink:0;">
               <label style="font-family:'DM Mono',monospace;font-size:0.58rem;color:#3a6a48;letter-spacing:0.08em;text-transform:uppercase;">🔢 Por Número de Folio</label>
-              <input type="number" id="folio_anterior" placeholder="Ej: 0100" min="1" oninput="cargarHistorialFolio()" style="max-width:140px;border-color:#2a7a3a !important;">
+              <input type="number" id="folio_anterior" placeholder="Ej: 0100" min="1" oninput="cargarHistorialFolioDebounce()" style="max-width:140px;border-color:#2a7a3a !important;">
             </div>
             <div style="flex-shrink:0;padding-bottom:6px;font-family:'DM Mono',monospace;font-size:0.6rem;color:#6a9a78;letter-spacing:0.1em;align-self:flex-end;">Ó</div>
             <div class="field-group" style="margin:0;flex-shrink:0;">
@@ -8134,6 +8134,19 @@ function cargarHistorialExpediente(){
   if($('expediente_buscar')) $('expediente_buscar').value = q; // mantener visible para referencia
   cargarHistorialFolio();
 }
+// ── Debounce: espera 350ms desde el último teclazo antes de buscar ──
+var _cargarHistFolioTimer = null;
+function cargarHistorialFolioDebounce(){
+  var v = parseInt((document.getElementById('folio_anterior')||{}).value||0)||0;
+  clearTimeout(_cargarHistFolioTimer);
+  if(!v){ cargarHistorialFolio(); return; } // limpiar inmediatamente
+  _cargarHistFolioTimer = setTimeout(cargarHistorialFolio, 350);
+}
+
+// ── Token de cancelación para activarModoConsulta ──
+// Cada llamada nueva incrementa el token; las llamadas viejas abortan cuando detectan discrepancia.
+var _modoConsultaToken = 0;
+
 function cargarHistorialFolio(){
   const val = parseInt(document.getElementById('folio_anterior').value)||null;
   const infoBox = document.getElementById('info-folio-anterior');
@@ -8321,7 +8334,8 @@ function cargarHistorialFolio(){
   activarModoConsulta(recibo);
 }
 async function activarModoConsulta(recibo){
-  // Mostrar PDF original en el iframe
+  // Token de cancelación: si el usuario cambia de folio mientras descarga, la llamada vieja aborta.
+  const myToken = ++_modoConsultaToken;
   const iframe = document.getElementById('pdf-consulta-iframe');
   const saldo = recibo.saldoPendiente || 0;
   // Limpiar blob URL anterior si existe
@@ -8336,15 +8350,18 @@ async function activarModoConsulta(recibo){
       for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
       const blob = new Blob([bytes],{type:'application/pdf'});
       const blobUrl = URL.createObjectURL(blob);
+      if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(blobUrl);}catch(e){} return; }
       iframe._blobUrl = blobUrl;
       iframe.src = blobUrl + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
     } catch(e) {
+      if(myToken !== _modoConsultaToken) return;
       iframe.src = src;
     }
   }
   if(recibo.pdfBase64){
     // Sesión actual: ya tenemos el PDF en memoria
     await mostrarBlobEnIframe(recibo.pdfBase64);
+    if(myToken !== _modoConsultaToken) return;
   } else if(recibo.archivo && window.SB_DESPACHO_ID){
     // Nueva sesión: buscar PDF en R2 y luego en Supabase Storage
     const _pathSB = window.SB_DESPACHO_ID + '/recibos/' + recibo.archivo;
@@ -8361,8 +8378,10 @@ async function activarModoConsulta(recibo){
       try {
         setStatus('loading','Cargando PDF…','loading');
         const _blob = await window.descargarR2(_pathR2, 'recibos');
+        if(myToken !== _modoConsultaToken) return; // folio cambió mientras descargaba
         if(_blob && _blob.size > 0){
           const _url = URL.createObjectURL(_blob);
+          if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_url);}catch(e){} return; }
           iframe._blobUrl = _url;
           iframe.src = _url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
           const _rd = new FileReader();
@@ -8371,7 +8390,7 @@ async function activarModoConsulta(recibo){
           setStatus('ok','PDF cargado','ok');
           _cargado = true;
         }
-      } catch(_e){ console.warn('[activarModoConsulta] R2:', _e); }
+      } catch(_e){ if(myToken !== _modoConsultaToken) return; console.warn('[activarModoConsulta] R2:', _e); }
     }
     // 2) Intentar Supabase Storage
     if(!_cargado && window.SB){
@@ -8379,11 +8398,15 @@ async function activarModoConsulta(recibo){
         setStatus('loading','Cargando PDF…','loading');
         const { data: _sd, error: _se } = await window.SB.storage
           .from(STORAGE_BUCKET).createSignedUrl(_pathSB, 120);
+        if(myToken !== _modoConsultaToken) return;
         if(!_se && _sd && _sd.signedUrl){
           const _res = await fetch(_sd.signedUrl);
+          if(myToken !== _modoConsultaToken) return;
           if(_res.ok){
             const _blob = await _res.blob();
+            if(myToken !== _modoConsultaToken) return;
             const _url = URL.createObjectURL(_blob);
+            if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_url);}catch(e){} return; }
             iframe._blobUrl = _url;
             iframe.src = _url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
             const _rd = new FileReader();
@@ -8393,7 +8416,7 @@ async function activarModoConsulta(recibo){
             _cargado = true;
           }
         }
-      } catch(_e){ console.warn('[activarModoConsulta] SB Storage:', _e); }
+      } catch(_e){ if(myToken !== _modoConsultaToken) return; console.warn('[activarModoConsulta] SB Storage:', _e); }
     }
     // ── Fallback: intentar versiones anteriores del mismo folio (B→A, C→B→A…) ──
     // Ocurre cuando la subida del PDF de la última versión falló silenciosamente.
@@ -8402,43 +8425,54 @@ async function activarModoConsulta(recibo){
         .filter(function(r){ return r.folio===recibo.folio&&!r.esComplemento&&r.archivo&&r.archivo!==recibo.archivo; })
         .sort(function(a,b){ return (b.letra||'A').localeCompare(a.letra||'A'); });
       for(var _vi=0;_vi<_versiones.length&&!_cargado;_vi++){
+        if(myToken !== _modoConsultaToken) return;
         var _rv=_versiones[_vi];
         var _rvPathR2=window.SB_DESPACHO_ID+'/recibos/'+(_rv.archivoR2||_rv.archivo);
         var _rvPathSB=window.SB_DESPACHO_ID+'/recibos/'+_rv.archivo;
         if(typeof window.descargarR2==='function'){
           try{
             var _rvBlob=await window.descargarR2(_rvPathR2,'recibos');
+            if(myToken !== _modoConsultaToken) return;
             if(_rvBlob&&_rvBlob.size>0){
               var _rvUrl=URL.createObjectURL(_rvBlob);
+              if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_rvUrl);}catch(e){} return; }
               iframe._blobUrl=_rvUrl; iframe.src=_rvUrl+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
               setStatus('ok','PDF versión '+(_rv.letra||'A')+' cargado (versión más reciente no disponible)','ok');
               _cargado=true;
             }
-          }catch(_e2){}
+          }catch(_e2){ if(myToken !== _modoConsultaToken) return; }
         }
         if(!_cargado&&window.SB){
           try{
             var _rvSd=await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_rvPathSB,120);
+            if(myToken !== _modoConsultaToken) return;
             if(!_rvSd.error&&_rvSd.data&&_rvSd.data.signedUrl){
               var _rvRes=await fetch(_rvSd.data.signedUrl);
+              if(myToken !== _modoConsultaToken) return;
               if(_rvRes.ok){
                 var _rvBlob2=await _rvRes.blob();
+                if(myToken !== _modoConsultaToken) return;
                 var _rvUrl2=URL.createObjectURL(_rvBlob2);
+                if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_rvUrl2);}catch(e){} return; }
                 iframe._blobUrl=_rvUrl2; iframe.src=_rvUrl2+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
                 setStatus('ok','PDF versión '+(_rv.letra||'A')+' cargado (versión más reciente no disponible)','ok');
                 _cargado=true;
               }
             }
-          }catch(_e3){}
+          }catch(_e3){ if(myToken !== _modoConsultaToken) return; }
         }
       }
     }
+    if(myToken !== _modoConsultaToken) return;
     if(!_cargado){
       setStatus('err','No se encontró el PDF del folio #'+String(recibo.folio).padStart(4,'0'),'err');
     }
   } else if(!recibo.archivo){
+    if(myToken !== _modoConsultaToken) return;
     setStatus('err','Este folio no tiene PDF generado','err');
   }
+  // Verificación final antes de actualizar UI: si el usuario cambió el folio, no actualizar nada
+  if(myToken !== _modoConsultaToken) return;
   // Actualizar toolbar
   const folioStr = String(recibo.folio).padStart(4,'0');
   document.getElementById('pdf-folio-badge').textContent = 'FOLIO #' + folioStr;
@@ -8492,6 +8526,7 @@ async function activarModoConsulta(recibo){
   if(!_panelesBusquedaAbiertos) togglePanelesBusqueda();
 }
 function salirModoConsulta(){
+  _modoConsultaToken++; // cancela cualquier activarModoConsulta en vuelo
   reciboEnConsulta = null;
   document.body.classList.remove('modo-consulta');
   document.body.classList.remove('folio-liquidado');
@@ -36247,10 +36282,12 @@ function abrirFichaFolio(){
   }
   var gl=document.getElementById('ficha-gastos-lista');
   gl.innerHTML='';
+  window._fichaGastosActuales = []; // limpiar lista en memoria antes de cargar
   // Cargar gastos desde R2 (con fallback localStorage)
   _gastoR2Cargar(folio, anio).then(function(gastos) {
     var gl2=document.getElementById('ficha-gastos-lista'); if(!gl2) return;
     gl2.innerHTML='';
+    window._fichaGastosActuales = gastos.slice(); // lista autoritativa en memoria
     var extP2=0;
     gastos.forEach(function(g,i){if(g.estado==='Pendiente')extP2+=parseFloat(g.monto||0);_fichaGastoRow(g,i);});
     document.getElementById('ficha-ext-pend').textContent='$'+fmt(extP2);
@@ -36436,8 +36473,10 @@ function fichaGuardarGasto(){
   var folio=ref?ref.folio:null, anio=ref?ref.anio:null;
   var fechaEl=document.getElementById('fichaGFechaDisplay');
   var today=fechaEl&&fechaEl.textContent?fechaEl.textContent:new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
-  var gastos=folio?JSON.parse(localStorage.getItem('ficha-gastos-'+folio+'-'+anio)||'[]'):[];
+  // Usar lista en memoria (autoridad) — no releer localStorage que puede ser stale
+  var gastos=(window._fichaGastosActuales||[]).slice();
   gastos.push({concepto:c,monto:m,estado:e,fecha:today});
+  window._fichaGastosActuales = gastos;
   if(folio) _gastoR2Guardar(folio, anio, gastos); // guarda R2 + localStorage
   var gl=document.getElementById('ficha-gastos-lista');gl.innerHTML='';
   var extP=0;var fmt=function(v){return typeof fmtMXN==='function'?fmtMXN(parseFloat(v||0)):parseFloat(v||0).toFixed(2);};
@@ -36450,8 +36489,10 @@ function fichaGuardarGasto(){
 function fichaEliminarGasto(idx){
   var ref=window._fichaRef;
   var folio=ref?ref.folio:null, anio=ref?ref.anio:null;
-  var gastos=folio?JSON.parse(localStorage.getItem('ficha-gastos-'+folio+'-'+anio)||'[]'):[];
+  // Usar lista en memoria (autoridad) — evitar stale de localStorage
+  var gastos=(window._fichaGastosActuales||[]).slice();
   gastos.splice(idx,1);
+  window._fichaGastosActuales = gastos;
   if(folio) _gastoR2Guardar(folio, anio, gastos);
   var gl=document.getElementById('ficha-gastos-lista');gl.innerHTML='';
   var extP=0;var fmt=function(v){return typeof fmtMXN==='function'?fmtMXN(parseFloat(v||0)):parseFloat(v||0).toFixed(2);};

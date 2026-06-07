@@ -8418,20 +8418,26 @@ async function activarModoConsulta(recibo){
   } else if(recibo.archivo && window.SB_DESPACHO_ID){
     // Nueva sesión: buscar PDF en R2 y luego en Supabase Storage
     const _pathSB = window.SB_DESPACHO_ID + '/recibos/' + recibo.archivo;
-    // Si archivoR2 no está guardado en el registro, reconstruir el nombre descriptivo
-    // usando la misma lógica de _nombreArchivoR2() para que coincida con la subida.
-    const _archivoR2Eff = recibo.archivoR2
-      || (typeof _nombreArchivoR2 === 'function' && recibo.nombre
-          ? _nombreArchivoR2(recibo.archivo.replace(/\.pdf$/i,''), recibo.nombre)
-          : recibo.archivo);
+    // Igual que Contabilidad y reDescargar: archivoR2 si existe, sino el nombre corto.
+    // Para folios antiguos (archivoR2 nulo) el PDF está en R2 bajo el nombre corto.
+    const _archivoR2Eff = recibo.archivoR2 || recibo.archivo;
+    // Nombre descriptivo alternativo (por si el archivo se subió con ese nombre pero archivoR2 no se guardó)
+    const _archivoR2Alt = (!recibo.archivoR2 && typeof _nombreArchivoR2 === 'function' && recibo.nombre)
+      ? _nombreArchivoR2(recibo.archivo.replace(/\.pdf$/i,''), recibo.nombre)
+      : null;
     const _pathR2 = window.SB_DESPACHO_ID + '/recibos/' + _archivoR2Eff;
     let _cargado = false;
     // 1) Intentar R2
     if(!_cargado && typeof window.descargarR2 === 'function'){
       try {
         setStatus('loading','Cargando PDF…','loading');
-        const _blob = await window.descargarR2(_pathR2, 'recibos');
+        let _blob = await window.descargarR2(_pathR2, 'recibos');
         if(myToken !== _modoConsultaToken) return; // folio cambió mientras descargaba
+        // Intento secundario: nombre descriptivo (folios donde archivoR2 no se guardó pero se subió así)
+        if((!_blob || _blob.size === 0) && _archivoR2Alt && _archivoR2Alt !== _archivoR2Eff){
+          _blob = await window.descargarR2(window.SB_DESPACHO_ID + '/recibos/' + _archivoR2Alt, 'recibos');
+          if(myToken !== _modoConsultaToken) return;
+        }
         if(_blob && _blob.size > 0){
           const _url = URL.createObjectURL(_blob);
           if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_url);}catch(e){} return; }

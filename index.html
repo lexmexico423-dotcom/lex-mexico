@@ -3217,6 +3217,14 @@ window.addEventListener('offline', ()=>{
             <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a0e8e8;text-align:center;line-height:1.3;">Normalizar<br>Nombres R2</div>
             <div style="font-family:monospace;font-size:0.5rem;color:rgba(160,232,232,0.6);text-align:center;line-height:1.4;padding:0 4px;">Renombra PDFs de formato antiguo (Recibo_26-083A_NOMBRE.pdf) al nuevo (26-083A_NOMBRE.pdf) y actualiza los vínculos en los recibos</div>
           </div>
+          <!-- Limpiar PDFs Huérfanos R2 -->
+          <div onclick="adminLimpiarPDFsHuerfanos()" style="position:relative;background:rgba(192,22,26,0.08);border:1.5px solid rgba(192,22,26,0.32);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#e05555';this.style.boxShadow='0 8px 20px rgba(192,22,26,0.28)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(192,22,26,0.32)';this.style.boxShadow=''">
+            <div style="width:60px;height:60px;border-radius:14px;background:#3a0a0a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">🧹</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#f0a0a0;text-align:center;line-height:1.3;">Limpiar PDFs<br>Huérfanos R2</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(240,160,160,0.6);text-align:center;line-height:1.4;padding:0 4px;">Detecta y elimina PDFs en R2 que no tienen recibo vinculado en el sistema. Muestra lista previa con selección individual antes de borrar.</div>
+          </div>
           <!-- Migrar a Folios Infinitos -->
           <div onclick="adminMigrarFoliosInfinitos()" style="position:relative;background:rgba(122,42,26,0.12);border:1.5px solid rgba(200,100,42,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
                onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#c8642a';this.style.boxShadow='0 8px 20px rgba(200,100,42,0.25)'"
@@ -3892,7 +3900,7 @@ window.addEventListener('offline', ()=>{
               <span class="srv-badge srv-badge-rojo">GOB</span>
               <span class="srv-externo-icon">↗</span>
             </button>
-            <button class="srv srv-externo" onclick="window.open('http://sujetosobligados.repuve.gob.mx:8046/repuve/login.jsp','_blank')">
+            <button class="srv srv-externo" onclick="window.open('http://entidades.sesnsp.gob.mx:8046/repuve/login.jsp','_blank')">
               <span class="srv-tipo-tag srv-tipo-externo">🌐 Externo</span>
               <span class="sico"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="11" width="18" height="11" rx="2" stroke-width="1.5"/><path d="M7 11V7a5 5 0 0110 0v4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="16" r="1.5" fill="currentColor" stroke="none"/></svg></span>
               <span class="snom">Plataforma México</span>
@@ -5911,6 +5919,42 @@ window.addEventListener('offline', ()=>{
     </div>
   </div>
 </div>
+
+<!-- ═══ MODAL: EXPEDIENTE DIGITAL VEHICULAR ═══ -->
+<div class="modal-overlay" id="modal-exp-digital-placas" style="display:none;z-index:10001;">
+  <div class="modal" style="max-width:560px;width:95%;padding:0;border-radius:8px;overflow:hidden;border:1.5px solid #4a6ea8;">
+    <div style="background:#1a3a70;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;">
+      <span style="font-family:'DM Mono',monospace;font-size:0.78rem;font-weight:700;color:#fff;letter-spacing:0.08em;text-transform:uppercase;">📋 Expediente Digital Vehicular</span>
+      <button onclick="cerrarExpDigital()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;cursor:pointer;border-radius:4px;padding:3px 9px;font-size:1rem;line-height:1;">✕</button>
+    </div>
+    <div id="exp-digital-info-veh" style="background:#e6f1fb;padding:10px 18px;border-bottom:1px solid #c8d8f0;font-family:'DM Mono',monospace;font-size:0.72rem;color:#1a3a70;"></div>
+    <div id="exp-digital-status-wrap" style="padding:10px 18px 6px;border-bottom:1px solid #e0ddd0;"></div>
+    <div style="padding:14px 18px;">
+      <div style="font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:700;color:#7a6840;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">Archivos adjuntos</div>
+      <div id="exp-digital-lista-archivos" style="min-height:50px;max-height:160px;overflow-y:auto;border:1px solid #ddd;border-radius:4px;padding:8px;background:#fafaf6;margin-bottom:10px;font-family:'DM Mono',monospace;font-size:0.72rem;color:#555;">
+        <span style="color:#aaa;font-style:italic;">Sin archivos seleccionados</span>
+      </div>
+      <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:4px;border:1.5px dashed #4a6ea8;background:#f0f5ff;color:#1a3a70;font-family:'DM Mono',monospace;font-size:0.72rem;font-weight:700;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#dce8ff'" onmouseout="this.style.background='#f0f5ff'">
+        📎 Adjuntar archivos (PDF, imagen)
+        <input type="file" id="exp-digital-file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.gif,.bmp,.webp" style="display:none;" onchange="_expDigOnFileChange(event)">
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 18px 18px;flex-wrap:wrap;">
+      <button id="exp-digital-btn-enviar" onclick="_expDigEnviar()" style="flex:1;min-width:160px;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px 14px;border-radius:4px;border:2px solid #1a5fa8;background:#1a5fa8;color:#fff;font-family:'DM Mono',monospace;font-size:0.78rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='#1448a0'" onmouseout="this.style.background='#1a5fa8'">
+        📤 Enviar Expediente
+      </button>
+      <button id="exp-digital-btn-ver" onclick="_expDigVerExpediente()" style="display:none;flex:1;min-width:150px;align-items:center;justify-content:center;gap:7px;padding:10px 14px;border-radius:4px;border:2px solid #2a7a4a;background:#e8f5ec;color:#0a4020;font-family:'DM Mono',monospace;font-size:0.78rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;transition:all 0.15s;" onmouseover="this.style.background='#c8f0d8'" onmouseout="this.style.background='#e8f5ec'">
+        👁 Ver en Drive
+      </button>
+      <button onclick="cerrarExpDigital()" style="flex:0.6;min-width:80px;padding:10px 14px;border-radius:4px;border:1.5px solid #c8b890;background:#f5f0e0;color:#7a6840;font-family:'DM Mono',monospace;font-size:0.78rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;">
+        ✕ Cerrar
+      </button>
+    </div>
+    <div id="exp-digital-progress" style="display:none;padding:8px 18px 14px;font-family:'DM Mono',monospace;font-size:0.72rem;color:#4a6ea8;text-align:center;"></div>
+  </div>
+</div>
+<!-- ═══ FIN EXPEDIENTE DIGITAL VEHICULAR ═══ -->
+
 <script>
 // ════════════════════════════════════════════════════════════════
 // BLOQUE 1 — originalmente en línea 3552 de index.html
@@ -6231,7 +6275,7 @@ async function obtenerDespachoActivo(){
   await sb.from('miembros').insert({ despacho_id: d.id, user_id: user.id, rol: 'admin', nombre: user.email.split('@')[0] });
   await sb.from('app_state').insert({
     despacho_id: d.id,
-    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0},
+    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]},
     recibos: {folioActual:1, recibos:[]}
   });
   window.SB_DESPACHO_ID = d.id;
@@ -6453,6 +6497,10 @@ function _tombstoneAplicaA(t, r) {
 function _revivirSiTombstone(rec) {
   try {
     if (!rec || typeof appData === 'undefined') return rec;
+    // Siempre marcar el recibo con el momento de creación. Si SB tiene un
+    // tombstone que aún no llegó a este dispositivo, _revivedTs protegerá
+    // el recibo en la comparación _revivedTs > t.ts del pre-read de syncEstadoSupabase.
+    if (!rec._revivedTs) rec._revivedTs = Date.now();
     const tombs = Array.isArray(appData.folios_eliminados) ? appData.folios_eliminados : [];
     const hayTomb = tombs.some(function(t){
       return String(t.folio) === String(rec.folio) && (t.letra || 'A') === (rec.letra || 'A');
@@ -6675,7 +6723,7 @@ async function sincronizarFolio(forzarSB){
         console.log('[SB] No hay estado previo — creando inicial...');
         await window.SB.from('app_state').insert({
           despacho_id: window.SB_DESPACHO_ID,
-          data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0},
+          data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]},
           recibos: {folioActual:1, recibos:[]},
           folio_actual: 100
         });
@@ -6806,6 +6854,15 @@ async function sincronizarFolio(forzarSB){
         D.escrituras            = data.data.escrituras    || [];
         D.recibosExcluidosCaja  = data.data.recibosExcluidosCaja || [];
         D.preRecibos            = data.data.preRecibos           || [];
+        // Catálogo de leyes del despacho — compartido entre todos los dispositivos
+        if (Array.isArray(data.data.leyes) && data.data.leyes.length) {
+          D.leyes = data.data.leyes;
+          localStorage.setItem('lex-leyes-despacho', JSON.stringify(D.leyes));
+        } else if (!D.leyes || !D.leyes.length) {
+          // Migración: si hay leyes en localStorage pero aún no en SB, conservarlas
+          const _localLeyes = JSON.parse(localStorage.getItem('lex-leyes-despacho') || '[]');
+          if (_localLeyes.length) D.leyes = _localLeyes;
+        }
 
         if(data.data.retro_global !== undefined) D.retro_global = data.data.retro_global;
         // Migrar pendientes legacy: marca/clase → vehMarca/vehClase
@@ -7019,7 +7076,7 @@ async function crearArchivoControl(){
   if(!window.SB || !window.SB_DESPACHO_ID) return 'supabase';
   const { error } = await window.SB.from('app_state').upsert({
     despacho_id: window.SB_DESPACHO_ID,
-    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0},
+    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]},
     recibos: { folioActual:1, anioFolioActual: new Date().getFullYear(), recibos:[] },
     folio_actual: 100
   });
@@ -12221,7 +12278,7 @@ let driveFoldersCache=[]; // cache de carpetas de Drive vinculadas a juicios
 let driveFolderSeleccionado=null; // {id, name} carpeta seleccionada en modal
 let acuerdoPDFPendiente=null; // File object pendiente de subir
 // ═══ ESTADO ═══
-let D={movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0};
+let D={movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]};
 let REC={folioActual:100,recibos:[]}; // Se sobrescribe con datos de Drive al conectar
 let filtroC='todo',filtroDT='todos',filtroCT='todas',filtroJ='todos',filtroP='activos',filtroSeccion='todas',modo='ingreso';
 let eiC=-1,eiK=-1,eiJ=-1,eiP=-1;
@@ -16803,6 +16860,12 @@ function renderPend(){
       if (p.placasNumero)     chips.push(`<span style="font-size:9.5px;background:#faeeda;color:#633806;border-radius:3px;padding:1px 6px;font-family:monospace;font-weight:700;"># ${esc(p.placasNumero)}</span>`);
       if (p.reciboVinculadoFolio) chips.push(`<span style="font-size:9.5px;background:rgba(26,122,58,0.08);color:#27500a;border-radius:3px;padding:1px 6px;font-family:monospace;cursor:pointer;" onclick="event.stopPropagation();_irAReciboVinculado('${esc(String(p.reciboVinculadoFolio))}')" title="Abrir recibo">🧾 #${esc(folioFormato(p.reciboVinculadoFolio))}</span>`);
       if (p.vehMarca||p.vehClase) chips.push(`<span style="font-size:9.5px;background:#f1efe8;color:#444441;border-radius:3px;padding:1px 6px;font-family:monospace;">${esc(((p.vehMarca||'')+' '+(p.vehClase||'')).trim())}</span>`);
+      // Badge estatus de gestión expediente digital
+      if (p.estatusGestion === 'enviado') {
+        chips.push(`<span style="font-size:9.5px;background:#d4f5e0;border:1px solid #2a9a50;color:#0a4020;border-radius:10px;padding:2px 8px;font-family:monospace;font-weight:700;">✅ ENVIADO A GESTIÓN${p.expDigitalFechaEnvio?' · '+p.expDigitalFechaEnvio:''}</span>`);
+      } else {
+        chips.push(`<span style="font-size:9.5px;background:#fff3e0;border:1px solid #c8952a;color:#7a4010;border-radius:10px;padding:2px 8px;font-family:monospace;font-weight:700;">⏳ SIN ENVIAR A GESTIÓN</span>`);
+      }
       const docsArr = p.documentos||[];
       const docsHtml = docsArr.map((d,di)=>{
         const nm=d.nombre||d||'doc'; const lbl=nm.length>18?nm.substring(0,18)+'…':nm;
@@ -17129,11 +17192,13 @@ function _verDetallePendiente(idx){
           ${p.carpeta?filaHtml('🗂','Carpeta','#'+p.carpeta):''}
           ${p.descripcionPlacas?filaHtml('📝','Descripción',p.descripcionPlacas):''}
           ${p.obs?filaHtml('💬','Notas',p.obs):''}
+          ${p.seccion==='placas'?filaHtml('📋','Estatus gestión', p.estatusGestion==='enviado' ? '✅ TRÁMITE ENVIADO PARA SU GESTIÓN'+(p.expDigitalFechaEnvio?' ('+p.expDigitalFechaEnvio+')':'') : '⏳ TRÁMITE SIN ENVIAR A GESTIÓN'):''}
         </div>
       </div>
       <!-- Footer -->
-      <div style="padding:12px 20px 16px;border-top:1.5px solid #ecdfa8;display:flex;gap:8px;justify-content:flex-end;">
+      <div style="padding:12px 20px 16px;border-top:1.5px solid #ecdfa8;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
         <button onclick="document.getElementById('_det-pend-ov').remove()" style="background:none;border:1.5px solid #d4b870;border-radius:8px;padding:8px 18px;cursor:pointer;font-family:monospace;font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;color:#8c6518;font-weight:700;" onmouseover="this.style.background='rgba(200,149,42,0.08)'" onmouseout="this.style.background='none'">Cerrar</button>
+        ${p.expDigitalDriveFileId?`<button onclick="document.getElementById('_det-pend-ov').remove();_expDigVerDesdeId('${p.expDigitalDriveFileId}','${esc(p.expDigitalNombreArchivo||'Expediente.pdf')}')" style="background:#e8f5ec;border:1.5px solid #2a7a4a;border-radius:8px;padding:8px 18px;cursor:pointer;font-family:monospace;font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;color:#0a4020;font-weight:700;" onmouseover="this.style.background='#c8f0d8'" onmouseout="this.style.background='#e8f5ec'">👁 Ver Exp. Digital</button>`:''}
         <button onclick="document.getElementById('_det-pend-ov').remove();abrirPendiente(${idx})" style="background:linear-gradient(135deg,#8c6518,#c8952a);border:none;border-radius:8px;padding:8px 20px;cursor:pointer;font-family:monospace;font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;color:#fff;font-weight:700;" onmouseover="this.style.opacity='0.88'" onmouseout="this.style.opacity='1'">✏ Editar</button>
       </div>
     </div>
@@ -18942,6 +19007,7 @@ async function syncEstadoSupabase(){
       escrituras:            D.escrituras            || [],
       recibosExcluidosCaja:  D.recibosExcluidosCaja  || [],
       preRecibos:            D.preRecibos            || [],
+      leyes:                 D.leyes                 || [],
       captura_meses:         capturaMesCargar() || D.captura_meses || {},
       retro_global:          window._retroGlobalActivo !== undefined
                              ? { activo: !!window._retroGlobalActivo }
@@ -19168,13 +19234,18 @@ function lexRealtimeConectar() {
       try {
         var _folioEl = payload.payload.folio;
         var _letraEl = payload.payload.letra || 'A';
+        // Usar el ts del payload (momento real de la eliminación), no Date.now().
+        // Si el broadcast llega tarde o es reproducido en una reconexión Realtime
+        // — después de que el folio ya fue reparado con _revivedTs — un ts fresco
+        // post-dataría la resurrección y el tombstone ganaría. Con el ts original
+        // la comparación _revivedTs > ts funciona aunque el mensaje llegue diferido.
+        var _tsEliminacion = Number(payload.payload.ts || Date.now());
         // 1. Agregar tombstone local
         if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
         if (!appData.folios_eliminados.some(function(t){ return String(t.folio)===String(_folioEl) && t.letra===_letraEl; }))
-          appData.folios_eliminados.push({ folio: _folioEl, letra: _letraEl, ts: Date.now() });
+          appData.folios_eliminados.push({ folio: _folioEl, letra: _letraEl, ts: _tsEliminacion });
         // 2. Eliminar de recibos locales — respetando supersesión: si el recibo
         // local fue revivido DESPUÉS de esta eliminación, no se toca.
-        var _tsEliminacion = Number(payload.payload.ts || Date.now());
         if (Array.isArray(appData.recibos)) {
           appData.recibos = appData.recibos.filter(function(rec){
             var coincide = String(rec.folio)===String(_folioEl) && (rec.letra||'A')===_letraEl;
@@ -24174,6 +24245,153 @@ async function adminNormalizarNombresR2() {
   try { await actualizarArchivoControl(); } catch(e) {}
   try { await syncEstadoSupabase(); } catch(e) {}
   toast('✅ ' + renombrados + ' archivo(s) normalizados' + (errores ? ' · ' + errores + ' errores' : ''));
+}
+// ══════════════════════════════════════════════════════════════════
+// LIMPIAR PDFs HUÉRFANOS EN R2 — Elimina archivos sin recibo vinculado
+// ══════════════════════════════════════════════════════════════════
+async function adminLimpiarPDFsHuerfanos() {
+  if (!window.SB_DESPACHO_ID || typeof window.listarR2 !== 'function') {
+    toast('R2 no disponible', 'err'); return;
+  }
+
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(12,9,5,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML =
+    '<div style="background:var(--surface);border:1px solid var(--border-l);border-radius:var(--radius);width:560px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-lg);">' +
+      '<div style="padding:14px 18px;border-bottom:1px solid var(--border-l);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">' +
+        '<div style="font-size:0.88rem;font-weight:700;color:var(--ink);">🧹 Limpiar PDFs huérfanos en R2</div>' +
+        '<button style="font-size:1rem;background:none;border:none;cursor:pointer;color:var(--muted);" onclick="this.closest(\'[data-r2ov]\').remove()">✕</button>' +
+      '</div>' +
+      '<div id="r2h-body" style="flex:1;overflow-y:auto;padding:14px 16px;font-family:\'JetBrains Mono\',monospace;font-size:0.65rem;line-height:2;color:var(--ink);"></div>' +
+      '<div id="r2h-footer" style="padding:10px 16px;border-top:1px solid var(--border-l);flex-shrink:0;display:flex;gap:8px;justify-content:flex-end;"></div>' +
+    '</div>';
+  ov.dataset.r2ov = '1';
+  document.body.appendChild(ov);
+
+  const body   = document.getElementById('r2h-body');
+  const footer = document.getElementById('r2h-footer');
+
+  function _log(html, color) {
+    const d = document.createElement('div');
+    if (color) d.style.color = color;
+    d.innerHTML = html;
+    body.appendChild(d);
+    body.scrollTop = body.scrollHeight;
+  }
+  function _btnCerrar() {
+    footer.innerHTML = '<button onclick="this.closest(\'[data-r2ov]\').remove()" style="padding:6px 18px;border-radius:6px;border:1px solid var(--border-l);background:var(--surface);color:var(--ink);cursor:pointer;font-size:0.78rem;">Cerrar</button>';
+  }
+
+  try {
+    _log('📦 Listando archivos en R2…');
+    const prefix  = window.SB_DESPACHO_ID + '/recibos/';
+    const objetos = await window.listarR2(prefix, 'recibos');
+
+    if (!objetos || !objetos.length) {
+      _log('⚠ No se encontraron archivos en R2/recibos/', 'var(--rojo)');
+      _btnCerrar(); return;
+    }
+    _log('✓ <b>' + objetos.length + '</b> archivos encontrados en R2');
+
+    // Construir set de nombres conocidos por el sistema (archivoR2 y archivo)
+    const _arr1 = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
+    const _arr2 = (typeof REC !== 'undefined' && REC.recibos) ? REC.recibos : [];
+    const todosRecibos = Array.from(new Map(
+      [..._arr1, ..._arr2].filter(function(x){ return x && x.folio != null; })
+        .map(function(x){ return [x.folio + '|' + (x.letra || 'A'), x]; })
+    ).values());
+
+    const nombresVinculados = new Set();
+    todosRecibos.forEach(function(r) {
+      if (r.archivoR2) nombresVinculados.add(r.archivoR2.split('/').pop().toLowerCase());
+      if (r.archivo)   nombresVinculados.add(r.archivo.split('/').pop().toLowerCase());
+    });
+    _log('📄 Recibos en sistema: <b>' + todosRecibos.length + '</b> · Referencias: <b>' + nombresVinculados.size + '</b>');
+
+    // Clasificar cada archivo R2
+    const huerfanos  = [];
+    const vinculados = [];
+    objetos.forEach(function(obj) {
+      const key    = obj.key || obj.name || '';
+      const nombre = key.split('/').pop();
+      if (!nombre || !nombre.toLowerCase().endsWith('.pdf')) return;
+      if (nombresVinculados.has(nombre.toLowerCase())) {
+        vinculados.push(nombre);
+      } else {
+        huerfanos.push({ key: key, nombre: nombre, size: obj.size || 0 });
+      }
+    });
+
+    _log('✅ Vinculados: <b style="color:var(--verde)">' + vinculados.length + '</b> &nbsp;·&nbsp; Huérfanos: <b style="color:var(--rojo)">' + huerfanos.length + '</b>');
+
+    if (!huerfanos.length) {
+      _log('✓ No hay PDFs huérfanos. El bucket está limpio.', 'var(--verde)');
+      _btnCerrar(); return;
+    }
+
+    // Lista con checkboxes
+    const sep = document.createElement('hr');
+    sep.style.cssText = 'border:none;border-top:1px solid var(--border-l);margin:6px 0;';
+    body.appendChild(sep);
+    const lbl = document.createElement('div');
+    lbl.style.cssText = 'font-size:0.62rem;color:rgba(240,120,100,0.9);margin-bottom:4px;';
+    lbl.textContent = 'PDFs en R2 sin recibo vinculado en el sistema — selecciona los que quieres eliminar:';
+    body.appendChild(lbl);
+
+    const listDiv = document.createElement('div');
+    listDiv.style.cssText = 'display:flex;flex-direction:column;gap:3px;margin-bottom:6px;';
+    huerfanos.forEach(function(obj) {
+      var kb = obj.size ? ' (' + (obj.size / 1024).toFixed(1) + ' KB)' : '';
+      var row = document.createElement('label');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;padding:3px 6px;border-radius:4px;background:rgba(192,22,26,0.06);border:1px solid rgba(192,22,26,0.15);';
+      row.innerHTML = '<input type="checkbox" checked data-key="' + obj.key + '" style="accent-color:#e05555;cursor:pointer;flex-shrink:0;"><span style="flex:1;word-break:break-all;font-size:0.63rem;">' + obj.nombre + '</span><span style="color:var(--muted);flex-shrink:0;font-size:0.6rem;">' + kb + '</span>';
+      listDiv.appendChild(row);
+    });
+    body.appendChild(listDiv);
+    body.scrollTop = body.scrollHeight;
+
+    // Botones de acción
+    const btnCancel = document.createElement('button');
+    btnCancel.textContent = 'Cancelar';
+    btnCancel.style.cssText = 'padding:7px 14px;border-radius:6px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);cursor:pointer;font-size:0.78rem;';
+    btnCancel.onclick = function(){ ov.remove(); };
+
+    const btnDel = document.createElement('button');
+    btnDel.textContent = 'Eliminar seleccionados';
+    btnDel.style.cssText = 'padding:7px 18px;border-radius:6px;border:1.5px solid rgba(192,22,26,0.5);background:rgba(192,22,26,0.12);color:rgba(240,120,100,0.95);cursor:pointer;font-size:0.78rem;font-weight:600;';
+    btnDel.onclick = async function() {
+      const seleccionados = Array.from(listDiv.querySelectorAll('input[type=checkbox]:checked'))
+        .map(function(cb){ return cb.dataset.key; }).filter(Boolean);
+      if (!seleccionados.length) { toast('Selecciona al menos un archivo', 'err'); return; }
+      if (!confirm('¿Eliminar ' + seleccionados.length + ' PDF(s) de R2 de forma PERMANENTE?\n\nEsta acción no se puede deshacer.')) return;
+      btnDel.disabled = true;
+      btnCancel.disabled = true;
+      btnDel.textContent = '⏳ Eliminando…';
+      var ok = 0, err = 0;
+      for (var i = 0; i < seleccionados.length; i++) {
+        try {
+          var borrado = await window.borrarR2(seleccionados[i], 'recibos');
+          if (borrado) { ok++; } else { err++; }
+        } catch(e) { err++; console.warn('[limpiarR2]', seleccionados[i], e); }
+        btnDel.textContent = '⏳ Eliminando… ' + (ok + err) + '/' + seleccionados.length;
+        await new Promise(function(res){ setTimeout(res, 60); });
+      }
+      const sep2 = document.createElement('hr');
+      sep2.style.cssText = 'border:none;border-top:1px solid var(--border-l);margin:6px 0;';
+      body.appendChild(sep2);
+      _log('✅ Eliminados: <b style="color:var(--verde)">' + ok + '</b>' + (err ? ' &nbsp;·&nbsp; <b style="color:var(--rojo)">Errores: ' + err + '</b>' : ''));
+      toast('🧹 ' + ok + ' PDFs huérfanos eliminados' + (err ? ' · ' + err + ' errores' : ''));
+      _btnCerrar();
+    };
+
+    footer.appendChild(btnCancel);
+    footer.appendChild(btnDel);
+
+  } catch(e) {
+    _log('❌ Error: ' + e.message, 'var(--rojo)');
+    _btnCerrar();
+    console.error('[adminLimpiarPDFsHuerfanos]', e);
+  }
 }
 // ══════════════════════════════════════════════════════════════════
 // BORRAR MOVIMIENTOS POR FECHA — Eliminación permanente con sync garantizado
@@ -35186,7 +35404,7 @@ async function adminBorradoTotal(){
       const { error } = await window.SB.from('app_state')
         .update({
           data:{ movimientos:[], directorio:directorioActual, carpetas:[], juicios:[],
-                 pendientes:[], cierres:[], prestamos:[], saldoAcumulado:0 },
+                 pendientes:[], cierres:[], prestamos:[], saldoAcumulado:0, leyes:[] },
           recibos:{ folioActual:1, recibos:[] },
           folio_actual:1,
           sesiones_log:[]
@@ -38651,7 +38869,7 @@ function regresarAlFormulario(){
 
       <div style="flex:1;max-height:10px;"></div>
 
-      <button id="ficha-btn-exp-digital" onclick="cerrarFichaFolio();setTimeout(abrirVincularArchivo,200);" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #4a6ea8;background:#e6f1fb;color:#1a3a70;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#c8dcf4'" onmouseout="this.style.background='#e6f1fb'">
+      <button id="ficha-btn-exp-digital" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #4a6ea8;background:#e6f1fb;color:#1a3a70;font-family:'DM Mono',monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;" onmouseover="this.style.background='#c8dcf4'" onmouseout="this.style.background='#e6f1fb'">
         <span style="font-size:15px;line-height:1;">📋</span>Exp. Digital
       </button>
 
@@ -39012,8 +39230,18 @@ function abrirFichaFolio(){
     if(btnSC){   btnSC.disabled=false;  btnSC.style.opacity='1'; btnSC.style.cursor='pointer'; btnSC.title=''; btnSC.onmouseover=function(){ this.style.background='#fde8cc'; }; btnSC.onmouseout=function(){ this.style.background='#fff0e0'; }; }
     if(btnVinc){ btnVinc.disabled=false; btnVinc.style.opacity='1'; btnVinc.style.cursor='pointer'; btnVinc.title=''; btnVinc.onmouseover=function(){ this.style.background='#fde8a0'; }; btnVinc.onmouseout=function(){ this.style.background='#fff8e0'; }; }
   }
-  // Exp. Digital: siempre habilitado sin importar el estado del folio
-  if(btnExp){ btnExp.disabled=false; btnExp.style.opacity='1'; btnExp.style.cursor='pointer'; btnExp.title=''; }
+  // Exp. Digital: vehicular → abre expediente digital; no vehicular → vincula archivo
+  if(btnExp){
+    btnExp.disabled=false; btnExp.style.opacity='1'; btnExp.style.cursor='pointer';
+    var _esVehicular = !!(recibo && (recibo.placa || recibo.clase || recibo.marca));
+    if(_esVehicular){
+      btnExp.onclick = function(){ cerrarFichaFolio(); setTimeout(function(){ abrirExpDigitalVehiculo(reciboEnConsulta); }, 200); };
+      btnExp.title = 'Ver / gestionar expediente digital vehicular';
+    } else {
+      btnExp.onclick = function(){ cerrarFichaFolio(); setTimeout(abrirVincularArchivo, 200); };
+      btnExp.title = 'Vincular archivo digital';
+    }
+  }
   // Badge modo lectura
   var badgeLiq=document.getElementById('ficha-badge-liquidado');
   if(badgeLiq){
@@ -39033,6 +39261,244 @@ function abrirFichaFolio(){
   document.getElementById('modal-ficha-folio').style.display='flex';
   document.body.style.overflow='hidden';
 }
+
+// ═══════════════════════════════════════════════════════
+// EXPEDIENTE DIGITAL VEHICULAR
+// ═══════════════════════════════════════════════════════
+var _expDigState = { recibo: null, pendiente: null, archivos: [] };
+var EXP_DIGITAL_DRIVE_FOLDER = 'Expedientes-Vehiculares';
+
+async function _expDigObtenerCarpeta(token) {
+  var DRIVE_ROOT_ID = '1TtVVL0Jbw6BFkwLw8Wo1LZfxLN0I_ndU';
+  var carpId = localStorage.getItem('lex_expdig_carpeta_id');
+  if (!carpId) {
+    carpId = await driveObtenerOCrearCarpeta(token, EXP_DIGITAL_DRIVE_FOLDER, DRIVE_ROOT_ID);
+    if (carpId) localStorage.setItem('lex_expdig_carpeta_id', carpId);
+  }
+  return carpId;
+}
+
+async function _expDigSubirArchivo(token, blob, nombre, carpetaId) {
+  var meta = JSON.stringify({ name: nombre, parents: [carpetaId] });
+  var form = new FormData();
+  form.append('metadata', new Blob([meta], { type: 'application/json' }));
+  form.append('file', blob);
+  var r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: form
+  });
+  if (!r.ok) throw new Error('Error subiendo a Drive: ' + r.status);
+  return await r.json();
+}
+
+async function _expDigMergerPDF(archivos) {
+  var jsPDF = window.jspdf && window.jspdf.jsPDF;
+  if (!jsPDF) throw new Error('jsPDF no disponible');
+  var doc = new jsPDF({ unit: 'mm', format: 'letter', orientation: 'portrait' });
+  var primero = true;
+  for (var i = 0; i < archivos.length; i++) {
+    var f = archivos[i];
+    var buf = await f.arrayBuffer();
+    var ext = (f.name || '').split('.').pop().toLowerCase();
+    if (ext === 'pdf') {
+      try {
+        if (typeof pdfjsLib === 'undefined') throw new Error('PDF.js no disponible');
+        var pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+        for (var p = 1; p <= pdf.numPages; p++) {
+          var page = await pdf.getPage(p);
+          var vp = page.getViewport({ scale: 1.5 });
+          var canvas = document.createElement('canvas');
+          canvas.width = vp.width; canvas.height = vp.height;
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+          var imgData = canvas.toDataURL('image/jpeg', 0.85);
+          var pw = 215.9;
+          var ph = (vp.height / vp.width) * pw;
+          if (!primero) doc.addPage();
+          doc.addImage(imgData, 'JPEG', 0, 0, pw, Math.min(ph, 279.4));
+          primero = false;
+        }
+      } catch(e) { console.warn('[ExpDig] Pág PDF error:', e); }
+    } else {
+      var imgData2 = await new Promise(function(res, rej) {
+        var reader = new FileReader();
+        reader.onload = function(ev) { res(ev.target.result); };
+        reader.onerror = rej;
+        reader.readAsDataURL(f);
+      });
+      var img2 = await new Promise(function(res, rej) {
+        var im = new Image();
+        im.onload = function() { res(im); };
+        im.onerror = rej;
+        im.src = imgData2;
+      });
+      var iw = 215.9;
+      var ih = (img2.naturalHeight / img2.naturalWidth) * iw;
+      if (!primero) doc.addPage();
+      var fmt2 = (ext === 'jpg' || ext === 'jpeg') ? 'JPEG' : 'PNG';
+      doc.addImage(imgData2, fmt2, 0, 0, iw, Math.min(ih, 279.4));
+      primero = false;
+    }
+  }
+  return doc.output('blob');
+}
+
+function _expDigRenderStatus() {
+  var wrap = document.getElementById('exp-digital-status-wrap');
+  if (!wrap) return;
+  var r = _expDigState.recibo;
+  var estatus = (r && r.expDigital) ? (r.expDigital.estatus || 'sin_enviar') : 'sin_enviar';
+  var fecha = (r && r.expDigital) ? (r.expDigital.fecha || '') : '';
+  var btnVer = document.getElementById('exp-digital-btn-ver');
+  var btnEnv = document.getElementById('exp-digital-btn-enviar');
+  if (estatus === 'enviado') {
+    wrap.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;background:#d4f5e0;border:1px solid #2a9a50;color:#0a4020;border-radius:20px;padding:4px 14px;font-family:\'DM Mono\',monospace;font-size:0.72rem;font-weight:700;">✅ TRÁMITE ENVIADO PARA SU GESTIÓN' + (fecha ? ' · ' + fecha : '') + '</span>';
+    if (btnVer) btnVer.style.display = 'flex';
+    if (btnEnv) btnEnv.textContent = '🔄 Reenviar Expediente';
+  } else {
+    wrap.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;background:#fff3e0;border:1px solid #c8952a;color:#7a4010;border-radius:20px;padding:4px 14px;font-family:\'DM Mono\',monospace;font-size:0.72rem;font-weight:700;">⏳ TRÁMITE SIN ENVIAR A GESTIÓN</span>';
+    if (btnVer) btnVer.style.display = 'none';
+    if (btnEnv) btnEnv.textContent = '📤 Enviar Expediente';
+  }
+}
+
+function _expDigRenderArchivos() {
+  var lista = document.getElementById('exp-digital-lista-archivos');
+  if (!lista) return;
+  var archivos = _expDigState.archivos;
+  if (!archivos.length) {
+    lista.innerHTML = '<span style="color:#aaa;font-style:italic;">Sin archivos seleccionados</span>';
+    return;
+  }
+  lista.innerHTML = archivos.map(function(f, i) {
+    var sz = f.size > 1048576 ? (f.size/1048576).toFixed(1)+'MB' : (f.size/1024).toFixed(0)+'KB';
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee;">'
+      + '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (i+1) + '. ' + f.name + '</span>'
+      + '<span style="color:#888;margin:0 8px;font-size:0.65rem;">' + sz + '</span>'
+      + '<button onclick="_expDigQuitarArchivo('+i+')" style="background:rgba(200,50,50,0.1);border:1px solid rgba(200,50,50,0.3);color:#c03030;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:0.7rem;">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+function _expDigQuitarArchivo(idx) {
+  _expDigState.archivos.splice(idx, 1);
+  _expDigRenderArchivos();
+}
+
+function _expDigOnFileChange(event) {
+  Array.from(event.target.files || []).forEach(function(f) { _expDigState.archivos.push(f); });
+  event.target.value = '';
+  _expDigRenderArchivos();
+}
+
+function abrirExpDigitalVehiculo(recibo) {
+  if (!recibo) { if(typeof toast==='function') toast('Sin recibo en contexto','err'); return; }
+  _expDigState.recibo = recibo;
+  _expDigState.pendiente = (typeof D !== 'undefined' && Array.isArray(D.pendientes))
+    ? D.pendientes.find(function(p){ return p.seccion==='placas' && Number(p.reciboVinculadoFolio)===Number(recibo.folio); }) || null
+    : null;
+  _expDigState.archivos = [];
+  var infoEl = document.getElementById('exp-digital-info-veh');
+  if (infoEl) {
+    var partes = [];
+    if (recibo.nombre) partes.push('👤 ' + recibo.nombre);
+    if (recibo.clase) partes.push('🚗 ' + recibo.clase);
+    if (recibo.marca) partes.push(recibo.marca);
+    if (recibo.placa) partes.push('Placa: ' + recibo.placa);
+    var folStr = (typeof folioConLetra==='function')
+      ? folioConLetra(recibo.folio, recibo.anio_folio||new Date().getFullYear(), recibo.letra||'A')
+      : (recibo.folio + (recibo.letra||'A'));
+    partes.push('Folio #' + folStr);
+    infoEl.textContent = partes.join('  ·  ');
+  }
+  _expDigRenderStatus();
+  _expDigRenderArchivos();
+  var prog = document.getElementById('exp-digital-progress');
+  if (prog) { prog.style.display = 'none'; prog.textContent = ''; prog.style.color = '#4a6ea8'; }
+  document.getElementById('modal-exp-digital-placas').style.display = 'flex';
+}
+
+function cerrarExpDigital() {
+  var modal = document.getElementById('modal-exp-digital-placas');
+  if (modal) modal.style.display = 'none';
+  _expDigState.archivos = [];
+}
+
+async function _expDigEnviar() {
+  var r = _expDigState.recibo;
+  if (!r) return;
+  var archivos = _expDigState.archivos;
+  if (!archivos.length) {
+    if(typeof toast==='function') toast('⚠ Adjunta al menos un archivo antes de enviar','err');
+    return;
+  }
+  var btn = document.getElementById('exp-digital-btn-enviar');
+  var prog = document.getElementById('exp-digital-progress');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Procesando...'; }
+  if (prog) { prog.style.display = 'block'; prog.style.color = '#4a6ea8'; prog.textContent = 'Unificando archivos en PDF...'; }
+  try {
+    var pdfBlob = await _expDigMergerPDF(archivos);
+    if (prog) prog.textContent = 'Conectando con Google Drive...';
+    var token = await driveGetAccessToken();
+    if (!token) throw new Error('Sin acceso a Google Drive. Autoriza en el Panel Admin.');
+    if (prog) prog.textContent = 'Preparando carpeta en Drive...';
+    var carpetaId = await _expDigObtenerCarpeta(token);
+    if (!carpetaId) throw new Error('No se pudo crear la carpeta en Drive');
+    var nombreCliente = (r.nombre || 'Cliente').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g,'').trim().replace(/\s+/g,'-').substring(0,30);
+    var folStr2 = (typeof folioConLetra==='function')
+      ? folioConLetra(r.folio, r.anio_folio||new Date().getFullYear(), r.letra||'A')
+      : (r.folio + (r.letra||'A'));
+    var fechaHoy = new Date().toLocaleDateString('es-MX',{timeZone:'America/Mexico_City',year:'numeric',month:'2-digit',day:'2-digit'}).split('/').reverse().join('-');
+    var nombrePDF = 'ExpVeh-' + nombreCliente + '-F' + folStr2 + '-' + fechaHoy + '.pdf';
+    if (prog) prog.textContent = 'Subiendo expediente a Drive...';
+    var resultado = await _expDigSubirArchivo(token, pdfBlob, nombrePDF, carpetaId);
+    if (!resultado || !resultado.id) throw new Error('Error al subir el PDF a Drive');
+    if (!r.expDigital) r.expDigital = {};
+    r.expDigital.estatus = 'enviado';
+    r.expDigital.driveFileId = resultado.id;
+    r.expDigital.fecha = fechaHoy;
+    r.expDigital.nombreArchivo = nombrePDF;
+    if (_expDigState.pendiente) {
+      _expDigState.pendiente.estatusGestion = 'enviado';
+      _expDigState.pendiente.expDigitalDriveFileId = resultado.id;
+      _expDigState.pendiente.expDigitalFechaEnvio = fechaHoy;
+      _expDigState.pendiente.expDigitalNombreArchivo = nombrePDF;
+    }
+    if (typeof save === 'function') save();
+    if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
+    if (prog) { prog.style.color = '#2a7a4a'; prog.textContent = '✅ Expediente enviado y guardado en Drive'; }
+    _expDigState.archivos = [];
+    _expDigRenderStatus();
+    _expDigRenderArchivos();
+    if(typeof toast==='function') toast('✅ Expediente enviado a Drive','ok');
+  } catch(e) {
+    console.error('[ExpDig]', e);
+    if (prog) { prog.style.color = '#c03030'; prog.textContent = '✗ Error: ' + e.message; }
+    if(typeof toast==='function') toast('Error: ' + e.message,'err');
+  }
+  if (btn) { btn.disabled = false; }
+  _expDigRenderStatus();
+}
+
+async function _expDigVerExpediente() {
+  var r = _expDigState.recibo;
+  if (!r || !r.expDigital || !r.expDigital.driveFileId) {
+    if(typeof toast==='function') toast('Sin expediente disponible en Drive','err');
+    return;
+  }
+  _expDigVerDesdeId(r.expDigital.driveFileId, r.expDigital.nombreArchivo || 'Expediente-Vehicular.pdf');
+}
+
+function _expDigVerDesdeId(driveFileId, nombreArchivo) {
+  if (!driveFileId) { if(typeof toast==='function') toast('Sin expediente disponible en Drive','err'); return; }
+  if (typeof verAcuerdoPDF === 'function') {
+    cerrarExpDigital();
+    verAcuerdoPDF(driveFileId, encodeURIComponent(nombreArchivo || 'Expediente-Vehicular.pdf'));
+  } else {
+    window.open('https://drive.google.com/file/d/' + driveFileId + '/view', '_blank');
+  }
+}
+// ═══════════════════════════════════════════════════════
+// FIN EXPEDIENTE DIGITAL VEHICULAR
+// ═══════════════════════════════════════════════════════
 
 function cerrarFichaFolio(){
   document.getElementById('modal-ficha-folio').style.display='none';
@@ -39554,8 +40020,18 @@ function guardarEntradaHistorial(){
 // Las leyes del despacho se guardan en localStorage como array de objetos {nombre, path}
 // Cada juicio guarda en j.leyesActivas = [nombre, nombre, ...]
 
-function getLeyesDespacho(){ return JSON.parse(localStorage.getItem('lex-leyes-despacho')||'[]'); }
-function setLeyesDespacho(arr){ localStorage.setItem('lex-leyes-despacho', JSON.stringify(arr)); }
+function getLeyesDespacho(){
+  // D.leyes es la fuente de verdad (sincronizado en Supabase); localStorage es caché local.
+  if (typeof D !== 'undefined' && Array.isArray(D.leyes) && D.leyes.length) return D.leyes;
+  return JSON.parse(localStorage.getItem('lex-leyes-despacho') || '[]');
+}
+function setLeyesDespacho(arr){
+  localStorage.setItem('lex-leyes-despacho', JSON.stringify(arr));
+  if (typeof D !== 'undefined') D.leyes = arr;
+  // Sincronizar a Supabase para que todos los dispositivos reciban el catálogo actualizado
+  if (typeof syncEstadoSupabaseDebounced === 'function')
+    setTimeout(function(){ syncEstadoSupabaseDebounced(); }, 300);
+}
 
 function actualizarContadorLeyes(){
   const j = D.juicios[_mexpIdx];
@@ -39571,6 +40047,17 @@ function abrirModalLeyes(){
   const modal = $('modal-leyes-caso');
   modal.style.display = 'flex';
   renderListaLeyes();
+  // Refrescar catálogo desde Drive en background para mantener todos los dispositivos al día
+  _leyesListarDrive().then(function(driveLista) {
+    if (!driveLista || !driveLista.length) return;
+    const local = getLeyesDespacho();
+    driveLista.forEach(function(d) {
+      const m = local.find(function(l){ return l.driveFileId === d.driveFileId; });
+      if (m) d.sha256 = m.sha256 || '';
+    });
+    setLeyesDespacho(driveLista);
+    renderListaLeyes();
+  }).catch(function(){});
 }
 
 function cerrarModalLeyes(){
@@ -39891,8 +40378,15 @@ function _flujoInicializarBtn() {
 }
 
 // Abrir selector de ley para generar flujo
-function abrirSelectorFlujo() {
-  const leyes = getLeyesDespacho();
+async function abrirSelectorFlujo() {
+  let leyes = getLeyesDespacho();
+  // Si no hay leyes en caché, intentar Drive antes de rechazar
+  if (!leyes.length) {
+    try {
+      const driveLista = await _leyesListarDrive();
+      if (driveLista.length) { setLeyesDespacho(driveLista); leyes = driveLista; }
+    } catch(e) {}
+  }
   if (!leyes.length) {
     if (typeof toast === 'function') toast('⚠ Primero carga leyes en "Cargar Leyes"', 'err');
     return;

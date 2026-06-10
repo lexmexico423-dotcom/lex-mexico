@@ -6239,7 +6239,7 @@ async function obtenerDespachoActivo(){
   await sb.from('miembros').insert({ despacho_id: d.id, user_id: user.id, rol: 'admin', nombre: user.email.split('@')[0] });
   await sb.from('app_state').insert({
     despacho_id: d.id,
-    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0},
+    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]},
     recibos: {folioActual:1, recibos:[]}
   });
   window.SB_DESPACHO_ID = d.id;
@@ -6687,7 +6687,7 @@ async function sincronizarFolio(forzarSB){
         console.log('[SB] No hay estado previo — creando inicial...');
         await window.SB.from('app_state').insert({
           despacho_id: window.SB_DESPACHO_ID,
-          data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0},
+          data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]},
           recibos: {folioActual:1, recibos:[]},
           folio_actual: 100
         });
@@ -6818,6 +6818,15 @@ async function sincronizarFolio(forzarSB){
         D.escrituras            = data.data.escrituras    || [];
         D.recibosExcluidosCaja  = data.data.recibosExcluidosCaja || [];
         D.preRecibos            = data.data.preRecibos           || [];
+        // Catálogo de leyes del despacho — compartido entre todos los dispositivos
+        if (Array.isArray(data.data.leyes) && data.data.leyes.length) {
+          D.leyes = data.data.leyes;
+          localStorage.setItem('lex-leyes-despacho', JSON.stringify(D.leyes));
+        } else if (!D.leyes || !D.leyes.length) {
+          // Migración: si hay leyes en localStorage pero aún no en SB, conservarlas
+          const _localLeyes = JSON.parse(localStorage.getItem('lex-leyes-despacho') || '[]');
+          if (_localLeyes.length) D.leyes = _localLeyes;
+        }
 
         if(data.data.retro_global !== undefined) D.retro_global = data.data.retro_global;
         // Migrar pendientes legacy: marca/clase → vehMarca/vehClase
@@ -7031,7 +7040,7 @@ async function crearArchivoControl(){
   if(!window.SB || !window.SB_DESPACHO_ID) return 'supabase';
   const { error } = await window.SB.from('app_state').upsert({
     despacho_id: window.SB_DESPACHO_ID,
-    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0},
+    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]},
     recibos: { folioActual:1, anioFolioActual: new Date().getFullYear(), recibos:[] },
     folio_actual: 100
   });
@@ -12233,7 +12242,7 @@ let driveFoldersCache=[]; // cache de carpetas de Drive vinculadas a juicios
 let driveFolderSeleccionado=null; // {id, name} carpeta seleccionada en modal
 let acuerdoPDFPendiente=null; // File object pendiente de subir
 // ═══ ESTADO ═══
-let D={movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0};
+let D={movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]};
 let REC={folioActual:100,recibos:[]}; // Se sobrescribe con datos de Drive al conectar
 let filtroC='todo',filtroDT='todos',filtroCT='todas',filtroJ='todos',filtroP='activos',filtroSeccion='todas',modo='ingreso';
 let eiC=-1,eiK=-1,eiJ=-1,eiP=-1;
@@ -18954,6 +18963,7 @@ async function syncEstadoSupabase(){
       escrituras:            D.escrituras            || [],
       recibosExcluidosCaja:  D.recibosExcluidosCaja  || [],
       preRecibos:            D.preRecibos            || [],
+      leyes:                 D.leyes                 || [],
       captura_meses:         capturaMesCargar() || D.captura_meses || {},
       retro_global:          window._retroGlobalActivo !== undefined
                              ? { activo: !!window._retroGlobalActivo }
@@ -35350,7 +35360,7 @@ async function adminBorradoTotal(){
       const { error } = await window.SB.from('app_state')
         .update({
           data:{ movimientos:[], directorio:directorioActual, carpetas:[], juicios:[],
-                 pendientes:[], cierres:[], prestamos:[], saldoAcumulado:0 },
+                 pendientes:[], cierres:[], prestamos:[], saldoAcumulado:0, leyes:[] },
           recibos:{ folioActual:1, recibos:[] },
           folio_actual:1,
           sesiones_log:[]
@@ -39718,8 +39728,18 @@ function guardarEntradaHistorial(){
 // Las leyes del despacho se guardan en localStorage como array de objetos {nombre, path}
 // Cada juicio guarda en j.leyesActivas = [nombre, nombre, ...]
 
-function getLeyesDespacho(){ return JSON.parse(localStorage.getItem('lex-leyes-despacho')||'[]'); }
-function setLeyesDespacho(arr){ localStorage.setItem('lex-leyes-despacho', JSON.stringify(arr)); }
+function getLeyesDespacho(){
+  // D.leyes es la fuente de verdad (sincronizado en Supabase); localStorage es caché local.
+  if (typeof D !== 'undefined' && Array.isArray(D.leyes) && D.leyes.length) return D.leyes;
+  return JSON.parse(localStorage.getItem('lex-leyes-despacho') || '[]');
+}
+function setLeyesDespacho(arr){
+  localStorage.setItem('lex-leyes-despacho', JSON.stringify(arr));
+  if (typeof D !== 'undefined') D.leyes = arr;
+  // Sincronizar a Supabase para que todos los dispositivos reciban el catálogo actualizado
+  if (typeof syncEstadoSupabaseDebounced === 'function')
+    setTimeout(function(){ syncEstadoSupabaseDebounced(); }, 300);
+}
 
 function actualizarContadorLeyes(){
   const j = D.juicios[_mexpIdx];
@@ -39735,6 +39755,17 @@ function abrirModalLeyes(){
   const modal = $('modal-leyes-caso');
   modal.style.display = 'flex';
   renderListaLeyes();
+  // Refrescar catálogo desde Drive en background para mantener todos los dispositivos al día
+  _leyesListarDrive().then(function(driveLista) {
+    if (!driveLista || !driveLista.length) return;
+    const local = getLeyesDespacho();
+    driveLista.forEach(function(d) {
+      const m = local.find(function(l){ return l.driveFileId === d.driveFileId; });
+      if (m) d.sha256 = m.sha256 || '';
+    });
+    setLeyesDespacho(driveLista);
+    renderListaLeyes();
+  }).catch(function(){});
 }
 
 function cerrarModalLeyes(){
@@ -40055,8 +40086,15 @@ function _flujoInicializarBtn() {
 }
 
 // Abrir selector de ley para generar flujo
-function abrirSelectorFlujo() {
-  const leyes = getLeyesDespacho();
+async function abrirSelectorFlujo() {
+  let leyes = getLeyesDespacho();
+  // Si no hay leyes en caché, intentar Drive antes de rechazar
+  if (!leyes.length) {
+    try {
+      const driveLista = await _leyesListarDrive();
+      if (driveLista.length) { setLeyesDespacho(driveLista); leyes = driveLista; }
+    } catch(e) {}
+  }
   if (!leyes.length) {
     if (typeof toast === 'function') toast('⚠ Primero carga leyes en "Cargar Leyes"', 'err');
     return;

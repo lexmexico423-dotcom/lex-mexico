@@ -3217,6 +3217,14 @@ window.addEventListener('offline', ()=>{
             <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a0e8e8;text-align:center;line-height:1.3;">Normalizar<br>Nombres R2</div>
             <div style="font-family:monospace;font-size:0.5rem;color:rgba(160,232,232,0.6);text-align:center;line-height:1.4;padding:0 4px;">Renombra PDFs de formato antiguo (Recibo_26-083A_NOMBRE.pdf) al nuevo (26-083A_NOMBRE.pdf) y actualiza los vínculos en los recibos</div>
           </div>
+          <!-- Migrar a Folios Infinitos -->
+          <div onclick="adminMigrarFoliosInfinitos()" style="position:relative;background:rgba(122,42,26,0.12);border:1.5px solid rgba(200,100,42,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#c8642a';this.style.boxShadow='0 8px 20px rgba(200,100,42,0.25)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(200,100,42,0.35)';this.style.boxShadow=''">
+            <div style="width:60px;height:60px;border-radius:14px;background:#3a1a0a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">∞</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#e8c0a0;text-align:center;line-height:1.3;">Migrar a<br>Folios Infinitos</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(232,192,160,0.6);text-align:center;line-height:1.4;padding:0 4px;">Renumera TODOS los recibos de 26-083A a 1A,2A,3A… Regenera PDFs y actualiza R2, Supabase y datos locales. IRREVERSIBLE.</div>
+          </div>
         </div><!-- /grid -->
       </div><!-- /admin-modal-body -->
       <div class="admin-modal-ftr">
@@ -7219,14 +7227,9 @@ async function guardarEnDirectorio(datos){
 // ── FOLIO DISPLAY ────────────────────────────────────────────────
 // Formato: AA-NN (año 2 dígitos + número sin padding fijo, mínimo 2 dígitos)
 // Ejemplos: 26-01, 26-10, 26-100, 26-1000
-// El año en folioFormato puede venir del recibo (anio_folio) o del año actual
+// Formato de folio: número consecutivo infinito sin año (1, 2, 3 …)
 function folioFormato(num, anioFolio){
-  const anio = anioFolio
-    ? String(anioFolio).slice(-2)
-    : new Date().getFullYear().toString().slice(2);
-  const n = Number(num);
-  // Padding de 3 dígitos: 26-001 a 26-999
-  return anio + '-' + String(n).padStart(3, '0');
+  return String(Number(num));
 }
 // Devuelve la letra de versión de un recibo: A (original), B (1ra actualización), etc.
 // Cuenta solo entradas que NO son 'Original' para derivar la versión correctamente.
@@ -7235,10 +7238,9 @@ function letraVersion(recibo){
   const n = (recibo.fechasImpresion || []).filter(f => f.etiqueta !== 'Original').length;
   return String.fromCharCode(65 + n); // 0=A, 1=B, 2=C...
 }
-// Devuelve el folio con su letra de versión: "26-001A", "26-001B", etc.
-// Si letra es null/undefined asume 'A' (recibos existentes sin versión).
+// Devuelve el folio con su letra de versión: "1A", "1B", "130A", etc.
 function folioConLetra(num, anioFolio, letra){
-  return folioFormato(num, anioFolio) + (letra || 'A');
+  return String(Number(num)) + (letra || 'A');
 }
 // Busca un recibo en appData por número de folio y devuelve su letra actual.
 // Usa recibo.letra (campo guardado) o lo computa con letraVersion(); default 'A'.
@@ -8086,10 +8088,7 @@ async function generarPDF(datos,folio,qrDataURL){
       const _inicialesResp = (datos.responsable||'').trim().split(/\s+/)
         .map(w=>(w[0]||'').toUpperCase()).join('').slice(0,4)||'—';
       // Folio original con letra A (referencia del recibo original)
-      const _folioOrig = datos.folio
-        ? (datos.anio_folio||new Date().getFullYear()).toString().slice(-2)+'-'+
-          String(datos.folio).padStart(3,'0')+'A'
-        : '';
+      const _folioOrig = datos.folio ? folioConLetra(datos.folio, datos.anio_folio, 'A') : '';
       // Descripción: "DEL RECIBO ORIGINAL*INICIALES FECHA HORA (26-001A)"
       const _fechaHoraOrig = (datos.fecha_recibo||'') + (datos.hora_recibo?' '+datos.hora_recibo:'');
       const descAnticipo = 'DEL RECIBO ORIGINAL*'+_inicialesResp+
@@ -23919,6 +23918,187 @@ async function adminMarcaPagadoPDFs(){
   try { await syncEstadoSupabase(); } catch(e){}
   toast('✅ ' + ok + ' PDFs con marca PAGADO' + (err ? ' · ' + err + ' errores' : ''));
 }
+// ══════════════════════════════════════════════════════════════════
+// MIGRAR A FOLIOS INFINITOS — Renumera todos los recibos 26-083A → 1A, 2A, 3A…
+// Regenera todos los PDFs y actualiza R2, Supabase y datos locales.
+// ══════════════════════════════════════════════════════════════════
+async function adminMigrarFoliosInfinitos() {
+  var _arr1 = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
+  var _arr2 = (typeof REC !== 'undefined' && REC.recibos) ? REC.recibos : [];
+  var _todos = [..._arr1, ..._arr2].filter(function(r){ return r && r.folio != null; });
+
+  // ─── 1. Identificar folios base únicos (folio + año, ignorando letra) ───
+  var baseSet = new Map(); // "folio|anio" → {oldFolio, oldAnio}
+  _todos.forEach(function(r) {
+    var k = String(r.folio) + '|' + (r.anio_folio || 0);
+    if (!baseSet.has(k)) baseSet.set(k, { oldFolio: r.folio, oldAnio: r.anio_folio || 0 });
+  });
+
+  var bases = [...baseSet.values()].sort(function(a, b) {
+    return a.oldAnio !== b.oldAnio ? a.oldAnio - b.oldAnio : a.oldFolio - b.oldFolio;
+  });
+
+  if (!bases.length) { toast('No hay recibos para migrar', 'err'); return; }
+
+  // ─── 2. Asignar nuevos números 1, 2, 3… ──────────────────────────────────
+  var mapping = new Map(); // "folio|anio" → newFolio
+  bases.forEach(function(b, i) { mapping.set(String(b.oldFolio) + '|' + b.oldAnio, i + 1); });
+
+  // ─── 3. Preview y confirmación ───────────────────────────────────────────
+  var prevItems = bases.slice(0, 6).map(function(b) {
+    var nF = mapping.get(String(b.oldFolio) + '|' + b.oldAnio);
+    var anio2 = b.oldAnio ? String(b.oldAnio).slice(-2) : '??';
+    return '#' + anio2 + '-' + String(b.oldFolio).padStart(3,'0') + 'A → #' + nF + 'A';
+  });
+  if (!confirm(
+    'MIGRACIÓN A FOLIOS INFINITOS\n\n' +
+    bases.length + ' folios únicos · ' + _todos.length + ' versiones totales\n\n' +
+    'Primeros cambios:\n' + prevItems.join('\n') + (bases.length > 6 ? '\n…' : '') +
+    '\n\n⚠ IRREVERSIBLE: renumera datos y regenera TODOS los PDFs.\n¿Continuar?'
+  )) return;
+
+  // ─── 4. Helper: texto → reemplaza "#26-083A" → "#83A" ───────────────────
+  function _fixTxt(txt) {
+    if (!txt) return txt;
+    return txt.replace(/#(\d{2})-(\d{3})([A-Za-z])/g, function(m, a2, f3, l) {
+      var nF = mapping.get(String(parseInt(f3)) + '|' + (2000 + parseInt(a2)));
+      return nF != null ? '#' + nF + l.toUpperCase() : m;
+    });
+  }
+
+  // Helper: buscar nueva asignación cuando el año no está disponible en la entidad
+  function _mapFolioUnico(oldFolio) {
+    if (oldFolio == null) return null;
+    var cands = [...mapping.entries()].filter(function(e){ return e[0].startsWith(String(oldFolio) + '|'); });
+    return cands.length === 1 ? cands[0][1] : null;
+  }
+
+  // ─── 5. Actualizar recibos ───────────────────────────────────────────────
+  // Construir lista deduplica con claves ORIGINALES antes de mutar
+  var seenR = new Set();
+  var reciboUpdates = [];
+  _todos.forEach(function(r) {
+    var uid = String(r.folio) + '|' + (r.anio_folio || 0) + '|' + (r.letra || letraVersion(r) || 'A');
+    if (seenR.has(uid)) return;
+    seenR.add(uid);
+    var k = String(r.folio) + '|' + (r.anio_folio || 0);
+    var nF = mapping.get(k);
+    if (nF != null) reciboUpdates.push({ r: r, oldFolio: r.folio, newFolio: nF });
+  });
+  reciboUpdates.forEach(function(u) {
+    var r = u.r, nF = u.newFolio;
+    r.folio = nF;
+    var letraR = r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A';
+    var fl = folioConLetra(nF, null, letraR);
+    r.archivo  = fl + '.pdf';
+    r.archivoR2 = typeof _nombreArchivoR2 === 'function' ? _nombreArchivoR2(fl, r.nombre || '') : fl + '.pdf';
+    if (r.folioRef      != null) { var x = _mapFolioUnico(r.folioRef);      if (x != null) r.folioRef      = x; }
+    if (r.folioAnterior != null) { var y = _mapFolioUnico(r.folioAnterior); if (y != null) r.folioAnterior = y; }
+  });
+
+  // ─── 6. Movimientos ─────────────────────────────────────────────────────
+  (D.movimientos || []).forEach(function(m) {
+    if (m.folio == null) return;
+    var oldF = m.folio;
+    var mAnio = m.fecha ? parseInt(String(m.fecha).split('-')[0]) : 0;
+    var nF = mapping.get(String(oldF) + '|' + mAnio);
+    if (nF == null) nF = _mapFolioUnico(oldF);
+    if (nF == null) return;
+    m.folio = nF;
+    if (m.id === 'M-REC-' + oldF) m.id = 'M-REC-' + nF;
+    m.cat         = _fixTxt(m.cat);
+    m.descripcion = _fixTxt(m.descripcion);
+  });
+
+  // ─── 7. Pendientes ──────────────────────────────────────────────────────
+  (D.pendientes || []).forEach(function(p) {
+    if (p.reciboVinculadoFolio == null) return;
+    var nF = _mapFolioUnico(p.reciboVinculadoFolio);
+    if (nF == null) return;
+    p.reciboVinculadoFolio = nF;
+    if (p.id && p.id.startsWith('PEND-REC-')) p.id = 'PEND-REC-' + nF;
+  });
+
+  // ─── 8. Gestiones ───────────────────────────────────────────────────────
+  (D.gestiones || []).forEach(function(g) {
+    (g.recibosOficiales || []).forEach(function(ro) {
+      if (ro.folio == null) return;
+      var nF = _mapFolioUnico(ro.folio);
+      if (nF == null) return;
+      ro.folio = nF;
+      var fl = folioConLetra(nF, null, 'A');
+      if (ro.archivo) ro.archivo = fl + '.pdf';
+    });
+  });
+
+  // ─── 9. historialPagos ──────────────────────────────────────────────────
+  if (appData.historialPagos) {
+    var nuevoHP = {};
+    Object.entries(appData.historialPagos).forEach(function(entry) {
+      var oldF = parseInt(entry[0]), arr = entry[1];
+      var nF = _mapFolioUnico(oldF) || oldF;
+      nuevoHP[nF] = (arr || []).map(function(p) {
+        if (p.folio == null) return p;
+        var pNF = _mapFolioUnico(p.folio);
+        return pNF != null ? Object.assign({}, p, { folio: pNF }) : p;
+      });
+    });
+    appData.historialPagos = nuevoHP;
+  }
+
+  // ─── 10. historialVersiones ─────────────────────────────────────────────
+  if (appData.historialVersiones) {
+    var nuevoHV = {};
+    Object.entries(appData.historialVersiones).forEach(function(entry) {
+      var oldF = parseInt(entry[0]);
+      var nF = _mapFolioUnico(oldF) || oldF;
+      nuevoHV[nF] = entry[1];
+    });
+    appData.historialVersiones = nuevoHV;
+  }
+
+  // ─── 11. folioActual ─────────────────────────────────────────────────────
+  var nuevoSig = bases.length + 1;
+  appData.folioActual = nuevoSig;
+  if (typeof REC !== 'undefined' && REC) REC.folioActual = nuevoSig;
+
+  // ─── 12. Persistir datos primero ─────────────────────────────────────────
+  if (typeof save === 'function') save();
+  try { await actualizarArchivoControl(); } catch(e) { console.warn('[migrarFolios] actualizarArchivoControl:', e); }
+
+  // ─── 13. Regenerar todos los PDFs ────────────────────────────────────────
+  var todosParaPDF = (appData.recibos || []).filter(function(r){ return r && !r.cancelado; });
+  var okPDF = 0, errPDF = 0;
+  for (var i = 0; i < todosParaPDF.length; i++) {
+    var r = todosParaPDF[i];
+    var letraR = r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A';
+    var fl = folioConLetra(r.folio, null, letraR);
+    toast('⏳ PDF ' + (i+1) + '/' + todosParaPDF.length + ' — #' + fl);
+    try {
+      var qrTxt = 'LEX-MEXICO|Folio:' + fl + '|' + (r.nombre||'') + '|' + (r.fecha_recibo||r.fecha||'');
+      var qrURL = typeof qrToDataURL === 'function' ? await qrToDataURL(qrTxt) : null;
+      var doc = await generarPDF(Object.assign({}, r, { letra: letraR }), r.folio, qrURL);
+      var pdfBlob = doc.output('blob');
+      r.pdfBase64 = doc.output('datauristring');
+      await subirPDFaDrive(pdfBlob, fl + '.pdf', r.archivoR2);
+      okPDF++;
+    } catch(e) {
+      console.warn('[migrarFolios] PDF folio', r.folio, e);
+      errPDF++;
+    }
+    await new Promise(function(res){ setTimeout(res, 100); });
+  }
+
+  // ─── 14. Guardar estado final ────────────────────────────────────────────
+  if (typeof save === 'function') save();
+  try { await actualizarArchivoControl(); } catch(e) {}
+  try { await syncEstadoSupabase(); } catch(e) {}
+  if (typeof renderContab     === 'function') renderContab();
+  if (typeof renderHistorial  === 'function') renderHistorial();
+  if (typeof badges           === 'function') badges();
+  toast('✅ Migración completa · ' + bases.length + ' folios · ' + okPDF + ' PDFs' + (errPDF ? ' · ' + errPDF + ' errores' : ''));
+}
+
 // ══════════════════════════════════════════════════════════════════
 // NORMALIZAR NOMBRES R2 — Renombra Recibo_26-083A_NOMBRE.pdf → 26-083A_NOMBRE.pdf
 // Actualiza archivoR2 en recibos que no lo tenían o tenían el nombre viejo

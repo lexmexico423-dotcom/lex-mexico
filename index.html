@@ -7116,6 +7116,7 @@ async function actualizarArchivoControl(){
         motivoCancelacion: r.motivoCancelacion||'',
         fechaCancelacion: r.fechaCancelacion||'',
         letra: r.letra||null,
+        archivoR2: r.archivoR2||null,
         esVersionAnterior: r.esVersionAnterior||false,
         esActualizacion: r.esActualizacion||false,
         fechaActualizacion: r.fechaActualizacion||null,
@@ -19013,7 +19014,7 @@ async function syncEstadoSupabase(){
       folioActual:       (typeof REC !== 'undefined' && REC.folioActual) ? REC.folioActual : (appData.folioActual || 100),
       anioFolioActual:   (appData.anioFolioActual || new Date().getFullYear()),
       folios_eliminados: appData.folios_eliminados || [],
-      recibos:           (appData.recibos || []).filter(function(r){ return !(appData.folios_eliminados||[]).some(function(t){ return typeof _tombstoneAplicaA === 'function' ? _tombstoneAplicaA(t, r) : (String(t.folio)===String(r.folio) && t.letra===(r.letra||'A')); }); })
+      recibos:           (appData.recibos || []).filter(function(r){ return !(appData.folios_eliminados||[]).some(function(t){ return typeof _tombstoneAplicaA === 'function' ? _tombstoneAplicaA(t, r) : (String(t.folio)===String(r.folio) && t.letra===(r.letra||'A')); }); }).map(function(r){ var c=Object.assign({},r); delete c.pdfBase64; return c; })
     };
     let _updBySy = null;
     try { _updBySy = (await Promise.race([window.SB.auth.getUser(), new Promise((_,rj)=>setTimeout(()=>rj(new Error('getUser timeout')),4000))])).data?.user?.id || null; } catch(_egu){}

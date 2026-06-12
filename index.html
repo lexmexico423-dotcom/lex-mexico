@@ -7001,6 +7001,8 @@ async function sincronizarFolio(forzarSB){
     if(typeof retroGlobalCargarSupabase==='function') retroGlobalCargarSupabase();
     // Auto-corregir letras de movimientos y paths R2 (silencioso, 8s después)
     if(typeof _autoCorregirLetrasR2 === 'function') _autoCorregirLetrasR2();
+    // Verificar y corregir movimientos con monto erróneo para recibos Sin Anticipo (con modal de confirmación)
+    if(typeof verificarYCorregirMovimientosSinAnticipo === 'function') setTimeout(verificarYCorregirMovimientosSinAnticipo, 1500);
     // Backup diario a R2 — corre silenciosamente 3s despues de cargar datos
     setTimeout(function(){ backupAppData().catch(function(e){ console.warn('[Backup] inicio:', e); }); }, 3000);
   } catch(e){
@@ -14235,8 +14237,13 @@ function renderCaja(){
     <td class="mono" style="font-size:0.68rem;color:var(--muted)">${m.hora||'—'}</td>
     <td>${esc(m.descripcion)}</td>
     <td style="white-space:nowrap;">${(()=>{
-      const est = m.estatus;
-      if(est){ const tc=est==='Liquidado'?'tag-v':est==='Anticipo'?'tag-b':est==='Abono parcial'?'tag-a':'tag-m'; return '<span class="tag '+tc+'" style="font-size:0.6rem;">'+est+'</span>'; }
+      // Fallback defensivo igual que _badgeEstatus: si recibo con anticipo=0, mostrar Sin Anticipo
+      let est = m.estatus;
+      if(!est && m.fuente==='recibo' && m.folio!=null){
+        const _rO=(typeof appData!=='undefined'?appData.recibos||[]:[]).find(r=>r.folio===m.folio&&!r.esComplemento&&(r.letra||'A')===(m.letra||'A'));
+        est = (_rO&&parseFloat(_rO.anticipo||0)===0) ? 'Sin Anticipo' : (m.monto>0?'Anticipo':'Pendiente');
+      } else if(!est){ est = m.monto>0?'Anticipo':'Pendiente'; }
+      if(est){ const tc=est==='Liquidado'?'tag-v':est==='Anticipo'?'tag-b':est==='Sin Anticipo'?'tag-sa':est==='Abono parcial'?'tag-a':'tag-m'; return '<span class="tag '+tc+'" style="font-size:0.6rem;">'+est+'</span>'; }
       return '<span class="tag '+(m.tipo==='ingreso'?'tag-v':'tag-r')+'" style="font-size:0.6rem;">'+(m.cat||m.tipo)+'</span>';
     })()}</td>
     <td style="font-size:0.68rem;color:var(--muted)">${esc(m.responsable||'—')}</td>
@@ -14320,13 +14327,16 @@ function _reciboAMovSintetico(r) {
   const anticipo     = parseFloat(r.anticipo || 0);
   const totalAbonado = parseFloat(r.totalAbonado || 0);
   const totalRec     = parseFloat(r.total || 0);
-  // monto = solo lo que realmente se cobró en este folio.
-  // Si anticipo=0 y total>0 → el cliente no dejó nada → monto=$0 (Sin Anticipo).
-  // totalAbonado solo se usa si tampoco hay anticipo explícito, para folios de abono posteriores.
-  const monto = anticipo > 0 ? anticipo : (totalAbonado > 0 ? totalAbonado : 0);
-  const liq   = r.saldoPendiente === 0 && (anticipo > 0 || totalAbonado > 0);
-  // "Sin Anticipo": recibo con total>0 pero sin pago inicial registrado
-  const sinAnticipo = monto === 0 && totalRec > 0;
+  // BUG FIX: monto = SOLO el anticipo inicial del recibo (lo cobrado al momento de emitirlo).
+  // NO usar totalAbonado como fallback — los abonos posteriores tienen sus propios
+  // movimientos reales en D.movimientos y suprimen este sintético vía _foliosYaEnCaja.
+  // Usar totalAbonado aquí inflaba el monto del sintético e inventaba un "Anticipo"/$X
+  // para recibos emitidos sin anticipo ($0) que luego recibieron abonos.
+  const monto = anticipo > 0 ? anticipo : 0;
+  // Usar parseFloat + <= 0 para evitar fallo cuando saldoPendiente viene como string "0"
+  const liq   = parseFloat(r.saldoPendiente || 0) <= 0 && totalRec > 0 && (anticipo > 0 || totalAbonado > 0);
+  // "Sin Anticipo": recibo con total>0 pero anticipo=0 al momento de emitirlo
+  const sinAnticipo = anticipo === 0 && totalRec > 0 && !liq;
   const fechaRec = (r.fecha && /^\d{4}-\d{2}-\d{2}/.test(r.fecha))
     ? r.fecha.substring(0, 10) : (r.fecha || '—');
   const _letraR = r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A';
@@ -14352,6 +14362,95 @@ function _reciboAMovSintetico(r) {
     responsable: r.generadoPor || r.responsable || '—'
   };
 }
+
+// ── TAREA 2: Modal de confirmación para cambios contables automáticos ──────────
+function confirmarCambioContable(opciones) {
+  // opciones: { titulo, descripcion, esError, mensajeError, onAplicar, onCancelar }
+  return new Promise(function(resolve) {
+    var id = '__modal_cambio_contable';
+    var prev = document.getElementById(id);
+    if (prev) prev.remove();
+    var esError = !!opciones.esError;
+    var errorHtml = esError
+      ? '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:10px 14px;margin:10px 0 4px;font-size:0.88rem;color:#7c5800;">'
+        + '<strong>⚠ Error detectado:</strong> ' + (opciones.mensajeError || opciones.descripcion)
+        + '<br><span style="font-size:0.82rem;color:#555;margin-top:4px;display:block;">Puedes resolverlo aquí mismo o pedirle ayuda a Claude para solucionarlo.</span>'
+        + '</div>'
+      : '';
+    var overlay = document.createElement('div');
+    overlay.id = id;
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:10px;padding:28px 30px;max-width:480px;width:92%;box-shadow:0 8px 40px rgba(0,0,0,0.28);font-family:inherit;">'
+      + '<h3 style="margin:0 0 10px;font-size:1.05rem;color:#2c3e50;">📋 ' + (opciones.titulo || 'Confirmación de cambio contable') + '</h3>'
+      + '<p style="margin:0 0 8px;font-size:0.92rem;color:#444;line-height:1.5;">' + opciones.descripcion + '</p>'
+      + errorHtml
+      + '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">'
+      + '<button id="__cc_cancelar" style="padding:8px 18px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;font-size:0.9rem;">Cancelar / Revisar manualmente</button>'
+      + '<button id="__cc_aplicar" style="padding:8px 18px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:0.9rem;font-weight:600;">Aplicar cambio</button>'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#__cc_aplicar').addEventListener('click', function() {
+      overlay.remove();
+      if (typeof opciones.onAplicar === 'function') opciones.onAplicar();
+      resolve(true);
+    });
+    overlay.querySelector('#__cc_cancelar').addEventListener('click', function() {
+      overlay.remove();
+      if (typeof opciones.onCancelar === 'function') opciones.onCancelar();
+      resolve(false);
+    });
+  });
+}
+
+// ── TAREA 1: Detecta movimientos reales con monto erróneo para recibos Sin Anticipo ──
+function _corregirMovimientosSinAnticipo() {
+  var movs    = (typeof D !== 'undefined' && D.movimientos) ? D.movimientos : [];
+  var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
+  var errores = [];
+  movs.forEach(function(m) {
+    if (m.fuente !== 'recibo' || !(m.monto > 0)) return;
+    var recOrig = recibos.find(function(r) {
+      return r.folio === m.folio && !r.esComplemento && (r.letra || 'A') === (m.letra || 'A');
+    });
+    if (!recOrig) return;
+    if (parseFloat(recOrig.anticipo || 0) !== 0) return;
+    errores.push({ mov: m, rec: recOrig });
+  });
+  return errores;
+}
+
+function verificarYCorregirMovimientosSinAnticipo() {
+  var errores = _corregirMovimientosSinAnticipo();
+  if (errores.length === 0) return;
+  var lista = errores.map(function(e) {
+    var folioStr = (typeof folioConLetra === 'function')
+      ? folioConLetra(e.rec.folio, e.rec.anio, e.rec.letra)
+      : ('#' + e.rec.folio + (e.rec.letra || 'A'));
+    return '• Recibo <strong>' + folioStr + '</strong>: movimiento registrado por $' + Number(e.mov.monto).toLocaleString('es-MX') + ' pero anticipo = $0.';
+  }).join('<br>');
+  confirmarCambioContable({
+    titulo: 'Corrección de movimientos Sin Anticipo',
+    descripcion: 'Se detectaron ' + errores.length + ' movimiento(s) en Caja/Contabilidad con monto incorrecto para recibos emitidos sin anticipo:<br><br>' + lista + '<br><br>¿Aplicar la corrección? El monto se ajustará a $0 y el estatus a "Sin Anticipo".',
+    esError: true,
+    mensajeError: errores.length + ' movimiento(s) tienen monto > $0 pero el recibo original se emitió sin anticipo ($0).',
+    onAplicar: function() {
+      errores.forEach(function(e) {
+        e.mov.monto   = 0;
+        e.mov.estatus = 'Sin Anticipo';
+      });
+      if (typeof save === 'function') save();
+      if (typeof renderCaja === 'function') renderCaja();
+      if (typeof renderContab === 'function') renderContab();
+      if (typeof syncEstadoSupabaseDebounced === 'function') setTimeout(syncEstadoSupabaseDebounced, 500);
+    },
+    onCancelar: function() {
+      console.info('[LEX] Corrección Sin Anticipo cancelada por el usuario.');
+    }
+  });
+}
+
 function getAllMovs() {
   const movsCaja  = _movimientosDeCaja();
   const excluidos = _foliosExcluidos();
@@ -14660,8 +14759,18 @@ function renderContab() {
       const _cls = m.tipo === 'egreso' ? 'tag-m' : 'tag-b';
       return `<span class="tag ${_cls}" style="font-size:0.54rem;">${_lbl}</span>`;
     }
-    // Fallback: monto>0 sin estatus → 'Anticipo'; monto=0 → 'Pendiente'
-    const est = m.estatus || (m.monto > 0 ? 'Anticipo' : 'Pendiente');
+    // Fallback defensivo: si el movimiento no tiene estatus, verificar el recibo original.
+    // Si el recibo fue emitido sin anticipo (anticipo=0), usar 'Sin Anticipo' aunque monto>0
+    // (esto cubre movimientos históricos creados con monto=total por error en lugar de monto=0).
+    const _estFallback = (function() {
+      if (m.fuente === 'recibo' && m.folio != null) {
+        const _recOrig = (typeof appData !== 'undefined' ? appData.recibos || [] : [])
+          .find(function(r){ return r.folio === m.folio && !r.esComplemento && (r.letra||'A') === (m.letra||'A'); });
+        if (_recOrig && parseFloat(_recOrig.anticipo || 0) === 0) return 'Sin Anticipo';
+      }
+      return m.monto > 0 ? 'Anticipo' : 'Pendiente';
+    })();
+    const est = m.estatus || _estFallback;
     // Etiquetas visibles al usuario — los valores internos no cambian
     const labelMap = {
       'Liquidado':    'Pago Total',

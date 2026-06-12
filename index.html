@@ -2828,7 +2828,7 @@ window.addEventListener('offline', ()=>{
       <div class="nav-item" id="nav-pendientes-gen" data-panel="pendientes" onclick="ir('pendientes');setPSec('manual',document.getElementById('pend-todas-btn'));document.getElementById('nav-placas').classList.remove('active');"><span class="ni">📌</span><span>Pendientes</span><span class="nav-badge amarillo" id="badgeP">?</span></div>
       <div class="nav-item" id="nav-placas" data-panel="pendientes" onclick="ir('pendientes');setPSec('placas',document.querySelector('#panel-pendientes .pend-sec-btn[data-sec=\'placas\']'));document.getElementById('nav-pendientes-gen').classList.remove('active');"><span class="ni">🚗</span><span>Placas</span><span class="nav-badge amarillo" id="badgePlacas" style="display:none;"></span></div>
       <div class="nav-item" onclick="ir('escrituras')" id="nav-escrituras"><span class="ni">📄</span><span>Escrituras</span><span class="nav-badge amarillo" id="badgeEscrituras" style="display:none;"></span></div>
-      <div class="nav-item" onclick="(function(){var o=document.getElementById('pr-overlay');if(o)o.remove();vslAbrir();})()" id="nav-vsl" style="display:none;border:1.5px solid rgba(200,149,42,0.35);background:rgba(200,149,42,0.07);"><span class="ni">👁</span><span>VSL</span></div>
+      <div class="nav-item" onclick="(function(){var o=document.getElementById('pr-overlay');if(o)o.remove();agendarCitaAbrir();})()" id="nav-citas" style="border:1.5px solid rgba(200,149,42,0.35);background:rgba(200,149,42,0.07);"><span class="ni">📅</span><span>Agendar Cita</span></div>
     </div>
   </div>
   <!-- ═══ BARRA CAPTURA RETROACTIVA (Admin + Secretaria) ═══ -->
@@ -2970,7 +2970,7 @@ window.addEventListener('offline', ()=>{
                onmouseout="this.style.transform='';this.style.borderColor='rgba(200,149,42,0.35)';this.style.boxShadow=''">
             <div style="width:60px;height:60px;border-radius:14px;background:#3a2800;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">🔗</div>
             <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#e8c875;text-align:center;line-height:1.3;">R2 Recovery<br>Center</div>
-            <div style="font-family:monospace;font-size:0.5rem;color:rgba(200,149,42,0.6);text-align:center;line-height:1.4;padding:0 4px;">Vincular PDFs huérfanos · Restaurar recibos eliminados con OCR · Recalcular contabilidad</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(200,149,42,0.6);text-align:center;line-height:1.4;padding:0 4px;">Vincular PDFs huérfanos de R2 a los recibos que no tienen ruta de archivo guardada.</div>
           </div>
           <!-- 2c. Regenerar PDFs Históricos -->
           <div onclick="adminRegenerarPDFsHistoricos()" style="position:relative;background:rgba(42,100,42,0.08);border:1.5px solid rgba(42,100,42,0.28);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
@@ -3120,6 +3120,42 @@ window.addEventListener('offline', ()=>{
             <div style="width:60px;height:60px;border-radius:14px;background:#1a2a5a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">🔢</div>
             <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a8c0ff;text-align:center;line-height:1.3;">Reparar<br>Folios</div>
             <div style="font-family:monospace;font-size:0.5rem;color:rgba(168,192,255,0.55);text-align:center;line-height:1.4;padding:0 4px;">Ej: borraste el folio #0130 y ahora hay un hueco en la secuencia (#0129, —, #0131). Esto reordena todos los folios para que queden consecutivos sin espacios vacíos</div>
+          </div>
+          <!-- 13b. Gestor de Folios (Insertar / Eliminar) -->
+          <div onclick="abrirGestorFolios()" style="position:relative;background:rgba(26,42,74,0.25);border:1.5px solid rgba(100,140,255,0.3);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#6488ff';this.style.boxShadow='0 8px 20px rgba(26,42,74,0.35)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(100,140,255,0.3)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:#1a2a5a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">↕️</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a8c0ff;text-align:center;line-height:1.3;">Gestor de<br>Folios</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(168,192,255,0.55);text-align:center;line-height:1.4;padding:0 4px;">Ej: se te olvidó capturar el folio #19 → inserta un espacio y los de arriba suben uno. O capturaste un recibo dos veces → elimínalo y decide si cerrar o dejar el hueco. Regenera los PDF con el folio nuevo sin tocar los datos</div>
+          </div>
+          <!-- 13c. Limpiar Duplicados R2 -->
+          <div onclick="adminLimpiarDuplicadosR2()" style="position:relative;background:rgba(26,60,26,0.22);border:1.5px solid rgba(77,202,106,0.3);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#4dca6a';this.style.boxShadow='0 8px 20px rgba(77,202,106,0.2)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(77,202,106,0.3)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:#1a4a1a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">🧹</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a0e8a0;text-align:center;line-height:1.3;">Limpiar<br>Duplicados R2</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(160,232,160,0.55);text-align:center;line-height:1.4;padding:0 4px;">Ej: un recibo quedó guardado dos veces en R2, como 72A.pdf y 72A_NOMBRE.pdf. Conserva el corto y borra el descriptivo, dejando un solo PDF por recibo. No toca los que tienen una sola versión</div>
+          </div>
+          <!-- 13d. Recuperar PDFs faltantes R2 -->
+          <div onclick="adminRecuperarPDFsFaltantesR2()" style="position:relative;background:rgba(200,149,42,0.1);border:1.5px solid rgba(200,149,42,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='var(--gold)';this.style.boxShadow='0 8px 20px rgba(200,149,42,0.25)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(200,149,42,0.35)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:linear-gradient(135deg,#8a6a1a,#c8952a);display:flex;align-items:center;justify-content:center;font-size:1.7rem;">📥</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#e8d4a0;text-align:center;line-height:1.3;">Recuperar PDFs<br>faltantes R2</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(232,212,160,0.6);text-align:center;line-height:1.4;padding:0 4px;">Ej: tienes muchos recibos en el sistema pero a varios les falta su PDF en R2. Regenera desde los datos del recibo y sube solo los que faltan, sin tocar los que ya están</div>
+          </div>
+          <!-- 13e. Vincular Historial ↔ Contabilidad -->
+          <div onclick="adminVincularHistorialContab()" style="position:relative;background:rgba(42,26,74,0.28);border:1.5px solid rgba(180,130,255,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
+               onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#b482ff';this.style.boxShadow='0 8px 20px rgba(130,80,255,0.25)'"
+               onmouseout="this.style.transform='';this.style.borderColor='rgba(180,130,255,0.35)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:linear-gradient(135deg,#2a1a4a,#4a2a8a);display:flex;align-items:center;justify-content:center;font-size:1.7rem;">🔗</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#d4b0ff;text-align:center;line-height:1.3;">Vincular Historial<br>↔ Contabilidad</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(212,176,255,0.55);text-align:center;line-height:1.4;padding:0 4px;">Repara los enlaces folio/letra entre los movimientos y sus recibos (sin tocar montos) y reordena el historial con el mismo criterio de fecha y folio que contabilidad. Reporta huérfanos y recibos sin movimiento</div>
           </div>
           <!-- 14. Auditoría -->
           <div onclick="adminAbrirAuditoria()" style="position:relative;background:rgba(42,26,74,0.3);border:1.5px solid rgba(180,130,255,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
@@ -4386,47 +4422,28 @@ window.addEventListener('offline', ()=>{
     </div><!-- fin panel-escrituras -->
 
     <!-- ══════════════════════════════════════════════════════
-         MODAL VSL — Vigilancia de Sesiones y Log
+         MODAL: AGENDAR CITA
     ═══════════════════════════════════════════════════════════ -->
-    <div id="vsl-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,6,2,0.82);z-index:9200;backdrop-filter:blur(3px);" onclick="if(event.target===this)vslCerrar()">
-      <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:min(820px,96vw);max-height:88vh;background:#1a1008;border:1.5px solid rgba(200,149,42,0.35);border-radius:18px;display:flex;flex-direction:column;overflow:hidden;">
-        <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid rgba(200,149,42,0.18);background:rgba(200,149,42,0.06);">
-          <span style="font-size:1.2rem;">👁</span>
-          <span style="font-family:'DM Mono',monospace;font-size:0.95rem;font-weight:700;color:#f0d080;letter-spacing:0.08em;">VIGILANCIA DE SESIONES — VSL</span>
-          <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <button onclick="vslGuardarDrive()" id="vsl-btn-drive" style="background:rgba(66,133,244,0.15);border:1px solid rgba(66,133,244,0.4);color:#8ab8f8;border-radius:8px;padding:4px 12px;font-size:0.7rem;cursor:pointer;font-family:'DM Mono',monospace;">📁 Guardar en Drive</button>
-            <button onclick="vslExportar()" style="background:rgba(26,122,58,0.12);border:1px solid rgba(26,122,58,0.3);color:#70c090;border-radius:8px;padding:4px 12px;font-size:0.7rem;cursor:pointer;font-family:'DM Mono',monospace;">📥 Exportar CSV</button>
-            <button onclick="vslLimpiar()" style="background:rgba(192,22,26,0.12);border:1px solid rgba(192,22,26,0.3);color:#e06060;border-radius:8px;padding:4px 12px;font-size:0.7rem;cursor:pointer;font-family:'DM Mono',monospace;">🗑 Limpiar log</button>
-            <button onclick="vslCerrar()" style="background:rgba(200,149,42,0.1);border:1px solid rgba(200,149,42,0.25);color:#c8952a;border-radius:8px;padding:4px 10px;font-size:0.8rem;cursor:pointer;">✕</button>
-          </div>
+    <div class="modal-ov" id="mAgendarCita"><div class="modal" id="mAgendarCitaInner" style="max-width:480px;">
+      <div class="modal-hdr"><h3>📅 Agendar Cita</h3><button class="modal-x" onclick="cerrar('mAgendarCita')">✕</button></div>
+      <div class="modal-body">
+        <div class="field"><label>Asunto / Título *</label><input id="citaTitulo" type="text" placeholder="Ej: Audiencia, firma de escritura, junta con cliente..."></div>
+        <div class="field"><label>👤 Cliente / Persona</label><input id="citaCliente" type="text" placeholder="Nombre del cliente o persona relacionada"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div class="field"><label>📅 Fecha *</label><input id="citaFecha" type="date"></div>
+          <div class="field"><label>🕐 Hora *</label><input id="citaHora" type="time" value="09:00"></div>
         </div>
-        <div id="vsl-drive-status" style="display:none;padding:6px 18px;font-family:'DM Mono',monospace;font-size:0.65rem;background:rgba(66,133,244,0.08);border-bottom:1px solid rgba(66,133,244,0.15);color:#8ab8f8;"></div>
-        <div style="display:flex;gap:8px;padding:10px 16px;flex-wrap:wrap;border-bottom:1px solid rgba(200,149,42,0.1);background:rgba(0,0,0,0.2);">
-          <input id="vsl-buscar" placeholder="🔍 Buscar usuario, folio o acción..." oninput="vslFiltrar()" style="flex:1;min-width:160px;background:rgba(200,149,42,0.07);border:1px solid rgba(200,149,42,0.2);border-radius:8px;padding:5px 10px;color:#fdfaf4;font-family:'DM Mono',monospace;font-size:0.7rem;outline:none;">
-          <select id="vsl-tipo" onchange="vslFiltrar()" style="background:#1a1008;border:1px solid rgba(200,149,42,0.25);border-radius:8px;padding:5px 10px;color:#d4b870;font-family:'DM Mono',monospace;font-size:0.7rem;cursor:pointer;">
-            <option value="">— Todos los tipos —</option>
-            <option value="login">🔑 Login</option>
-            <option value="navegacion">🧭 Navegación</option>
-            <option value="folio">📂 Folio abierto</option>
-            <option value="impresion">🖨 Impresión</option>
-            <option value="abono">💰 Abono</option>
-            <option value="cancelacion">🚫 Cancelación</option>
-            <option value="liquidacion">✅ Liquidación</option>
-            <option value="edicion">✏️ Edición</option>
-            <option value="complemento">📎 Complemento</option>
-          </select>
-          <select id="vsl-usuario" onchange="vslFiltrar()" style="background:#1a1008;border:1px solid rgba(200,149,42,0.25);border-radius:8px;padding:5px 10px;color:#d4b870;font-family:'DM Mono',monospace;font-size:0.7rem;cursor:pointer;">
-            <option value="">— Todos los usuarios —</option>
-          </select>
-        </div>
-        <div id="vsl-lista" style="flex:1;overflow-y:auto;padding:12px 16px;"></div>
-        <div style="padding:8px 16px;border-top:1px solid rgba(200,149,42,0.1);display:flex;justify-content:space-between;align-items:center;">
-          <span id="vsl-count" style="font-family:'DM Mono',monospace;font-size:0.6rem;color:rgba(200,149,42,0.4);"></span>
-          <span style="font-family:'DM Mono',monospace;font-size:0.58rem;color:rgba(200,149,42,0.25);">Solo visible para el Administrador</span>
-        </div>
+        <div class="field"><label>📍 Lugar / Dirección</label><input id="citaLugar" type="text" placeholder="Ej: Juzgado 3ro Civil, calle, ciudad..."></div>
+        <div class="field"><label>📝 Notas</label><textarea id="citaNotas" rows="3" placeholder="Detalles adicionales, documentos a llevar, etc."></textarea></div>
+        <div id="citaCalendarStatus" style="display:none;font-family:monospace;font-size:0.65rem;padding:7px 10px;border-radius:6px;margin-top:4px;"></div>
       </div>
-    </div>
-    <!-- fin modal VSL -->
+      <div class="modal-ftr">
+        <button class="btn btn-ghost" onclick="cerrar('mAgendarCita')">Cancelar</button>
+        <button class="btn" onclick="agendarCitaComoLlegar()" style="background:var(--azul-l);color:var(--azul);border:1px solid var(--azul);">📍 Cómo llegar</button>
+        <button class="btn btn-primary" onclick="agendarCitaGuardar()">💾 Guardar y agendar</button>
+      </div>
+    </div></div>
+    <!-- fin modal Agendar Cita -->
 
     <!-- ══════════════════════════════════════════════════════
          PANEL RECIBOS EN GESTIÓN
@@ -6848,6 +6865,7 @@ async function sincronizarFolio(forzarSB){
         D.directorio            = data.data.directorio    || [];
         D.carpetas              = data.data.carpetas      || [];
         D.pendientes            = sbPends;
+        D.citas                 = data.data.citas         || [];
         D.cierres               = data.data.cierres       || [];
         D.prestamos             = data.data.prestamos     || [];
         D.saldoAcumulado        = data.data.saldoAcumulado || 0;
@@ -6983,6 +7001,8 @@ async function sincronizarFolio(forzarSB){
     if(typeof retroGlobalCargarSupabase==='function') retroGlobalCargarSupabase();
     // Auto-corregir letras de movimientos y paths R2 (silencioso, 8s después)
     if(typeof _autoCorregirLetrasR2 === 'function') _autoCorregirLetrasR2();
+    // Verificar y corregir movimientos con monto erróneo para recibos Sin Anticipo (con modal de confirmación)
+    if(typeof verificarYCorregirMovimientosSinAnticipo === 'function') setTimeout(verificarYCorregirMovimientosSinAnticipo, 1500);
     // Backup diario a R2 — corre silenciosamente 3s despues de cargar datos
     setTimeout(function(){ backupAppData().catch(function(e){ console.warn('[Backup] inicio:', e); }); }, 3000);
   } catch(e){
@@ -7018,6 +7038,8 @@ function _cargarDatosDesdeJSON(data){
     console.warn('⚠ JSON sin datos válidos — manteniendo estado en memoria');
     if(!appData.folioActual || appData.folioActual < 1) appData.folioActual = 1;
   }
+  // Tras cualquier carga/merge: el contador nunca puede quedar rebobinado.
+  if(typeof _blindarContadorFolio === 'function') _blindarContadorFolio();
 }
 // ── RESERVAR FOLIO ATÓMICO EN DRIVE ─────────────────────────────
 // Implementa "optimistic locking" con reintentos:
@@ -7210,15 +7232,173 @@ async function actualizarArchivoControl(){
     throw e;
   }
 }
-// Genera el nombre de archivo para R2: 26-001A_NOMBRE_CLIENTE.pdf
+// Nombre de archivo CANÓNICO para R2: corto y estable (depende solo de folio+letra).
+// Ej: "72A.pdf". No cambia si se edita el nombre del cliente → garantiza UN archivo por recibo.
 function _nombreArchivoR2(folioStr, nombre) {
+  return folioStr + '.pdf';
+}
+// Nombre DESCRIPTIVO legacy (formato viejo "72A_NOMBRE.pdf"). Solo se usa para
+// localizar y purgar archivos antiguos; NO se generan nuevos con este formato.
+function _nombreArchivoR2Legacy(folioStr, nombre) {
   var sanitizado = (nombre || '')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toUpperCase()
     .replace(/[^A-Z0-9\s]/g, '')
     .trim()
     .replace(/\s+/g, '_');
   return folioStr + '_' + sanitizado + '.pdf';
+}
+// Purga TODAS las variantes del PDF de un folio (corta canónica + descriptiva legacy)
+// en R2 y en Drive. Úsala al editar, eliminar o renumerar para no dejar duplicados.
+async function _purgarPDFRecibo(folioStr, nombre){
+  var variantes = new Set([folioStr + '.pdf']);
+  if(typeof _nombreArchivoR2Legacy === 'function') variantes.add(_nombreArchivoR2Legacy(folioStr, nombre||''));
+  var arr = Array.from(variantes);
+  for(var i=0;i<arr.length;i++){
+    var pn = arr[i];
+    try{ if(typeof window.borrarR2==='function' && window.SB_DESPACHO_ID) await window.borrarR2(window.SB_DESPACHO_ID+'/recibos/'+pn, 'recibos').catch(function(){}); }catch(e){}
+    try{ if(typeof borrarPDFdeDrive==='function') await borrarPDFdeDrive(pn).catch(function(){}); }catch(e){}
+  }
+}
+// ══════════════════════════════════════════════════════════════════
+// LIMPIEZA ÚNICA — Elimina PDFs duplicados ya acumulados en R2.
+// Para cada folio+letra que tenga AMBOS nombres (corto "72A.pdf" y
+// descriptivo "72A_NOMBRE.pdf"), conserva el corto (canónico) y borra el
+// descriptivo. NO toca folios que solo tengan una versión → cero pérdida.
+// ══════════════════════════════════════════════════════════════════
+async function adminLimpiarDuplicadosR2(){
+  if(!window.SB_DESPACHO_ID || typeof window.listarR2!=='function'){ alert('Sin conexión a R2.'); return; }
+  if(!confirm('LIMPIAR PDFs DUPLICADOS EN R2\n\nPara cada recibo que tenga dos archivos (el corto "72A.pdf" y el descriptivo "72A_NOMBRE.pdf"), se conserva el CORTO y se borra el descriptivo.\n\nLos recibos con una sola versión NO se tocan (cero pérdida).\n\n¿Continuar?')) return;
+  var prefix = window.SB_DESPACHO_ID + '/recibos/';
+  if(typeof toast==='function') toast('⏳ Listando archivos en R2…');
+  var objetos = await window.listarR2(prefix, 'recibos');
+  if(!objetos || !objetos.length){ alert('No se encontraron archivos en R2/recibos/.'); return; }
+  // Agrupar por folio+letra
+  var reCorto = /^(\d+)([A-Z])\.pdf$/i;
+  var reDesc  = /^(\d+)([A-Z])_.+\.pdf$/i;
+  var grupos = {}; // "folio|letra" → { corto:[rutas], desc:[rutas] }
+  objetos.forEach(function(obj){
+    var ruta = obj.key || obj.name || '';
+    var nombre = ruta.split('/').pop();
+    var m = reCorto.exec(nombre), tipo=null;
+    if(m){ tipo='corto'; }
+    else { m = reDesc.exec(nombre); if(m) tipo='desc'; }
+    if(!m) return;
+    var k = Number(m[1]) + '|' + m[2].toUpperCase();
+    if(!grupos[k]) grupos[k] = { corto:[], desc:[] };
+    grupos[k][tipo].push(ruta);
+  });
+  // Borrar descriptivos solo donde también existe el corto
+  var borrados=0, gruposAfectados=0, refsActualizadas=0;
+  var keys = Object.keys(grupos);
+  for(var i=0;i<keys.length;i++){
+    var g = grupos[keys[i]];
+    if(g.corto.length && g.desc.length){
+      gruposAfectados++;
+      var partes = keys[i].split('|');
+      var folioNum = Number(partes[0]), letra = partes[1];
+      var folioStr = folioConLetra(folioNum, 2026, letra);
+      if(typeof toast==='function') toast('🧹 Limpiando #'+folioStr+' ('+g.desc.length+' duplicado(s))…');
+      for(var j=0;j<g.desc.length;j++){
+        try{ var ok = await window.borrarR2(g.desc[j], 'recibos'); if(ok) borrados++; }catch(e){ console.warn('[limpiarDup] borrar', g.desc[j], e); }
+      }
+      // Normalizar la referencia del recibo al nombre corto canónico
+      (appData.recibos||[]).forEach(function(r){
+        if(r && Number(r.folio)===folioNum && (r.letra||'A')===letra){
+          r.archivo = folioStr + '.pdf';
+          r.archivoR2 = folioStr + '.pdf';
+          refsActualizadas++;
+        }
+      });
+    }
+  }
+  if(refsActualizadas){
+    try{ if(typeof save==='function') save(); }catch(e){}
+    try{ if(typeof actualizarArchivoControl==='function') await actualizarArchivoControl(); }catch(e){}
+    try{ if(typeof syncEstadoSupabase==='function') await syncEstadoSupabase(); }catch(e){}
+  }
+  alert('LIMPIEZA TERMINADA\n\n'
+    + '• Folios con duplicado: '+gruposAfectados+'\n'
+    + '• Archivos descriptivos borrados: '+borrados+'\n'
+    + '• Referencias normalizadas a nombre corto: '+refsActualizadas+'\n\n'
+    + (gruposAfectados? 'El bucket quedó con un solo PDF por recibo.' : 'No había duplicados que limpiar.'));
+}
+// ══════════════════════════════════════════════════════════════════
+// RECUPERAR PDFs FALTANTES EN R2 — regenera desde los datos del recibo
+// (sin OCR) y sube SOLO los que no existen. No toca los que ya están.
+// ══════════════════════════════════════════════════════════════════
+async function adminRecuperarPDFsFaltantesR2(){
+  if(!window.SB_DESPACHO_ID || typeof window.listarR2!=='function' || typeof generarPDF!=='function'){
+    alert('Sin conexión a R2 o falta el generador de PDF.'); return;
+  }
+  var _arr1 = (typeof appData!=='undefined' && appData.recibos) ? appData.recibos : [];
+  var _arr2 = (typeof REC!=='undefined' && REC.recibos) ? REC.recibos : [];
+  var recibos = Array.from(new Map(
+    _arr1.concat(_arr2).filter(function(x){ return x && x.folio!=null; })
+      .map(function(x){ return [x.folio+'|'+(x.letra||(typeof letraVersion==='function'?letraVersion(x):'A')||'A'), x]; })
+  ).values());
+  if(!recibos.length){ alert('No hay recibos en el sistema.'); return; }
+  if(!confirm('RECUPERAR PDFs FALTANTES EN R2\n\nSe revisarán '+recibos.length+' recibo(s). A los que NO tengan PDF en R2 se les regenera desde sus datos y se sube (nombre corto canónico). Los que ya están NO se tocan.\n\nLos recibos cancelados se omiten (su PDF lleva sello especial).\n\n¿Continuar?')) return;
+  // ── overlay de progreso ──
+  try{ var _ex=document.getElementById('rec-recover-ov'); if(_ex) _ex.remove(); }catch(e){}
+  var ov=document.createElement('div');
+  ov.id='rec-recover-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(12,9,5,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML=''
+    +'<div style="background:var(--surface);border:1px solid var(--border-l);border-radius:var(--radius);width:480px;max-width:96vw;padding:22px;box-shadow:var(--shadow-lg);">'
+    +  '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:6px;">📥 Recuperar PDFs faltantes en R2</div>'
+    +  '<div id="rec-recover-status" style="font-size:0.7rem;color:var(--muted);font-family:monospace;margin-bottom:10px;min-height:1.2em;">Iniciando…</div>'
+    +  '<div style="height:8px;background:var(--surface2);border-radius:5px;overflow:hidden;"><div id="rec-recover-bar" style="height:100%;width:0%;background:var(--gold);transition:width 0.2s;"></div></div>'
+    +  '<button id="rec-recover-close" onclick="document.getElementById(\'rec-recover-ov\').remove()" style="display:none;margin-top:14px;padding:8px 16px;border-radius:6px;border:1px solid var(--border-l);background:var(--surface2);color:var(--ink);font-size:0.74rem;font-weight:700;cursor:pointer;">Cerrar</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+  var _status=function(t){ var el=document.getElementById('rec-recover-status'); if(el) el.textContent=t; };
+  var _bar=function(f){ var el=document.getElementById('rec-recover-bar'); if(el) el.style.width=Math.round(f*100)+'%'; };
+
+  if(typeof _ultimoSyncPropio!=='undefined') _ultimoSyncPropio=Date.now();
+  _status('Listando lo que ya hay en R2…');
+  var objetos = await window.listarR2(window.SB_DESPACHO_ID+'/recibos/', 'recibos');
+  var existentes = new Set((objetos||[]).map(function(o){ return (o.key||o.name||'').split('/').pop().toLowerCase(); }));
+
+  var recuperados=0, yaExistian=0, omitidosCancelados=0, errores=0;
+  for(var i=0;i<recibos.length;i++){
+    var r = recibos[i];
+    var letra = r.letra || (typeof letraVersion==='function'?letraVersion(r):'A') || 'A';
+    var fStr = folioConLetra(r.folio, r.anio_folio||2026, letra);
+    _status('Revisando '+(i+1)+'/'+recibos.length+' — #'+fStr); _bar((i+1)/recibos.length);
+    if(r.cancelado){ omitidosCancelados++; continue; }
+    var corto = (fStr+'.pdf').toLowerCase();
+    var desc  = (typeof _nombreArchivoR2Legacy==='function'? _nombreArchivoR2Legacy(fStr, r.nombre||'') : fStr+'.pdf').toLowerCase();
+    if(existentes.has(corto) || existentes.has(desc)){
+      yaExistian++;
+      if(existentes.has(corto)){ r.archivo=fStr+'.pdf'; r.archivoR2=fStr+'.pdf'; }
+      continue;
+    }
+    _status('Recuperando '+(i+1)+'/'+recibos.length+' — #'+fStr);
+    try{
+      var qrTxt='LEX-MEXICO|Folio:'+fStr+'|'+(r.nombre||'')+'|'+(r.fecha_recibo||r.fecha||'')+' '+(r.hora_recibo||r.hora||'');
+      var qrURL=await qrToDataURL(qrTxt);
+      var doc=await generarPDF(Object.assign({}, r, {anio_folio:r.anio_folio||2026, letra:letra}), r.folio, qrURL);
+      r.pdfBase64=doc.output('datauristring');
+      r.archivo=fStr+'.pdf'; r.archivoR2=fStr+'.pdf';
+      await subirPDFaDrive(doc.output('blob'), fStr+'.pdf');
+      recuperados++;
+    }catch(e){ console.warn('[recuperarPDF] folio', r.folio, e); errores++; }
+    await new Promise(function(res){ setTimeout(res, 60); });
+  }
+  if(recuperados){
+    try{ if(typeof save==='function') save(); }catch(e){}
+    try{ if(typeof actualizarArchivoControl==='function') await actualizarArchivoControl(); }catch(e){}
+    try{ if(typeof syncEstadoSupabase==='function') await syncEstadoSupabase(); }catch(e){}
+  }
+  _status('Listo.'); _bar(1);
+  var btn=document.getElementById('rec-recover-close'); if(btn) btn.style.display='inline-block';
+  alert('RECUPERACIÓN TERMINADA\n\n'
+    + '• Recibos revisados: '+recibos.length+'\n'
+    + '• PDFs recuperados (subidos): '+recuperados+'\n'
+    + '• Ya estaban en R2: '+yaExistian+'\n'
+    + '• Cancelados omitidos: '+omitidosCancelados+'\n'
+    + '• Errores: '+errores);
 }
 // ── PARTE 2: SUBIR PDF A SUPABASE STORAGE ────────────────────────
 // r2Nombre (opcional): nombre descriptivo solo para R2. Supabase usa siempre nombreArchivo.
@@ -7308,14 +7488,49 @@ function letraDeRecibo(folio) {
   return r ? (r.letra || letraVersion(r) || 'A') : 'A';
 }
 // Detecta cambio de año y reinicia el contador anual
+// Blindaje del contador: garantiza que appData.folioActual NUNCA retroceda por
+// debajo de (mayor folio ya emitido + 1). Protege contra el viejo reinicio anual,
+// merges de Supabase con un valor stale, y regresiones por borrado de recibos.
+function _blindarContadorFolio(){
+  try {
+    const usados = Object.create(null);
+    const recs = (appData && appData.recibos) || [];
+    for(let i=0; i<recs.length; i++){
+      const f = Number(recs[i] && recs[i].folio);
+      if(Number.isFinite(f)) usados[f] = true;
+    }
+    let f = Number(appData.folioActual);
+    if(!Number.isFinite(f) || f < 1) f = 1;
+    // El contador SOLO se corrige si apunta a un folio YA OCUPADO (riesgo de
+    // duplicado por reinicio anual viejo, merge stale o regresión por borrado).
+    // Si apunta a un hueco LIBRE (p. ej. tras "Insertar espacio" o "Usar
+    // siguiente hueco"), se respeta — los huecos son números válidos por llenar.
+    if(usados[f]){
+      const prev = f;
+      while(usados[f]) f++;
+      console.warn('[LEX] folioActual apuntaba a un folio ocupado (' + prev +
+        '); corregido al primer libre: ' + f);
+    }
+    if(appData.folioActual !== f){
+      appData.folioActual = f;
+      if(typeof REC !== 'undefined' && REC) REC.folioActual = f;
+    }
+  } catch(e){ console.error('[_blindarContadorFolio]', e); }
+}
 function verificarReinicioAnual(){
+  // ── MODELO DE FOLIO CONTINUO E INFINITO ──────────────────────────────
+  // El número de folio NUNCA se reinicia: es una secuencia perpetua (1,2,3…).
+  // Solo se actualiza el año-sello (anio_folio) para los registros; el
+  // contador folioActual sigue creciendo sin importar el cambio de año.
   const anioActual = new Date().getFullYear();
   if(!appData.anioFolioActual) appData.anioFolioActual = anioActual;
   if(appData.anioFolioActual !== anioActual){
-    console.log('[LEX] Nuevo año detectado — reiniciando contador de folios a 1');
-    appData.folioActual    = 1;
+    console.log('[LEX] Nuevo año detectado — folioActual NO se reinicia (secuencia continua). Año-sello: ' + anioActual);
     appData.anioFolioActual = anioActual;
+    // ⚠️ NO se toca appData.folioActual: la secuencia es infinita.
   }
+  // El contador jamás debe quedar por debajo del mayor folio ya emitido.
+  _blindarContadorFolio();
 }
 function actualizarFolioDisplay(){
   verificarReinicioAnual();
@@ -8560,19 +8775,52 @@ function cargarHistorialFolio(){
     var ultimo    = ordenados[ordenados.length-1];
     var primero   = ordenados[0];
     var saldoFinal= _saldoRv(ultimo);
-    var totalTram = parseFloat(primero.total)||(primero.conceptos||[]).reduce(function(s,c){return s+(parseFloat(c.precio)||0);},0);
+    var totalTram = parseFloat(ultimo.total)||parseFloat(primero.total)||(primero.conceptos||[]).reduce(function(s,c){return s+(parseFloat(c.precio)||0);},0);
     var liquidado = saldoFinal <= 0 && totalTram > 0;
     var cancelado = !!ultimo.cancelado;
+    // ── HISTORIAL CRONOLÓGICO: saldo por versión reconstruido desde los pagos ──
+    // No se usa el saldoPendiente GUARDADO de versiones previas: al liquidar, el
+    // registro original se sincroniza al saldo final (para la lógica de pendientes),
+    // así que su saldo guardado ya NO refleja su estado en ese momento. Se reconstruye
+    // desde el anticipo + pagosParciales (registro append-only etiquetado por versión).
+    var _letraPrim = (primero.letra||'A');
+    var _pagoPorLetra = {};
+    ordenados.forEach(function(rv){ _pagoPorLetra[(rv.letra||'A')] = 0; });
+    _pagoPorLetra[_letraPrim] = (_pagoPorLetra[_letraPrim]||0) + (parseFloat(primero.anticipo)||0);
+    ((ultimo.pagosParciales)||[]).forEach(function(p){
+      var L = (p.folioLetra || _letraPrim);
+      if(_pagoPorLetra[L] === undefined) _pagoPorLetra[L] = 0;
+      _pagoPorLetra[L] += (parseFloat(p.cantidad)||0);
+    });
+    var _saldoPorIdx = [], _pagoPorIdx = [], _acumPago = 0;
+    for(var _ki=0; _ki<ordenados.length; _ki++){
+      var _Lk  = (ordenados[_ki].letra||'A');
+      var _pgk = _pagoPorLetra[_Lk]||0;
+      _acumPago += _pgk;
+      _pagoPorIdx[_ki]  = _pgk;
+      _saldoPorIdx[_ki] = Math.max(0, totalTram - _acumPago);
+    }
+    // Anclar la ÚLTIMA versión al saldo real almacenado (cubre costos extra u otros
+    // ajustes que no estén en pagosParciales). Las intermedias quedan cronológicas.
+    if(ordenados.length){
+      var _lastIdx = ordenados.length-1;
+      if(_saldoPorIdx[_lastIdx] !== saldoFinal){
+        var _saldoPrevLast = _lastIdx>0 ? _saldoPorIdx[_lastIdx-1] : totalTram;
+        _pagoPorIdx[_lastIdx]  = Math.max(0, _saldoPrevLast - saldoFinal);
+        _saldoPorIdx[_lastIdx] = saldoFinal;
+      }
+    }
     // Filas del timeline
     var filasHtml = ordenados.map(function(rv, i){
       var ltr      = rv.letra||(typeof letraVersion==='function'?letraVersion(rv):'A')||'A';
-      var saldoEste= _saldoRv(rv);
+      var saldoEste= _saldoPorIdx[i];
       var prefix   = (i === ordenados.length-1) ? '└─' : '├─';
-      var fecha    = _fc(rv.fecha || rv.fecha_recibo);
-      var saldoAnt = (i === 0) ? totalTram : _saldoRv(ordenados[i-1]);
-      var pago     = Math.max(0, saldoAnt - saldoEste);
+      // La versión original (A) usa su fecha; las posteriores (liquidación/abono)
+      // usan su fecha real de creación (fechaActualizacion), no la heredada.
+      var fecha    = _fc((i === 0) ? (rv.fecha || rv.fecha_recibo) : (rv.fechaActualizacion || rv.fecha || rv.fecha_recibo));
+      var pago     = _pagoPorIdx[i]||0;
       var esLiq    = saldoEste <= 0 && totalTram > 0;
-      var tipo     = (i===0) ? (esLiq?'Liquidado':'Anticipo') : (esLiq?'Liquidado':'Abono');
+      var tipo     = (i===0) ? (esLiq?'Liquidado':(pago>0?'Anticipo':'Sin anticipo')) : (esLiq?'Liquidado':'Abono');
       var colTipo  = esLiq ? '#1a7a3a' : '#8c6518';
       var saldoTag = esLiq
         ? ' <span style="color:#1a7a3a;font-size:0.62rem;">&#x2705;</span>'
@@ -8743,22 +8991,25 @@ async function activarModoConsulta(recibo){
     // Igual que Contabilidad y reDescargar: archivoR2 si existe, sino el nombre corto.
     // Para folios antiguos (archivoR2 nulo) el PDF está en R2 bajo el nombre corto.
     const _archivoR2Eff = recibo.archivoR2 || recibo.archivo;
-    // Nombre descriptivo alternativo (por si el archivo se subió con ese nombre pero archivoR2 no se guardó)
-    const _archivoR2Alt = (!recibo.archivoR2 && typeof _nombreArchivoR2 === 'function' && recibo.nombre)
-      ? _nombreArchivoR2(recibo.archivo.replace(/\.pdf$/i,''), recibo.nombre)
-      : null;
-    const _pathR2 = window.SB_DESPACHO_ID + '/recibos/' + _archivoR2Eff;
+    // Candidatos de nombre en R2 (orden de preferencia). Tolerante a duplicados y
+    // al formato descriptivo legacy, para que purgar copias nunca rompa la lectura.
+    const _r2Cands = [];
+    if(_archivoR2Eff) _r2Cands.push(_archivoR2Eff);
+    if(recibo.archivo && _r2Cands.indexOf(recibo.archivo) === -1) _r2Cands.push(recibo.archivo);
+    if(recibo.nombre && typeof _nombreArchivoR2Legacy === 'function'){
+      var _legR2 = _nombreArchivoR2Legacy(recibo.archivo.replace(/\.pdf$/i,''), recibo.nombre);
+      if(_r2Cands.indexOf(_legR2) === -1) _r2Cands.push(_legR2);
+    }
     let _cargado = false;
-    // 1) Intentar R2
+    // 1) Intentar R2 con cada candidato hasta encontrar el PDF
     if(!_cargado && typeof window.descargarR2 === 'function'){
       try {
         setStatus('loading','Cargando PDF…','loading');
-        let _blob = await window.descargarR2(_pathR2, 'recibos');
-        if(myToken !== _modoConsultaToken) return; // folio cambió mientras descargaba
-        // Intento secundario: nombre descriptivo (folios donde archivoR2 no se guardó pero se subió así)
-        if((!_blob || _blob.size === 0) && _archivoR2Alt && _archivoR2Alt !== _archivoR2Eff){
-          _blob = await window.descargarR2(window.SB_DESPACHO_ID + '/recibos/' + _archivoR2Alt, 'recibos');
-          if(myToken !== _modoConsultaToken) return;
+        let _blob = null;
+        for(let _ci=0; _ci<_r2Cands.length; _ci++){
+          _blob = await window.descargarR2(window.SB_DESPACHO_ID + '/recibos/' + _r2Cands[_ci], 'recibos');
+          if(myToken !== _modoConsultaToken) return; // folio cambió mientras descargaba
+          if(_blob && _blob.size > 0) break;
         }
         if(_blob && _blob.size > 0){
           const _url = URL.createObjectURL(_blob);
@@ -12078,13 +12329,25 @@ function filtrarHistorial(){
     if(r.fechaActualizacion) return { f: r.fechaActualizacion, h: r.horaActualizacion || r.hora || '00:00' };
     return { f: r.fecha || '', h: r.hora || '00:00' };
   }
-  // Ordenar por fecha+hora efectiva descendente (más reciente arriba)
+  // ── Orden IGUAL que contabilidad: por la fecha+hora del MOVIMIENTO del recibo ──
+  // (respaldo a la fecha efectiva del recibo si no existe un movimiento vinculado)
+  const _movFechaMap = {};
+  (typeof D !== 'undefined' && Array.isArray(D.movimientos) ? D.movimientos : []).forEach(function(m){
+    if(!m || m.fuente !== 'recibo' || m.borrado || m.folio == null) return;
+    const k = m.folio + '|' + (m.letra || 'A');
+    const clave = (m.fecha || '') + 'T' + (m.hora || '00:00');
+    if(!_movFechaMap[k] || clave > _movFechaMap[k]) _movFechaMap[k] = clave;
+  });
+  function _claveOrdenRec(r){
+    const k = r.folio + '|' + (r.letra || 'A');
+    if(_movFechaMap[k]) return _movFechaMap[k];
+    const ef = _fechaEfRec(r);
+    return (ef.f || '') + 'T' + (ef.h || '00:00');
+  }
   lista.sort(function(a, b) {
-    const da = _fechaEfRec(a), db = _fechaEfRec(b);
-    const fa = da.f + 'T' + da.h;
-    const fb = db.f + 'T' + db.h;
-    if (fb !== fa) return fb.localeCompare(fa);
-    // Misma fecha y hora: letra mayor primero (D > C > B > A), luego folio mayor
+    const ca = _claveOrdenRec(a), cb = _claveOrdenRec(b);
+    if (cb !== ca) return cb.localeCompare(ca);
+    // Mismo instante: letra mayor primero (D > C > B > A), luego folio mayor
     const la = (a.letra || 'A'), lb = (b.letra || 'A');
     if(la !== lb) return lb.localeCompare(la);
     return (b.folio || 0) - (a.folio || 0);
@@ -12278,7 +12541,7 @@ let driveFoldersCache=[]; // cache de carpetas de Drive vinculadas a juicios
 let driveFolderSeleccionado=null; // {id, name} carpeta seleccionada en modal
 let acuerdoPDFPendiente=null; // File object pendiente de subir
 // ═══ ESTADO ═══
-let D={movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]};
+let D={movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],citas:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]};
 let REC={folioActual:100,recibos:[]}; // Se sobrescribe con datos de Drive al conectar
 let filtroC='todo',filtroDT='todos',filtroCT='todas',filtroJ='todos',filtroP='activos',filtroSeccion='todas',modo='ingreso';
 let eiC=-1,eiK=-1,eiJ=-1,eiP=-1;
@@ -12749,9 +13012,9 @@ function renderAcuerdosDrive(lista) {
       ? `<span style="color:var(--gold-d);font-family:'JetBrains Mono',monospace;font-size:0.68rem;font-weight:700;margin-right:5px;">${fechaAcuerdoBadge}</span>${escHTML(ac.nombre || ac.archivo)}`
       : escHTML(ac.nombre || ac.archivo);
 
-    // Descripción — hasta 3 líneas
+    // Descripción — 4 líneas completas (respeta saltos de línea de la IA)
     const _descRow = ac.descripcion
-      ? `<div style="font-size:0.62rem;color:var(--muted);margin-top:3px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">${escHTML(ac.descripcion)}</div>`
+      ? `<div style="font-size:0.62rem;color:var(--muted);margin-top:3px;line-height:1.5;white-space:pre-line;word-break:break-word;">${escHTML(ac.descripcion)}</div>`
       : '';
 
     // Badge de notificación: si ya tiene fecha muestra "NOTIFICACIÓN 15/MAY/26", si no muestra "+ Notificación" clickeable
@@ -12884,16 +13147,9 @@ async function subirAcuerdoDriveFiles(files) {
         }
       } catch(e) { console.warn('[Acuerdos] OCR falló, usará PDF base64:', e.message); }
 
-      // 2) Analizar con Gemini para extraer nombre, tipo, fecha y resumen
-      let geminiKey = '';
-      try {
-        if (window.SB) {
-          const { data } = await window.SB.from('configuracion').select('valor').eq('id','gemini_api_key').single();
-          if (data && data.valor) geminiKey = data.valor;
-        }
-        if (!geminiKey) geminiKey = localStorage.getItem('gemini_api_key') || '';
-      } catch(e) {}
-
+      // 2) Analizar con GROQ para extraer nombre, tipo, fecha y descripción (4 líneas)
+      //    Groq es texto-solo: requiere el texto de Mistral OCR. Si no hubo OCR,
+      //    se usa Gemini con el PDF como respaldo (Groq no lee PDFs/imágenes).
       let nombreIA = file.name.replace(/\.pdf$/i,'');
       let nombreCortoIA = '';
       let tipoIA = 'acuerdo';
@@ -12901,41 +13157,60 @@ async function subirAcuerdoDriveFiles(files) {
       let resumenIA = '';
       let descripcionIA = '';
 
-      if (geminiKey) {
-        if (procTxt) procTxt.textContent = 'Gemini analizando acuerdo…';
-        try {
-          const prompt = `Del siguiente texto de un acuerdo judicial mexicano, extrae:
+      const _promptAcuerdo = `Eres un abogado litigante mexicano. Del siguiente texto de un acuerdo o documento judicial mexicano, extrae:
 (a) la fecha del acuerdo en formato DD-MM-AAAA,
 (b) un nombre de archivo corto y descriptivo en MAYUSCULAS sin acentos ni caracteres especiales (max 40 chars),
-(c) una descripcion breve en español (max 80 chars),
+(c) una descripción clara en español de EXACTAMENTE 4 líneas (aprox. 4 frases breves) que resuman qué resuelve u ordena el documento, plazos relevantes y a quién afecta. Sé concreto y útil.
 (d) el tipo: uno de auto|sentencia|notificacion|acuerdo|requerimiento|otro.
-Responde solo en JSON: {"fecha":"DD-MM-AAAA","nombre":"NOMBRE ARCHIVO","descripcion":"descripcion breve","tipo":"tipo"}`;
-          let gBody;
-          if (textoOCR) {
-            gBody = JSON.stringify({ contents: [{ parts: [{ text: textoOCR + '\n\n---\n' + prompt }]}]});
-          } else {
-            gBody = JSON.stringify({ contents: [{ parts: [{ inline_data: { mime_type: 'application/pdf', data: b64 }}, { text: prompt }]}]});
+Responde ÚNICAMENTE con un JSON válido, sin markdown ni texto extra:
+{"fecha":"DD-MM-AAAA","nombre":"NOMBRE ARCHIVO","descripcion":"línea 1\\nlínea 2\\nlínea 3\\nlínea 4","tipo":"tipo"}`;
+
+      function _aplicarAnalisisAcuerdo(rawTxt) {
+        const cleanTxt = (rawTxt || '').replace(/```json|```/g,'').trim();
+        const m = cleanTxt.match(/\{[\s\S]*\}/);
+        const jsonStr = m ? m[0] : cleanTxt;
+        const parsed = JSON.parse(jsonStr);
+        if (parsed.nombre) nombreCortoIA = parsed.nombre.toUpperCase().replace(/[^A-Z0-9\s\-\.]/g,'').trim().slice(0,40);
+        if (parsed.descripcion) { descripcionIA = String(parsed.descripcion).trim().slice(0,500); resumenIA = descripcionIA; }
+        if (parsed.tipo && ACUERDO_TIPOS[parsed.tipo]) tipoIA = parsed.tipo;
+        if (parsed.fecha) {
+          if (/^\d{2}-\d{2}-\d{4}$/.test(parsed.fecha)) {
+            const [dd,mm,aaaa] = parsed.fecha.split('-'); fechaIA = aaaa+'-'+mm+'-'+dd;
+          } else if (/^\d{4}-\d{2}-\d{2}$/.test(parsed.fecha)) { fechaIA = parsed.fecha; }
+        }
+      }
+
+      if (textoOCR) {
+        // Camino principal: GROQ (con respaldo automático a Gemini vía _iaLlamar)
+        if (procTxt) procTxt.textContent = 'Groq analizando acuerdo…';
+        try {
+          const rawTxt = await _iaLlamar(textoOCR + '\n\n---\n' + _promptAcuerdo, 700, 0.2);
+          _aplicarAnalisisAcuerdo(rawTxt);
+        } catch(e) { console.warn('[Acuerdos] Error Groq/IA:', e.message); }
+      } else {
+        // Sin texto OCR: Groq no puede leer el PDF. Respaldo con Gemini sobre el PDF.
+        let geminiKey = '';
+        try {
+          if (window.SB) {
+            const { data } = await window.SB.from('configuracion').select('valor').eq('id','gemini_api_key').single();
+            if (data && data.valor) geminiKey = data.valor;
           }
-          const gResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+encodeURIComponent(geminiKey), {
-            method: 'POST', headers: {'Content-Type':'application/json'}, body: gBody
-          });
-          if (gResp.ok) {
-            const gData = await gResp.json();
-            const txt = gData.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            const cleanTxt = txt.replace(/```json|```/g,'').trim();
-            try {
-              const parsed = JSON.parse(cleanTxt);
-              if (parsed.nombre) nombreCortoIA = parsed.nombre.toUpperCase().replace(/[^A-Z0-9\s\-\.]/g,'').trim().slice(0,40);
-              if (parsed.descripcion) { descripcionIA = parsed.descripcion.trim().slice(0,80); resumenIA = descripcionIA; }
-              if (parsed.tipo && ACUERDO_TIPOS[parsed.tipo]) tipoIA = parsed.tipo;
-              if (parsed.fecha) {
-                if (/^\d{2}-\d{2}-\d{4}$/.test(parsed.fecha)) {
-                  const [dd,mm,aaaa] = parsed.fecha.split('-'); fechaIA = aaaa+'-'+mm+'-'+dd;
-                } else if (/^\d{4}-\d{2}-\d{2}$/.test(parsed.fecha)) { fechaIA = parsed.fecha; }
-              }
-            } catch(e) { console.warn('[Acuerdos] JSON Gemini inválido:', txt); }
-          }
-        } catch(e) { console.warn('[Acuerdos] Error Gemini:', e); }
+          if (!geminiKey) geminiKey = localStorage.getItem('gemini_api_key') || localStorage.getItem('lex-gemini-key') || '';
+        } catch(e) {}
+        if (geminiKey) {
+          if (procTxt) procTxt.textContent = 'Gemini analizando PDF (sin OCR)…';
+          try {
+            const gBody = JSON.stringify({ contents: [{ parts: [{ inline_data: { mime_type: 'application/pdf', data: b64 }}, { text: _promptAcuerdo }]}]});
+            const gResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key='+encodeURIComponent(geminiKey), {
+              method: 'POST', headers: {'Content-Type':'application/json'}, body: gBody
+            });
+            if (gResp.ok) {
+              const gData = await gResp.json();
+              const txt = gData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              try { _aplicarAnalisisAcuerdo(txt); } catch(e) { console.warn('[Acuerdos] JSON Gemini inválido:', txt); }
+            }
+          } catch(e) { console.warn('[Acuerdos] Error Gemini (respaldo):', e); }
+        }
       }
 
       // Nombre del archivo en Drive: DD-MM-AAAA NOMBRE.pdf; la tarjeta muestra solo NOMBRE
@@ -13962,8 +14237,13 @@ function renderCaja(){
     <td class="mono" style="font-size:0.68rem;color:var(--muted)">${m.hora||'—'}</td>
     <td>${esc(m.descripcion)}</td>
     <td style="white-space:nowrap;">${(()=>{
-      const est = m.estatus;
-      if(est){ const tc=est==='Liquidado'?'tag-v':est==='Anticipo'?'tag-b':est==='Abono parcial'?'tag-a':'tag-m'; return '<span class="tag '+tc+'" style="font-size:0.6rem;">'+est+'</span>'; }
+      // Fallback defensivo igual que _badgeEstatus: si recibo con anticipo=0, mostrar Sin Anticipo
+      let est = m.estatus;
+      if(!est && m.fuente==='recibo' && m.folio!=null){
+        const _rO=(typeof appData!=='undefined'?appData.recibos||[]:[]).find(r=>r.folio===m.folio&&!r.esComplemento&&(r.letra||'A')===(m.letra||'A'));
+        est = (_rO&&parseFloat(_rO.anticipo||0)===0) ? 'Sin Anticipo' : (m.monto>0?'Anticipo':'Pendiente');
+      } else if(!est){ est = m.monto>0?'Anticipo':'Pendiente'; }
+      if(est){ const tc=est==='Liquidado'?'tag-v':est==='Anticipo'?'tag-b':est==='Sin Anticipo'?'tag-sa':est==='Abono parcial'?'tag-a':'tag-m'; return '<span class="tag '+tc+'" style="font-size:0.6rem;">'+est+'</span>'; }
       return '<span class="tag '+(m.tipo==='ingreso'?'tag-v':'tag-r')+'" style="font-size:0.6rem;">'+(m.cat||m.tipo)+'</span>';
     })()}</td>
     <td style="font-size:0.68rem;color:var(--muted)">${esc(m.responsable||'—')}</td>
@@ -14047,13 +14327,16 @@ function _reciboAMovSintetico(r) {
   const anticipo     = parseFloat(r.anticipo || 0);
   const totalAbonado = parseFloat(r.totalAbonado || 0);
   const totalRec     = parseFloat(r.total || 0);
-  // monto = solo lo que realmente se cobró en este folio.
-  // Si anticipo=0 y total>0 → el cliente no dejó nada → monto=$0 (Sin Anticipo).
-  // totalAbonado solo se usa si tampoco hay anticipo explícito, para folios de abono posteriores.
-  const monto = anticipo > 0 ? anticipo : (totalAbonado > 0 ? totalAbonado : 0);
-  const liq   = r.saldoPendiente === 0 && (anticipo > 0 || totalAbonado > 0);
-  // "Sin Anticipo": recibo con total>0 pero sin pago inicial registrado
-  const sinAnticipo = monto === 0 && totalRec > 0;
+  // BUG FIX: monto = SOLO el anticipo inicial del recibo (lo cobrado al momento de emitirlo).
+  // NO usar totalAbonado como fallback — los abonos posteriores tienen sus propios
+  // movimientos reales en D.movimientos y suprimen este sintético vía _foliosYaEnCaja.
+  // Usar totalAbonado aquí inflaba el monto del sintético e inventaba un "Anticipo"/$X
+  // para recibos emitidos sin anticipo ($0) que luego recibieron abonos.
+  const monto = anticipo > 0 ? anticipo : 0;
+  // Usar parseFloat + <= 0 para evitar fallo cuando saldoPendiente viene como string "0"
+  const liq   = parseFloat(r.saldoPendiente || 0) <= 0 && totalRec > 0 && (anticipo > 0 || totalAbonado > 0);
+  // "Sin Anticipo": recibo con total>0 pero anticipo=0 al momento de emitirlo
+  const sinAnticipo = anticipo === 0 && totalRec > 0 && !liq;
   const fechaRec = (r.fecha && /^\d{4}-\d{2}-\d{2}/.test(r.fecha))
     ? r.fecha.substring(0, 10) : (r.fecha || '—');
   const _letraR = r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A';
@@ -14079,6 +14362,95 @@ function _reciboAMovSintetico(r) {
     responsable: r.generadoPor || r.responsable || '—'
   };
 }
+
+// ── TAREA 2: Modal de confirmación para cambios contables automáticos ──────────
+function confirmarCambioContable(opciones) {
+  // opciones: { titulo, descripcion, esError, mensajeError, onAplicar, onCancelar }
+  return new Promise(function(resolve) {
+    var id = '__modal_cambio_contable';
+    var prev = document.getElementById(id);
+    if (prev) prev.remove();
+    var esError = !!opciones.esError;
+    var errorHtml = esError
+      ? '<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:10px 14px;margin:10px 0 4px;font-size:0.88rem;color:#7c5800;">'
+        + '<strong>⚠ Error detectado:</strong> ' + (opciones.mensajeError || opciones.descripcion)
+        + '<br><span style="font-size:0.82rem;color:#555;margin-top:4px;display:block;">Puedes resolverlo aquí mismo o pedirle ayuda a Claude para solucionarlo.</span>'
+        + '</div>'
+      : '';
+    var overlay = document.createElement('div');
+    overlay.id = id;
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:10px;padding:28px 30px;max-width:480px;width:92%;box-shadow:0 8px 40px rgba(0,0,0,0.28);font-family:inherit;">'
+      + '<h3 style="margin:0 0 10px;font-size:1.05rem;color:#2c3e50;">📋 ' + (opciones.titulo || 'Confirmación de cambio contable') + '</h3>'
+      + '<p style="margin:0 0 8px;font-size:0.92rem;color:#444;line-height:1.5;">' + opciones.descripcion + '</p>'
+      + errorHtml
+      + '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end;">'
+      + '<button id="__cc_cancelar" style="padding:8px 18px;border:1px solid #ccc;border-radius:6px;background:#f5f5f5;cursor:pointer;font-size:0.9rem;">Cancelar / Revisar manualmente</button>'
+      + '<button id="__cc_aplicar" style="padding:8px 18px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;font-size:0.9rem;font-weight:600;">Aplicar cambio</button>'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('#__cc_aplicar').addEventListener('click', function() {
+      overlay.remove();
+      if (typeof opciones.onAplicar === 'function') opciones.onAplicar();
+      resolve(true);
+    });
+    overlay.querySelector('#__cc_cancelar').addEventListener('click', function() {
+      overlay.remove();
+      if (typeof opciones.onCancelar === 'function') opciones.onCancelar();
+      resolve(false);
+    });
+  });
+}
+
+// ── TAREA 1: Detecta movimientos reales con monto erróneo para recibos Sin Anticipo ──
+function _corregirMovimientosSinAnticipo() {
+  var movs    = (typeof D !== 'undefined' && D.movimientos) ? D.movimientos : [];
+  var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
+  var errores = [];
+  movs.forEach(function(m) {
+    if (m.fuente !== 'recibo' || !(m.monto > 0)) return;
+    var recOrig = recibos.find(function(r) {
+      return r.folio === m.folio && !r.esComplemento && (r.letra || 'A') === (m.letra || 'A');
+    });
+    if (!recOrig) return;
+    if (parseFloat(recOrig.anticipo || 0) !== 0) return;
+    errores.push({ mov: m, rec: recOrig });
+  });
+  return errores;
+}
+
+function verificarYCorregirMovimientosSinAnticipo() {
+  var errores = _corregirMovimientosSinAnticipo();
+  if (errores.length === 0) return;
+  var lista = errores.map(function(e) {
+    var folioStr = (typeof folioConLetra === 'function')
+      ? folioConLetra(e.rec.folio, e.rec.anio, e.rec.letra)
+      : ('#' + e.rec.folio + (e.rec.letra || 'A'));
+    return '• Recibo <strong>' + folioStr + '</strong>: movimiento registrado por $' + Number(e.mov.monto).toLocaleString('es-MX') + ' pero anticipo = $0.';
+  }).join('<br>');
+  confirmarCambioContable({
+    titulo: 'Corrección de movimientos Sin Anticipo',
+    descripcion: 'Se detectaron ' + errores.length + ' movimiento(s) en Caja/Contabilidad con monto incorrecto para recibos emitidos sin anticipo:<br><br>' + lista + '<br><br>¿Aplicar la corrección? El monto se ajustará a $0 y el estatus a "Sin Anticipo".',
+    esError: true,
+    mensajeError: errores.length + ' movimiento(s) tienen monto > $0 pero el recibo original se emitió sin anticipo ($0).',
+    onAplicar: function() {
+      errores.forEach(function(e) {
+        e.mov.monto   = 0;
+        e.mov.estatus = 'Sin Anticipo';
+      });
+      if (typeof save === 'function') save();
+      if (typeof renderCaja === 'function') renderCaja();
+      if (typeof renderContab === 'function') renderContab();
+      if (typeof syncEstadoSupabaseDebounced === 'function') setTimeout(syncEstadoSupabaseDebounced, 500);
+    },
+    onCancelar: function() {
+      console.info('[LEX] Corrección Sin Anticipo cancelada por el usuario.');
+    }
+  });
+}
+
 function getAllMovs() {
   const movsCaja  = _movimientosDeCaja();
   const excluidos = _foliosExcluidos();
@@ -14387,8 +14759,18 @@ function renderContab() {
       const _cls = m.tipo === 'egreso' ? 'tag-m' : 'tag-b';
       return `<span class="tag ${_cls}" style="font-size:0.54rem;">${_lbl}</span>`;
     }
-    // Fallback: monto>0 sin estatus → 'Anticipo'; monto=0 → 'Pendiente'
-    const est = m.estatus || (m.monto > 0 ? 'Anticipo' : 'Pendiente');
+    // Fallback defensivo: si el movimiento no tiene estatus, verificar el recibo original.
+    // Si el recibo fue emitido sin anticipo (anticipo=0), usar 'Sin Anticipo' aunque monto>0
+    // (esto cubre movimientos históricos creados con monto=total por error en lugar de monto=0).
+    const _estFallback = (function() {
+      if (m.fuente === 'recibo' && m.folio != null) {
+        const _recOrig = (typeof appData !== 'undefined' ? appData.recibos || [] : [])
+          .find(function(r){ return r.folio === m.folio && !r.esComplemento && (r.letra||'A') === (m.letra||'A'); });
+        if (_recOrig && parseFloat(_recOrig.anticipo || 0) === 0) return 'Sin Anticipo';
+      }
+      return m.monto > 0 ? 'Anticipo' : 'Pendiente';
+    })();
+    const est = m.estatus || _estFallback;
     // Etiquetas visibles al usuario — los valores internos no cambian
     const labelMap = {
       'Liquidado':    'Pago Total',
@@ -17068,21 +17450,9 @@ function abrirPendiente(idx){
   if(secEl){ secEl.value = sec; pSecCambio(); }
   if(p){
     if(sec === 'placas') _pPlacasCargar(p);
-    else if(sec === 'escrituras'){
-      const _s=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
-      _s('pEscComprador',p.escComprador);_s('pEscVendedor',p.escVendedor);
-      _s('pEscArchivoFisico',p.escArchivoFisico);_s('pEscNotaria',p.escNotaria);
-      _s('pEscVolumen',p.escVolumen);_s('pEscInstrumento',p.escInstrumento);
-      _s('pEscFolio',p.escFolio);_s('pEscCosto',p.escCosto);
-      _s('pEscCobrado',p.escCobrado);_s('pEscServiciosComp',p.escServiciosComp);
-      _s('pEscEtapa',p.escEtapa);_s('pEscDesc',p.escDescripcion);
-      _s('pEscSiguientePaso',p.escSiguientePaso);
-    } else if(sec === 'juicios'){
-      const _s=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
-      _s('pJuiCliente',p.juiCliente);_s('pJuiExpediente',p.juiExpediente);
-      _s('pJuiEtapa',p.juiEtapa);_s('pJuiTermino',p.juiTermino);
-      _s('pJuiAudiencia',p.juiAudiencia);_s('pJuiDesc',p.juiDescripcion);
-    } else {
+    else if(sec === 'escrituras') _pEscCargar(p);
+    else if(sec === 'juicios') _pJuiCargar(p);
+    else {
       const _s=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
       _s('pOtrosNombre',p.persona);_s('pOtrosDesc',p.obs||p.texto);
     }
@@ -17092,6 +17462,8 @@ function abrirPendiente(idx){
     const cEl=document.getElementById('pCarpeta');if(cEl)cEl.value=p.carpeta||'';
   } else {
     _pPlacasLimpiar();
+    _pEscCargar(null);
+    _pJuiCargar(null);
     ['pPri','pRe','pFecha','pCarpeta','pOtrosNombre','pOtrosDesc'].forEach(id=>{
       const e=document.getElementById(id);if(e)e.value = id==='pPri'?'normal':id==='pRe'?'Antonieta':'';
     });
@@ -17119,6 +17491,32 @@ function guardarPend(){
       fechaLimite: document.getElementById('pFecha')?.value||'',
       carpeta: document.getElementById('pCarpeta')?.value.trim()||''
     };
+  } else if(sec === 'escrituras'){
+    const d = _pEscRecopilar();
+    if(!d.escDescripcion){ toast('La descripción es obligatoria','err'); return; }
+    especifico = Object.assign({
+      id: (eiP>=0 && D.pendientes[eiP]?.id) || ('P-'+Date.now()),
+      texto: d.escDescripcion,
+      persona: d.escComprador || d.escVendedor || '',
+      seccion: 'escrituras',
+      prioridad: document.getElementById('pPri')?.value||'normal',
+      resp: document.getElementById('pRe')?.value||'Antonieta',
+      fechaLimite: document.getElementById('pFecha')?.value||'',
+      carpeta: document.getElementById('pCarpeta')?.value.trim()||''
+    }, d);
+  } else if(sec === 'juicios'){
+    const d = _pJuiRecopilar();
+    if(!d.juiDescripcion){ toast('La descripción es obligatoria','err'); return; }
+    especifico = Object.assign({
+      id: (eiP>=0 && D.pendientes[eiP]?.id) || ('P-'+Date.now()),
+      texto: d.juiDescripcion,
+      persona: d.juiCliente || '',
+      seccion: 'juicios',
+      prioridad: document.getElementById('pPri')?.value||'normal',
+      resp: document.getElementById('pRe')?.value||'Antonieta',
+      fechaLimite: document.getElementById('pFecha')?.value||'',
+      carpeta: document.getElementById('pCarpeta')?.value.trim()||''
+    }, d);
   } else {
     const nombre = document.getElementById('pOtrosNombre')?.value.trim()||document.getElementById('pPersona')?.value.trim()||'';
     const desc   = document.getElementById('pOtrosDesc')?.value.trim()||document.getElementById('pTxt')?.value.trim()||'';
@@ -19001,6 +19399,7 @@ async function syncEstadoSupabase(){
       juicios:               D.juicios               || [],
       gestiones:             D.gestiones             || [],
       pendientes:            _pendientesSinLiquidados,
+      citas:                 D.citas                 || [],
       cierres:               D.cierres               || [],
       prestamos:             D.prestamos             || [],
       saldoAcumulado:        D.saldoAcumulado        || 0,
@@ -22558,6 +22957,55 @@ async function abrirPreviaDesdeContab(numFolio, letra){
         }
       }catch(_eSB){ console.warn('[contabPDF] Storage:', _eSB); }
     }
+    // ── 3b. Recuperar pdfBase64 desde versiones_recibo en Supabase ──
+    if(window.SB && window.SB_DESPACHO_ID){
+      try{
+        if(msg) msg.textContent = 'Recuperando PDF…';
+        const _letraRec = (r.letra || (typeof letraVersion==='function' ? letraVersion(r) : 'A') || 'A').toUpperCase();
+        const _anioRec  = r.anio_folio || new Date().getFullYear();
+        let _vr = null;
+        const { data: _vd1 } = await window.SB
+          .from('versiones_recibo')
+          .select('datos_completos, pdf_storage_path, letra')
+          .eq('despacho_id', window.SB_DESPACHO_ID)
+          .eq('folio_base', r.folio)
+          .eq('anio_folio', _anioRec)
+          .eq('letra', _letraRec)
+          .limit(1);
+        _vr = (_vd1 && _vd1.length) ? _vd1[0] : null;
+        if(!_vr){
+          const { data: _vd2 } = await window.SB
+            .from('versiones_recibo')
+            .select('datos_completos, pdf_storage_path, letra')
+            .eq('despacho_id', window.SB_DESPACHO_ID)
+            .eq('folio_base', r.folio)
+            .eq('anio_folio', _anioRec)
+            .order('letra', { ascending: false })
+            .limit(1);
+          _vr = (_vd2 && _vd2.length) ? _vd2[0] : null;
+        }
+        if(_vr && _vr.datos_completos && _vr.datos_completos.pdfBase64){
+          const _b64 = _vr.datos_completos.pdfBase64;
+          const _b64d = _b64.includes(',') ? _b64.split(',')[1] : _b64;
+          const _bin = atob(_b64d);
+          const _buf = new Uint8Array(_bin.length);
+          for(let i=0;i<_bin.length;i++) _buf[i]=_bin.charCodeAt(i);
+          const _blob = new Blob([_buf],{type:'application/pdf'});
+          const _url  = URL.createObjectURL(_blob);
+          embed.setAttribute('src', _url + '#toolbar=0&navpanes=0');
+          loading.style.display = 'none';
+          r.pdfBase64 = _b64;
+          // Re-subir a R2 en segundo plano
+          const _r2path = _vr.pdf_storage_path
+            || (window.SB_DESPACHO_ID + '/recibos/' + (r.archivoR2 || r.archivo || (String(r.folio).padStart(4,'0') + (_vr.letra||'A') + '.pdf')));
+          const _f = new File([_blob], _r2path.split('/').pop(), {type:'application/pdf'});
+          window.subirR2(_f, _r2path, 'recibos')
+            .then(function(ok){ if(ok) console.info('[contabPDF] PDF re-subido a R2:', _r2path); })
+            .catch(function(e){ console.warn('[contabPDF] No se pudo re-subir a R2:', e); });
+          return;
+        }
+      }catch(_eVR){ console.warn('[contabPDF] versiones_recibo:', _eVR); }
+    }
     // ── 4. PDF no encontrado — regenerarlo automáticamente con la fecha/hora original ──
     // Para B/C/D: pre-rellenar desde la letra inmediatamente anterior.
     // Para A: usar los datos del propio recibo.
@@ -23166,394 +23614,15 @@ function adminAbrirR2Recovery() {
           </div>
         </div>
 
-        <!-- OPCIÓN 2: Restaurar recibo desde PDF -->
-        <div style="padding:16px;border:1.5px solid var(--border-l);border-radius:10px;">
-          <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:12px;">
-            <div style="font-size:1.8rem;flex-shrink:0;">🔄</div>
-            <div>
-              <div style="font-size:0.82rem;font-weight:700;color:var(--ink);margin-bottom:4px;">Restaurar recibo desde PDF</div>
-              <div style="font-size:0.65rem;color:var(--muted);line-height:1.5;">Usa Mistral OCR para leer un PDF de R2 y reconstruir el recibo completo (folio, cliente, monto, fecha). Si es un folio A, también restaura sus sub-folios B, C, D y recalcula saldos.</div>
-            </div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <div style="flex:1;min-width:160px;">
-              <label style="font-size:0.58rem;color:var(--muted);display:block;margin-bottom:3px;font-family:'JetBrains Mono',monospace;">FOLIO A RESTAURAR (ej: 72 o 72B)</label>
-              <input id="r2rec-folio-input" type="text" placeholder="72" style="width:100%;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.76rem;background:var(--surface2);color:var(--ink);font-family:'JetBrains Mono',monospace;">
-            </div>
-            <button onclick="_r2RecoveryRestaurar()" style="margin-top:16px;padding:8px 16px;border-radius:6px;border:none;background:var(--gold);color:#fff;font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap;">🔄 Restaurar</button>
-          </div>
-          <div id="r2rec-lista-pdfs" style="margin-top:10px;"></div>
-        </div>
-
       </div>
     </div>`;
   document.body.appendChild(ov);
-  // Cargar lista de PDFs disponibles en R2
-  _r2RecoveryCargarLista();
-}
-
-// ── Cargar lista de PDFs en R2 para mostrarlos como opciones ──
-async function _r2RecoveryCargarLista() {
-  const el = document.getElementById('r2rec-lista-pdfs');
-  if (!el) return;
-  el.innerHTML = '<div style="font-size:0.62rem;color:var(--muted);">Cargando PDFs de R2…</div>';
-  try {
-    const prefix = window.SB_DESPACHO_ID + '/recibos/';
-    const objs = await window.listarR2(prefix, 'recibos');
-    if (!objs || !objs.length) { el.innerHTML = '<div style="font-size:0.62rem;color:var(--muted);">Sin archivos en R2/recibos/</div>'; return; }
-    // Ordenar por nombre
-    objs.sort((a,b) => (a.key||a.name||'').localeCompare(b.key||b.name||''));
-    el.innerHTML = `
-      <div style="font-size:0.58rem;color:var(--muted);margin-bottom:5px;font-family:'JetBrains Mono',monospace;">${objs.length} PDFs en R2 — haz clic para seleccionar:</div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px;max-height:130px;overflow-y:auto;">
-        ${objs.map(o => {
-          const nombre = (o.key||o.name||'').split('/').pop();
-          return `<span onclick="document.getElementById('r2rec-folio-input').value='${nombre.replace('.pdf','')}';" style="font-size:0.6rem;padding:2px 8px;border-radius:10px;border:1px solid var(--border-l);cursor:pointer;font-family:'JetBrains Mono',monospace;background:var(--surface2);" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border-l)'">${nombre}</span>`;
-        }).join('')}
-      </div>`;
-  } catch(e) { el.innerHTML = '<div style="font-size:0.62rem;color:var(--rojo);">Error al listar R2: ' + e.message + '</div>'; }
 }
 
 // ── Opción 1: Vincular (reutiliza adminVincularPDFsR2) ──
 function _r2RecoveryVincular() {
   document.getElementById('r2-recovery-ov').remove();
   adminVincularPDFsR2();
-}
-
-// ── Opción 2: Restaurar recibo desde PDF con OCR ──
-async function _r2RecoveryRestaurar() {
-  const inp = document.getElementById('r2rec-folio-input');
-  if (!inp || !inp.value.trim()) { toast('⚠ Ingresa el folio a restaurar', 'err'); return; }
-  const folioRaw = inp.value.trim().toUpperCase();
-
-  // Determinar folio numérico y letra
-  const match = folioRaw.match(/^(\d+)([A-Z]?)$/);
-  if (!match) { toast('⚠ Formato inválido. Usa: 72 o 72B', 'err'); return; }
-  const folioNum = parseInt(match[1]);
-  const letraInicial = match[2] || 'A';
-
-  // Cerrar modal y abrir overlay de progreso
-  document.getElementById('r2-recovery-ov').remove();
-
-  const progOv = document.createElement('div');
-  progOv.id = 'r2rec-prog-ov';
-  progOv.style.cssText = 'position:fixed;inset:0;background:rgba(12,9,5,0.88);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
-  progOv.innerHTML = `
-    <div style="background:var(--surface);border:1px solid var(--border-l);border-radius:var(--radius);width:540px;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;">
-      <div style="padding:14px 18px;border-bottom:1px solid var(--border-l);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-        <div style="font-size:0.85rem;font-weight:700;color:var(--ink);">🔄 Restaurando Folio #${folioNum}</div>
-        <button id="r2rec-prog-cerrar" style="display:none;font-size:0.72rem;padding:5px 12px;border-radius:4px;border:1px solid var(--border-l);background:none;color:var(--muted);cursor:pointer;">✕ Cerrar</button>
-      </div>
-      <div id="r2rec-prog-log" style="flex:1;overflow-y:auto;padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:0.63rem;line-height:1.9;"></div>
-      <div style="padding:8px 16px;border-top:1px solid var(--border-l);flex-shrink:0;">
-        <div style="background:var(--border-l);border-radius:4px;height:5px;overflow:hidden;">
-          <div id="r2rec-prog-barra" style="height:100%;background:var(--gold);width:0%;transition:width 0.4s;"></div>
-        </div>
-        <div id="r2rec-prog-status" style="font-size:0.58rem;color:var(--muted);margin-top:3px;">Iniciando…</div>
-      </div>
-    </div>`;
-  document.body.appendChild(progOv);
-
-  const log      = document.getElementById('r2rec-prog-log');
-  const barra    = document.getElementById('r2rec-prog-barra');
-  const status   = document.getElementById('r2rec-prog-status');
-  const btnCerrar = document.getElementById('r2rec-prog-cerrar');
-  btnCerrar.onclick = () => progOv.remove();
-
-  function _log(txt, color) {
-    const d = document.createElement('div');
-    d.style.color = color || 'var(--ink)';
-    d.innerHTML = txt;
-    log.appendChild(d);
-    log.scrollTop = log.scrollHeight;
-  }
-  function _prog(pct, msg) { barra.style.width = pct + '%'; if(msg) status.textContent = msg; }
-
-  try {
-    // 1) Listar PDFs en R2
-    _log('📦 Listando PDFs en R2…');
-    _prog(5, 'Consultando R2…');
-    const prefix = window.SB_DESPACHO_ID + '/recibos/';
-    const objs = await window.listarR2(prefix, 'recibos');
-    if (!objs || !objs.length) throw new Error('No hay archivos en R2/recibos/');
-
-    // Construir índice de archivos
-    const mapaR2 = {};
-    objs.forEach(o => {
-      const ruta = o.key || o.name || '';
-      const nombre = ruta.split('/').pop().toLowerCase();
-      mapaR2[nombre] = ruta;
-    });
-    _log(`✓ ${objs.length} archivos en R2`,'var(--verde)');
-    _prog(10);
-
-    // 2) Determinar qué letras restaurar
-    // Si pidió 72 → buscar 72A, 72B, 72C… Si pidió 72B → solo 72B
-    const letrasARestaurar = [];
-    if (letraInicial === 'A') {
-      // Buscar todas las letras disponibles para este folio
-      const folioStr = String(folioNum).padStart(3,'0');
-      'ABCDEFGHIJ'.split('').forEach(l => {
-        const anioCorto = String(new Date().getFullYear()).slice(2);
-        const patrones = [
-          `${anioCorto}-${folioStr}${l}.pdf`,
-          `${folioStr}${l}.pdf`,
-          `${folioStr}${l === 'A' ? '' : l}.pdf`,
-        ];
-        const encontrado = patrones.some(p => mapaR2[p.toLowerCase()]);
-        // Búsqueda parcial con regex exacto — evita falsos positivos (folio 7 vs 72)
-        // Busca folio+letra en cualquier parte del nombre (cubre: 26-072A.pdf, Recibo_26-072A_NOMBRE.pdf, etc)
-        const reLetra = new RegExp('(^|[^0-9])' + folioStr + (l === 'A' ? 'a?' : l) + '([^0-9]|_|\.pdf)', 'i');
-        const parcial = !encontrado && Object.keys(mapaR2).some(k => reLetra.test(k));
-        if (encontrado || parcial) letrasARestaurar.push(l);
-      });
-      if (!letrasARestaurar.length) letrasARestaurar.push('A');
-    } else {
-      letrasARestaurar.push(letraInicial);
-    }
-
-    _log(`📋 Letras a restaurar: ${letrasARestaurar.join(', ')}`);
-    _prog(15);
-
-    // 3) Restaurar cada letra
-    const recibosRestaurados = [];
-    for (let li = 0; li < letrasARestaurar.length; li++) {
-      const letra = letrasARestaurar[li];
-      _prog(15 + Math.round((li / letrasARestaurar.length) * 70), `Procesando ${folioNum}${letra}…`);
-
-      // Buscar ruta del PDF en R2
-      const folioStr = String(folioNum).padStart(3,'0');
-      const anioCorto = String(new Date().getFullYear()).slice(2);
-      const patrones = [
-        `recibo_${anioCorto}-${folioStr}${letra}`,        // Recibo_26-072A_NOMBRE.pdf (prefijo)
-        `${anioCorto}-${folioStr}${letra}.pdf`,           // 26-072A.pdf
-        `${folioStr}${letra}.pdf`,                        // 072A.pdf
-        `f-${anioCorto}${folioStr}${letra}.pdf`,          // f-26072A.pdf
-        ...(letra === 'A' ? [
-          `recibo_${anioCorto}-${folioStr}`,              // Recibo_26-072_NOMBRE.pdf sin letra
-          `${anioCorto}-${folioStr}.pdf`,                 // 26-072.pdf sin letra
-          `${folioStr}.pdf`,                              // 072.pdf
-          `${anioCorto}-${folioStr}a.pdf`,               // 26-072a.pdf minúscula
-        ] : [
-          `${anioCorto}-${folioStr}${letra.toLowerCase()}.pdf`,  // 26-072b.pdf minúscula
-        ]),
-      ];
-      // Para patrones con prefijo Recibo_, buscar por inclusión (no exacto)
-      const _esPatronPrefijo = (p) => p.startsWith('recibo_');
-      let rutaR2 = null;
-      for (const p of patrones) {
-        const pLow = p.toLowerCase();
-        if (_esPatronPrefijo && _esPatronPrefijo(pLow)) {
-          // Buscar por inclusión para nombres con prefijo Recibo_ + sufijo _NOMBRE
-          const kFound = Object.keys(mapaR2).find(k => k.toLowerCase().includes(pLow));
-          if (kFound) { rutaR2 = mapaR2[kFound]; break; }
-        } else if (mapaR2[pLow]) {
-          rutaR2 = mapaR2[pLow]; break;
-        }
-      }
-      if (!rutaR2) {
-        // Búsqueda parcial con regex exacto
-        // Busca folio+letra en cualquier parte del nombre (cubre: Recibo_26-072A_NOMBRE.pdf, 26-072A.pdf, etc)
-        const reExacto = new RegExp('(^|[^0-9])' + folioStr + (letra === 'A' ? 'a?' : letra) + '([^0-9]|_|\.pdf)', 'i');
-        const kMatch = Object.keys(mapaR2).find(k => reExacto.test(k.split('/').pop()));
-        if (kMatch) rutaR2 = mapaR2[kMatch];
-      }
-      if (!rutaR2) { _log(`  ⚠ Folio ${folioNum}${letra}: PDF no encontrado en R2`, 'var(--gold-d)'); continue; }
-
-      const nombreArchivo = rutaR2.split('/').pop();
-      _log(`📄 ${folioNum}${letra} → ${nombreArchivo}`);
-
-      // Descargar PDF
-      _log(`  ⬇ Descargando desde R2…`);
-      const blob = await window.descargarR2(rutaR2, 'recibos');
-      if (!blob || blob.size < 100) { _log(`  ❌ PDF vacío o inválido`, 'var(--rojo)'); continue; }
-
-      // OCR con Mistral + parseo de datos
-      _log(`  🔍 Extrayendo datos con Mistral OCR…`);
-      let datosRecibo = { folio: folioNum, letra, nombre: '—', fecha: new Date().toISOString().slice(0,10), concepto: '—', total: 0, anticipo: 0, saldo: 0 };
-      try {
-        const pdfFile = new File([blob], nombreArchivo, { type: 'application/pdf' });
-        if (typeof _ocrExtraerTexto === 'function') {
-          const ocrRes = await _ocrExtraerTexto(pdfFile, (m) => { status.textContent = m; });
-          const textoOCR = (ocrRes && ocrRes.texto) ? ocrRes.texto : '';
-          if (textoOCR) {
-            _log(`  🤖 Analizando con Mistral…`);
-            let mistralKey = '';
-            try {
-              if (typeof window._getMistralKey === 'function') mistralKey = await window._getMistralKey();
-              if (!mistralKey) mistralKey = window._mistralKeyCached || localStorage.getItem('mistral_api_key') || '';
-            } catch(e) {}
-            if (mistralKey) {
-              const prompt = `Del siguiente texto de un recibo de despacho jurídico mexicano, extrae en JSON puro sin backticks:
-{"folio":número,"letra":"A/B/C","nombre":"nombre del cliente","fecha":"YYYY-MM-DD","concepto":"servicio","total":número,"anticipo":número,"saldo":número}
-Si no encuentras un campo usa null.
-
-TEXTO:
-${textoOCR.slice(0, 8000)}`;
-              const mResp = await fetch('https://api.mistral.ai/v1/chat/completions', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + mistralKey },
-                body: JSON.stringify({ model: 'mistral-small-latest', messages: [{ role: 'user', content: prompt }], temperature: 0 })
-              });
-              if (mResp.ok) {
-                const mData = await mResp.json();
-                const txt = (mData.choices?.[0]?.message?.content || '').replace(/```json|```/g,'').trim();
-                try {
-                  const p = JSON.parse(txt);
-                  if (p.nombre)    datosRecibo.nombre   = p.nombre;
-                  if (p.fecha)     datosRecibo.fecha    = p.fecha;
-                  if (p.concepto)  datosRecibo.concepto = p.concepto;
-                  if (p.total    != null) datosRecibo.total    = parseFloat(p.total)    || 0;
-                  if (p.anticipo != null) datosRecibo.anticipo = parseFloat(p.anticipo) || 0;
-                  if (p.saldo    != null) datosRecibo.saldo    = parseFloat(p.saldo)    || 0;
-                  if (p.letra)     datosRecibo.letra    = p.letra.toUpperCase();
-                  if (p.folio)     datosRecibo.folio    = parseInt(p.folio) || folioNum;
-                } catch(e) { _log(`  ⚠ JSON Mistral inválido`, 'rgba(200,149,42,0.7)'); }
-              }
-            }
-          } else { _log(`  ⚠ Sin texto OCR — datos mínimos`, 'rgba(200,149,42,0.7)'); }
-        }
-      } catch(e) { _log(`  ⚠ OCR/Mistral falló: ${e.message}`, 'rgba(200,149,42,0.7)'); }
-
-      _log(`  ✓ Cliente: <strong>${escHTML(datosRecibo.nombre)}</strong> | Total: $${datosRecibo.total} | Saldo: $${datosRecibo.saldo}`, 'var(--verde)');
-
-
-      // Verificar si ya existe en el sistema (usar referencia viva, no snapshot)
-      const _reciboVivo = () => (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
-      const yaExiste = _reciboVivo().some(r => r.folio == datosRecibo.folio && (r.letra || 'A') === datosRecibo.letra);
-      if (yaExiste) { _log(`  ℹ Ya existe en el sistema — actualizando archivoR2`, 'var(--azul)'); }
-
-      // Construir objeto recibo
-      const reciboObj = {
-        folio:          datosRecibo.folio,
-        letra:          datosRecibo.letra,
-        anio_folio:     new Date(datosRecibo.fecha).getFullYear(),
-        nombre:         datosRecibo.nombre,
-        clientes:       [{ nombre: datosRecibo.nombre }],
-        conceptos:      [{ concepto: datosRecibo.concepto, precio: datosRecibo.total }],
-        total:          datosRecibo.total,
-        anticipo:       datosRecibo.anticipo,
-        totalAbonado:   datosRecibo.anticipo, // solo el anticipo real
-        // saldo y saldoPendiente idénticos a como los crea guardarReciboInterno
-        saldo:          datosRecibo.saldo > 0
-          ? datosRecibo.saldo
-          : (datosRecibo.anticipo >= datosRecibo.total ? 0 : datosRecibo.total - datosRecibo.anticipo),
-        saldoPendiente: datosRecibo.saldo > 0
-          ? datosRecibo.saldo
-          : (datosRecibo.anticipo >= datosRecibo.total ? 0 : datosRecibo.total - datosRecibo.anticipo),
-        fecha_recibo:   datosRecibo.fecha,
-        fecha:          datosRecibo.fecha,
-        hora_recibo:    '00:00',
-        archivo:        nombreArchivo,
-        archivoR2:      nombreArchivo,
-        esActualizacion: datosRecibo.letra !== 'A',
-        _restauradoDeR2: true,
-      };
-
-      // Revivir sobre tombstone (folio eliminado y restaurado desde R2)
-      if (typeof _revivirSiTombstone === 'function') _revivirSiTombstone(reciboObj);
-      // Agregar o actualizar en appData
-      if (!yaExiste) {
-        // Insertar en orden correcto (A primero, luego B, C…)
-        // Insertar después del último recibo del mismo folio (mantiene orden A,B,C…)
-        const idxUltFolio = (() => {
-          let last = -1;
-          appData.recibos.forEach((r, i) => { if (r.folio == datosRecibo.folio) last = i; });
-          return last;
-        })();
-        if (idxUltFolio >= 0) {
-          appData.recibos.splice(idxUltFolio + 1, 0, reciboObj);
-        } else {
-          appData.recibos.push(reciboObj);
-        }
-        _log(`  ✅ Recibo agregado al sistema`, 'var(--verde)');
-      } else {
-        // Solo actualizar archivoR2
-        const idxExist = _reciboVivo().findIndex(r => r.folio == datosRecibo.folio && (r.letra || 'A') === datosRecibo.letra);
-        if (idxExist >= 0) { appData.recibos[idxExist].archivoR2 = nombreArchivo; appData.recibos[idxExist].archivo = nombreArchivo; }
-      }
-
-      // Registrar en contabilidad si no existe
-      const movId = 'R2REC-' + datosRecibo.folio + datosRecibo.letra + '-' + Date.now();
-      const movExiste = (D.movimientos || []).some(m => m.fuente === 'recibo' && m.folio == datosRecibo.folio && (m.letra || 'A') === datosRecibo.letra);
-      if (!movExiste && datosRecibo.total > 0) {
-        // monto = SOLO lo realmente abonado (total - saldo pendiente real).
-        // Sin pago alguno → $0 con estatus "Sin Anticipo" (igual que el flujo
-        // normal). Registrar el total inflaba la caja con ingresos ficticios.
-        const _saldoReal = datosRecibo.saldo > 0
-          ? datosRecibo.saldo
-          : (datosRecibo.anticipo >= datosRecibo.total ? 0 : datosRecibo.total - datosRecibo.anticipo);
-        const _abonadoReal = Math.max(0, (parseFloat(datosRecibo.total) || 0) - _saldoReal);
-        const _estatusReal = (_saldoReal <= 0 && _abonadoReal > 0) ? 'Liquidado'
-          : (_abonadoReal > 0 ? 'Anticipo' : 'Sin Anticipo');
-        const _fsR2 = typeof folioConLetra === 'function'
-          ? folioConLetra(datosRecibo.folio, null, datosRecibo.letra) : datosRecibo.folio + datosRecibo.letra;
-        _registrarMovimiento({
-          id:          movId,
-          fuente:      'recibo',
-          folio:       datosRecibo.folio,
-          letra:       datosRecibo.letra,
-          nombre:      datosRecibo.nombre,
-          concepto:    datosRecibo.concepto,
-          descripcion: _estatusReal + ' — Recibo #' + _fsR2 + ' · ' + (datosRecibo.nombre||'') + (datosRecibo.concepto ? ' · ' + datosRecibo.concepto : ''),
-          monto:       _abonadoReal,            // solo lo realmente cobrado
-          tipo:        'ingreso',
-          anticipo:    datosRecibo.anticipo,    // anticipo pagado (puede ser 0)
-          saldoPendiente: _saldoReal,           // saldo real pendiente
-          fecha:       datosRecibo.fecha,
-          hora:        '00:00',
-          estatus:     _estatusReal,
-          cat:         _estatusReal + ' · #' + _fsR2,
-          responsable: (typeof empNombre === 'function') ? empNombre() : 'Admin',
-        });
-        _log(`  ✅ Movimiento registrado — monto: $${datosRecibo.total} | anticipo: $${datosRecibo.anticipo} | saldo: $${_saldoReal} | ${_estatusReal}`, 'var(--verde)');
-      } else if (movExiste) {
-        _log(`  ℹ Movimiento ya existe en contabilidad`, 'var(--azul)');
-      }
-
-      recibosRestaurados.push(reciboObj);
-    }
-
-    // 4) Recalcular saldos en cascada A→B→C…
-    if (recibosRestaurados.length > 1 || (recibosRestaurados.length === 1 && letraInicial === 'A')) {
-      _log(`\n💰 Recalculando saldos en cascada…`, 'var(--gold-d)');
-      _prog(90, 'Recalculando saldos…');
-      const todosDelFolio = (appData.recibos || [])
-        .filter(r => r.folio == folioNum)
-        .sort((a,b) => (a.letra||'A').localeCompare(b.letra||'A'));
-      let saldoAcum = 0;
-      todosDelFolio.forEach((r, i) => {
-        if (i === 0) { saldoAcum = parseFloat(r.total || 0) - parseFloat(r.anticipo || 0); r.saldoPendiente = saldoAcum; }
-        else { saldoAcum = Math.max(0, saldoAcum - parseFloat(r.total || 0)); r.saldoPendiente = saldoAcum; }
-        _log(`  ${r.letra||'A'}: saldo → $${saldoAcum.toFixed(2)}`);
-      });
-    }
-
-    // 5) Guardar en Supabase
-    _prog(95, 'Guardando en Supabase…');
-    _log(`\n💾 Sincronizando con Supabase…`, 'var(--gold-d)');
-    try {
-      if (typeof syncEstadoSupabase === 'function') await syncEstadoSupabase();
-      else if (typeof save === 'function') save();
-      _log('✓ Guardado exitosamente', 'var(--verde)');
-    } catch(e) { _log('⚠ Error al guardar: ' + e.message, 'var(--rojo)'); }
-
-    // Actualizar vistas
-    if (typeof renderContab === 'function') renderContab();
-    if (typeof renderCaja === 'function') renderCaja();
-    if (typeof renderRec === 'function') renderRec();
-    if (typeof badges === 'function') badges();
-
-    _prog(100);
-    _log(`\n✅ RESTAURACIÓN COMPLETADA — ${recibosRestaurados.length} recibo(s) procesados`, 'var(--verde)');
-    toast(`✓ Folio ${folioNum} restaurado (${recibosRestaurados.length} versiones)`, 'ok');
-
-  } catch(e) {
-    _log('❌ Error: ' + e.message, 'var(--rojo)');
-    console.error('[R2Recovery]', e);
-    _prog(100, 'Error: ' + e.message);
-  }
-  btnCerrar.style.display = 'block';
 }
 
 async function adminVincularPDFsR2() {
@@ -23738,6 +23807,289 @@ async function adminRegenerarPDFsHistoricos() {
   try { await syncEstadoSupabase(); } catch(e){}
   toast('✅ ' + ok + ' PDFs regenerados' + (err ? ' · ' + err + ' errores' : ''));
 }
+
+// ════════════════════════════════════════════════════════════════════
+// GESTOR DE FOLIOS — Insertar (hacer espacio) / Eliminar (cerrar o dejar hueco)
+// Módulo INDEPENDIENTE. No modifica las demás opciones de borrado/reparación.
+// Modelo de folio continuo (sin año): solo cambia el número impreso del PDF,
+// los datos del recibo quedan intactos.
+// ════════════════════════════════════════════════════════════════════
+function _gfRecibosVivos(){
+  return (appData.recibos||[]).filter(function(r){ return r && r.folio!=null && !r.esComplemento; });
+}
+function _gfMaxFolio(){
+  var max=0;
+  _gfRecibosVivos().forEach(function(r){ var f=Number(r.folio); if(Number.isFinite(f)&&f>max) max=f; });
+  return max;
+}
+function _gfFolioExiste(n){
+  return (appData.recibos||[]).some(function(r){ return r && Number(r.folio)===Number(n); });
+}
+function _gfRecibosEnRango(desde, hasta){
+  return (appData.recibos||[]).filter(function(r){
+    var f=Number(r.folio); return Number.isFinite(f) && f>=desde && f<=hasta;
+  });
+}
+function _gfDistintosFolios(lista){
+  var s=new Set(); lista.forEach(function(r){ s.add(Number(r.folio)); }); return s.size;
+}
+// Respaldo previo en localStorage (snapshot puntual antes de mutar).
+function _gfBackup(etiqueta){
+  try{
+    var snap={ ts:Date.now(), etiqueta:etiqueta,
+      recibos:(appData.recibos||[]),
+      movimientos:(typeof D!=='undefined' && D.movimientos)?D.movimientos:[],
+      folioActual:appData.folioActual };
+    localStorage.setItem('lex_gf_backup_'+etiqueta+'_'+Date.now(), JSON.stringify(snap));
+  }catch(e){ console.warn('[gestorFolios] backup', e); }
+}
+// Regenera el PDF de cada recibo afectado (ya con su folio NUEVO aplicado en r.folio) y lo sube.
+async function _gfRegenerarPDFs(recibosAfectados, logFn){
+  for(var i=0;i<recibosAfectados.length;i++){
+    var r=recibosAfectados[i];
+    var letra=r.letra||'A';
+    var fStr=folioConLetra(r.folio, r.anio_folio||2026, letra);
+    if(logFn) logFn('Regenerando '+(i+1)+'/'+recibosAfectados.length+' — #'+fStr);
+    try{
+      var qrTxt='LEX-MEXICO|Folio:'+fStr+'|'+(r.nombre||'')+'|'+(r.fecha_recibo||r.fecha||'')+' '+(r.hora_recibo||r.hora||'');
+      var qrURL=await qrToDataURL(qrTxt);
+      var doc=await generarPDF(Object.assign({}, r, {anio_folio:r.anio_folio||2026, letra:letra}), r.folio, qrURL);
+      r.pdfBase64=doc.output('datauristring');
+      var r2n=(typeof _nombreArchivoR2==='function')?_nombreArchivoR2(fStr, r.nombre||''):fStr+'.pdf';
+      await subirPDFaDrive(doc.output('blob'), fStr+'.pdf', r2n);
+    }catch(e){ console.warn('[gestorFolios] regen folio', r.folio, e); }
+    await new Promise(function(res){ setTimeout(res, 80); });
+  }
+}
+// Borra de R2/Drive los PDFs viejos identificados por {folio, letra, nombre}.
+async function _gfBorrarPDFsViejos(items, preservar){
+  preservar = preservar || new Set();
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    var fStr=folioConLetra(it.folio, 2026, it.letra||'A');
+    var corto = fStr+'.pdf';
+    // La variante descriptiva legacy se borra SIEMPRE (nunca colisiona con un nombre nuevo).
+    if(typeof _nombreArchivoR2Legacy==='function'){
+      var leg=_nombreArchivoR2Legacy(fStr, it.nombre||'');
+      try{ if(typeof window.borrarR2==='function' && window.SB_DESPACHO_ID) await window.borrarR2(window.SB_DESPACHO_ID+'/recibos/'+leg, 'recibos').catch(function(){}); }catch(e){}
+      try{ if(typeof borrarPDFdeDrive==='function') await borrarPDFdeDrive(leg).catch(function(){}); }catch(e){}
+    }
+    // El nombre corto se borra SOLO si NO se reutiliza como nombre nuevo de otro
+    // recibo desplazado (al recorrer ±1, el nombre viejo de uno = nombre nuevo de otro).
+    if(!preservar.has(corto)){
+      try{ if(typeof window.borrarR2==='function' && window.SB_DESPACHO_ID) await window.borrarR2(window.SB_DESPACHO_ID+'/recibos/'+corto, 'recibos').catch(function(){}); }catch(e){}
+      try{ if(typeof borrarPDFdeDrive==='function') await borrarPDFdeDrive(corto).catch(function(){}); }catch(e){}
+    }
+  }
+}
+// Nombres cortos NUEVOS (canónicos) de un conjunto de recibos ya renumerados.
+function _gfNombresNuevos(recibos){
+  var s=new Set();
+  (recibos||[]).forEach(function(r){ s.add(folioConLetra(r.folio, r.anio_folio||2026, r.letra||'A')+'.pdf'); });
+  return s;
+}
+// Actualiza folio_base en versiones_recibo (Supabase) en el ORDEN dado, para
+// no chocar con el índice único (despacho_id, folio_base, anio_folio, letra).
+async function _gfActualizarVersionesSB(pares){
+  if(!(window.SB && window.SB_DESPACHO_ID)) return;
+  for(var i=0;i<pares.length;i++){
+    var viejo=pares[i][0], nuevo=pares[i][1];
+    try{
+      await window.SB.from('versiones_recibo').update({folio_base:nuevo})
+        .eq('despacho_id', window.SB_DESPACHO_ID).eq('folio_base', viejo);
+    }catch(e){ console.warn('[gestorFolios] versiones '+viejo+'→'+nuevo, e); }
+  }
+}
+// Apunta el contador al folio indicado y lo persiste (mismo flujo que el sistema).
+async function _gfFijarContador(n){
+  appData.folioActual=n;
+  if(typeof REC!=='undefined') REC.folioActual=n;
+  if(typeof actualizarFolioDisplay==='function') actualizarFolioDisplay();
+  try{ if(typeof guardarFolioEnDrive==='function') await guardarFolioEnDrive(n); }
+  catch(e){ console.warn('[gestorFolios] guardarFolioEnDrive', e); }
+}
+
+// ── OPERACIÓN: INSERTAR (hacer espacio, recorre +1) ──────────────────
+async function _gfInsertarEjecutar(folioN, logFn){
+  folioN=Number(folioN);
+  var max=_gfMaxFolio();
+  if(!Number.isInteger(folioN)||folioN<1){ alert('Folio inválido.'); return false; }
+  if(folioN>max){ alert('El folio '+folioN+' está por encima del último (#'+max+'). No hay folios que recorrer: captúralo directamente como nuevo.'); return false; }
+  if(!_gfFolioExiste(folioN)){ alert('El folio '+folioN+' ya está libre (no existe). No hace falta hacer espacio.'); return false; }
+  if(typeof _ultimoSyncPropio!=='undefined') _ultimoSyncPropio=Date.now();
+  _gfBackup('insertar_'+folioN);
+  var afectados=_gfRecibosEnRango(folioN, max);
+  var viejos=afectados.map(function(r){ return {folio:Number(r.folio), letra:(r.letra||'A'), nombre:(r.nombre||'')}; });
+  var mapa=new Map();
+  for(var f=max; f>=folioN; f--) mapa.set(f, f+1);
+  if(logFn) logFn('Renumerando '+mapa.size+' folio(s) hacia arriba…');
+  await _aplicarMapaRenumeracion(mapa, 2026, folioN);
+  await _gfRegenerarPDFs(afectados, logFn);
+  if(logFn) logFn('Borrando PDFs viejos…');
+  await _gfBorrarPDFsViejos(viejos, _gfNombresNuevos(afectados));
+  if(logFn) logFn('Actualizando Supabase…');
+  await _gfActualizarVersionesSB(Array.from(mapa.entries()).sort(function(a,b){ return b[0]-a[0]; }));
+  await _gfFijarContador(folioN);
+  try{ await actualizarArchivoControl(); }catch(e){}
+  try{ await syncEstadoSupabase(); }catch(e){}
+  if(typeof renderHistorial==='function') renderHistorial();
+  if(typeof renderContab==='function') renderContab();
+  if(logFn) logFn('Listo. Folio '+folioN+' libre.');
+  if(typeof toast==='function') toast('✅ Hueco creado en folio '+folioN+' — el siguiente recibo lo ocupará.');
+  return true;
+}
+
+// ── OPERACIÓN: ELIMINAR (cerrar o dejar hueco) ───────────────────────
+async function _gfEliminarEjecutar(folioN, cerrarHueco, logFn){
+  folioN=Number(folioN);
+  var max=_gfMaxFolio();
+  if(!Number.isInteger(folioN)||folioN<1){ alert('Folio inválido.'); return false; }
+  var delRecs=(appData.recibos||[]).filter(function(r){ return Number(r.folio)===folioN; });
+  if(!delRecs.length){ alert('No existe el folio '+folioN+'.'); return false; }
+  if(typeof _ultimoSyncPropio!=='undefined') _ultimoSyncPropio=Date.now();
+  _gfBackup('eliminar_'+folioN);
+  // Tombstones + broadcast por cada versión, para que no reaparezca en el merge.
+  if(!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados=[];
+  delRecs.forEach(function(r){
+    var letra=r.letra||'A';
+    if(!appData.folios_eliminados.some(function(t){ return String(t.folio)===String(folioN)&&t.letra===letra; }))
+      appData.folios_eliminados.push({folio:folioN, letra:letra, ts:Date.now()});
+    try{
+      if(typeof _lexRealtimeChannel!=='undefined' && _lexRealtimeChannel && _lexRealtimeChannel.state==='joined')
+        _lexRealtimeChannel.send({type:'broadcast', event:'folio_eliminado', payload:{folio:folioN, letra:letra, ts:Date.now()}}).catch(function(){});
+    }catch(e){}
+  });
+  var pdfsDel=delRecs.map(function(r){ return {folio:folioN, letra:(r.letra||'A'), nombre:(r.nombre||'')}; });
+  // Quitar de memoria (recibo, movimientos, historial de pagos, snapshots, pendientes).
+  appData.recibos=(appData.recibos||[]).filter(function(r){ return Number(r.folio)!==folioN; });
+  if(typeof REC!=='undefined') REC.recibos=appData.recibos;
+  if(typeof D!=='undefined' && Array.isArray(D.movimientos))
+    D.movimientos=D.movimientos.filter(function(m){ return !(m && m.fuente==='recibo' && Number(m.folio)===folioN); });
+  if(appData.historialPagos) delete appData.historialPagos[folioN];
+  if(typeof D!=='undefined' && Array.isArray(D.snapshotsRecibos))
+    D.snapshotsRecibos=D.snapshotsRecibos.filter(function(s){ return Number(s.folio)!==folioN; });
+  if(typeof D!=='undefined' && Array.isArray(D.pendientes))
+    D.pendientes=D.pendientes.filter(function(p){ return !(p && Number(p.reciboVinculadoFolio)===folioN); });
+  // Supabase: borrar versiones del folio.
+  try{ if(window.SB && window.SB_DESPACHO_ID) await window.SB.from('versiones_recibo').delete().eq('despacho_id', window.SB_DESPACHO_ID).eq('folio_base', folioN); }
+  catch(e){ console.warn('[gestorFolios] del versiones', e); }
+  if(logFn) logFn('Borrando PDF del folio '+folioN+'…');
+  await _gfBorrarPDFsViejos(pdfsDel);
+
+  if(cerrarHueco){
+    var afectados=_gfRecibosEnRango(folioN+1, max);
+    var viejos=afectados.map(function(r){ return {folio:Number(r.folio), letra:(r.letra||'A'), nombre:(r.nombre||'')}; });
+    var mapa=new Map();
+    for(var f=folioN+1; f<=max; f++) mapa.set(f, f-1);
+    if(logFn) logFn('Cerrando hueco: renumerando '+mapa.size+' folio(s) hacia abajo…');
+    await _aplicarMapaRenumeracion(mapa, 2026, max);
+    await _gfRegenerarPDFs(afectados, logFn);
+    if(logFn) logFn('Borrando PDFs viejos…');
+    await _gfBorrarPDFsViejos(viejos, _gfNombresNuevos(afectados));
+    if(logFn) logFn('Actualizando Supabase…');
+    await _gfActualizarVersionesSB(Array.from(mapa.entries()).sort(function(a,b){ return a[0]-b[0]; }));
+    await _gfFijarContador(max);
+  } else {
+    if(typeof save==='function') save();
+    await _gfFijarContador((typeof _recalcularFolioActual==='function')?_recalcularFolioActual():(_gfMaxFolio()+1));
+  }
+  try{ await actualizarArchivoControl(); }catch(e){}
+  try{ await syncEstadoSupabase(); }catch(e){}
+  if(typeof renderHistorial==='function') renderHistorial();
+  if(typeof renderContab==='function') renderContab();
+  if(typeof renderCaja==='function') renderCaja();
+  if(logFn) logFn('Listo.');
+  if(typeof toast==='function') toast('✅ Folio '+folioN+' eliminado'+(cerrarHueco?' y hueco cerrado.':' (hueco dejado).'));
+  return true;
+}
+
+// ── UI: modal del gestor ─────────────────────────────────────────────
+function abrirGestorFolios(){
+  try{ var ex=document.getElementById('gf-ov'); if(ex) ex.remove(); }catch(e){}
+  var max=_gfMaxFolio();
+  var ov=document.createElement('div');
+  ov.id='gf-ov';
+  ov.style.cssText='position:fixed;inset:0;background:rgba(12,9,5,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.innerHTML=''
+    +'<div style="background:var(--surface);border:1px solid var(--border-l);border-radius:var(--radius);width:560px;max-width:96vw;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:var(--shadow-lg);">'
+    +  '<div style="padding:16px 20px;border-bottom:1px solid var(--border-l);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'
+    +    '<div><div style="font-size:0.92rem;font-weight:700;color:var(--ink);">🔢 Gestor de Folios</div>'
+    +    '<div style="font-size:0.6rem;color:var(--muted);margin-top:2px;">Insertar espacio · Eliminar recibo — último folio: #'+max+'</div></div>'
+    +    '<button onclick="document.getElementById(\'gf-ov\').remove()" style="font-size:1rem;background:none;border:none;cursor:pointer;color:var(--muted);padding:4px 8px;">✕</button>'
+    +  '</div>'
+    +  '<div style="padding:18px 20px;display:flex;flex-direction:column;gap:16px;overflow-y:auto;flex:1;">'
+    +    '<div style="border:1.5px solid rgba(77,202,106,0.35);border-radius:10px;padding:14px;">'
+    +      '<div style="font-size:0.8rem;font-weight:700;color:var(--ink);margin-bottom:4px;">➕ Insertar espacio</div>'
+    +      '<div style="font-size:0.64rem;color:var(--muted);line-height:1.5;margin-bottom:10px;">Libera un folio recorriendo ese número y los siguientes una posición hacia arriba (+1). Solo cambia el número impreso del PDF; los datos del recibo quedan intactos. El folio liberado lo ocupará el siguiente recibo que captures.</div>'
+    +      '<div style="display:flex;gap:8px;align-items:center;">'
+    +        '<input id="gf-ins-folio" type="number" min="1" placeholder="Folio a liberar (ej. 19)" style="flex:1;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;background:var(--surface2);color:var(--ink);font-family:monospace;">'
+    +        '<button onclick="_gfUIInsertar()" style="padding:8px 14px;border-radius:6px;border:none;background:#2e7d46;color:#fff;font-size:0.74rem;font-weight:700;cursor:pointer;white-space:nowrap;">Insertar</button>'
+    +      '</div>'
+    +    '</div>'
+    +    '<div style="border:1.5px solid rgba(192,22,26,0.35);border-radius:10px;padding:14px;">'
+    +      '<div style="font-size:0.8rem;font-weight:700;color:var(--ink);margin-bottom:4px;">🗑 Eliminar recibo</div>'
+    +      '<div style="font-size:0.64rem;color:var(--muted);line-height:1.5;margin-bottom:10px;">Borra el recibo completo (recibo, sus movimientos de contabilidad y su PDF). Elige si cerrar el hueco —los folios siguientes bajan uno— o dejarlo.</div>'
+    +      '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">'
+    +        '<input id="gf-del-folio" type="number" min="1" placeholder="Folio a eliminar" style="flex:1;box-sizing:border-box;padding:7px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;background:var(--surface2);color:var(--ink);font-family:monospace;">'
+    +      '</div>'
+    +      '<div style="display:flex;gap:8px;">'
+    +        '<button onclick="_gfUIEliminar(true)" style="flex:1;padding:8px 10px;border-radius:6px;border:1px solid rgba(192,22,26,0.5);background:rgba(192,22,26,0.12);color:#e85555;font-size:0.72rem;font-weight:700;cursor:pointer;">Eliminar y cerrar hueco</button>'
+    +        '<button onclick="_gfUIEliminar(false)" style="flex:1;padding:8px 10px;border-radius:6px;border:1px solid var(--border-l);background:var(--surface2);color:var(--ink);font-size:0.72rem;font-weight:700;cursor:pointer;">Eliminar y dejar hueco</button>'
+    +      '</div>'
+    +    '</div>'
+    +    '<div id="gf-log" style="font-family:monospace;font-size:0.62rem;color:var(--muted);line-height:1.8;max-height:120px;overflow-y:auto;"></div>'
+    +  '</div>'
+    +'</div>';
+  document.body.appendChild(ov);
+}
+function _gfLog(msg){
+  var el=document.getElementById('gf-log');
+  if(el){ var d=document.createElement('div'); d.textContent='• '+msg; el.appendChild(d); el.scrollTop=el.scrollHeight; }
+}
+function _gfBloquear(b){
+  document.querySelectorAll('#gf-ov button, #gf-ov input').forEach(function(x){ x.disabled=b; });
+}
+async function _gfUIInsertar(){
+  var n=Number((document.getElementById('gf-ins-folio')||{}).value);
+  var max=_gfMaxFolio();
+  if(!Number.isInteger(n)||n<1){ alert('Escribe un folio válido.'); return; }
+  var afectados=_gfRecibosEnRango(n, max);
+  var cuenta=_gfDistintosFolios(afectados);
+  if(_gfFolioExiste(n) && n<=max){
+    if(!confirm('INSERTAR ESPACIO EN FOLIO '+n+'\n\n'
+      +'Se recorrerán '+cuenta+' folio(s) hacia arriba (+1):\n'
+      +'   '+n+' → '+(n+1)+'   …   '+max+' → '+(max+1)+'\n\n'
+      +'• Quedará LIBRE el folio '+n+' (el siguiente recibo lo ocupará).\n'
+      +'• Se regeneran los PDF con su folio nuevo y se borran los viejos.\n'
+      +'• Los datos de cada recibo NO cambian, solo el número.\n\n'
+      +'⚠ Hazlo cuando nadie más esté capturando. ¿Continuar?')) return;
+  }
+  _gfBloquear(true);
+  try{ await _gfInsertarEjecutar(n, _gfLog); }
+  catch(e){ console.error(e); alert('Error: '+(e&&e.message?e.message:e)); }
+  _gfBloquear(false);
+}
+async function _gfUIEliminar(cerrar){
+  var n=Number((document.getElementById('gf-del-folio')||{}).value);
+  var max=_gfMaxFolio();
+  if(!Number.isInteger(n)||n<1){ alert('Escribe un folio válido.'); return; }
+  var delRecs=(appData.recibos||[]).filter(function(r){ return Number(r.folio)===n; });
+  if(!delRecs.length){ alert('No existe el folio '+n+'.'); return; }
+  var versiones=delRecs.map(function(r){ return (r.letra||'A'); }).join(', ');
+  var nombre=(delRecs[0].nombre||'(sin nombre)');
+  var msg='ELIMINAR FOLIO '+n+'   ('+nombre+')\n\n'
+    +'Versiones: '+versiones+'\n'
+    +'Se borrará: recibo, sus movimientos de contabilidad y su PDF.\n\n';
+  if(cerrar) msg+='CERRAR HUECO: los folios > '+n+' bajarán uno ('+(n+1)+'→'+n+'   …   '+max+'→'+(max-1)+').\nSe regeneran sus PDF (solo cambia el número).\n\n';
+  else msg+='DEJAR HUECO: quedará un vacío en el folio '+n+'.\n\n';
+  msg+='⚠ Acción con respaldo, pero hazla cuando nadie más esté capturando. ¿Continuar?';
+  if(!confirm(msg)) return;
+  _gfBloquear(true);
+  try{ await _gfEliminarEjecutar(n, cerrar, _gfLog); }
+  catch(e){ console.error(e); alert('Error: '+(e&&e.message?e.message:e)); }
+  _gfBloquear(false);
+}
+
 // ══════════════════════════════════════════════════════════════════
 // CORREGIR LETRAS DE MOVIMIENTOS — Repara movimientos con letra 'A'
 // que deberían tener la letra de la versión más reciente del recibo
@@ -23920,6 +24272,51 @@ async function adminCorregirLetrasMovimientos(silencioso){
   } else if(totalCambios > 0){
     console.log('[CorregirLetras+R2] Auto-corrección: '+corregidos+' liq., '+corregidosContab+' contab., '+r2Corregidos+' R2');
   }
+}
+// ══════════════════════════════════════════════════════════════════
+// VINCULAR HISTORIAL ↔ CONTABILIDAD — repara enlaces folio/letra (sin
+// tocar montos) y regulariza el orden del historial igual que contabilidad.
+// ══════════════════════════════════════════════════════════════════
+async function adminVincularHistorialContab(){
+  if(typeof D==='undefined' || !Array.isArray(D.movimientos)){ alert('Sin movimientos de contabilidad en memoria.'); return; }
+  if(!confirm('VINCULAR HISTORIAL ↔ CONTABILIDAD\n\nVa a:\n• Reparar los enlaces folio/letra de los movimientos para que cuadren con su recibo (NO toca montos ni fechas).\n• Regularizar el orden del historial para que siga el mismo criterio que contabilidad (fecha del movimiento + folio).\n\n¿Continuar?')) return;
+  if(typeof _ultimoSyncPropio!=='undefined') _ultimoSyncPropio=Date.now();
+  // 1) Reparar enlaces (letras/folio) reutilizando la corrección existente.
+  try{ await adminCorregirLetrasMovimientos(true); }catch(e){ console.warn('[vincular] corregir letras', e); }
+  // 2) Auditoría de correspondencia movimiento ↔ recibo (por folio+letra).
+  var recKeys = new Set();
+  (appData.recibos||[]).forEach(function(r){ if(r && r.folio!=null && !r.esComplemento) recKeys.add(Number(r.folio)+'|'+(r.letra||'A')); });
+  var foliosConRecibo = new Set();
+  (appData.recibos||[]).forEach(function(r){ if(r && r.folio!=null) foliosConRecibo.add(Number(r.folio)); });
+  var movKeys = new Set();
+  var huerfanos = [];
+  D.movimientos.forEach(function(m){
+    if(!m || m.fuente!=='recibo' || m.borrado || m.folio==null) return;
+    var k = Number(m.folio)+'|'+(m.letra||'A');
+    movKeys.add(k);
+    if(!foliosConRecibo.has(Number(m.folio))) huerfanos.push(folioConLetra(m.folio, null, m.letra||'A'));
+  });
+  var vinculados = 0; recKeys.forEach(function(k){ if(movKeys.has(k)) vinculados++; });
+  var sinMovimiento = [];
+  recKeys.forEach(function(k){ if(!movKeys.has(k)){ var p=k.split('|'); sinMovimiento.push(folioConLetra(Number(p[0]), 2026, p[1])); } });
+  // Dedup y orden de listas
+  huerfanos = Array.from(new Set(huerfanos));
+  sinMovimiento = Array.from(new Set(sinMovimiento));
+  // 3) Persistir reparaciones + re-render (el historial se reordena al criterio de contabilidad).
+  try{ if(typeof save==='function') save(); }catch(e){}
+  try{ if(typeof actualizarArchivoControl==='function') await actualizarArchivoControl(); }catch(e){}
+  try{ if(typeof syncEstadoSupabase==='function') await syncEstadoSupabase(); }catch(e){}
+  if(typeof renderHistorial==='function') renderHistorial();
+  if(typeof renderContab==='function') renderContab();
+  // 4) Reporte
+  var msg = 'VINCULACIÓN TERMINADA\n\n'
+    + '• Recibos vinculados a su movimiento: '+vinculados+'\n'
+    + '• Historial reordenado al mismo criterio que contabilidad (fecha del movimiento + folio).\n'
+    + '• Enlaces folio/letra revisados y corregidos donde hacía falta (sin tocar montos).\n\n';
+  if(huerfanos.length) msg += '⚠ Movimientos huérfanos (sin recibo) — '+huerfanos.length+': '+huerfanos.slice(0,25).join(', ')+(huerfanos.length>25?' …':'')+'\n';
+  if(sinMovimiento.length) msg += '⚠ Recibos sin movimiento en contabilidad — '+sinMovimiento.length+': '+sinMovimiento.slice(0,25).join(', ')+(sinMovimiento.length>25?' …':'')+'\n';
+  if(!huerfanos.length && !sinMovimiento.length) msg += '✅ Todo cuadra: cada recibo tiene su movimiento y viceversa.';
+  alert(msg);
 }
 // Ejecutar automáticamente al cargar — modo silencioso
 // Se lanza después de que Supabase cargó los datos (debounced 8s)
@@ -24470,7 +24867,7 @@ async function adminBorrarMovimientosPorFecha() {
         carpetas:             D.carpetas             || [],
         juicios:              D.juicios              || [],
         pendientes:           D.pendientes           || [],
-        cierres:              D.cierres              || [],
+        citas:                D.citas                || [],
         prestamos:            D.prestamos            || [],
         saldoAcumulado:       D.saldoAcumulado       || 0,
         escrituras:           D.escrituras           || [],
@@ -25952,6 +26349,7 @@ async function adminRevertirLetraA(idx) {
         movimientos: movsLimpios,
         directorio:  D.directorio  || [], carpetas: D.carpetas || [],
         juicios:     D.juicios     || [], pendientes: D.pendientes || [],
+        citas:       D.citas       || [],
         cierres:     D.cierres     || [], prestamos:  D.prestamos || [],
         saldoAcumulado: D.saldoAcumulado || 0,
         escrituras:  D.escrituras  || [],
@@ -26419,8 +26817,13 @@ async function guardarEdicionCompleta() {
     const nombreArchivo = folioConLetra(r.folio, anioFolioN, letraRecibo) + '.pdf';
     r.pdfBase64 = doc.output('datauristring');
     r.archivo   = nombreArchivo;
+    r.archivoR2 = nombreArchivo; // referencia canónica corta
     // ─── Subir PDF a Storage ────────────────────────────────────────
-    if (typeof borrarPDFdeDrive === 'function') {
+    // Purga TODAS las variantes viejas (corta + descriptiva legacy) en R2 y Drive
+    // antes de subir la versión nueva → un solo archivo por recibo.
+    if (typeof _purgarPDFRecibo === 'function') {
+      try { await _purgarPDFRecibo(nombreArchivo.replace(/\.pdf$/i,''), primerNombre); } catch(e){ registrarError('catch vacio', e); }
+    } else if (typeof borrarPDFdeDrive === 'function') {
       try { await borrarPDFdeDrive(nombreArchivo); } catch(e){ registrarError('catch vacio', e); }
     }
     if (typeof subirPDFaDrive === 'function') {
@@ -30542,7 +30945,7 @@ if(typeof guardarReciboInterno === 'function' && !window._guardarReciboInternoOr
         carpetas:       D.carpetas      || [],
         juicios:        D.juicios       || [],
         pendientes:     D.pendientes    || [],
-        cierres:        D.cierres       || [],
+        citas:          D.citas         || [],
         prestamos:      D.prestamos     || [],
         saldoAcumulado: D.saldoAcumulado || 0
       };
@@ -37958,7 +38361,7 @@ function driveIniciarOAuth(){
     client_id:     DRIVE_CLIENT_ID,
     redirect_uri:  'https://lexmexico423-dotcom.github.io/lex-mexico/',
     response_type: 'code',
-    scope:         'https://www.googleapis.com/auth/drive.file',
+    scope:         'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar.events',
     access_type:   'offline',
     prompt:        'consent'
   });
@@ -38019,7 +38422,122 @@ if(typeof toast==='function') toast('✅ Drive conectado permanentemente — ya 
     if(typeof toast==='function') toast('❌ Error al conectar Drive: '+e.message,'err');
   }
 }
-// Verificar si hay un callback OAuth pendiente al cargar la página
+// ─── GOOGLE CALENDAR ─────────────────────────────────────────────────
+// Reutiliza el mismo token (y refresh automático) que Drive, ya que
+// driveIniciarOAuth() pide también el scope calendar.events.
+const CALENDAR_API_BASE = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+// Construye el cuerpo del evento a partir de una "cita" del módulo de Citas
+function _calendarEventoBody(cita){
+  // cita.fecha: 'YYYY-MM-DD', cita.hora: 'HH:MM' (24h), cita.duracionMin opcional (default 60)
+  const tz = 'America/Mexico_City';
+  const inicio = (cita.fecha||'') + 'T' + (cita.hora||'09:00') + ':00';
+  const dur = cita.duracionMin || 60;
+  const [h,m] = (cita.hora||'09:00').split(':').map(Number);
+  let finH = h, finM = m + dur;
+  while(finM >= 60){ finM -= 60; finH += 1; }
+  const fin = (cita.fecha||'') + 'T' + String(finH).padStart(2,'0') + ':' + String(finM).padStart(2,'0') + ':00';
+  return {
+    summary: cita.titulo || 'Cita',
+    location: cita.lugar || cita.direccion || '',
+    description: cita.notas || '',
+    start: { dateTime: inicio, timeZone: tz },
+    end:   { dateTime: fin,    timeZone: tz }
+  };
+}
+// Crear un evento — devuelve {id, htmlLink} o null si falla
+async function calendarCrearEvento(cita){
+  try{
+    const token = await driveGetAccessToken();
+    if(!token){ if(typeof toast==='function') toast('⚠ Conecta Drive/Calendar primero','err'); return null; }
+    const resp = await fetch(CALENDAR_API_BASE, {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(_calendarEventoBody(cita))
+    });
+    const data = await resp.json();
+    if(!resp.ok){ console.error('[Calendar] crear', data); if(typeof toast==='function') toast('⚠ Error al crear evento en Calendar','err'); return null; }
+    return { id: data.id, htmlLink: data.htmlLink };
+  }catch(e){ console.error('[Calendar] crear', e); return null; }
+}
+// Actualizar un evento existente por su eventId
+async function calendarActualizarEvento(eventId, cita){
+  try{
+    const token = await driveGetAccessToken();
+    if(!token || !eventId) return null;
+    const resp = await fetch(CALENDAR_API_BASE + '/' + eventId, {
+      method: 'PATCH',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(_calendarEventoBody(cita))
+    });
+    const data = await resp.json();
+    if(!resp.ok){ console.error('[Calendar] actualizar', data); return null; }
+    return { id: data.id, htmlLink: data.htmlLink };
+  }catch(e){ console.error('[Calendar] actualizar', e); return null; }
+}
+// Eliminar un evento por su eventId
+async function calendarEliminarEvento(eventId){
+  try{
+    const token = await driveGetAccessToken();
+    if(!token || !eventId) return false;
+    const resp = await fetch(CALENDAR_API_BASE + '/' + eventId, {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    return resp.ok || resp.status === 410; // 410 = ya estaba eliminado
+  }catch(e){ console.error('[Calendar] eliminar', e); return false; }
+}
+// ─── MODAL: AGENDAR CITA ─────────────────────────────────────────────
+function agendarCitaAbrir(){
+  if(!Array.isArray(D.citas)) D.citas = [];
+  const ids = ['citaTitulo','citaCliente','citaLugar','citaNotas'];
+  ids.forEach(id=>{ const e=document.getElementById(id); if(e) e.value=''; });
+  const f=document.getElementById('citaFecha'); if(f) f.value='';
+  const h=document.getElementById('citaHora'); if(h) h.value='09:00';
+  const st=document.getElementById('citaCalendarStatus'); if(st){ st.style.display='none'; st.textContent=''; }
+  const modal = document.getElementById('mAgendarCita');
+  if(modal) modal.classList.add('show');
+}
+// Abre Google Maps con la ruta hacia el lugar de la cita (sin necesidad de API key)
+function agendarCitaComoLlegar(){
+  const lugar = document.getElementById('citaLugar')?.value.trim() || '';
+  if(!lugar){ toast('Escribe primero el lugar/dirección de la cita','err'); return; }
+  const url = 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(lugar);
+  window.open(url, '_blank');
+}
+// Guarda la cita en D.citas, sincroniza y crea el evento en Google Calendar
+async function agendarCitaGuardar(){
+  const titulo = document.getElementById('citaTitulo')?.value.trim() || '';
+  const fecha  = document.getElementById('citaFecha')?.value || '';
+  const hora   = document.getElementById('citaHora')?.value || '09:00';
+  const cliente= document.getElementById('citaCliente')?.value.trim() || '';
+  const lugar  = document.getElementById('citaLugar')?.value.trim() || '';
+  const notas  = document.getElementById('citaNotas')?.value.trim() || '';
+  if(!titulo){ toast('El asunto/título es obligatorio','err'); return; }
+  if(!fecha){ toast('La fecha es obligatoria','err'); return; }
+  const cita = {
+    id: 'CITA-'+Date.now(),
+    titulo, cliente, fecha, hora, lugar, notas,
+    creadaEn: new Date().toISOString(),
+    eventoCalendarId: null, eventoCalendarLink: null
+  };
+  if(!Array.isArray(D.citas)) D.citas = [];
+  D.citas.unshift(cita);
+  // Guardar local/Supabase de inmediato — no depender de Calendar para persistir
+  save(); syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); });
+  cerrar('mAgendarCita');
+  toast('📅 Cita guardada — agendando en Google Calendar...');
+  // Intentar crear el evento en Google Calendar (no bloquea el guardado)
+  const ev = await calendarCrearEvento(cita);
+  if(ev){
+    cita.eventoCalendarId   = ev.id;
+    cita.eventoCalendarLink = ev.htmlLink;
+    save(); syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); });
+    toast('✅ Cita agendada y agregada a Google Calendar');
+  } else {
+    toast('⚠ Cita guardada, pero no se pudo agregar a Google Calendar — conecta Drive/Calendar en ⚙️','err');
+  }
+}
+
 window.addEventListener('load', ()=>{
   // Esperar 3s para que Supabase cargue antes de procesar el callback
   setTimeout(driveProcessOAuthCallback, 3000);
@@ -39086,10 +39604,16 @@ function abrirFichaFolio(){
     }
 
     var monto=mov?parseFloat(mov.monto||0):(esOrig?parseFloat(r.anticipo||0):parseFloat(r.pago||r.anticipo||0));
+    // Acumular ANTES de calcular el saldo: el saldo de cada versión es el running
+    // cronológico (total − abonado hasta aquí), NO el saldoPendiente guardado, que en
+    // versiones previas se sincroniza al saldo final al liquidar y deja de ser histórico.
+    if(r.esComplemento){totalTramite+=parseFloat(r.total||0);}
+    else{totalAbonado+=monto;}
+    var saldo=Math.max(0, totalTramite - totalAbonado);
     // Construir descripción igual que contabilidad
-    var esLiqFila=parseFloat(r.saldoPendiente||0)<=0;
+    var esLiqFila=saldo<=0&&totalTramite>0;
     var esSinAnticipo=parseFloat(r.anticipo||0)===0&&parseFloat(r.total||0)>0&&!esOrig;
-    var prefijo=esOrig?(esLiqFila?'Liquidado — Recibo #':'Anticipo — Recibo #'):(r.esComplemento?'Complemento — Recibo #':'Abono parcial — Recibo #');
+    var prefijo=esOrig?(esLiqFila?'Liquidado — Recibo #':(monto>0?'Anticipo — Recibo #':'Sin anticipo — Recibo #')):(r.esComplemento?'Complemento — Recibo #':'Abono parcial — Recibo #');
     var rc0=r.conceptos&&r.conceptos[0];
     var descripcion=prefijo+rfStr+' · '+r.nombre+(rc0?' · '+(rc0.concepto||''):'');
     // Agregar responsable y fecha si existe
@@ -39098,10 +39622,6 @@ function abrirFichaFolio(){
     if(resp) descripcion+=' | '+resp;
     var descripcionCorta=descripcion.length>60?descripcion.substring(0,60)+'…':descripcion;
 
-    if(r.esComplemento){totalTramite+=parseFloat(r.total||0);}
-    else{totalAbonado+=monto;}
-
-    var saldo=parseFloat(r.saldoPendiente||0);
     var esLiq=saldo<=0&&monto>0;
     var esCan=!!r.cancelado;
     var tipo=esCan?'Cancelado':(esOrig?'Original':(r.esComplemento?'Serv. compl.':(esLiq?'Liquidación':'Abono')));
@@ -40445,88 +40965,277 @@ async function _flujoGenerarConLey(leyIdx) {
   } catch(e) {}
   if (!geminiKey) { if(typeof toast==='function') toast('⚠ Configura la API Key de Gemini', 'err'); return; }
 
-  const prompt = `Eres un abogado litigante mexicano experto. Basándote en la ley "${ley.nombre}" y el tipo de juicio "${tipoJuicio}", genera el FLUJO COMPLETO DEL PROCEDIMIENTO JUDICIAL en formato JSON.
+  // ── Estilo NotebookLM: la IA lee el TEXTO real de la ley (PDF) y se ciñe a él ──
+  const _setLoad = (msg) => { if (lista) lista.innerHTML = `<div style="display:flex;align-items:center;gap:8px;padding:16px 4px;color:var(--muted);font-size:0.72rem;"><span style="display:inline-block;width:12px;height:12px;border:2px solid var(--gold);border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></span>${msg}</div>`; };
+  const _blobB64 = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(('' + r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(blob); });
 
-Responde ÚNICAMENTE con un array JSON válido, sin texto extra, sin markdown, sin backticks. Formato exacto:
-[
-  {
-    "etapa": "Número y nombre de la etapa",
-    "descripcion": "Qué ocurre en esta etapa",
-    "plazo": "Término legal (ej: 3 días hábiles)",
-    "documentos": "Documentos requeridos",
-    "recursos": "Recursos o medios de impugnación disponibles",
-    "riesgo": "Consecuencia de no atender este plazo"
+  // 1) Descargar el PDF de la ley desde Drive para que Gemini lo lea (grounding)
+  let leyB64 = '';
+  try {
+    if (ley.driveFileId) {
+      _setLoad('Descargando la ley desde Drive…');
+      const token = await driveGetAccessToken();
+      if (!token) throw new Error('Sin token de Drive');
+      const resp = await fetch('https://www.googleapis.com/drive/v3/files/' + ley.driveFileId + '?alt=media', { headers: { Authorization: 'Bearer ' + token } });
+      if (!resp.ok) throw new Error('Drive HTTP ' + resp.status);
+      const blob = await resp.blob();
+      if (blob.size > 18 * 1024 * 1024) throw new Error('La ley pesa ' + Math.round(blob.size/1048576) + ' MB; es demasiado grande para leerla completa');
+      leyB64 = await _blobB64(blob);
+    }
+  } catch(e) {
+    console.warn('[Flujo] No se pudo leer el PDF de la ley:', e.message);
+    if (typeof toast === 'function') toast('⚠ No se pudo leer el texto de la ley (' + e.message + '). Se generará sin grounding; revísalo con cuidado.', 'err');
   }
-]
 
-Genera entre 8 y 14 etapas completas y detalladas del procedimiento, en orden cronológico.`;
+  // 2) Prompts: con texto (grounding estricto) o sin texto (respaldo con advertencia)
+  const _formato = `[
+  {"etapa":"Número y nombre de la etapa","descripcion":"Qué ocurre en esta etapa","articulos":"Artículo(s) exactos que la fundamentan","plazo":"Plazo textual o 'no especificado en la ley'","documentos":"Documentos requeridos","recursos":"Recursos/medios de impugnación","riesgo":"Consecuencia de no atenderlo"}
+]`;
+
+  const promptGround = `Eres un abogado litigante mexicano. Te adjunto el documento de la ley "${ley.nombre}".
+Genera el FLUJO COMPLETO DEL PROCEDIMIENTO para un juicio de tipo "${tipoJuicio}", basándote EXCLUSIVAMENTE en el contenido del documento adjunto (fuente única, estilo NotebookLM).
+
+REGLAS ESTRICTAS:
+- Localiza el capítulo/título/sección que regula específicamente "${tipoJuicio}" y trabaja SOLO sobre ese apartado. NO mezcles plazos ni etapas de otros procedimientos del código.
+- NO uses conocimiento externo ni de memoria. Cada plazo, artículo y regla debe provenir del texto adjunto.
+- Copia los PLAZOS y NÚMEROS DE ARTÍCULO tal como aparecen en el documento. Si un dato no aparece en el texto, escribe "no especificado en la ley"; NUNCA lo inventes.
+- En "articulos" cita el/los artículo(s) exactos del documento que fundamentan cada etapa.
+
+Responde ÚNICAMENTE con un array JSON válido, sin markdown ni backticks. Formato:
+${_formato}
+
+Incluye todas las etapas reales del procedimiento en orden cronológico (las que correspondan según la ley).`;
+
+  const promptSinTexto = `Eres un abogado litigante mexicano experto. Para el juicio "${tipoJuicio}" regido por "${ley.nombre}", genera el FLUJO del procedimiento en orden cronológico.
+ADVERTENCIA: no tienes el texto de la ley a la vista; cita un artículo solo si estás seguro y, si dudas de un plazo, escribe "verificar en la ley" en vez de adivinar.
+Responde ÚNICAMENTE con un array JSON válido, sin markdown ni backticks. Formato:
+${_formato}`;
 
   try {
+    _setLoad(leyB64 ? 'Leyendo la ley y generando el flujo…' : 'Generando flujo…');
+    const parts = leyB64
+      ? [ { inline_data: { mime_type: 'application/pdf', data: leyB64 } }, { text: promptGround } ]
+      : [ { text: promptSinTexto } ];
     const gResp = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + encodeURIComponent(geminiKey), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0.1, maxOutputTokens: 8192 } })
     });
     if (!gResp.ok) throw new Error('Gemini HTTP ' + gResp.status);
     const gData = await gResp.json();
-    const txt = (gData.candidates?.[0]?.content?.parts?.[0]?.text || '').replace(/```json|```/g, '').trim();
-    const etapas = JSON.parse(txt);
+    let txt = (gData.candidates?.[0]?.content?.parts?.[0]?.text || '').replace(/```json|```/g, '').trim();
+    const m = txt.match(/\[[\s\S]*\]/);
+    const etapas = JSON.parse(m ? m[0] : txt);
 
     // Guardar en el juicio
     if (j) {
       j.flujoProcedimiento = etapas;
       j.flujoLey = ley.nombre;
+      j.flujoGrounded = !!leyB64;
       try { saveJuicios(); } catch(e) {}
+      try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e) {}
     }
     _flujoRender(etapas, ley.nombre);
-    if (typeof toast === 'function') toast('✓ Flujo generado con ' + ley.nombre, 'ok');
+    if (typeof toast === 'function') toast(leyB64 ? '✓ Flujo generado leyendo el texto de ' + ley.nombre : '✓ Flujo generado (sin texto de la ley)', 'ok');
   } catch(e) {
     console.error('[Flujo]', e);
-    if (lista) lista.innerHTML = `<div style="color:var(--rojo);font-size:0.7rem;padding:10px 4px;">⚠ Error al generar: ${e.message}</div>`;
+    if (lista) lista.innerHTML = `<div style="color:var(--rojo);font-size:0.7rem;padding:10px 4px;">⚠ Error al generar: ${escHTML(e.message)}</div>`;
     if (typeof toast === 'function') toast('⚠ Error al generar flujo: ' + e.message, 'err');
   }
 }
 
-// Renderizar el flujo en el panel
+// Renderizar el flujo en el panel — SOLO TÍTULOS clickeables
 function _flujoRender(etapas, leyNombre) {
   const panel = document.getElementById('mexp-flujo-panel');
   const lista = document.getElementById('mexp-flujo-lista');
   if (!lista) return;
   if (panel) panel.style.display = 'flex';
 
-  // Determinar etapa actual por acuerdos subidos
-  const acuerdosNombres = (() => {
-    try {
-      const lsKey = 'lex_acuerdos_' + (window._jdetId || '');
-      return JSON.parse(localStorage.getItem(lsKey) || '[]').map(a => (a.nombre||'').toLowerCase());
-    } catch(e) { return []; }
-  })();
+  // Guardar referencia para el detalle
+  window._flujoEtapasActual = etapas || [];
+  window._flujoLeyActual = leyNombre || '';
 
-  lista.innerHTML = (leyNombre ? `<div style="font-size:0.58rem;color:var(--muted);padding:4px 0 8px;font-style:italic;">Ley base: ${escHTML(leyNombre)}</div>` : '') +
+  // Etapa actual marcada manualmente por el abogado (índice; -1 si ninguna)
+  const j = D.juicios && D.juicios[_mexpIdx];
+  const actual = (j && typeof j.flujoEtapaActual === 'number') ? j.flujoEtapaActual : -1;
+
+  const detectarBtn = `<button id="flujo-detectar-btn" onclick="_flujoDetectarEtapa()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid var(--gold);background:var(--gold-bg);color:var(--gold-d);font-size:0.62rem;font-weight:700;cursor:pointer;font-family:'JetBrains Mono',monospace;">🔮 Detectar etapa según documentos</button>`;
+
+  const razon = (actual >= 0 && j && j.flujoEtapaActualRazon)
+    ? `<div style="font-size:0.6rem;color:var(--gold-d);background:var(--gold-bg);border:1px solid var(--border-l);border-radius:var(--radius-sm);padding:6px 9px;margin:2px 0 8px;line-height:1.45;">🔮 ${escHTML(j.flujoEtapaActualRazon)}</div>`
+    : (actual < 0
+      ? `<div style="font-size:0.6rem;color:var(--muted);padding:2px 0 8px;line-height:1.4;">Pulsa <strong>Detectar etapa</strong> para que la IA infiera el punto del juicio según los documentos cargados, o márcala manualmente al abrir una etapa.</div>`
+      : '');
+
+  lista.innerHTML =
+    (leyNombre ? `<div style="font-size:0.58rem;color:var(--muted);padding:4px 0 4px;font-style:italic;">Ley base: ${escHTML(leyNombre)}${(j && j.flujoGrounded) ? ' · <span style="font-style:normal;color:var(--verde);font-weight:600;">📚 leído del texto de la ley</span>' : ''}</div>` : '') +
+    `<div style="padding:2px 0 8px;">${detectarBtn}</div>` +
+    razon +
     etapas.map((et, i) => {
-      // Heurística: si algún acuerdo menciona palabras clave de la etapa, marcar como "completada"
-      const palabras = (et.etapa + ' ' + et.descripcion).toLowerCase().split(/\s+/);
-      const completada = acuerdosNombres.some(a => palabras.some(p => p.length > 5 && a.includes(p)));
-      const color = completada ? 'var(--verde)' : 'var(--border-l)';
-      const bgColor = completada ? 'var(--verde-l)' : 'var(--surface)';
-      const dot = completada ? '✓' : (i + 1);
+      // Estado por etapa actual manual: cumplida (<actual) / en curso (=actual) / pendiente (>actual)
+      const esCumplida = actual >= 0 && i < actual;
+      const esActual = actual >= 0 && i === actual;
 
-      return `<div style="display:flex;gap:10px;margin-bottom:10px;">
+      let borde, fondo, colorNum, contenido;
+      if (esActual) {
+        borde = 'var(--gold)'; fondo = 'var(--gold)'; colorNum = '#fff'; contenido = (i + 1);
+      } else if (esCumplida) {
+        borde = 'var(--verde)'; fondo = 'var(--verde-l)'; colorNum = 'var(--verde)'; contenido = '✓';
+      } else {
+        borde = 'var(--border-l)'; fondo = 'var(--surface)'; colorNum = 'var(--muted)'; contenido = (i + 1);
+      }
+
+      const tituloColor = esActual ? 'var(--gold-d)' : (esCumplida ? 'var(--ink)' : 'var(--ink)');
+      const filaBg = esActual ? 'var(--gold-bg)' : '';
+      const badgeActual = esActual
+        ? `<span style="font-size:0.52rem;font-weight:700;letter-spacing:0.08em;padding:2px 7px;border-radius:10px;background:var(--gold);color:#fff;flex-shrink:0;">● EN CURSO</span>`
+        : `<span style="font-size:0.62rem;color:var(--muted);flex-shrink:0;">ver ›</span>`;
+
+      return `<div onclick="_flujoAbrirDetalle(${i})" style="display:flex;gap:10px;margin-bottom:8px;cursor:pointer;border-radius:var(--radius-sm);padding:6px 8px;transition:background 0.12s;background:${filaBg};" onmouseover="this.style.background='var(--gold-bg)'" onmouseout="this.style.background='${filaBg}'">
         <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;">
-          <div style="width:22px;height:22px;border-radius:50%;background:${bgColor};border:2px solid ${color};display:flex;align-items:center;justify-content:center;font-size:0.55rem;font-weight:700;color:${completada?'var(--verde)':'var(--muted)'};">${dot}</div>
-          ${i < etapas.length - 1 ? `<div style="width:2px;flex:1;background:var(--border-l);min-height:12px;margin-top:3px;"></div>` : ''}
+          <div style="width:22px;height:22px;border-radius:50%;background:${fondo};border:2px solid ${borde};display:flex;align-items:center;justify-content:center;font-size:0.55rem;font-weight:700;color:${colorNum};${esActual?'box-shadow:0 0 0 3px var(--gold-bg);':''}">${contenido}</div>
+          ${i < etapas.length - 1 ? `<div style="width:2px;flex:1;background:${esCumplida?'var(--verde)':'var(--border-l)'};min-height:14px;margin-top:3px;"></div>` : ''}
         </div>
-        <div style="flex:1;padding-bottom:8px;">
-          <div style="font-size:0.72rem;font-weight:700;color:var(--ink);line-height:1.3;">${escHTML(et.etapa)}</div>
-          <div style="font-size:0.65rem;color:var(--muted);margin-top:2px;line-height:1.45;">${escHTML(et.descripcion)}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;">
-            ${et.plazo ? `<span style="font-size:0.58rem;padding:1px 7px;border-radius:10px;background:var(--amarillo-l);color:var(--amarillo);">⏱ ${escHTML(et.plazo)}</span>` : ''}
-            ${et.recursos ? `<span style="font-size:0.58rem;padding:1px 7px;border-radius:10px;background:var(--azul-l);color:var(--azul);">⚡ ${escHTML(et.recursos)}</span>` : ''}
-            ${et.riesgo ? `<span style="font-size:0.58rem;padding:1px 7px;border-radius:10px;background:var(--rojo-l);color:var(--rojo);">⚠ ${escHTML(et.riesgo)}</span>` : ''}
-          </div>
-          ${et.documentos ? `<div style="font-size:0.6rem;color:var(--muted);margin-top:4px;">📄 ${escHTML(et.documentos)}</div>` : ''}
+        <div style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding:1px 0;">
+          <div style="flex:1;font-size:0.74rem;font-weight:${esActual?'800':'700'};color:${tituloColor};line-height:1.35;">${escHTML(et.etapa)}</div>
+          ${badgeActual}
         </div>
       </div>`;
     }).join('');
+}
+
+// Abrir pantalla de detalle de una etapa del flujo
+function _flujoAbrirDetalle(i) {
+  const etapas = window._flujoEtapasActual || [];
+  const et = etapas[i];
+  if (!et) return;
+  const leyNombre = window._flujoLeyActual || '';
+
+  // Limpiar overlay previo
+  const prev = document.getElementById('flujo-detalle-ov');
+  if (prev) prev.remove();
+
+  // Helper para cada sección (solo se muestra si hay contenido)
+  function _sec(icono, titulo, contenido, colorBg, colorTxt) {
+    if (!contenido) return '';
+    return `<div style="margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.58rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:${colorTxt||'var(--gold-d)'};margin-bottom:5px;">
+        <span>${icono}</span>${titulo}
+      </div>
+      <div style="font-size:0.82rem;line-height:1.6;color:var(--ink);background:${colorBg||'var(--surface2)'};border:1px solid var(--border-l);border-radius:var(--radius-sm);padding:9px 12px;white-space:pre-line;">${escHTML(contenido)}</div>
+    </div>`;
+  }
+
+  const ov = document.createElement('div');
+  ov.id = 'flujo-detalle-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(12,9,5,0.80);z-index:320;display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+
+  // ¿Es la etapa actual marcada?
+  const _j = D.juicios && D.juicios[_mexpIdx];
+  const _esActual = _j && _j.flujoEtapaActual === i;
+  const btnEtapa = _esActual
+    ? `<button onclick="_flujoMarcarEtapaActual(${i})" style="flex:1;padding:9px 14px;border-radius:var(--radius-sm);border:1px solid var(--verde);background:var(--verde-l);color:var(--verde);font-size:0.74rem;font-weight:700;cursor:pointer;">✓ Etapa actual — quitar marca</button>`
+    : `<button onclick="_flujoMarcarEtapaActual(${i})" style="flex:1;padding:9px 14px;border-radius:var(--radius-sm);border:none;background:var(--gold);color:#fff;font-size:0.74rem;font-weight:700;cursor:pointer;">📍 Marcar como etapa actual</button>`;
+
+  ov.innerHTML = `
+    <div style="background:var(--surface);border:1px solid var(--border-l);border-radius:var(--radius);width:560px;max-width:100%;max-height:86vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);overflow:hidden;">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--border-l);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;background:var(--gold-bg);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.55rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--gold-d);font-weight:700;margin-bottom:4px;">⚖️ Etapa del procedimiento${_esActual?' · ● EN CURSO':''}</div>
+          <div style="font-size:1rem;font-weight:700;color:var(--ink);line-height:1.3;">${escHTML(et.etapa)}</div>
+          ${leyNombre ? `<div style="font-size:0.6rem;color:var(--muted);margin-top:4px;font-style:italic;">Ley base: ${escHTML(leyNombre)}</div>` : ''}
+        </div>
+        <button onclick="document.getElementById('flujo-detalle-ov').remove()" style="font-size:1.1rem;background:none;border:none;cursor:pointer;color:var(--muted);flex-shrink:0;line-height:1;">✕</button>
+      </div>
+      <div style="padding:16px 20px;flex:1;overflow-y:auto;">
+        ${_sec('📋','Descripción', et.descripcion, 'var(--surface2)', 'var(--gold-d)')}
+        ${_sec('📜','Artículos que la rigen', et.articulos, '#fff8e8', '#8a5010')}
+        ${_sec('⏱','Plazo / término', et.plazo, 'var(--amarillo-l)', 'var(--amarillo)')}
+        ${_sec('⚡','Recursos disponibles', et.recursos, 'var(--azul-l)', 'var(--azul)')}
+        ${_sec('⚠','Riesgo si no se atiende', et.riesgo, 'var(--rojo-l)', 'var(--rojo)')}
+        ${_sec('📄','Documentos requeridos', et.documentos, 'var(--surface2)', 'var(--gold-d)')}
+      </div>
+      <div style="padding:12px 20px;border-top:1px solid var(--border-l);display:flex;gap:8px;background:var(--surface2);">
+        ${btnEtapa}
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+}
+
+// Marcar (o quitar) la etapa actual del procedimiento — manual, persistente
+function _flujoMarcarEtapaActual(i) {
+  const j = D.juicios && D.juicios[_mexpIdx];
+  if (!j) return;
+  // Toggle: si ya era la actual, se quita la marca
+  j.flujoEtapaActual = (j.flujoEtapaActual === i) ? null : i;
+  j.flujoEtapaActualRazon = ''; // marca manual: sin razón de IA
+  try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e) {}
+  try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e) {}
+  const ov = document.getElementById('flujo-detalle-ov');
+  if (ov) ov.remove();
+  _flujoRender(window._flujoEtapasActual, window._flujoLeyActual);
+  if (typeof toast === 'function') {
+    toast(j.flujoEtapaActual === null ? 'Marca de etapa actual retirada' : '📍 Etapa actual actualizada', 'ok');
+  }
+}
+
+// Inferir la etapa actual con IA, según los documentos cargados (acuerdos + historial)
+async function _flujoDetectarEtapa() {
+  const j = D.juicios && D.juicios[_mexpIdx];
+  const etapas = window._flujoEtapasActual || [];
+  if (!j || !etapas.length) { if (typeof toast === 'function') toast('⚠ Primero genera el flujo del procedimiento', 'err'); return; }
+
+  // Reunir documentos del expediente: acuerdos + historial
+  let acuerdos = [];
+  try { acuerdos = JSON.parse(localStorage.getItem('lex_acuerdos_' + (window._jdetId || '')) || '[]'); } catch(e) {}
+  const docsLineas = [];
+  acuerdos.filter(a => a.estado !== 'procesando' && a.estado !== 'error').forEach(a => {
+    const f = a.fechaAcuerdo || a.fechaSubida || '';
+    const d = (a.descripcion || a.resumen || '').replace(/\s+/g, ' ').trim();
+    docsLineas.push(`- ${f ? '[' + f + '] ' : ''}${a.nombre || a.archivo || 'documento'}${d ? ': ' + d : ''}`);
+  });
+  if (Array.isArray(j.historial)) {
+    j.historial.forEach(h => {
+      if (h && h.texto) docsLineas.push(`- ${h.fecha ? '[' + h.fecha + '] ' : ''}${h.texto}${h.detalle ? ': ' + h.detalle : ''}`);
+    });
+  }
+  if (!docsLineas.length) { if (typeof toast === 'function') toast('⚠ No hay documentos cargados para inferir la etapa', 'err'); return; }
+
+  const btn = document.getElementById('flujo-detectar-btn');
+  if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.innerHTML = '<span style="display:inline-block;width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:-1px;margin-right:6px;"></span>Analizando documentos…'; }
+
+  const listaEtapas = etapas.map((e, i) => (i + 1) + '. ' + (e.etapa || '')).join('\n');
+  const prompt = `Eres un abogado litigante mexicano experto. Con base en el FLUJO del procedimiento y los DOCUMENTOS ya cargados en el expediente, determina en qué ETAPA se encuentra ACTUALMENTE el juicio (la etapa correspondiente al documento procesalmente más avanzado).
+
+FLUJO (etapas):
+${listaEtapas}
+
+DOCUMENTOS DEL EXPEDIENTE (con fecha si está disponible):
+${docsLineas.join('\n')}
+
+Responde ÚNICAMENTE en JSON válido, sin markdown ni texto extra:
+{"numero": N, "razon": "explicación breve (1-2 frases) citando el documento clave que define la etapa"}
+donde N es el número de la etapa actual, entre 1 y ${etapas.length}.`;
+
+  try {
+    const raw = await _iaLlamar(prompt, 300, 0.1);
+    const clean = (raw || '').replace(/```json|```/g, '').trim();
+    const m = clean.match(/\{[\s\S]*\}/);
+    const parsed = JSON.parse(m ? m[0] : clean);
+    let n = parseInt(parsed.numero, 10);
+    if (!Number.isFinite(n)) throw new Error('La IA no devolvió un número de etapa');
+    n = Math.max(1, Math.min(etapas.length, n));
+    j.flujoEtapaActual = n - 1;
+    j.flujoEtapaActualRazon = (parsed.razon || '').toString().slice(0, 240);
+    try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e) {}
+    try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e) {}
+    _flujoRender(window._flujoEtapasActual, window._flujoLeyActual);
+    if (typeof toast === 'function') toast('🔮 Etapa detectada: ' + (etapas[n - 1].etapa || ('Etapa ' + n)), 'ok');
+  } catch(e) {
+    console.error('[Flujo] detectar etapa:', e);
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.innerHTML = '🔮 Detectar etapa según documentos'; }
+    if (typeof toast === 'function') toast('⚠ No se pudo detectar la etapa: ' + (e.message || ''), 'err');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════

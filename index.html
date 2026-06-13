@@ -4463,14 +4463,45 @@ window.addEventListener('offline', ()=>{
       </div>
       <!-- Lista de citas guardadas -->
       <div style="padding:10px 14px 6px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(200,149,42,0.1);">
-        <input style="flex:1;background:rgba(200,149,42,0.05);border:1.5px solid rgba(200,149,42,0.2);border-radius:20px;padding:6px 14px;font-size:0.78rem;color:var(--ink);outline:none;" placeholder="🔍 Buscar citas..." id="citasQ" oninput="renderCitas()">
+        <input style="flex:1;background:rgba(200,149,42,0.05);border:1.5px solid rgba(200,149,42,0.2);border-radius:20px;padding:6px 14px;font-size:0.78rem;color:var(--ink);outline:none;" placeholder="🔍 Buscar citas..." id="modal-citasQ" oninput="renderCitas()">
       </div>
-      <div id="citas-lista" style="flex:1;overflow-y:auto;padding:10px 14px 16px;display:flex;flex-direction:column;gap:8px;"></div>
+      <div id="modal-citas-lista" style="flex:1;overflow-y:auto;padding:10px 14px 16px;display:flex;flex-direction:column;gap:8px;"></div>
       <div class="modal-ftr" style="justify-content:flex-end;">
         <button class="btn btn-ghost" onclick="cerrar('mAgendarCita')">Cerrar</button>
       </div>
     </div></div>
     <!-- fin modal Agendar Cita -->
+
+    <!-- ══════════════════════════════════════════════════════
+         MODAL: CLIENTE RÁPIDO (resumen + iniciar trámite)
+    ═══════════════════════════════════════════════════════════ -->
+    <div class="modal-ov" id="mClienteRapido"><div class="modal" style="max-width:400px;">
+      <div class="modal-hdr"><h3>👤 Cliente encontrado</h3><button class="modal-x" onclick="cerrar('mClienteRapido')">✕</button></div>
+      <div style="padding:20px 22px 6px;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+          <div id="mCR-avatar" style="width:52px;height:52px;border-radius:50%;background:rgba(200,149,42,0.13);border:2px solid rgba(200,149,42,0.35);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.15rem;color:var(--gold-dark);font-family:'DM Mono',monospace;flex-shrink:0;letter-spacing:0.04em;"></div>
+          <div style="min-width:0;">
+            <div id="mCR-nombre" style="font-weight:700;font-size:1rem;color:var(--ink);line-height:1.25;word-break:break-word;"></div>
+            <div id="mCR-stats" style="font-size:0.72rem;color:var(--muted);margin-top:5px;line-height:1.6;"></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;background:rgba(200,149,42,0.04);border:1px solid var(--border-light);border-radius:6px;padding:11px 13px;margin-bottom:6px;">
+          <div style="display:flex;gap:10px;align-items:center;">
+            <span style="color:var(--muted);width:68px;flex-shrink:0;font-family:'DM Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.07em;">📞 Teléfono</span>
+            <span id="mCR-tel" style="color:var(--ink);font-family:'DM Mono',monospace;font-size:0.82rem;"></span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <span style="color:var(--muted);width:68px;flex-shrink:0;font-family:'DM Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.07em;">📍 Domicilio</span>
+            <span id="mCR-dom" style="color:var(--ink);font-size:0.82rem;line-height:1.45;"></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-ftr">
+        <button class="btn btn-ghost" onclick="cerrar('mClienteRapido')">Cerrar</button>
+        <button class="btn btn-primary" onclick="iniciarTramiteDesdeCliente()">📋 Iniciar trámite nuevo</button>
+      </div>
+    </div></div>
+    <!-- fin modal Cliente Rápido -->
 
     <!-- ══════════════════════════════════════════════════════
          PANEL RECIBOS EN GESTIÓN
@@ -12494,8 +12525,10 @@ function buscarClientePBC(){
     if(nPend) partes.push('<span style="color:#9a5a10">'+nPend+' pend.</span>');
     if(nPag)  partes.push('<span style="color:#1a5a2a">'+nPag+' liq.</span>');
     if(nCanc) partes.push('<span style="color:#888">'+nCanc+' canc.</span>');
+    const _nomAttr = g.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return '<div class="pbc-card">'
-      +'<div class="pbc-nombre-row">'+escHTML(g.nombre)
+      +'<div class="pbc-nombre-row" style="cursor:pointer;" onclick="abrirClienteRapido(\''+_nomAttr+'\')" title="Ver resumen e iniciar trámite">'
+      +'<span style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;">'+escHTML(g.nombre)+'</span>'
       +'<span class="pbc-badge">'+total+(total===1?' trámite':' trámites')+'</span>'
       +(partes.length?'<span class="pbc-estados">'+partes.join('')+'</span>':'')
       +'</div><div class="pbc-chips">'+chips+'</div></div>';
@@ -12522,6 +12555,73 @@ function abrirFolioPBC(folio, esComplemento){
   campo.scrollIntoView({behavior:'smooth',block:'center'});
   campo.focus();
   if(typeof cargarHistorialFolio==='function') cargarHistorialFolio();
+}
+// ── BUSCADOR RÁPIDO DE CLIENTES ───────────────────────────────────
+function abrirClienteRapido(nombre){
+  const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  const nNorm = norm(nombre);
+  const recibos = (appData.recibos||[]).filter(r => norm(r.nombre) === nNorm);
+  if(!recibos.length) return;
+  // Datos de contacto: tomar del recibo más reciente que los tenga
+  const sorted = [...recibos].sort((a,b) => b.folio - a.folio);
+  let movil = '', tel = '', domicilio = '';
+  for(const r of sorted){
+    const c = (r.clientes||[])[0] || {};
+    if(!movil    && c.movil)    movil    = c.movil;
+    if(!tel      && c.tel)      tel      = c.tel;
+    if(!domicilio && c.domicilio) domicilio = c.domicilio;
+    if(movil && tel && domicilio) break;
+  }
+  // Estadísticas
+  const validos    = recibos.filter(r => !r.cancelado && !r.esComplemento);
+  const nPagados   = validos.filter(r => !(r.saldoPendiente > 0)).length;
+  const nPendiente = validos.filter(r =>   r.saldoPendiente > 0 ).length;
+  const nCancelado = recibos.filter(r => r.cancelado).length;
+  const totalCobrado   = recibos.reduce((s,r) => s+(parseFloat(r.anticipo)||0), 0);
+  const totalPendiente = recibos.reduce((s,r) => s+(parseFloat(r.saldoPendiente)||0), 0);
+  const partes = [];
+  if(nPagados)   partes.push('<span style="color:var(--verde-d)">'+nPagados+' liquidado'+(nPagados!==1?'s':'')+'</span>');
+  if(nPendiente) partes.push('<span style="color:#9a5a10">'+nPendiente+' pendiente'+(nPendiente!==1?'s':'')+'</span>');
+  if(nCancelado) partes.push('<span style="color:var(--muted)">'+nCancelado+' cancelado'+(nCancelado!==1?'s':'')+'</span>');
+  let statsHtml = recibos.length+' trámite'+(recibos.length!==1?'s':'');
+  if(partes.length) statsHtml += ' · '+partes.join(' · ');
+  if(totalCobrado>0)   statsHtml += '<br><strong style="color:var(--gold-dark)">$'+fmtMXN(totalCobrado)+'</strong> cobrado';
+  if(totalPendiente>0) statsHtml += ' · <span style="color:var(--rojo)">$'+fmtMXN(totalPendiente)+' pendiente</span>';
+  // Iniciales para avatar
+  const initials = nombre.trim().split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||'').join('');
+  const modal = document.getElementById('mClienteRapido');
+  document.getElementById('mCR-avatar').textContent  = initials;
+  document.getElementById('mCR-nombre').textContent  = nombre;
+  document.getElementById('mCR-stats').innerHTML     = statsHtml;
+  document.getElementById('mCR-tel').textContent     = movil || tel || '—';
+  document.getElementById('mCR-dom').textContent     = domicilio || '—';
+  modal.dataset.nombre    = nombre;
+  modal.dataset.movil     = movil;
+  modal.dataset.tel       = tel;
+  modal.dataset.domicilio = domicilio;
+  modal.classList.add('show');
+}
+function iniciarTramiteDesdeCliente(){
+  const modal    = document.getElementById('mClienteRapido');
+  const nombre   = modal.dataset.nombre    || '';
+  const movil    = modal.dataset.movil     || '';
+  const tel      = modal.dataset.tel       || '';
+  const domicilio= modal.dataset.domicilio || '';
+  cerrar('mClienteRapido');
+  if(typeof ir === 'function') ir('nuevo-recibo');
+  if(window._panelesBusquedaAbiertos) togglePanelesBusqueda();
+  if(typeof limpiarForm === 'function') limpiarForm();
+  setTimeout(()=>{
+    const elNombre = document.querySelector('#clientes-wrapper .cliente-row [id^="nombre_"]');
+    const elMovil  = document.querySelector('#clientes-wrapper .cliente-row [id^="movil_"]');
+    const elTel    = document.querySelector('#clientes-wrapper .cliente-row [id^="tel_"]');
+    const elDom    = document.querySelector('#clientes-wrapper .cliente-row [id^="domicilio_"]');
+    if(elNombre && nombre)   { elNombre.value = nombre;    elNombre.dispatchEvent(new Event('input')); }
+    if(elMovil  && movil)    elMovil.value    = movil;
+    if(elTel    && tel)      elTel.value      = tel;
+    if(elDom    && domicilio) elDom.value     = domicilio;
+    if(nombre) toast('✅ Datos de '+nombre.split(' ')[0]+' cargados — completa el trámite','ok');
+  }, 120);
 }
 // ── EVENTOS ──────────────────────────────────────────────────────
 document.addEventListener('input',function(e){
@@ -38498,10 +38598,12 @@ async function calendarEliminarEvento(eventId){
 // ─── MODAL: AGENDAR CITA ─────────────────────────────────────────────
 // ── Renderizar panel de Citas ────────────────────────────────
 function renderCitas(){
-  const contenedor = document.getElementById('citas-lista');
-  if(!contenedor) return;
+  const contenedor      = document.getElementById('citas-lista');
+  const contenedorModal = document.getElementById('modal-citas-lista');
+  if(!contenedor && !contenedorModal) return;
   if(!Array.isArray(D.citas)) D.citas = [];
-  const q = (document.getElementById('citasQ')?.value||'').toLowerCase().trim();
+  // Leer query de cualquiera de los dos inputs (panel o modal)
+  const q = ((document.getElementById('citasQ')?.value||'') || (document.getElementById('modal-citasQ')?.value||'')).toLowerCase().trim();
   let lista = D.citas.slice().sort((a,b)=>(a.fecha||'') < (b.fecha||'') ? -1 : 1);
   if(q) lista = lista.filter(c =>
     (c.titulo||'').toLowerCase().includes(q) ||
@@ -38514,17 +38616,20 @@ function renderCitas(){
   const badge = document.getElementById('badgeCitas');
   if(badge){ const hoy = new Date().toISOString().slice(0,10); const prox = D.citas.filter(c=>c.fecha>=hoy).length; badge.textContent=prox||''; badge.style.display=prox?'':'none'; }
 
+  function _set(el, html){ if(el) el.innerHTML = html; }
+
   if(!lista.length){
-    contenedor.innerHTML = `<div style="text-align:center;padding:60px 20px;color:var(--muted);font-size:0.85rem;">
+    const vacio = `<div style="text-align:center;padding:60px 20px;color:var(--muted);font-size:0.85rem;">
       <div style="font-size:2.5rem;margin-bottom:12px;">📅</div>
       <div style="font-weight:600;margin-bottom:6px;">${q?'Sin resultados':'No hay citas agendadas'}</div>
       <div style="font-size:0.75rem;opacity:0.7;">${q?'Intenta con otra búsqueda':'Haz clic en «Nueva Cita» para agendar'}</div>
     </div>`;
+    _set(contenedor, vacio); _set(contenedorModal, vacio);
     return;
   }
 
   const hoy = new Date().toISOString().slice(0,10);
-  contenedor.innerHTML = lista.map(c=>{
+  const html = lista.map(c=>{
     const pasada = c.fecha && c.fecha < hoy;
     const esHoy  = c.fecha === hoy;
     const borderColor = esHoy ? 'var(--gold)' : pasada ? 'rgba(0,0,0,0.1)' : 'rgba(200,149,42,0.3)';
@@ -38532,7 +38637,9 @@ function renderCitas(){
     const badge = esHoy ? `<span style="background:var(--gold);color:#fff;font-size:0.55rem;font-family:monospace;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:0.08em;">HOY</span>` :
                   pasada ? `<span style="background:rgba(0,0,0,0.08);color:var(--muted);font-size:0.55rem;font-family:monospace;font-weight:700;padding:2px 8px;border-radius:20px;">PASADA</span>` :
                   `<span style="background:var(--verde-l);color:var(--verde-d);font-size:0.55rem;font-family:monospace;font-weight:700;padding:2px 8px;border-radius:20px;">PRÓXIMA</span>`;
-    const calLink = c.eventoCalendarLink ? `<a href="${escHTML(c.eventoCalendarLink)}" target="_blank" style="font-size:0.7rem;color:var(--azul);font-family:monospace;text-decoration:none;" title="Ver en Google Calendar">📆 Calendar</a>` : '';
+    const calLink = c.eventoCalendarLink
+      ? `<a href="${escHTML(c.eventoCalendarLink)}" target="_blank" style="font-size:0.7rem;color:var(--azul);font-family:monospace;text-decoration:none;" title="Ver en Google Calendar">📆 Calendar</a>`
+      : `<button onclick="citaSyncCalendar('${escHTML(c.id)}')" style="background:rgba(26,74,138,0.07);color:var(--azul);border:1px solid rgba(26,74,138,0.2);border-radius:14px;padding:3px 10px;font-size:0.65rem;font-family:monospace;cursor:pointer;" title="Agregar a Google Calendar">📆 Sync Calendar</button>`;
     return `<div style="background:${bgColor};border:1.5px solid ${borderColor};border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
         <span style="font-weight:600;font-size:0.92rem;color:var(--ink);flex:1;">${escHTML(c.titulo||'Sin título')}</span>
@@ -38551,6 +38658,7 @@ function renderCitas(){
       </div>
     </div>`;
   }).join('');
+  _set(contenedor, html); _set(contenedorModal, html);
 }
 
 function citaEliminar(id){
@@ -38560,6 +38668,19 @@ function citaEliminar(id){
   save(); syncEstadoSupabaseDebounced().catch(()=>{});
   renderCitas();
   toast('Cita eliminada');
+}
+async function citaSyncCalendar(id){
+  const cita = (D.citas||[]).find(c=>c.id===id);
+  if(!cita) return;
+  toast('📆 Sincronizando con Google Calendar...');
+  const ev = await calendarCrearEvento(cita);
+  if(ev){
+    cita.eventoCalendarId   = ev.id;
+    cita.eventoCalendarLink = ev.htmlLink;
+    save(); syncEstadoSupabaseDebounced().catch(()=>{});
+    renderCitas();
+    toast('✅ Cita agregada a Google Calendar','ok');
+  }
 }
 
 function citaToggleForm(){

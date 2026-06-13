@@ -10079,6 +10079,9 @@ async function imprimirActualizacion(){
     reciboEnActualizacion = window._reciboActualizacionBackup;
   }
   if(!reciboEnActualizacion){ showModal('Error','No hay un recibo en actualizaci\u00f3n.'); return; }
+  if(esPeriodoCerrado(reciboEnActualizacion.fecha || reciboEnActualizacion.fecha_recibo, reciboEnActualizacion.hora || reciboEnActualizacion.hora_recibo || '00:00')){
+    toast(_msgPeriodoCerrado(), 'err'); return;
+  }
   const _costosExtraTmp = getCostosExtra();
   const _pagosTmp       = getPagosParciales();
   const _abonosNuevosTmp = _pagosTmp.filter(p => p.locked !== true);
@@ -10555,6 +10558,9 @@ async function ejecutarTramiteCancelado(){
 async function confirmarCancelacion(){
   const recibo = reciboEnConsulta;
   if(!recibo) return;
+  if(esPeriodoCerrado(recibo.fecha || recibo.fecha_recibo, recibo.hora || recibo.hora_recibo || '00:00')){
+    toast(_msgPeriodoCerrado(), 'err'); return;
+  }
   const motivo = document.getElementById('cancelacion-motivo').value.trim();
   const tipoCancelacion = window._cancelTipoSeleccionado;
   const montoInput = parseFloat(document.getElementById('cancelacion-monto').value) || 0;
@@ -11492,6 +11498,12 @@ async function guardarRecibo(){
     }
   }
   _guardarForzado = false;
+  // Blindaje de período: en modo retroactivo verificar que la fecha no esté en un período cerrado
+  if(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada){
+    if(esPeriodoCerrado(window._reciboRetroactivoFechaPersonalizada, window._reciboRetroactivoHoraPersonalizada || '00:00')){
+      toast(_msgPeriodoCerrado(), 'err'); return;
+    }
+  }
   const btn=document.getElementById('btn-guardar');
   btn.disabled=true; setStatus('loading','Preparando...','loading');
   // Re-verificar hora con Drive en background (no bloquea)
@@ -12654,6 +12666,27 @@ let eiC=-1,eiK=-1,eiJ=-1,eiP=-1;
 let _cajaCerradaHoy = false;
 function cajaBloqueada() { return _cajaCerradaHoy; }
 function marcarCajaCerrada() { _cajaCerradaHoy = true; }
+
+// ─── BLINDAJE DE PERÍODO POR CORTE DE CAJA ───────────────────────
+// Un registro es inmutable si su fecha+hora es anterior o igual al
+// timestamp del corte de caja que cerró ese período.
+// Una vez blindado, NADA (usuario, modo retroactivo, auto-corrección)
+// puede modificar, cancelar ni eliminar ese registro.
+function esPeriodoCerrado(fecha, hora) {
+  const cortes = (D.cierres || []).filter(function(c){ return c && c.esCorte === true && c.fecha; });
+  if (!cortes.length) return false;
+  const tsMov = (fecha || '') + 'T' + (hora || '00:00') + ':00';
+  return cortes.some(function(c){
+    const tsCorte = c.fecha + 'T' + (c.hora || '00:00') + ':00';
+    return tsMov <= tsCorte;
+  });
+}
+function _msgPeriodoCerrado() {
+  const cortes = (D.cierres || []).filter(function(c){ return c && c.esCorte === true && c.fecha; })
+    .sort(function(a,b){ return ((b.fecha||'')+'T'+(b.hora||'')).localeCompare((a.fecha||'')+'T'+(a.hora||'')); });
+  const ult = cortes[0];
+  return '🔒 Período cerrado por corte de caja' + (ult ? ' del ' + ult.fecha + (ult.hora ? ' ' + ult.hora : '') : '') + ' — este registro no se puede modificar.';
+}
 function aplicarEstadoCierre() {
   const bloqueada = cajaBloqueada();
   const saldoTotal = getSaldo();
@@ -14358,6 +14391,9 @@ function renderCaja(){
 function delMov(id){
   const mov = (D.movimientos||[]).find(function(m){ return m && m.id === id; });
   if(!mov){ toast('Movimiento no encontrado','err'); return; }
+  if(esPeriodoCerrado(mov.fecha, mov.hora || '00:00')){
+    toast(_msgPeriodoCerrado(), 'err'); return;
+  }
   // Verificar si el recibo vinculado existe
   const tieneRecibo = mov.fuente === 'recibo' && mov.folio != null
     ? (appData.recibos||[]).some(function(r){ return r && r.folio == mov.folio; })
@@ -14516,6 +14552,8 @@ function _corregirMovimientosSinAnticipo() {
   var errores = [];
   movs.forEach(function(m) {
     if (m.fuente !== 'recibo' || !(m.monto > 0)) return;
+    // No tocar registros de períodos cerrados por corte de caja
+    if (typeof esPeriodoCerrado === 'function' && esPeriodoCerrado(m.fecha, m.hora || '00:00')) return;
     var recOrig = recibos.find(function(r) {
       return r.folio === m.folio && !r.esComplemento && (r.letra || 'A') === (m.letra || 'A');
     });
@@ -25400,6 +25438,9 @@ function adminConfirmarRetro(){
   var fechaHoy = (typeof hoy === 'function' ? hoy() : new Date().toISOString().split('T')[0]);
   var fecha  = (document.getElementById('rFecha')  || {}).value || '';
   var hr     = (document.getElementById('rHora')   || {}).value || '';
+  if(fecha && esPeriodoCerrado(fecha, hr || '00:00')){
+    if(typeof toast === 'function') toast(_msgPeriodoCerrado(), 'err'); else alert(_msgPeriodoCerrado()); return;
+  }
   var desc   = ((document.getElementById('rDesc')  || {}).value || '').trim();
   var monto  = parseFloat((document.getElementById('rMonto') || {}).value) || 0;
   var motivo = ((document.getElementById('rMotivo')|| {}).value || '').trim();
@@ -30864,6 +30905,11 @@ if(typeof guardarReciboInterno === 'function' && !window._guardarReciboInternoOr
     var fechaPers = window._reciboRetroactivoFechaPersonalizada;
     var horaPers = window._reciboRetroactivoHoraPersonalizada;
     var motivoPers = window._reciboRetroactivoMotivo;
+    // Blindaje de período: en modo retroactivo verificar que la fecha no esté en período cerrado
+    if(esRetro && fechaPers && typeof esPeriodoCerrado === 'function' && esPeriodoCerrado(fechaPers, horaPers || '00:00')){
+      if(typeof toast === 'function') toast(typeof _msgPeriodoCerrado === 'function' ? _msgPeriodoCerrado() : '🔒 Período cerrado por corte de caja', 'err');
+      return;
+    }
     // CRÍTICO: cuando es retro, la función original sobreescribe fecha con hoy() en líneas 14151
     // Necesitamos interceptar esto. Forzamos que mantenga el valor actual.
     if(esRetro && fechaPers){
@@ -31918,406 +31964,7 @@ setTimeout(async function(){
   // El warning se omite aquí — puede no haber sesión aún. Se emite en onAuthStateChange si sigue faltando.
 }, 800);
 // ═══ FIN GROQ IA ═══
-// ═══════════════════════════════════════════════════════════════════════
-// 🤖 ASISTENTE GLOBAL LEX-MÉXICO
-// Botón flotante visible en toda la app. Conoce tu caja, juicios,
-// pendientes, directorio, recibos y la pantalla activa.
-// ═══════════════════════════════════════════════════════════════════════
-let _agHistorial  = [];     // historial de chat global
-let _agAbierto    = false;  // estado del panel
-let _agPanelActual = 'caja'; // panel visible actualmente
-// ── Inyectar HTML del asistente en el DOM ───────────────────────────
-(function _agInyectar() {
-  const html = `
-  <style>
-    #ag-fab{
-      position:fixed;bottom:24px;right:24px;z-index:8000;
-      width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
-      background:linear-gradient(135deg,#7c3aed,#4f46e5);
-      box-shadow:0 4px 20px rgba(124,58,237,0.5);
-      display:flex;align-items:center;justify-content:center;
-      font-size:1.4rem;transition:transform 0.2s,box-shadow 0.2s;
-    }
-    #ag-fab:hover{transform:scale(1.08);box-shadow:0 6px 28px rgba(124,58,237,0.7);}
-    #ag-fab.abierto{background:linear-gradient(135deg,#4f46e5,#7c3aed);}
-    #ag-panel{
-      position:fixed;bottom:88px;right:24px;z-index:8000;
-      width:420px;max-width:calc(100vw - 48px);
-      height:580px;max-height:calc(100vh - 110px);
-      background:#120f1e;border:1px solid rgba(139,92,246,0.4);
-      border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.7);
-      display:none;flex-direction:column;overflow:hidden;
-    }
-    #ag-panel.show{display:flex;animation:ag-slide-up 0.22s ease;}
-    @keyframes ag-slide-up{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-    #ag-header{
-      padding:14px 16px 12px;
-      background:linear-gradient(135deg,rgba(124,58,237,0.25),rgba(79,70,229,0.15));
-      border-bottom:1px solid rgba(139,92,246,0.2);
-      display:flex;align-items:center;gap:10px;flex-shrink:0;
-    }
-    #ag-avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;}
-    #ag-titulo{font-family:serif;font-size:0.95rem;color:#e8e0ff;flex:1;}
-    #ag-subtitulo{font-family:monospace;font-size:0.52rem;color:rgba(139,92,246,0.6);margin-top:1px;}
-    #ag-btn-limpiar{background:none;border:1px solid rgba(139,92,246,0.2);border-radius:6px;padding:3px 8px;cursor:pointer;font-family:monospace;font-size:0.52rem;color:rgba(139,92,246,0.5);}
-    #ag-btn-limpiar:hover{border-color:rgba(139,92,246,0.5);color:#c4b5fd;}
-    #ag-acciones{
-      padding:10px 12px;border-bottom:1px solid rgba(139,92,246,0.12);
-      display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0;
-    }
-    .ag-chip{
-      border-radius:20px;padding:5px 11px;cursor:pointer;
-      font-family:monospace;font-size:0.6rem;font-weight:700;
-      transition:all 0.15s;white-space:nowrap;border:1.5px solid;
-    }
-    .ag-chip:hover{filter:brightness(1.2);transform:translateY(-1px);}
-    .ag-chip-morado{background:rgba(124,58,237,0.2);border-color:rgba(124,58,237,0.5);color:#c4b5fd;}
-    .ag-chip-rojo  {background:rgba(192,22,26,0.18);border-color:rgba(192,22,26,0.5);color:#ff9999;}
-    .ag-chip-verde {background:rgba(26,122,58,0.18);border-color:rgba(26,122,58,0.5);color:#6ee7a0;}
-    .ag-chip-azul  {background:rgba(26,74,138,0.2);border-color:rgba(26,74,138,0.5);color:#93c5fd;}
-    .ag-chip-amber {background:rgba(180,115,20,0.2);border-color:rgba(180,115,20,0.5);color:#fbbf24;}
-    .ag-chip-gold  {background:rgba(200,149,42,0.18);border-color:rgba(200,149,42,0.5);color:#e8c875;}
-    #ag-msgs{
-      flex:1;overflow-y:auto;padding:12px;
-      display:flex;flex-direction:column;gap:8px;
-    }
-    .ag-msg-user{align-self:flex-end;background:#7c3aed;color:#fff;border-radius:12px 12px 3px 12px;padding:9px 13px;max-width:85%;font-size:0.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
-    .ag-msg-ia{align-self:flex-start;background:rgba(255,255,255,0.07);border:1px solid rgba(139,92,246,0.25);color:#f0ecff;border-radius:12px 12px 12px 3px;padding:9px 13px;max-width:90%;font-size:0.82rem;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
-    .ag-msg-ia.pensando{color:rgba(196,181,253,0.5);font-style:italic;animation:ag-pulse 1s ease-in-out infinite;}
-    @keyframes ag-pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-    .ag-copy-btn{background:none;border:1px solid rgba(139,92,246,0.2);border-radius:4px;padding:2px 7px;font-family:monospace;font-size:0.5rem;color:rgba(196,181,253,0.5);cursor:pointer;margin-top:4px;align-self:flex-start;}
-    .ag-copy-btn:hover{border-color:rgba(139,92,246,0.5);color:#c4b5fd;}
-    #ag-footer{
-      padding:10px 12px;border-top:1px solid rgba(139,92,246,0.12);
-      display:flex;gap:8px;align-items:flex-end;flex-shrink:0;
-      background:rgba(0,0,0,0.2);
-    }
-    #ag-inp{
-      flex:1;background:rgba(255,255,255,0.05);border:1.5px solid rgba(139,92,246,0.3);
-      border-radius:8px;padding:8px 12px;color:#f0ecff;font-family:sans-serif;
-      font-size:0.82rem;outline:none;resize:none;max-height:100px;
-      transition:border-color 0.15s;
-    }
-    #ag-inp:focus{border-color:rgba(139,92,246,0.7);}
-    #ag-inp::placeholder{color:rgba(196,181,253,0.35);}
-    #ag-send{
-      background:#7c3aed;color:#fff;border:none;border-radius:8px;
-      padding:8px 14px;cursor:pointer;font-family:monospace;
-      font-size:0.65rem;font-weight:700;flex-shrink:0;transition:all 0.15s;
-    }
-    #ag-send:hover{background:#6d28d9;}
-    #ag-send:disabled{opacity:0.4;cursor:not-allowed;}
-    #ag-panel-indicator{
-      font-family:monospace;font-size:0.48rem;
-      color:rgba(139,92,246,0.4);padding:0 12px 6px;flex-shrink:0;text-align:right;
-    }
-/* ═══ PANEL DE DIAGNÓSTICO ═══ */
-#lex-diag-fab{
-  position:fixed;bottom:80px;left:16px;z-index:99999;
-  width:38px;height:38px;border-radius:50%;
-  background:linear-gradient(135deg,#c0161a,#8c1010);
-  border:2px solid rgba(255,100,100,0.4);
-  color:#fff;font-size:1rem;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 4px 16px rgba(192,22,26,0.5);
-  transition:all 0.2s;
-}
-#lex-diag-fab:hover{transform:scale(1.1);}
-#lex-diag-fab .lex-diag-badge{
-  position:absolute;top:-4px;right:-4px;
-  background:#ff4444;color:#fff;
-  border-radius:10px;padding:1px 5px;
-  font-size:0.5rem;font-family:monospace;font-weight:700;
-  min-width:16px;text-align:center;
-  display:none;
-}
-#lex-diag-panel{
-  position:fixed;bottom:0;left:0;right:0;
-  height:55vh;z-index:99998;
-  background:#0a0705;
-  border-top:2px solid rgba(192,22,26,0.5);
-  display:none;flex-direction:column;
-  font-family:monospace;
-}
-#lex-diag-panel.show{display:flex;}
-#lex-diag-header{
-  display:flex;align-items:center;gap:10px;
-  padding:8px 14px;
-  background:#120806;
-  border-bottom:1px solid rgba(192,22,26,0.2);
-  flex-shrink:0;
-}
-#lex-diag-header span{font-size:0.7rem;color:#ff8080;font-weight:700;letter-spacing:0.1em;}
-#lex-diag-header .lex-diag-status{
-  margin-left:auto;font-size:0.6rem;color:rgba(255,128,128,0.5);
-}
-.lex-diag-btn{
-  padding:4px 12px;border-radius:6px;border:1px solid rgba(255,100,100,0.3);
-  background:rgba(192,22,26,0.15);color:#ff8080;
-  font-family:monospace;font-size:0.58rem;cursor:pointer;
-  transition:all 0.15s;
-}
-.lex-diag-btn:hover{background:rgba(192,22,26,0.3);border-color:rgba(255,100,100,0.6);}
-#lex-diag-filter{
-  display:flex;gap:6px;padding:6px 14px;
-  background:#0e0603;border-bottom:1px solid rgba(192,22,26,0.1);
-  flex-shrink:0;overflow-x:auto;
-}
-.lex-diag-chip{
-  padding:3px 10px;border-radius:12px;border:1px solid rgba(255,100,100,0.2);
-  background:rgba(192,22,26,0.08);color:rgba(255,128,128,0.6);
-  font-size:0.55rem;cursor:pointer;white-space:nowrap;transition:all 0.15s;
-}
-.lex-diag-chip.on{background:rgba(192,22,26,0.3);border-color:rgba(255,100,100,0.5);color:#ff9090;}
-#lex-diag-logs{
-  flex:1;overflow-y:auto;padding:8px 0;
-}
-.lex-diag-entry{
-  display:flex;gap:8px;padding:4px 14px;
-  border-bottom:1px solid rgba(255,255,255,0.03);
-  font-size:0.62rem;line-height:1.5;
-  transition:background 0.1s;
-}
-.lex-diag-entry:hover{background:rgba(255,255,255,0.03);}
-.lex-diag-ts{color:rgba(255,128,80,0.45);flex-shrink:0;width:70px;}
-.lex-diag-tag{flex-shrink:0;width:72px;font-weight:700;font-size:0.55rem;letter-spacing:0.05em;}
-.lex-diag-msg{color:rgba(220,220,220,0.85);word-break:break-all;flex:1;}
-.lex-diag-entry.err .lex-diag-tag{color:#ff5555;}
-.lex-diag-entry.err .lex-diag-msg{color:#ffaaaa;}
-.lex-diag-entry.warn .lex-diag-tag{color:#ffaa44;}
-.lex-diag-entry.warn .lex-diag-msg{color:#ffe0aa;}
-.lex-diag-entry.ok .lex-diag-tag{color:#44dd88;}
-.lex-diag-entry.ok .lex-diag-msg{color:#aaffcc;}
-.lex-diag-entry.info .lex-diag-tag{color:#4488ff;}
-.lex-diag-entry.info .lex-diag-msg{color:#aaccff;}
-.lex-diag-entry.net .lex-diag-tag{color:#aa44ff;}
-.lex-diag-entry.net .lex-diag-msg{color:#ddaaff;}
-</style>
-  <!-- Botón flotante -->
-  <button id="ag-fab" onclick="agToggle()" title="Asistente IA">🤖</button>
-  <!-- Panel del asistente -->
-  <div id="ag-panel">
-    <div id="ag-header">
-      <div id="ag-avatar">🤖</div>
-      <div style="flex:1;min-width:0;">
-        <div id="ag-titulo">Asistente LEX-MÉXICO</div>
-        <div id="ag-subtitulo">Contexto completo del despacho · Gemini</div>
-      </div>
-      <button id="ag-btn-limpiar" onclick="agLimpiar()">↺ Nueva conversación</button>
-    </div>
-    <!-- Acciones rápidas con colores distintos por función -->
-    <div id="ag-acciones">
-      <span class="ag-chip ag-chip-morado" onclick="agAccion('resumen_dia')">📊 Resumen del día</span>
-      <span class="ag-chip ag-chip-rojo"   onclick="agAccion('urgentes')">🔴 Urgentes</span>
-      <span class="ag-chip ag-chip-verde"  onclick="agAccion('caja')">💰 Estado de caja</span>
-      <span class="ag-chip ag-chip-azul"   onclick="agAccion('proximas_audiencias')">📅 Audiencias</span>
-      <span class="ag-chip ag-chip-amber"  onclick="agAccion('pendientes_sem')">📌 Pendientes</span>
-      <span class="ag-chip ag-chip-gold"   onclick="agAccion('consejo')">💡 Qué hacer hoy</span>
-    </div>
-    <!-- Mensajes -->
-    <div id="ag-msgs"></div>
-    <!-- Indicador de panel -->
-    <div id="ag-panel-indicator">Panel activo: <span id="ag-panel-nombre">Principal</span></div>
-    <!-- Input -->
-    <div id="ag-footer">
-      <textarea id="ag-inp" rows="1" placeholder="Pregunta lo que quieras sobre el despacho..."
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();agEnviar();}"></textarea>
-      <button id="ag-send" onclick="agEnviar()">Enviar</button>
-    </div>
-  </div>`;
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = html;
-  document.body.appendChild(wrapper);
-})();
-// ── Toggle abrir/cerrar ───────────────────────────────────────────────
-function agToggle() {
-  _agAbierto = !_agAbierto;
-  const panel = document.getElementById('ag-panel');
-  const fab   = document.getElementById('ag-fab');
-  panel.classList.toggle('show', _agAbierto);
-  fab.classList.toggle('abierto', _agAbierto);
-  fab.textContent = _agAbierto ? '✕' : '🤖';
-  if (_agAbierto) {
-    if (!_agHistorial.length) _agMensajeBienvenida();
-    setTimeout(() => document.getElementById('ag-inp')?.focus(), 150);
-  }
-}
-// ── Construir contexto completo del sistema ───────────────────────────
-function _agConstruirContexto() {
-  const hoy = new Date().toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  const ahora = new Date().toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' });
-  // Caja: movimientos de hoy
-  const hoyStr = new Date().toISOString().split('T')[0];
-  const movsHoy = (D.movimientos || []).filter(m => (m.fecha || '').startsWith(hoyStr));
-  const entradas = movsHoy.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (parseFloat(m.monto) || 0), 0);
-  const salidas  = movsHoy.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (parseFloat(m.monto) || 0), 0);
-  const saldo    = D.saldoAcumulado || 0;
-  // Juicios urgentes y con audiencia próxima
-  const juiciosUrgentes = (D.juicios || []).filter(j => j.estatus === 'urgente')
-    .map(j => `- ${j.cliente} (Exp. ${j.expediente || '—'}) · ${j.juzgado}`).join('\n') || 'Ninguno';
-  const hoy30 = new Date(); hoy30.setDate(hoy30.getDate() + 30);
-  const audienciasProximas = (D.juicios || [])
-    .filter(j => j.audiencia && new Date(j.audiencia + 'T12:00:00') <= hoy30)
-    .sort((a, b) => a.audiencia.localeCompare(b.audiencia))
-    .slice(0, 8)
-    .map(j => `- ${j.audiencia}: ${j.cliente} (${j.tipo})`)
-    .join('\n') || 'Sin audiencias en los próximos 30 días';
-  // Pendientes activos
-  const pendientesActivos = (D.pendientes || []).filter(p => !p.resuelto);
-  const pendientesUrgentes = pendientesActivos.filter(p => p.prioridad === 'urgente')
-    .map(p => `- ${p.texto} (${p.resp || 'sin asignar'})`).join('\n') || 'Ninguno';
-  const pendientesTotal = pendientesActivos.length;
-  // Recibos con saldo pendiente
-  const conSaldo = (appData.recibos || []).filter(r => !r.cancelado && r.saldoPendiente > 0);
-  const totalPorCobrar = conSaldo.reduce((s, r) => s + (r.saldoPendiente || 0), 0);
-  // Juicios resumen
-  const juiciosTotales = (D.juicios || []).length;
-  const juiciosPorEstatus = {};
-  (D.juicios || []).forEach(j => { juiciosPorEstatus[j.estatus || 'otro'] = (juiciosPorEstatus[j.estatus || 'otro'] || 0) + 1; });
-  // Panel activo
-  const panelNombres = { caja:'Principal/Caja', contabilidad:'Contabilidad', recibos:'Historial de Recibos', juicios:'Control de Juicios', pendientes:'Pendientes', carpetas:'Control de Carpetas', directorio:'Directorio', 'nuevo-recibo':'Nuevo Recibo' };
-  const panelActivo = panelNombres[_agPanelActual] || _agPanelActual;
-  return `Eres el asistente inteligente de LEX-MÉXICO, un sistema de gestión para un despacho de abogados en Juxtlahuaca, Oaxaca, México.
-Tienes acceso en tiempo real a toda la información del despacho. Responde de forma directa, práctica y en español.
-Cuando el usuario pregunte sobre datos, usa los números exactos que tienes aquí. Sé conciso pero completo.
-El abogado titular es LIC. NAHUM PELÁEZ. La empleada es LIC. ANTONIETA CHÁVEZ MONTAÑO (operadora).
-FECHA Y HORA ACTUAL: ${hoy}, ${ahora} hrs
-PANTALLA ACTIVA: ${panelActivo}
-═══ CAJA ═══
-Saldo acumulado: $${saldo.toLocaleString('es-MX', {minimumFractionDigits:2})}
-Movimientos hoy: ${movsHoy.length} (Entradas: $${entradas.toLocaleString('es-MX', {minimumFractionDigits:2})} · Salidas: $${salidas.toLocaleString('es-MX', {minimumFractionDigits:2})})
-Recibos con saldo pendiente: ${conSaldo.length} clientes · Total por cobrar: $${totalPorCobrar.toLocaleString('es-MX', {minimumFractionDigits:2})}
-═══ JUICIOS (${juiciosTotales} total) ═══
-Por estatus: ${Object.entries(juiciosPorEstatus).map(([k,v])=>`${k}: ${v}`).join(' · ')}
-URGENTES:
-${juiciosUrgentes}
-AUDIENCIAS PRÓXIMAS (30 días):
-${audienciasProximas}
-═══ PENDIENTES ═══
-Total activos: ${pendientesTotal}
-URGENTES:
-${pendientesUrgentes}
-═══ DIRECTORIO ═══
-Contactos registrados: ${(D.directorio || []).length}
-═══ EXPEDIENTES (Control de Carpetas) ═══
-Carpetas activas: ${(D.carpetas || []).filter(c => c.estatus !== 'archivado').length} de ${(D.carpetas || []).length} total`;
-}
-// ── Mensaje de bienvenida ─────────────────────────────────────────────
-function _agMensajeBienvenida() {
-  const hora = new Date().getHours();
-  const saludo = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches';
-  const urgentes = (D.juicios || []).filter(j => j.estatus === 'urgente').length;
-  const pendUrgentes = (D.pendientes || []).filter(p => !p.resuelto && p.prioridad === 'urgente').length;
-  let msg = `${saludo}. Soy tu asistente del despacho. Tengo acceso completo al sistema en tiempo real.\n\n`;
-  if (urgentes > 0) msg += `⚠️ Tienes ${urgentes} juicio${urgentes > 1 ? 's' : ''} urgente${urgentes > 1 ? 's' : ''}.\n`;
-  if (pendUrgentes > 0) msg += `📌 ${pendUrgentes} pendiente${pendUrgentes > 1 ? 's' : ''} urgente${pendUrgentes > 1 ? 's' : ''}.\n`;
-  msg += `\n¿En qué te puedo ayudar?`;
-  _agAgregarMensaje('ia', msg);
-}
-// ── Agregar mensaje al chat ───────────────────────────────────────────
-function _agAgregarMensaje(rol, texto, id) {
-  const cont = document.getElementById('ag-msgs');
-  if (!cont) return null;
-  const wrap = document.createElement('div');
-  wrap.style.cssText = 'display:flex;flex-direction:column;';
-  if (id) wrap.id = id;
-  const burbuja = document.createElement('div');
-  burbuja.className = rol === 'user' ? 'ag-msg-user' : 'ag-msg-ia';
-  if (texto === '...') burbuja.classList.add('pensando');
-  burbuja.textContent = texto;
-  wrap.appendChild(burbuja);
-  if (rol === 'ia' && texto !== '...') {
-    const btnCopy = document.createElement('button');
-    btnCopy.className = 'ag-copy-btn';
-    btnCopy.textContent = '📋 Copiar';
-    btnCopy.onclick = () => { navigator.clipboard.writeText(texto).catch((e)=>{ registrarError('Promise catch vacio', e); }); btnCopy.textContent = '✓'; setTimeout(() => btnCopy.textContent = '📋 Copiar', 2000); };
-    wrap.appendChild(btnCopy);
-  }
-  cont.appendChild(wrap);
-  cont.scrollTop = cont.scrollHeight;
-  return wrap;
-}
-// ── Enviar mensaje ────────────────────────────────────────────────────
-async function agEnviar() {
-  const inp  = document.getElementById('ag-inp');
-  const btn  = document.getElementById('ag-send');
-  const texto = (inp.value || '').trim();
-  if (!texto) return;
-  // Verificar que haya al menos una key (Groq o Gemini)
-  const _agGroqKey = typeof _groqGetKey === 'function' ? _groqGetKey() : '';
-  const _agGeminiKey = window._geminiKeyCached || localStorage.getItem('lex-gemini-key') || '';
-  if ((!_agGroqKey || _agGroqKey.length < 10) && (!_agGeminiKey || _agGeminiKey.length < 10)) {
-    _agAgregarMensaje('ia', '⚠ Configura Groq (gratis) o Gemini en ⚙️ Configuración para usar el asistente.');
-    return;
-  }
-  inp.value = '';
-  inp.disabled = true;
-  btn.disabled = true;
-  _agAgregarMensaje('user', texto);
-  _agHistorial.push({ role: 'user', content: texto });
-  const idPensando = 'ag-pensando-' + Date.now();
-  _agAgregarMensaje('ia', '...', idPensando);
-  // FIX: construir prompt con contexto + historial + mensaje del usuario
-  // Antes: `prompt` no estaba definido en este scope → enviaba undefined → 400 Bad Request
-  const _agCtx = (typeof _iaConstruirContexto === 'function') ? _iaConstruirContexto() : _agConstruirContexto();
-  const _agHistPrev = _agHistorial.slice(-11, -1)
-    .map(m => (m.role === 'user' ? 'Usuario: ' : 'Asistente: ') + m.content)
-    .join('\n');
-  const prompt = _agCtx + (_agHistPrev ? '\n\nCONVERSACIÓN PREVIA:\n' + _agHistPrev : '') + '\n\nUSUARIO: ' + texto;
-  try {
-    // Usar _iaLlamar: intenta Groq primero, fallback a Gemini automáticamente
-    const respuesta = await _iaLlamar(prompt, 900, 0.3);
-    document.getElementById(idPensando)?.remove();
-    _agAgregarMensaje('ia', respuesta.trim());
-    _agHistorial.push({ role: 'assistant', content: respuesta.trim() });
-    if (_agHistorial.length > 30) _agHistorial = _agHistorial.slice(-30);
-  } catch(e) {
-    document.getElementById(idPensando)?.remove();
-    // Mensajes de error en español claro
-    let msgUsuario = e.message;
-    if(e.message.includes('prepayment') || e.message.includes('credits')) msgUsuario = '💳 Créditos de Gemini agotados. Recarga en aistudio.google.com o configura una key de Groq en ⚙️ Configuración.';
-    else if(e.message.includes('SIN_KEY')) msgUsuario = '🔑 No hay API Key configurada. Ve a ⚙️ Configuración y agrega tu key de Groq (gratis) o Gemini.';
-    else if(e.message.includes('GROQ_RATE_LIMIT')) msgUsuario = '⏳ Límite de Groq alcanzado. Espera un momento e intenta de nuevo.';
-    _agAgregarMensaje('ia', '⚠ ' + msgUsuario);
-  } finally {
-    inp.disabled = false;
-    btn.disabled = false;
-    inp.focus();
-  }
-}
-// ── Acciones rápidas del asistente global ────────────────────────────
-const _agPrompts = {
-  resumen_dia:       'Dame un resumen ejecutivo del día de hoy: movimientos de caja, situación de los juicios urgentes y pendientes más importantes.',
-  urgentes:          'Muéstrame todo lo que es urgente ahora mismo: juicios urgentes, pendientes urgentes y cualquier plazo o audiencia que esté cerca.',
-  caja:              'Analiza el estado financiero actual del despacho: saldo, movimientos de hoy, recibos pendientes de cobro y cualquier situación que requiera atención.',
-  proximas_audiencias: 'Lista todas las audiencias próximas con fecha, cliente y tipo de juicio. Dime cuál es la más urgente y qué debería prepararse.',
-  pendientes_sem:    'Muéstrame los pendientes activos más importantes. ¿Cuáles son prioritarios y cuáles llevan más tiempo sin resolver?',
-  consejo:           '¿Qué debería hacer hoy en el despacho? Dame una lista priorizada de las acciones más importantes considerando juicios urgentes, audiencias próximas, pendientes y cobros.'
-};
-function agAccion(tipo) {
-  const prompt = _agPrompts[tipo];
-  if (!prompt) return;
-  const inp = document.getElementById('ag-inp');
-  if (inp) { inp.value = prompt; }
-  agEnviar();
-}
-// ── Limpiar conversación ──────────────────────────────────────────────
-function agLimpiar() {
-  _agHistorial = [];
-  const cont = document.getElementById('ag-msgs');
-  if (cont) cont.innerHTML = '';
-  _agMensajeBienvenida();
-}
-// ── Actualizar indicador de panel activo ─────────────────────────────
-const _irOriginalAg = ir;
-ir = function(p) {
-  _irOriginalAg(p);
-  _agPanelActual = p;
-  const nombres = { caja:'Principal', contabilidad:'Contabilidad', recibos:'Recibos', juicios:'Juicios', pendientes:'Pendientes', carpetas:'Archivo', directorio:'Directorio', 'nuevo-recibo':'Nuevo Recibo' };
-  const el = document.getElementById('ag-panel-nombre');
-  if (el) el.textContent = nombres[p] || p;
-};
-// ═══ FIN ASISTENTE GLOBAL ═══
+
 // ═══════════════════════════════════════════════════════════════════════
 // 📜 HISTORIAL CRONOLÓGICO — SALA DE JUICIO
 // Reemplaza tabs de Acuerdos + Términos + IA por pantalla completa
@@ -33055,7 +32702,7 @@ function hjIaLimpiar() {
 // ── _iaConstruirContexto: usa contexto de juicio o contexto general ──
 function _iaConstruirContexto() {
   if (typeof jdetIdx !== 'undefined' && jdetIdx >= 0 && D.juicios[jdetIdx]) return _hjConstruirContextoIA();
-  return _agConstruirContexto();
+  return '';
 }
 // ── abrirDetalle — abre el visor full-screen de expediente ───────
 abrirDetalle = function(idx) {

@@ -1334,6 +1334,8 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
    ══════════════════════════════════════════════════════ */
 #panel-gestiones{display:none;flex-direction:column;height:100%;overflow:hidden;}
 #panel-gestiones.active{display:flex !important;}
+#panel-citas{display:none;flex-direction:column;overflow-y:auto;}
+#panel-citas.active{display:flex !important;}
 .gest-layout{display:grid;grid-template-columns:280px 1fr;height:calc(100vh - 120px);overflow:hidden;gap:0;}
 .gest-sidebar{border-right:1px solid rgba(200,149,42,0.15);display:flex;flex-direction:column;overflow:hidden;background:rgba(15,10,5,0.4);}
 .gest-sidebar-header{padding:14px 14px 10px;border-bottom:1px solid rgba(200,149,42,0.12);}
@@ -2828,7 +2830,7 @@ window.addEventListener('offline', ()=>{
       <div class="nav-item" id="nav-pendientes-gen" data-panel="pendientes" onclick="ir('pendientes');setPSec('manual',document.getElementById('pend-todas-btn'));document.getElementById('nav-placas').classList.remove('active');"><span class="ni">📌</span><span>Pendientes</span><span class="nav-badge amarillo" id="badgeP">?</span></div>
       <div class="nav-item" id="nav-placas" data-panel="pendientes" onclick="ir('pendientes');setPSec('placas',document.querySelector('#panel-pendientes .pend-sec-btn[data-sec=\'placas\']'));document.getElementById('nav-pendientes-gen').classList.remove('active');"><span class="ni">🚗</span><span>Placas</span><span class="nav-badge amarillo" id="badgePlacas" style="display:none;"></span></div>
       <div class="nav-item" onclick="ir('escrituras')" id="nav-escrituras"><span class="ni">📄</span><span>Escrituras</span><span class="nav-badge amarillo" id="badgeEscrituras" style="display:none;"></span></div>
-      <div class="nav-item" onclick="(function(){var o=document.getElementById('pr-overlay');if(o)o.remove();agendarCitaAbrir();})()" id="nav-citas" style="border:1.5px solid rgba(200,149,42,0.35);background:rgba(200,149,42,0.07);"><span class="ni">📅</span><span>Agendar Cita</span></div>
+      <div class="nav-item" onclick="ir('citas')" id="nav-citas" style="border:1.5px solid rgba(200,149,42,0.35);background:rgba(200,149,42,0.07);"><span class="ni">📅</span><span>Citas</span><span class="nav-badge amarillo" id="badgeCitas" style="display:none;"></span></div>
     </div>
   </div>
   <!-- ═══ BARRA CAPTURA RETROACTIVA (Admin + Secretaria) ═══ -->
@@ -4422,28 +4424,84 @@ window.addEventListener('offline', ()=>{
     </div><!-- fin panel-escrituras -->
 
     <!-- ══════════════════════════════════════════════════════
+         PANEL: CITAS (lista)
+    ═══════════════════════════════════════════════════════════ -->
+    <div id="panel-citas" class="panel">
+      <div class="search-row">
+        <input class="search-inp" placeholder="🔍 Buscar por título, cliente, lugar..." id="citasQ" oninput="renderCitas()">
+        <button class="btn btn-primary" onclick="agendarCitaAbrir()">📅 Nueva Cita</button>
+      </div>
+      <div id="citas-lista" style="padding:12px 16px 32px;display:flex;flex-direction:column;gap:10px;"></div>
+    </div><!-- fin panel-citas -->
+
+    <!-- ══════════════════════════════════════════════════════
          MODAL: AGENDAR CITA
     ═══════════════════════════════════════════════════════════ -->
-    <div class="modal-ov" id="mAgendarCita"><div class="modal" id="mAgendarCitaInner" style="max-width:480px;">
-      <div class="modal-hdr"><h3>📅 Agendar Cita</h3><button class="modal-x" onclick="cerrar('mAgendarCita')">✕</button></div>
-      <div class="modal-body">
-        <div class="field"><label>Asunto / Título *</label><input id="citaTitulo" type="text" placeholder="Ej: Audiencia, firma de escritura, junta con cliente..."></div>
-        <div class="field"><label>👤 Cliente / Persona</label><input id="citaCliente" type="text" placeholder="Nombre del cliente o persona relacionada"></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-          <div class="field"><label>📅 Fecha *</label><input id="citaFecha" type="date"></div>
-          <div class="field"><label>🕐 Hora *</label><input id="citaHora" type="time" value="09:00"></div>
+    <div class="modal-ov" id="mAgendarCita"><div class="modal" id="mAgendarCitaInner" style="max-width:560px;max-height:90vh;display:flex;flex-direction:column;">
+      <div class="modal-hdr"><h3>📅 Citas</h3><button class="modal-x" onclick="cerrar('mAgendarCita')">✕</button></div>
+      <!-- Formulario nueva cita (colapsable) -->
+      <div id="mCitaFormWrap" style="border-bottom:1px solid rgba(200,149,42,0.15);">
+        <div onclick="citaToggleForm()" style="padding:10px 18px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;">
+          <span style="font-family:monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.12em;color:rgba(200,149,42,0.6);">➕ Nueva cita</span>
+          <span id="mCitaFormArrow" style="font-size:0.75rem;color:rgba(200,149,42,0.5);transition:transform 0.2s;">▲</span>
         </div>
-        <div class="field"><label>📍 Lugar / Dirección</label><input id="citaLugar" type="text" placeholder="Ej: Juzgado 3ro Civil, calle, ciudad..."></div>
-        <div class="field"><label>📝 Notas</label><textarea id="citaNotas" rows="3" placeholder="Detalles adicionales, documentos a llevar, etc."></textarea></div>
-        <div id="citaCalendarStatus" style="display:none;font-family:monospace;font-size:0.65rem;padding:7px 10px;border-radius:6px;margin-top:4px;"></div>
+        <div id="mCitaFormBody" style="padding:0 18px 14px;">
+          <div class="field"><label>Asunto / Título *</label><input id="citaTitulo" type="text" placeholder="Ej: Audiencia, firma de escritura, junta con cliente..."></div>
+          <div class="field"><label>👤 Cliente / Persona</label><input id="citaCliente" type="text" placeholder="Nombre del cliente o persona relacionada"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div class="field"><label>📅 Fecha *</label><input id="citaFecha" type="date"></div>
+            <div class="field"><label>🕐 Hora *</label><input id="citaHora" type="time" value="09:00"></div>
+          </div>
+          <div class="field"><label>📍 Lugar / Dirección</label><input id="citaLugar" type="text" placeholder="Ej: Juzgado 3ro Civil, calle, ciudad..."></div>
+          <div class="field"><label>📝 Notas</label><textarea id="citaNotas" rows="2" placeholder="Detalles adicionales, documentos a llevar, etc."></textarea></div>
+          <div id="citaCalendarStatus" style="display:none;font-family:monospace;font-size:0.65rem;padding:7px 10px;border-radius:6px;margin-top:4px;"></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+            <button class="btn" onclick="agendarCitaComoLlegar()" style="background:var(--azul-l);color:var(--azul);border:1px solid var(--azul);">📍 Cómo llegar</button>
+            <button class="btn btn-primary" onclick="agendarCitaGuardar()">💾 Guardar y agendar</button>
+          </div>
+        </div>
       </div>
-      <div class="modal-ftr">
-        <button class="btn btn-ghost" onclick="cerrar('mAgendarCita')">Cancelar</button>
-        <button class="btn" onclick="agendarCitaComoLlegar()" style="background:var(--azul-l);color:var(--azul);border:1px solid var(--azul);">📍 Cómo llegar</button>
-        <button class="btn btn-primary" onclick="agendarCitaGuardar()">💾 Guardar y agendar</button>
+      <!-- Lista de citas guardadas -->
+      <div style="padding:10px 14px 6px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(200,149,42,0.1);">
+        <input style="flex:1;background:rgba(200,149,42,0.05);border:1.5px solid rgba(200,149,42,0.2);border-radius:20px;padding:6px 14px;font-size:0.78rem;color:var(--ink);outline:none;" placeholder="🔍 Buscar citas..." id="modal-citasQ" oninput="renderCitas()">
+      </div>
+      <div id="modal-citas-lista" style="flex:1;overflow-y:auto;padding:10px 14px 16px;display:flex;flex-direction:column;gap:8px;"></div>
+      <div class="modal-ftr" style="justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="cerrar('mAgendarCita')">Cerrar</button>
       </div>
     </div></div>
     <!-- fin modal Agendar Cita -->
+
+    <!-- ══════════════════════════════════════════════════════
+         MODAL: CLIENTE RÁPIDO (resumen + iniciar trámite)
+    ═══════════════════════════════════════════════════════════ -->
+    <div class="modal-ov" id="mClienteRapido"><div class="modal" style="max-width:400px;">
+      <div class="modal-hdr"><h3>👤 Cliente encontrado</h3><button class="modal-x" onclick="cerrar('mClienteRapido')">✕</button></div>
+      <div style="padding:20px 22px 6px;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+          <div id="mCR-avatar" style="width:52px;height:52px;border-radius:50%;background:rgba(200,149,42,0.13);border:2px solid rgba(200,149,42,0.35);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.15rem;color:var(--gold-dark);font-family:'DM Mono',monospace;flex-shrink:0;letter-spacing:0.04em;"></div>
+          <div style="min-width:0;">
+            <div id="mCR-nombre" style="font-weight:700;font-size:1rem;color:var(--ink);line-height:1.25;word-break:break-word;"></div>
+            <div id="mCR-stats" style="font-size:0.72rem;color:var(--muted);margin-top:5px;line-height:1.6;"></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px;background:rgba(200,149,42,0.04);border:1px solid var(--border-light);border-radius:6px;padding:11px 13px;margin-bottom:6px;">
+          <div style="display:flex;gap:10px;align-items:center;">
+            <span style="color:var(--muted);width:68px;flex-shrink:0;font-family:'DM Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.07em;">📞 Teléfono</span>
+            <span id="mCR-tel" style="color:var(--ink);font-family:'DM Mono',monospace;font-size:0.82rem;"></span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <span style="color:var(--muted);width:68px;flex-shrink:0;font-family:'DM Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.07em;">📍 Domicilio</span>
+            <span id="mCR-dom" style="color:var(--ink);font-size:0.82rem;line-height:1.45;"></span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-ftr">
+        <button class="btn btn-ghost" onclick="cerrar('mClienteRapido')">Cerrar</button>
+        <button class="btn btn-primary" onclick="iniciarTramiteDesdeCliente()">📋 Iniciar trámite nuevo</button>
+      </div>
+    </div></div>
+    <!-- fin modal Cliente Rápido -->
 
     <!-- ══════════════════════════════════════════════════════
          PANEL RECIBOS EN GESTIÓN
@@ -11466,77 +11524,41 @@ async function guardarRecibo(){
   // ⚠️ CRÍTICO: leer folioAntNum ANTES de reservar folio para detectar si es abono
   const folioAntNum = window._folioReferencia || parseInt($('folio_anterior').value)||null;
   const historialPagosRef = folioAntNum ? obtenerHistorialPagosAbono(folioAntNum) : [];
-  // ── RESERVAR FOLIO ATÓMICO — lee Drive en este instante y lo incrementa ──
-  // Si hay un folio de referencia (_folioReferencia), es un abono sobre un recibo
-  // existente — tanto en modo normal como retroactivo.
-  // En ese caso NO se reserva folio nuevo: se reutiliza el folio original con la
-  // siguiente letra (A→B, B→C, etc.).
-  // Si no hay referencia, es un recibo nuevo y se reserva el siguiente folio.
-  let folio;
   const _esAbono = !!(window._folioReferencia);
-  if (_esAbono) {
-    // Reutilizar el folio del recibo original — calcular siguiente letra disponible
-    folio = folioAntNum;
-    const _letrasUsadas = (appData.recibos || [])
-      .filter(_r => _r.folio === folioAntNum && !_r.esComplemento)
-      .map(_r => (_r.letra || 'A').toUpperCase().charCodeAt(0));
-    const _maxLetra = _letrasUsadas.length > 0
-      ? Math.max(..._letrasUsadas)
-      : 'A'.charCodeAt(0);
-    const _letraNueva = String.fromCharCode(_maxLetra + 1);
-    window._letraAbonoRetroactivo = _letraNueva;
-    const _modoLabel = window._reciboRetroactivoActivo ? 'abono retroactivo' : 'abono';
-    setStatus('loading', 'Preparando ' + _modoLabel + ' — folio #' + folioAntNum + _letraNueva + '...', 'loading');
-  } else {
-    // Recibo nuevo — reservar folio único
-    window._letraAbonoRetroactivo = null;
-    setStatus('loading','Reservando folio único...','loading');
-    folio = await reservarFolioEnDrive();
+
+  // ── PEDIR RESPONSABLE ANTES DE RESERVAR FOLIO ────────────────────────────
+  // El folio se toma en el último momento posible (dentro del try, abajo).
+  // Si el usuario cancela aquí, ningún folio se quema.
+  const respSelec = await new Promise(function(resolve){
+    elegirResponsable(function(nombre){ resolve(nombre); });
+  });
+  if (!respSelec) {
+    const btnAbort = document.getElementById('btn-guardar');
+    if (btnAbort) btnAbort.disabled = false;
+    setStatus('ok', 'Guardado cancelado', 'ok');
+    return;
   }
-  // Actualizar el display con el folio y letra correctos
-  const _letraDisplay = window._letraAbonoRetroactivo || 'A';
-  $('folio-display').textContent = folioConLetra(folio, null, _letraDisplay);
+  window._respSeleccionado = respSelec;
+  // ─────────────────────────────────────────────────────────────────────────
+
   const primerNombre=clientes[0].nombre;
   const saldoPendiente=Math.max(0,total-anticipo);
   // ── CORRECCIÓN BUG #2 y #3 — Cálculo de saldos en folio secundario ────────
-  // Cuando este recibo es un abono (folioAntNum existe), la base para calcular
-  // totalAbonado y saldoNuevo NO es el "total" capturado en el formulario (que solo
-  // refleja el monto de este acto), sino el saldo heredado del folio primario.
-  //
-  // Ejemplo correcto:
-  //   Folio A: total=$10,500  anticipo=$3,500  → saldoPendiente=$7,000
-  //   Folio B: pago de $7,000
-  //     totalGeneral  = $10,500  (costo total del contrato, heredado)
-  //     anticipo hist = $3,500   (anticipo original, heredado)
-  //     abonoEsteActo = $7,000   (lo que paga ahora)
-  //     totalAbonado  = $3,500 + $7,000 = $10,500
-  //     saldoNuevo    = max(0, $10,500 - $10,500) = $0  ✓
-  //
-  // Sin esta corrección el sistema usaba:
-  //   totalGeneral = $7,000  (el monto del formulario)
-  //   totalAbonado = $7,000  (solo el pago de hoy)
-  //   saldoNuevo   = max(0, $7,000 - $7,000) = $0 por coincidencia,
-  // PERO el recibo impreso mostraba "$3,500 restantes" porque el anticipo
-  // original no estaba sumado en la vista del PDF.
   let _totalGeneralDatos = total;
   let _totalAbonadoDatos = anticipo;
   let _saldoNuevoDatos   = Math.max(0, total - anticipo);
   if(folioAntNum){
     const recPrim = appData.recibos.find(r => r.folio === folioAntNum);
     if(recPrim){
-      // El costo total del contrato es el del folio primario
       _totalGeneralDatos = parseFloat(recPrim.total) || _totalGeneralDatos;
-      // Lo ya abonado antes de este acto
       const _yaAbonado = parseFloat(recPrim.totalAbonado) || parseFloat(recPrim.anticipo) || 0;
-      // Total abonado en la historia = pagos previos + pago de ahora
       _totalAbonadoDatos = _yaAbonado + anticipo;
-      // Saldo resultante después de este pago
       _saldoNuevoDatos   = Math.max(0, _totalGeneralDatos - _totalAbonadoDatos);
     }
   }
   // ─────────────────────────────────────────────────────────────────────────────
   const datos={
-    folio,clientes,
+    folio: null, clientes,
     tramites:document.getElementById('tramites').value,
     clase:document.getElementById('clase').value,
     marca:document.getElementById('marca').value,
@@ -11567,19 +11589,32 @@ async function guardarRecibo(){
     descripcionVehicular: tipoTramite === 'vehicular' ? _descripcionVehicular : '',
     letra: window._letraAbonoRetroactivo || 'A'
   };
-  // ── Seleccionar responsable (solo admin ve el modal) ──
-  const respSelec = await new Promise(function(resolve){
-    elegirResponsable(function(nombre){ resolve(nombre); });
-  });
-  if (!respSelec) {
-    // Usuario canceló el modal — abortar guardado y rehabilitar botón
-    const btnAbort = document.getElementById('btn-guardar');
-    if (btnAbort) btnAbort.disabled = false;
-    setStatus('ok', 'Guardado cancelado', 'ok');
-    return;
-  }
-  window._respSeleccionado = respSelec;
   try {
+    // ── RESERVAR FOLIO — lo más tarde posible, ya con responsable confirmado ──
+    // Si dos usuarios dan clic simultáneo, reservarFolioEnDrive() tiene lock atómico
+    // y les asigna folios distintos. Si el usuario canceló antes (modal responsable),
+    // nunca llegamos aquí, por lo que ningún folio se quema.
+    let folio;
+    if (_esAbono) {
+      folio = folioAntNum;
+      const _letrasUsadas = (appData.recibos || [])
+        .filter(_r => _r.folio === folioAntNum && !_r.esComplemento)
+        .map(_r => (_r.letra || 'A').toUpperCase().charCodeAt(0));
+      const _maxLetra = _letrasUsadas.length > 0 ? Math.max(..._letrasUsadas) : 'A'.charCodeAt(0);
+      const _letraNueva = String.fromCharCode(_maxLetra + 1);
+      window._letraAbonoRetroactivo = _letraNueva;
+      const _modoLabel = window._reciboRetroactivoActivo ? 'abono retroactivo' : 'abono';
+      setStatus('loading', 'Preparando ' + _modoLabel + ' — folio #' + folioAntNum + _letraNueva + '...', 'loading');
+    } else {
+      window._letraAbonoRetroactivo = null;
+      setStatus('loading','Reservando folio único...','loading');
+      folio = await reservarFolioEnDrive();
+    }
+    const _letraDisplay = window._letraAbonoRetroactivo || 'A';
+    $('folio-display').textContent = folioConLetra(folio, null, _letraDisplay);
+    datos.folio = folio;
+    datos.letra = window._letraAbonoRetroactivo || 'A';
+    // ─────────────────────────────────────────────────────────────────────────
     const qrTexto='LEX-MEXICO|Folio:'+folioFormato(folio)+'|'+primerNombre+'|'+datos.fecha_recibo+' '+datos.hora_recibo;
     const qrDataURL=await qrToDataURL(qrTexto);
     const doc=await generarPDF(datos,folio,qrDataURL);
@@ -12490,8 +12525,10 @@ function buscarClientePBC(){
     if(nPend) partes.push('<span style="color:#9a5a10">'+nPend+' pend.</span>');
     if(nPag)  partes.push('<span style="color:#1a5a2a">'+nPag+' liq.</span>');
     if(nCanc) partes.push('<span style="color:#888">'+nCanc+' canc.</span>');
+    const _nomAttr = g.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return '<div class="pbc-card">'
-      +'<div class="pbc-nombre-row">'+escHTML(g.nombre)
+      +'<div class="pbc-nombre-row" style="cursor:pointer;" onclick="abrirClienteRapido(\''+_nomAttr+'\')" title="Ver resumen e iniciar trámite">'
+      +'<span style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;">'+escHTML(g.nombre)+'</span>'
       +'<span class="pbc-badge">'+total+(total===1?' trámite':' trámites')+'</span>'
       +(partes.length?'<span class="pbc-estados">'+partes.join('')+'</span>':'')
       +'</div><div class="pbc-chips">'+chips+'</div></div>';
@@ -12518,6 +12555,73 @@ function abrirFolioPBC(folio, esComplemento){
   campo.scrollIntoView({behavior:'smooth',block:'center'});
   campo.focus();
   if(typeof cargarHistorialFolio==='function') cargarHistorialFolio();
+}
+// ── BUSCADOR RÁPIDO DE CLIENTES ───────────────────────────────────
+function abrirClienteRapido(nombre){
+  const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  const nNorm = norm(nombre);
+  const recibos = (appData.recibos||[]).filter(r => norm(r.nombre) === nNorm);
+  if(!recibos.length) return;
+  // Datos de contacto: tomar del recibo más reciente que los tenga
+  const sorted = [...recibos].sort((a,b) => b.folio - a.folio);
+  let movil = '', tel = '', domicilio = '';
+  for(const r of sorted){
+    const c = (r.clientes||[])[0] || {};
+    if(!movil    && c.movil)    movil    = c.movil;
+    if(!tel      && c.tel)      tel      = c.tel;
+    if(!domicilio && c.domicilio) domicilio = c.domicilio;
+    if(movil && tel && domicilio) break;
+  }
+  // Estadísticas
+  const validos    = recibos.filter(r => !r.cancelado && !r.esComplemento);
+  const nPagados   = validos.filter(r => !(r.saldoPendiente > 0)).length;
+  const nPendiente = validos.filter(r =>   r.saldoPendiente > 0 ).length;
+  const nCancelado = recibos.filter(r => r.cancelado).length;
+  const totalCobrado   = recibos.reduce((s,r) => s+(parseFloat(r.anticipo)||0), 0);
+  const totalPendiente = recibos.reduce((s,r) => s+(parseFloat(r.saldoPendiente)||0), 0);
+  const partes = [];
+  if(nPagados)   partes.push('<span style="color:var(--verde-d)">'+nPagados+' liquidado'+(nPagados!==1?'s':'')+'</span>');
+  if(nPendiente) partes.push('<span style="color:#9a5a10">'+nPendiente+' pendiente'+(nPendiente!==1?'s':'')+'</span>');
+  if(nCancelado) partes.push('<span style="color:var(--muted)">'+nCancelado+' cancelado'+(nCancelado!==1?'s':'')+'</span>');
+  let statsHtml = recibos.length+' trámite'+(recibos.length!==1?'s':'');
+  if(partes.length) statsHtml += ' · '+partes.join(' · ');
+  if(totalCobrado>0)   statsHtml += '<br><strong style="color:var(--gold-dark)">$'+fmtMXN(totalCobrado)+'</strong> cobrado';
+  if(totalPendiente>0) statsHtml += ' · <span style="color:var(--rojo)">$'+fmtMXN(totalPendiente)+' pendiente</span>';
+  // Iniciales para avatar
+  const initials = nombre.trim().split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||'').join('');
+  const modal = document.getElementById('mClienteRapido');
+  document.getElementById('mCR-avatar').textContent  = initials;
+  document.getElementById('mCR-nombre').textContent  = nombre;
+  document.getElementById('mCR-stats').innerHTML     = statsHtml;
+  document.getElementById('mCR-tel').textContent     = movil || tel || '—';
+  document.getElementById('mCR-dom').textContent     = domicilio || '—';
+  modal.dataset.nombre    = nombre;
+  modal.dataset.movil     = movil;
+  modal.dataset.tel       = tel;
+  modal.dataset.domicilio = domicilio;
+  modal.classList.add('show');
+}
+function iniciarTramiteDesdeCliente(){
+  const modal    = document.getElementById('mClienteRapido');
+  const nombre   = modal.dataset.nombre    || '';
+  const movil    = modal.dataset.movil     || '';
+  const tel      = modal.dataset.tel       || '';
+  const domicilio= modal.dataset.domicilio || '';
+  cerrar('mClienteRapido');
+  if(typeof ir === 'function') ir('nuevo-recibo');
+  if(window._panelesBusquedaAbiertos) togglePanelesBusqueda();
+  if(typeof limpiarForm === 'function') limpiarForm();
+  setTimeout(()=>{
+    const elNombre = document.querySelector('#clientes-wrapper .cliente-row [id^="nombre_"]');
+    const elMovil  = document.querySelector('#clientes-wrapper .cliente-row [id^="movil_"]');
+    const elTel    = document.querySelector('#clientes-wrapper .cliente-row [id^="tel_"]');
+    const elDom    = document.querySelector('#clientes-wrapper .cliente-row [id^="domicilio_"]');
+    if(elNombre && nombre)   { elNombre.value = nombre;    elNombre.dispatchEvent(new Event('input')); }
+    if(elMovil  && movil)    elMovil.value    = movil;
+    if(elTel    && tel)      elTel.value      = tel;
+    if(elDom    && domicilio) elDom.value     = domicilio;
+    if(nombre) toast('✅ Datos de '+nombre.split(' ')[0]+' cargados — completa el trámite','ok');
+  }, 120);
 }
 // ── EVENTOS ──────────────────────────────────────────────────────
 document.addEventListener('input',function(e){
@@ -14056,7 +14160,7 @@ function mostrarAtajosAyuda() {
 // Activar atajos globales
 document.addEventListener('keydown', manejarAtajos);
 // ═══ NAVEGACIÓN ═══
-const TITULOS={'pre-recibo':'📋 Pre-Recibos',sesiones:'👁 Monitor de Sesiones',caja:'🏠 Principal','registro-civil':'📋 Impresión Registro Civil',contabilidad:'📊 Contabilidad',recibos:'🧾 Recibos Oficiales','nuevo-recibo':'✍️ Nuevo Recibo','configuracion':'⚙️ Configuración',directorio:'👥 Directorio',carpetas:'🗂️ Control de Carpetas',juicios:'⚖️ Control de Juicios',pendientes:'📌 Pendientes',escrituras:'📄 Control de Escrituras',gestiones:'📋 Recibos en Gestión'};
+const TITULOS={'pre-recibo':'📋 Pre-Recibos',sesiones:'👁 Monitor de Sesiones',caja:'🏠 Principal','registro-civil':'📋 Impresión Registro Civil',contabilidad:'📊 Contabilidad',recibos:'🧾 Recibos Oficiales','nuevo-recibo':'✍️ Nuevo Recibo','configuracion':'⚙️ Configuración',directorio:'👥 Directorio',carpetas:'🗂️ Control de Carpetas',juicios:'⚖️ Control de Juicios',pendientes:'📌 Pendientes',escrituras:'📄 Control de Escrituras',gestiones:'📋 Recibos en Gestión',citas:'📅 Citas'};
 function ir(p){
   // Cerrar panel Pre-Recibo al navegar
   const _prOv = document.getElementById('pr-overlay');
@@ -14087,6 +14191,7 @@ function ir(p){
   if(p==='registro-civil')rcAbrirSubpanel('home');
   if(p==='escrituras'){ if(!Array.isArray(D.escrituras))D.escrituras=[]; escRender(); }
   if(p==='gestiones'){ if(!Array.isArray(D.gestiones))D.gestiones=[]; gestRender(); }
+  if(p==='citas'){ if(!Array.isArray(D.citas))D.citas=[]; renderCitas(); }
   if(p==='recibos'||p==='contabilidad'||p==='caja'){ repararFoliosDuplicados(); sincronizarPendientesPlacas(); }
   if(p==='pendientes'){ sincronizarPendientesPlacas(); }
   if(p==='configuracion'){ setTimeout(ocrCargarKeyEnCfg, 100); setTimeout(cfgMostrarFolioActual, 120); }
@@ -18925,6 +19030,10 @@ function badges(){
   const ue=(D.escrituras||[]).filter(e=>e.estado==='urgente').length;
   const be=$('badgeEscrituras');
   if(be){be.textContent=ue||'';be.style.display=ue?'':'none';}
+  const hoy2=new Date().toISOString().slice(0,10);
+  const uc=(D.citas||[]).filter(c=>c.fecha>=hoy2).length;
+  const bc=$('badgeCitas');
+  if(bc){bc.textContent=uc||'';bc.style.display=uc?'':'none';}
 }
 // ═══ RELOJ ═══
 function reloj(){
@@ -38487,6 +38596,102 @@ async function calendarEliminarEvento(eventId){
   }catch(e){ console.error('[Calendar] eliminar', e); return false; }
 }
 // ─── MODAL: AGENDAR CITA ─────────────────────────────────────────────
+// ── Renderizar panel de Citas ────────────────────────────────
+function renderCitas(){
+  const contenedor      = document.getElementById('citas-lista');
+  const contenedorModal = document.getElementById('modal-citas-lista');
+  if(!contenedor && !contenedorModal) return;
+  if(!Array.isArray(D.citas)) D.citas = [];
+  // Leer query de cualquiera de los dos inputs (panel o modal)
+  const q = ((document.getElementById('citasQ')?.value||'') || (document.getElementById('modal-citasQ')?.value||'')).toLowerCase().trim();
+  let lista = D.citas.slice().sort((a,b)=>(a.fecha||'') < (b.fecha||'') ? -1 : 1);
+  if(q) lista = lista.filter(c =>
+    (c.titulo||'').toLowerCase().includes(q) ||
+    (c.cliente||'').toLowerCase().includes(q) ||
+    (c.lugar||'').toLowerCase().includes(q) ||
+    (c.notas||'').toLowerCase().includes(q)
+  );
+
+  // Badge en nav
+  const badge = document.getElementById('badgeCitas');
+  if(badge){ const hoy = new Date().toISOString().slice(0,10); const prox = D.citas.filter(c=>c.fecha>=hoy).length; badge.textContent=prox||''; badge.style.display=prox?'':'none'; }
+
+  function _set(el, html){ if(el) el.innerHTML = html; }
+
+  if(!lista.length){
+    const vacio = `<div style="text-align:center;padding:60px 20px;color:var(--muted);font-size:0.85rem;">
+      <div style="font-size:2.5rem;margin-bottom:12px;">📅</div>
+      <div style="font-weight:600;margin-bottom:6px;">${q?'Sin resultados':'No hay citas agendadas'}</div>
+      <div style="font-size:0.75rem;opacity:0.7;">${q?'Intenta con otra búsqueda':'Haz clic en «Nueva Cita» para agendar'}</div>
+    </div>`;
+    _set(contenedor, vacio); _set(contenedorModal, vacio);
+    return;
+  }
+
+  const hoy = new Date().toISOString().slice(0,10);
+  const html = lista.map(c=>{
+    const pasada = c.fecha && c.fecha < hoy;
+    const esHoy  = c.fecha === hoy;
+    const borderColor = esHoy ? 'var(--gold)' : pasada ? 'rgba(0,0,0,0.1)' : 'rgba(200,149,42,0.3)';
+    const bgColor = esHoy ? 'rgba(200,149,42,0.07)' : pasada ? 'rgba(0,0,0,0.02)' : 'var(--surface)';
+    const badge = esHoy ? `<span style="background:var(--gold);color:#fff;font-size:0.55rem;font-family:monospace;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:0.08em;">HOY</span>` :
+                  pasada ? `<span style="background:rgba(0,0,0,0.08);color:var(--muted);font-size:0.55rem;font-family:monospace;font-weight:700;padding:2px 8px;border-radius:20px;">PASADA</span>` :
+                  `<span style="background:var(--verde-l);color:var(--verde-d);font-size:0.55rem;font-family:monospace;font-weight:700;padding:2px 8px;border-radius:20px;">PRÓXIMA</span>`;
+    const calLink = c.eventoCalendarLink
+      ? `<a href="${escHTML(c.eventoCalendarLink)}" target="_blank" style="font-size:0.7rem;color:var(--azul);font-family:monospace;text-decoration:none;" title="Ver en Google Calendar">📆 Calendar</a>`
+      : `<button onclick="citaSyncCalendar('${escHTML(c.id)}')" style="background:rgba(26,74,138,0.07);color:var(--azul);border:1px solid rgba(26,74,138,0.2);border-radius:14px;padding:3px 10px;font-size:0.65rem;font-family:monospace;cursor:pointer;" title="Agregar a Google Calendar">📆 Sync Calendar</button>`;
+    return `<div style="background:${bgColor};border:1.5px solid ${borderColor};border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span style="font-weight:600;font-size:0.92rem;color:var(--ink);flex:1;">${escHTML(c.titulo||'Sin título')}</span>
+        ${badge}
+      </div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:0.78rem;color:var(--muted);">
+        ${c.fecha?`<span>📅 ${c.fecha}${c.hora?' · '+c.hora:''}</span>`:''}
+        ${c.cliente?`<span>👤 ${escHTML(c.cliente)}</span>`:''}
+        ${c.lugar?`<span>📍 ${escHTML(c.lugar)}</span>`:''}
+      </div>
+      ${c.notas?`<div style="font-size:0.75rem;color:var(--muted);background:rgba(0,0,0,0.03);padding:6px 10px;border-radius:6px;line-height:1.5;">${escHTML(c.notas)}</div>`:''}
+      <div style="display:flex;gap:8px;align-items:center;margin-top:2px;">
+        ${calLink}
+        ${c.lugar?`<button onclick="window.open('https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent('${escHTML(c.lugar).replace(/'/g,"\\'")}'),'_blank')" style="background:var(--azul-l);color:var(--azul);border:1px solid rgba(26,74,138,0.2);border-radius:14px;padding:3px 10px;font-size:0.65rem;font-family:monospace;cursor:pointer;">📍 Cómo llegar</button>`:''}
+        <button onclick="citaEliminar('${escHTML(c.id)}')" style="margin-left:auto;background:var(--rojo-l);color:var(--rojo);border:1px solid rgba(192,22,26,0.2);border-radius:14px;padding:3px 10px;font-size:0.65rem;font-family:monospace;cursor:pointer;">🗑 Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+  _set(contenedor, html); _set(contenedorModal, html);
+}
+
+function citaEliminar(id){
+  if(!confirm('¿Eliminar esta cita?')) return;
+  if(!Array.isArray(D.citas)) return;
+  D.citas = D.citas.filter(c=>c.id!==id);
+  save(); syncEstadoSupabaseDebounced().catch(()=>{});
+  renderCitas();
+  toast('Cita eliminada');
+}
+async function citaSyncCalendar(id){
+  const cita = (D.citas||[]).find(c=>c.id===id);
+  if(!cita) return;
+  toast('📆 Sincronizando con Google Calendar...');
+  const ev = await calendarCrearEvento(cita);
+  if(ev){
+    cita.eventoCalendarId   = ev.id;
+    cita.eventoCalendarLink = ev.htmlLink;
+    save(); syncEstadoSupabaseDebounced().catch(()=>{});
+    renderCitas();
+    toast('✅ Cita agregada a Google Calendar','ok');
+  }
+}
+
+function citaToggleForm(){
+  const body = document.getElementById('mCitaFormBody');
+  const arrow = document.getElementById('mCitaFormArrow');
+  if(!body) return;
+  const visible = body.style.display !== 'none';
+  body.style.display = visible ? 'none' : '';
+  if(arrow) arrow.style.transform = visible ? 'rotate(180deg)' : '';
+}
+
 function agendarCitaAbrir(){
   if(!Array.isArray(D.citas)) D.citas = [];
   const ids = ['citaTitulo','citaCliente','citaLugar','citaNotas'];
@@ -38496,6 +38701,11 @@ function agendarCitaAbrir(){
   const st=document.getElementById('citaCalendarStatus'); if(st){ st.style.display='none'; st.textContent=''; }
   const modal = document.getElementById('mAgendarCita');
   if(modal) modal.classList.add('show');
+  // Asegurar que el formulario esté visible al abrir
+  const fb = document.getElementById('mCitaFormBody');
+  const fa = document.getElementById('mCitaFormArrow');
+  if(fb){ fb.style.display=''; } if(fa){ fa.style.transform=''; }
+  renderCitas();
 }
 // Abre Google Maps con la ruta hacia el lugar de la cita (sin necesidad de API key)
 function agendarCitaComoLlegar(){
@@ -38526,6 +38736,7 @@ async function agendarCitaGuardar(){
   save(); syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); });
   cerrar('mAgendarCita');
   toast('📅 Cita guardada — agendando en Google Calendar...');
+  if(document.getElementById('panel-citas')?.classList.contains('active')) renderCitas();
   // Intentar crear el evento en Google Calendar (no bloquea el guardado)
   const ev = await calendarCrearEvento(cita);
   if(ev){

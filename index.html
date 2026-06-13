@@ -3854,6 +3854,21 @@ window.addEventListener('offline', ()=>{
   <div class="content">
     <!-- ═══ CAJA ═══ -->
     <div id="panel-caja" class="panel active">
+      <!-- ── BÚSQUEDA DE CLIENTES POR RECIBOS ── -->
+      <div style="padding:10px 0 4px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <input id="cajaBusca-input" type="search" autocomplete="off"
+            placeholder="🔍 Buscar cliente por nombre…"
+            oninput="buscarClienteCaja()"
+            style="flex:1;padding:9px 14px;border:1px solid var(--border-l);border-radius:var(--radius-sm);font-size:0.88rem;background:var(--surface);color:var(--ink);outline:none;">
+          <button id="cajaBusca-clear" onclick="limpiarBuscaCaja()"
+            style="display:none;padding:8px 13px;border:1px solid var(--border-l);border-radius:var(--radius-sm);background:var(--surface);cursor:pointer;color:var(--muted);font-size:0.78rem;">✕</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;min-height:16px;margin-top:4px;padding:0 2px;">
+          <span id="cajaBusca-count" style="font-size:0.65rem;color:var(--muted);font-family:monospace;"></span>
+        </div>
+        <div id="cajaBusca-res" style="display:none;max-height:340px;overflow-y:auto;border:1px solid var(--border-light);border-radius:4px;background:var(--surface);margin-top:2px;"></div>
+      </div>
       <div class="stats-grid">
         <div class="stat verde"><div class="stat-lbl">Entradas hoy</div><div class="stat-val" id="cIng">$0</div><div class="stat-sub" id="cIngCnt">0 mov.</div></div>
         <div class="stat rojo"><div class="stat-lbl">Salidas hoy</div><div class="stat-val" id="cEgr">$0</div><div class="stat-sub" id="cEgrCnt">0 mov.</div></div>
@@ -12552,6 +12567,75 @@ function limpiarPBC(){
   document.getElementById('pbc-resultados').innerHTML='';
   document.getElementById('pbc-count').textContent='';
   $('pbc-input').focus();
+}
+// ── BÚSQUEDA DE CLIENTES EN PANEL PRINCIPAL (solo recibos, independiente) ──
+function buscarClienteCaja(){
+  const inp     = document.getElementById('cajaBusca-input');
+  const clearBtn= document.getElementById('cajaBusca-clear');
+  const countEl = document.getElementById('cajaBusca-count');
+  const resDiv  = document.getElementById('cajaBusca-res');
+  if(!inp) return;
+  const q = (inp.value || '').trim();
+  clearBtn.style.display = q ? 'inline-block' : 'none';
+  if(q.length < 2){
+    resDiv.style.display='none'; resDiv.innerHTML=''; countEl.textContent=''; return;
+  }
+  const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+  const qn = norm(q);
+  const grupos = {};
+  (appData.recibos||[]).forEach(r=>{
+    const nk = norm(r.nombre);
+    if(!nk.includes(qn)) return;
+    if(!grupos[nk]) grupos[nk]={ nombre:r.nombre, recibos:[] };
+    grupos[nk].recibos.push(r);
+  });
+  const clientes = Object.values(grupos);
+  resDiv.style.display = 'block';
+  if(!clientes.length){
+    resDiv.innerHTML='<div class="pbc-empty">Sin resultados para "<strong>'+escHTML(q)+'</strong>"</div>';
+    countEl.textContent=''; return;
+  }
+  countEl.textContent = clientes.length+(clientes.length===1?' cliente encontrado':' clientes encontrados');
+  resDiv.innerHTML = clientes.map(g=>{
+    const prioridad = r => r.cancelado?3:(r.esComplemento?2:(r.saldoPendiente>0?0:1));
+    const sorted = [...g.recibos].sort((a,b)=>prioridad(a)-prioridad(b)||b.folio-a.folio);
+    const chips = sorted.map(r=>{
+      const fs='#'+folioConLetra(r.folio, r.anio_folio, r.letra||'A');
+      let clase,ico;
+      if(r.cancelado)             { clase='cancelado';   ico='🚫'; }
+      else if(r.esComplemento)    { clase='complemento'; ico='↳';  }
+      else if(r.saldoPendiente>0) { clase='pendiente';   ico='⚠️'; }
+      else                        { clase='pagado';      ico='✅'; }
+      const tip = r.cancelado?'CANCELADO':r.esComplemento?'Complemento ref.#'+folioFormato(r.folioRef||0):(r.saldoPendiente>0?'Pendiente $'+fmtMXN(r.saldoPendiente):'Liquidado');
+      return '<span class="pbc-chip '+clase+'" title="'+fs+' · '+(r.fecha||'—')+' · '+tip+'">'
+        +ico+' '+fs+(r.fecha?'<span class="pbc-chip-fecha">'+r.fecha+'</span>':'')+'</span>';
+    }).join('');
+    const nPend=g.recibos.filter(r=>!r.cancelado&&!r.esComplemento&&r.saldoPendiente>0).length;
+    const nPag =g.recibos.filter(r=>!r.cancelado&&!r.esComplemento&&!(r.saldoPendiente>0)).length;
+    const nCanc=g.recibos.filter(r=>r.cancelado).length;
+    const total=g.recibos.length;
+    const partes=[];
+    if(nPend) partes.push('<span style="color:#9a5a10">'+nPend+' pend.</span>');
+    if(nPag)  partes.push('<span style="color:#1a5a2a">'+nPag+' liq.</span>');
+    if(nCanc) partes.push('<span style="color:#888">'+nCanc+' canc.</span>');
+    const _nomAttr = g.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return '<div class="pbc-card">'
+      +'<div class="pbc-nombre-row" style="cursor:pointer;" onclick="abrirClienteRapido(\''+_nomAttr+'\')" title="Ver historial e iniciar trámite">'
+      +'<span style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;">'+escHTML(g.nombre)+'</span>'
+      +'<span class="pbc-badge">'+total+(total===1?' trámite':' trámites')+'</span>'
+      +(partes.length?'<span class="pbc-estados">'+partes.join('')+'</span>':'')
+      +'</div><div class="pbc-chips">'+chips+'</div></div>';
+  }).join('');
+}
+function limpiarBuscaCaja(){
+  const inp = document.getElementById('cajaBusca-input');
+  if(inp){ inp.value=''; inp.focus(); }
+  const cl = document.getElementById('cajaBusca-clear');
+  if(cl) cl.style.display='none';
+  const res = document.getElementById('cajaBusca-res');
+  if(res){ res.style.display='none'; res.innerHTML=''; }
+  const cnt = document.getElementById('cajaBusca-count');
+  if(cnt) cnt.textContent='';
 }
 function abrirFolioPBC(folio, esComplemento){
   if(esComplemento){

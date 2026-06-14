@@ -35265,10 +35265,13 @@ function sincronizarPendientesPlacas() {
       return Number(r.folio) === Number(p.reciboVinculadoFolio);
     });
     var _saldoMinSync = _versSync.reduce(function(m,r){
-      var s=parseFloat(r.saldoPendiente); if(!isNaN(s)) return Math.min(m,s);
-      var sn=parseFloat(r.saldoNuevo);   if(!isNaN(sn)) return Math.min(m,sn);
-      if(r.liquidado===true) return Math.min(m,0);
-      return m;
+      // Evaluar saldoPendiente Y saldoNuevo juntos: la A puede tener saldoPendiente
+      // original (5000) y la B tener saldoNuevo=0 — sin retorno anticipado al primero.
+      var minR = Infinity;
+      var s  = parseFloat(r.saldoPendiente); if(!isNaN(s))  minR = Math.min(minR, s);
+      var sn = parseFloat(r.saldoNuevo);     if(!isNaN(sn)) minR = Math.min(minR, sn);
+      if(r.liquidado===true) minR = 0;
+      return Math.min(m, minR);
     }, Infinity);
     // Si el recibo ya no tiene saldo (en cualquier versión) o fue cancelado → eliminar pendiente
     if (_versSync.length === 0 || _versSync.some(function(r){return r.cancelado;}) || !(_saldoMinSync > 0)) {
@@ -35305,10 +35308,13 @@ function sincronizarPendientesPlacas() {
     // por lo que checar solo r.saldoPendiente recrearía pendientes ya liquidados.
     var _versPaso2 = appData.recibos.filter(function(v){ return Number(v.folio) === Number(r.folio); });
     var _saldoMinPaso2 = _versPaso2.reduce(function(m,v){
-      var s=parseFloat(v.saldoPendiente); if(!isNaN(s)) return Math.min(m,s);
-      var sn=parseFloat(v.saldoNuevo);   if(!isNaN(sn)) return Math.min(m,sn);
-      if(v.liquidado===true) return Math.min(m,0);
-      return m;
+      // Mismo criterio que PASO 1: mínimo entre saldoPendiente Y saldoNuevo
+      // para no ignorar B/C/D cuyo saldoNuevo=0 mientras A conserva su valor original.
+      var minV = Infinity;
+      var s  = parseFloat(v.saldoPendiente); if(!isNaN(s))  minV = Math.min(minV, s);
+      var sn = parseFloat(v.saldoNuevo);     if(!isNaN(sn)) minV = Math.min(minV, sn);
+      if(v.liquidado===true) minV = 0;
+      return Math.min(m, minV);
     }, Infinity);
     if (!(_saldoMinPaso2 > 0)) return;
     const folio = r.folio;

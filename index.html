@@ -15080,25 +15080,24 @@ function renderContab() {
   const BG_HDR  = ['#e8c875','#d4b870'];
   const BG_BODY = ['#fdfaf4','#f7f3e8'];
   let granIngTotal = 0, granEgrTotal = 0;
-  // ── PRE-CÁLCULO GLOBAL: saldo "EN CAJA" cruzando meses y años ──
-  // El acumulado NO se reinicia al cambiar de mes; solo se reinicia con un
-  // corte de caja. Recorremos TODAS las fechas en orden ascendente una sola vez.
+  // ── PRE-CÁLCULO GLOBAL: saldo "EN CAJA" infinito ──
+  // Usa TODOS los movimientos sin filtrar para que el acumulado cruce meses
+  // y años sin reiniciarse. Solo se reinicia con un corte de caja (esCorte).
+  // El cierre de caja (sin esCorte) NO afecta el acumulado.
   const _acumGlobal = {};
   {
-    const _todasFechasAsc = [];
-    Object.keys(arbol).sort().forEach(a =>
-      Object.keys(arbol[a]).sort().forEach(m =>
-        Object.keys(arbol[a][m]).sort().forEach(f => _todasFechasAsc.push(f))
-      )
-    );
+    const _todosMovs = getAllMovs();
+    const _fechasSet = new Set();
+    _todosMovs.forEach(m => { if (m.fecha && m.fecha !== '—') _fechasSet.add(m.fecha); });
+    (D.cierres || []).forEach(c => { if (c.fecha) _fechasSet.add(c.fecha); });
+    const _todasFechasAsc = [..._fechasSet].sort();
     let _carry = 0;
     _todasFechasAsc.forEach(f => {
-      const _a = f.substring(0,4), _m = f.substring(5,7);
-      const msDia = arbol[_a][_m][f];
-      const corteF = (D.cierres||[]).find(c => c.fecha===f && c.esCorte);
+      const corteF = (D.cierres || []).find(c => c.fecha === f && c.esCorte);
       if (corteF) _carry = 0;
-      const ingF = msDia.filter(m => m.tipo==='ingreso').reduce((s,m)=>s+(parseFloat(m.monto)||0),0);
-      const egrF = msDia.filter(m => m.tipo==='egreso').reduce((s,m)=>s+(parseFloat(m.monto)||0),0);
+      const _movsDia = _todosMovs.filter(m => m.fecha === f);
+      const ingF = _movsDia.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (parseFloat(m.monto) || 0), 0);
+      const egrF = _movsDia.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (parseFloat(m.monto) || 0), 0);
       _carry += ingF - egrF;
       _acumGlobal[f] = _carry;
       if (corteF) _carry = 0;

@@ -273,6 +273,7 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 /* ───────── STATS ───────── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px;}
+.caja-top-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;align-items:start;}
 .stats-grid-4{grid-template-columns:repeat(4,1fr);}
 @media (max-width:900px){.stats-grid-4{grid-template-columns:repeat(2,1fr);}}
 .stat{
@@ -1085,6 +1086,7 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
   .nav-sub-item{padding:9px;justify-content:center;margin:0 4px 3px;}
   .nav-sub-item > span:not(.ni),.nav-sub-item .nav-badge{display:none;}
   .stats-grid{grid-template-columns:1fr 1fr;}
+  .caja-top-row{grid-template-columns:1fr;}
   .captura-rapida{grid-template-columns:1fr 1fr;}
   .topbar{padding:10px 16px;}
   .content{padding:14px 16px;}
@@ -3854,26 +3856,28 @@ window.addEventListener('offline', ()=>{
   <div class="content">
     <!-- ═══ CAJA ═══ -->
     <div id="panel-caja" class="panel active">
-      <!-- ── BÚSQUEDA DE CLIENTES POR RECIBOS ── -->
-      <div style="background:#fdfaf4;border:1px solid #d4b870;border-radius:8px;padding:12px 14px 8px;margin-bottom:14px;">
-        <div style="font-family:monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:#8c6518;margin-bottom:8px;font-weight:600;">🔍 Buscar cliente (por recibos)</div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <input id="cajaBusca-input" type="search" autocomplete="off"
-            placeholder="Escribe nombre del cliente…"
-            oninput="buscarClienteCaja()"
-            style="flex:1;padding:9px 14px;border:1.5px solid #d4b870;border-radius:6px;font-size:0.88rem;background:#fff;color:#1a1008;outline:none;">
-          <button id="cajaBusca-clear" onclick="limpiarBuscaCaja()"
-            style="display:none;padding:8px 13px;border:1px solid #d4b870;border-radius:6px;background:#fdfaf4;cursor:pointer;color:#7a6840;font-size:0.78rem;">✕</button>
+      <!-- ── FILA SUPERIOR: BÚSQUEDA + ENTRADAS + SALIDAS (3 columnas iguales) ── -->
+      <div class="caja-top-row">
+        <!-- Columna 1: Búsqueda de clientes por recibos -->
+        <div style="background:#fdfaf4;border:1px solid #d4b870;border-radius:8px;padding:12px 14px 8px;">
+          <div style="font-family:monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:#8c6518;margin-bottom:8px;font-weight:600;">🔍 Buscar cliente (por recibos)</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="cajaBusca-input" type="search" autocomplete="off"
+              placeholder="Escribe nombre del cliente…"
+              oninput="buscarClienteCaja()"
+              style="flex:1;padding:9px 14px;border:1.5px solid #d4b870;border-radius:6px;font-size:0.88rem;background:#fff;color:#1a1008;outline:none;">
+            <button id="cajaBusca-clear" onclick="limpiarBuscaCaja()"
+              style="display:none;padding:8px 13px;border:1px solid #d4b870;border-radius:6px;background:#fdfaf4;cursor:pointer;color:#7a6840;font-size:0.78rem;">✕</button>
+          </div>
+          <div style="min-height:14px;margin-top:4px;">
+            <span id="cajaBusca-count" style="font-size:0.65rem;color:#7a6840;font-family:monospace;"></span>
+          </div>
+          <div id="cajaBusca-res" style="display:none;max-height:340px;overflow-y:auto;border:1px solid #ecdfa8;border-radius:4px;background:#fdfaf4;margin-top:2px;"></div>
         </div>
-        <div style="min-height:14px;margin-top:4px;">
-          <span id="cajaBusca-count" style="font-size:0.65rem;color:#7a6840;font-family:monospace;"></span>
-        </div>
-        <div id="cajaBusca-res" style="display:none;max-height:340px;overflow-y:auto;border:1px solid #ecdfa8;border-radius:4px;background:#fdfaf4;margin-top:2px;"></div>
-      </div>
-      <div class="stats-grid">
+        <!-- Columna 2: Entradas hoy -->
         <div class="stat verde"><div class="stat-lbl">Entradas hoy</div><div class="stat-val" id="cIng">$0</div><div class="stat-sub" id="cIngCnt">0 mov.</div></div>
+        <!-- Columna 3: Salidas hoy -->
         <div class="stat rojo"><div class="stat-lbl">Salidas hoy</div><div class="stat-val" id="cEgr">$0</div><div class="stat-sub" id="cEgrCnt">0 mov.</div></div>
-        <div class="stat gold"><div class="stat-lbl">Saldo en caja</div><div class="stat-val" id="cSaldo">$0</div><div class="stat-sub" id="cFecha">—</div></div>
       </div>
       <!-- ── ACCIONES RÁPIDAS ── -->
       <div class="caja-acciones-titulo">Acciones Rápidas</div>
@@ -12621,11 +12625,9 @@ function buscarClienteCaja(){
     if(nCanc) partes.push('<span style="color:#888">'+nCanc+' canc.</span>');
     const _nomAttr = g.nombre.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return '<div class="pbc-card">'
-      +'<div class="pbc-nombre-row" style="cursor:pointer;" onclick="abrirClienteRapido(\''+_nomAttr+'\')" title="Ver historial e iniciar trámite">'
+      +'<div class="pbc-nombre-row" style="cursor:pointer;margin-bottom:0;" onclick="abrirClienteRapido(\''+_nomAttr+'\')" title="Ver historial e iniciar trámite">'
       +'<span style="text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;">'+escHTML(g.nombre)+'</span>'
-      +'<span class="pbc-badge">'+total+(total===1?' trámite':' trámites')+'</span>'
-      +(partes.length?'<span class="pbc-estados">'+partes.join('')+'</span>':'')
-      +'</div><div class="pbc-chips">'+chips+'</div></div>';
+      +'</div></div>';
   }).join('');
 }
 function limpiarBuscaCaja(){
@@ -14432,6 +14434,7 @@ function renderCaja(){
   $('cIng').textContent = sinSesion ? '—' : '$'+fmt(ing);
   $('cEgr').textContent = sinSesion ? '—' : '$'+fmt(egr);
   const saldoEl=$('cSaldo');
+  if(saldoEl){
   if(sinSesion){
     saldoEl.textContent='Conecta sesión';
     saldoEl.style.color='var(--muted,#888)';
@@ -14445,9 +14448,10 @@ function renderCaja(){
     saldoEl.style.color='';
     saldoEl.style.fontSize='';
   }
+  }
   $('cIngCnt').textContent=movs.filter(m=>m.tipo==='ingreso').length+' mov.';
   $('cEgrCnt').textContent=movs.filter(m=>m.tipo==='egreso').length+' mov.';
-  $('cFecha').textContent=new Date().toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'long'});
+  var _cFechaEl=$('cFecha');if(_cFechaEl)_cFechaEl.textContent=new Date().toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'long'});
   var _cRec=document.getElementById('cRec');if(_cRec)_cRec.textContent=REC.recibos.filter(r=>r.fecha===hoy()).length;
   const saldoFmt=(saldoTotal<0?'-':'')+'$'+fmt(Math.abs(saldoTotal));
   var cm=document.getElementById('cierreMonto');if(cm)cm.textContent=sinSesion?'—':saldoFmt;
@@ -35309,14 +35313,22 @@ function sincronizarPendientesPlacas() {
     if (!(_saldoMinPaso2 > 0)) return;
     const folio = r.folio;
     const idPend = 'PEND-REC-' + folio;
+    // Si ya existe un pendiente para este folio: reactivarlo si está resuelto
+    // (el recibo aún tiene saldo, no debería considerarse resuelto)
+    const _pendExist = D.pendientes.find(function(p) {
+      return p.id === idPend || Number(p.reciboVinculadoFolio) === Number(folio);
+    });
+    if (_pendExist) {
+      if (_pendExist.resuelto) {
+        _pendExist.resuelto = false;
+        _pendExist.fechaResolucion = '';
+        creados++;
+      }
+      return;
+    }
     // No recrear si ya fue liquidado/eliminado (lista negra en localStorage)
     const _listaNegraPlacas = JSON.parse(localStorage.getItem('lex-placas-liquidados') || '[]');
     if (_listaNegraPlacas.indexOf(String(folio)) >= 0) return;
-    // No tocar si ya existe un pendiente para este folio (resuelto o no)
-    const yaExiste = D.pendientes.some(function(p) {
-      return p.id === idPend || Number(p.reciboVinculadoFolio) === Number(folio);
-    });
-    if (yaExiste) return;
     // Detectar tipo de trámite vehicular desde el primer concepto
     const conc0 = ((r.conceptos && r.conceptos[0]) ? (r.conceptos[0].concepto || '') : '').toLowerCase();
     let tipoVeh = 'alta';

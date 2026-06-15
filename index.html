@@ -2896,48 +2896,56 @@ window.addEventListener('offline', ()=>{
   </div>
 </nav>
 <!-- ═══ SCANSYS PANEL ═══ -->
-<div id="scansys-panel" style="display:none;position:fixed;left:240px;top:0;height:100vh;width:400px;background:linear-gradient(160deg,#0e0904 0%,#130c05 100%);border-right:1px solid rgba(200,149,42,0.18);border-left:1px solid rgba(200,149,42,0.1);z-index:9997;display:none;flex-direction:column;font-family:monospace;overflow:hidden;box-shadow:4px 0 24px rgba(0,0,0,0.5);">
+<!-- SCANSYS overlay de fondo -->
+<div id="scansys-overlay" onclick="scansysToggle()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:9996;backdrop-filter:blur(2px);"></div>
+<!-- SCANSYS ventana flotante pantalla completa -->
+<div id="scansys-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(96vw,1200px);height:min(92vh,860px);background:linear-gradient(160deg,#0c0800 0%,#120a03 60%,#0e0c04 100%);border:1px solid rgba(200,149,42,0.28);border-radius:16px;z-index:9997;flex-direction:column;font-family:monospace;overflow:hidden;box-shadow:0 8px 60px rgba(0,0,0,0.8),0 0 0 1px rgba(200,149,42,0.08);">
   <!-- Header -->
-  <div style="display:flex;align-items:center;gap:8px;padding:12px 14px 10px;border-bottom:1px solid rgba(200,149,42,0.15);flex-shrink:0;">
-    <span style="font-size:1rem;">🔍</span>
-    <span style="color:rgba(200,149,42,0.9);font-size:0.7rem;letter-spacing:0.12em;font-weight:700;">SCANSYS</span>
-    <span id="ss-status-dot" style="width:7px;height:7px;border-radius:50%;background:#3c3;margin-left:2px;flex-shrink:0;" title="Estado del monitor"></span>
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 20px 12px;border-bottom:1px solid rgba(200,149,42,0.15);flex-shrink:0;background:rgba(0,0,0,0.25);">
+    <span style="font-size:1.3rem;">🔍</span>
+    <span style="color:rgba(200,149,42,0.95);font-size:0.9rem;letter-spacing:0.18em;font-weight:700;">SCANSYS</span>
+    <span id="ss-status-dot" style="width:8px;height:8px;border-radius:50%;background:#3c3;margin-left:2px;flex-shrink:0;box-shadow:0 0 6px #3c3;" title="Monitor activo"></span>
+    <span style="color:rgba(200,149,42,0.3);font-size:0.6rem;letter-spacing:0.08em;">LEX·MÉXICO — DIAGNÓSTICO EN TIEMPO REAL</span>
     <div style="flex:1;"></div>
-    <button onclick="scansysEscanearManual()" title="Escaneo completo ahora" style="background:rgba(200,149,42,0.1);border:1px solid rgba(200,149,42,0.3);border-radius:10px;padding:3px 9px;color:rgba(200,149,42,0.85);font-family:monospace;font-size:0.58rem;cursor:pointer;letter-spacing:0.07em;">⚡ SCAN</button>
-    <button onclick="scansysReparar()" title="Ejecutar todas las reparaciones" style="background:rgba(22,192,80,0.08);border:1px solid rgba(22,192,80,0.25);border-radius:10px;padding:3px 9px;color:rgba(80,220,120,0.85);font-family:monospace;font-size:0.58rem;cursor:pointer;letter-spacing:0.07em;">🧹 FIX</button>
-    <button onclick="scansysToggle()" style="background:none;border:none;color:rgba(200,149,42,0.45);font-size:1rem;cursor:pointer;padding:0 2px;line-height:1;">✕</button>
+    <button onclick="scansysEscanearManual()" title="Escaneo completo ahora" style="background:rgba(200,149,42,0.12);border:1px solid rgba(200,149,42,0.35);border-radius:10px;padding:5px 14px;color:rgba(200,149,42,0.9);font-family:monospace;font-size:0.65rem;cursor:pointer;letter-spacing:0.07em;transition:all 0.15s;">⚡ ESCANEAR</button>
+    <button onclick="scansysReparar()" title="Ejecutar todas las reparaciones" style="background:rgba(22,192,80,0.1);border:1px solid rgba(22,192,80,0.3);border-radius:10px;padding:5px 14px;color:rgba(80,220,120,0.9);font-family:monospace;font-size:0.65rem;cursor:pointer;letter-spacing:0.07em;transition:all 0.15s;">🧹 REPARAR</button>
+    <button onclick="scansysToggle()" title="Cerrar SCANSYS" style="background:rgba(192,22,26,0.08);border:1px solid rgba(192,22,26,0.25);border-radius:10px;padding:5px 12px;color:rgba(220,80,80,0.7);font-size:0.75rem;cursor:pointer;font-family:monospace;transition:all 0.15s;">✕ CERRAR</button>
   </div>
   <!-- Contadores en vivo -->
-  <div id="ss-counters" style="display:flex;gap:0;border-bottom:1px solid rgba(200,149,42,0.1);flex-shrink:0;">
-    <div style="flex:1;padding:6px 10px;border-right:1px solid rgba(200,149,42,0.1);">
-      <div style="font-size:0.45rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;">Recibos</div>
-      <div id="ss-cnt-recibos" style="font-size:0.85rem;color:rgba(200,149,42,0.85);">—</div>
+  <div id="ss-counters" style="display:flex;gap:0;border-bottom:1px solid rgba(200,149,42,0.1);flex-shrink:0;background:rgba(0,0,0,0.15);">
+    <div style="flex:1;padding:10px 18px;border-right:1px solid rgba(200,149,42,0.1);text-align:center;">
+      <div style="font-size:0.52rem;color:rgba(200,149,42,0.4);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:2px;">Recibos</div>
+      <div id="ss-cnt-recibos" style="font-size:1.3rem;color:rgba(200,149,42,0.9);font-weight:700;">—</div>
     </div>
-    <div style="flex:1;padding:6px 10px;border-right:1px solid rgba(200,149,42,0.1);">
-      <div style="font-size:0.45rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;">Movimientos</div>
-      <div id="ss-cnt-movs" style="font-size:0.85rem;color:rgba(200,149,42,0.85);">—</div>
+    <div style="flex:1;padding:10px 18px;border-right:1px solid rgba(200,149,42,0.1);text-align:center;">
+      <div style="font-size:0.52rem;color:rgba(200,149,42,0.4);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:2px;">Movimientos</div>
+      <div id="ss-cnt-movs" style="font-size:1.3rem;color:rgba(200,149,42,0.9);font-weight:700;">—</div>
     </div>
-    <div style="flex:1;padding:6px 10px;border-right:1px solid rgba(200,149,42,0.1);">
-      <div style="font-size:0.45rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;">Supabase</div>
-      <div id="ss-cnt-sb" style="font-size:0.85rem;color:#3c3;">🟢</div>
+    <div style="flex:1;padding:10px 18px;border-right:1px solid rgba(200,149,42,0.1);text-align:center;">
+      <div style="font-size:0.52rem;color:rgba(200,149,42,0.4);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:2px;">Supabase</div>
+      <div id="ss-cnt-sb" style="font-size:1.1rem;">🟢</div>
     </div>
-    <div style="flex:1;padding:6px 10px;">
-      <div style="font-size:0.45rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;">Último sync</div>
-      <div id="ss-cnt-sync" style="font-size:0.62rem;color:rgba(200,149,42,0.6);">—</div>
+    <div style="flex:1;padding:10px 18px;border-right:1px solid rgba(200,149,42,0.1);text-align:center;">
+      <div style="font-size:0.52rem;color:rgba(200,149,42,0.4);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:2px;">Último sync</div>
+      <div id="ss-cnt-sync" style="font-size:0.75rem;color:rgba(200,149,42,0.7);">—</div>
+    </div>
+    <div style="flex:1;padding:10px 18px;text-align:center;">
+      <div style="font-size:0.52rem;color:rgba(192,22,26,0.5);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:2px;">Errores</div>
+      <div id="ss-cnt-errores" style="font-size:1.3rem;color:rgba(220,80,80,0.9);font-weight:700;">0</div>
     </div>
   </div>
   <!-- Tabs -->
   <div style="display:flex;border-bottom:1px solid rgba(200,149,42,0.1);flex-shrink:0;">
-    <button onclick="scansysTab('live')" id="ss-tab-live" style="flex:1;padding:7px 4px;font-family:monospace;font-size:0.55rem;letter-spacing:0.07em;cursor:pointer;border:none;border-bottom:2px solid rgba(200,149,42,0.7);background:rgba(200,149,42,0.06);color:rgba(200,149,42,0.9);">🔴 EN VIVO</button>
-    <button onclick="scansysTab('scan')" id="ss-tab-scan" style="flex:1;padding:7px 4px;font-family:monospace;font-size:0.55rem;letter-spacing:0.07em;cursor:pointer;border:none;border-bottom:2px solid transparent;background:none;color:rgba(200,149,42,0.45);">🔍 DIAGNÓSTICO</button>
-    <button onclick="scansysTab('log')" id="ss-tab-log"  style="flex:1;padding:7px 4px;font-family:monospace;font-size:0.55rem;letter-spacing:0.07em;cursor:pointer;border:none;border-bottom:2px solid transparent;background:none;color:rgba(200,149,42,0.45);">📋 LOG</button>
+    <button onclick="scansysTab('live')" id="ss-tab-live" style="flex:1;padding:11px 4px;font-family:monospace;font-size:0.68rem;letter-spacing:0.08em;cursor:pointer;border:none;border-bottom:2px solid rgba(200,149,42,0.7);background:rgba(200,149,42,0.06);color:rgba(200,149,42,0.95);">🔴 EN VIVO</button>
+    <button onclick="scansysTab('scan')" id="ss-tab-scan" style="flex:1;padding:11px 4px;font-family:monospace;font-size:0.68rem;letter-spacing:0.08em;cursor:pointer;border:none;border-bottom:2px solid transparent;background:none;color:rgba(200,149,42,0.45);">🔍 DIAGNÓSTICO</button>
+    <button onclick="scansysTab('log')"  id="ss-tab-log"  style="flex:1;padding:11px 4px;font-family:monospace;font-size:0.68rem;letter-spacing:0.08em;cursor:pointer;border:none;border-bottom:2px solid transparent;background:none;color:rgba(200,149,42,0.45);">📋 LOG COMPLETO</button>
   </div>
   <!-- Body -->
-  <div id="ss-body" style="flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;"></div>
+  <div id="ss-body" style="flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:8px;"></div>
   <!-- Footer -->
-  <div style="padding:8px 12px;border-top:1px solid rgba(200,149,42,0.1);display:flex;gap:6px;flex-shrink:0;">
-    <button onclick="scansysExportarLog()" style="flex:1;background:rgba(200,149,42,0.06);border:1px solid rgba(200,149,42,0.18);border-radius:10px;padding:5px 8px;color:rgba(200,149,42,0.6);font-family:monospace;font-size:0.52rem;cursor:pointer;letter-spacing:0.07em;">📥 EXPORTAR</button>
-    <button onclick="scansysLimpiarLog()" style="flex:1;background:rgba(192,22,26,0.06);border:1px solid rgba(192,22,26,0.2);border-radius:10px;padding:5px 8px;color:rgba(220,80,80,0.7);font-family:monospace;font-size:0.52rem;cursor:pointer;letter-spacing:0.07em;">🗑 LIMPIAR LOG</button>
+  <div style="padding:10px 20px;border-top:1px solid rgba(200,149,42,0.1);display:flex;gap:8px;flex-shrink:0;background:rgba(0,0,0,0.2);">
+    <button onclick="scansysExportarLog()" style="flex:1;background:rgba(200,149,42,0.06);border:1px solid rgba(200,149,42,0.2);border-radius:10px;padding:7px 10px;color:rgba(200,149,42,0.65);font-family:monospace;font-size:0.6rem;cursor:pointer;letter-spacing:0.07em;">📥 EXPORTAR LOG</button>
+    <button onclick="scansysLimpiarLog()" style="flex:1;background:rgba(192,22,26,0.06);border:1px solid rgba(192,22,26,0.2);border-radius:10px;padding:7px 10px;color:rgba(220,80,80,0.7);font-family:monospace;font-size:0.6rem;cursor:pointer;letter-spacing:0.07em;">🗑 LIMPIAR LOG</button>
   </div>
 </div>
 <!-- ═══ RUEDA DENTADA ADMIN ═══ -->
@@ -42512,12 +42520,17 @@ if(typeof window.eliminarR2 === 'undefined'){
     const eMov  = document.getElementById('ss-cnt-movs');
     const eSB   = document.getElementById('ss-cnt-sb');
     const eSync = document.getElementById('ss-cnt-sync');
+    const eErr  = document.getElementById('ss-cnt-errores');
     if(eRec) eRec.textContent = (appData&&Array.isArray(appData.recibos)) ? appData.recibos.length : '—';
     if(eMov) eMov.textContent = (typeof D!=='undefined'&&Array.isArray(D.movimientos)) ? D.movimientos.length : '—';
     if(eSB)  eSB.textContent  = (window.SB && window.SB_DESPACHO_ID) ? '🟢' : '🔴';
     if(eSync){
       const ts = window._ultimoSyncPropio ? new Date(window._ultimoSyncPropio).toLocaleTimeString('es-MX',{hour12:false}) : '—';
       eSync.textContent = ts;
+    }
+    if(eErr){
+      eErr.textContent = SS.errores + SS.advertencias;
+      eErr.style.color = (SS.errores>0) ? 'rgba(220,80,80,0.95)' : (SS.advertencias>0) ? 'rgba(200,149,42,0.9)' : 'rgba(80,220,100,0.8)';
     }
   }
 
@@ -42537,9 +42550,11 @@ if(typeof window.eliminarR2 === 'undefined'){
   /* ── Toggle panel ───────────────────────────────────────────────────── */
   window.scansysToggle = function(){
     const p = document.getElementById('scansys-panel');
+    const ov = document.getElementById('scansys-overlay');
     if(!p) return;
     SS.abierto = !SS.abierto;
-    p.style.display = SS.abierto ? 'flex' : 'none';
+    p.style.display  = SS.abierto ? 'flex' : 'none';
+    if(ov) ov.style.display = SS.abierto ? 'block' : 'none';
     if(SS.abierto){ ssContadoresActualizar(); ssRender(); }
   };
 
@@ -42587,22 +42602,22 @@ if(typeof window.eliminarR2 === 'undefined'){
 
   /* ── Tarjeta de entrada del log ─────────────────────────────────────── */
   function ssEntryHTML(e, i, tab){
-    const colorBorde = e.tipo==='error' ? 'rgba(192,22,26,0.45)' : e.tipo==='warn' ? 'rgba(200,149,42,0.45)' : 'rgba(80,150,255,0.25)';
-    const colorFondo = e.tipo==='error' ? 'rgba(192,22,26,0.06)' : e.tipo==='warn' ? 'rgba(200,149,42,0.05)' : 'rgba(80,150,255,0.04)';
+    const colorBorde = e.tipo==='error' ? 'rgba(192,22,26,0.5)' : e.tipo==='warn' ? 'rgba(200,149,42,0.5)' : 'rgba(80,150,255,0.28)';
+    const colorFondo = e.tipo==='error' ? 'rgba(192,22,26,0.07)' : e.tipo==='warn' ? 'rgba(200,149,42,0.06)' : 'rgba(80,150,255,0.05)';
     const icono      = e.tipo==='error' ? '❌' : e.tipo==='warn' ? '⚠️' : 'ℹ️';
-    const groqHtml   = e.groqResp ? '<div style="margin-top:6px;padding:6px 8px;background:rgba(80,200,120,0.07);border-left:2px solid rgba(80,200,120,0.4);border-radius:4px;font-size:0.55rem;color:rgba(150,220,160,0.9);white-space:pre-wrap;line-height:1.5;">'+ssEscape(e.groqResp)+'</div>' : '';
-    const sugerHtml  = e.sugerencia ? '<div style="margin-top:5px;font-size:0.53rem;color:rgba(200,149,42,0.6);line-height:1.4;">💡 '+ssEscape(e.sugerencia)+'</div>' : '';
-    return '<div style="border:1px solid '+colorBorde+';background:'+colorFondo+';border-radius:8px;padding:8px 10px;font-size:0.58rem;line-height:1.5;">'
-      +'<div style="display:flex;align-items:flex-start;gap:5px;">'
-      +'<span style="flex-shrink:0;">'+icono+'</span>'
+    const groqHtml   = e.groqResp ? '<div style="margin-top:8px;padding:10px 12px;background:rgba(80,200,120,0.08);border-left:3px solid rgba(80,200,120,0.45);border-radius:6px;font-size:0.7rem;color:rgba(150,220,160,0.95);white-space:pre-wrap;line-height:1.6;">'+ssEscape(e.groqResp)+'</div>' : '';
+    const sugerHtml  = e.sugerencia ? '<div style="margin-top:6px;font-size:0.68rem;color:rgba(200,149,42,0.65);line-height:1.5;">💡 '+ssEscape(e.sugerencia)+'</div>' : '';
+    return '<div style="border:1px solid '+colorBorde+';background:'+colorFondo+';border-radius:10px;padding:12px 16px;font-size:0.72rem;line-height:1.6;">'
+      +'<div style="display:flex;align-items:flex-start;gap:8px;">'
+      +'<span style="flex-shrink:0;font-size:1rem;">'+icono+'</span>'
       +'<div style="flex:1;word-break:break-word;">'
-      +'<span style="color:rgba(200,149,42,0.4);font-size:0.5rem;">'+e.ts+'</span> '
-      +'<span style="color:rgba(230,215,190,0.85);">'+ssEscape(e.msg)+'</span>'
+      +'<span style="color:rgba(200,149,42,0.45);font-size:0.62rem;font-weight:600;">'+e.ts+'</span>'
+      +'<div style="color:rgba(235,220,195,0.9);margin-top:3px;">'+ssEscape(e.msg)+'</div>'
       +sugerHtml+groqHtml
       +'</div></div>'
-      +'<div style="display:flex;gap:5px;margin-top:6px;justify-content:flex-end;">'
-      +(e.tipo!=='info'?'<button onclick="_scansysAnalizar('+i+',\''+tab+'\')" style="background:rgba(80,200,120,0.08);border:1px solid rgba(80,200,120,0.25);border-radius:8px;padding:2px 8px;color:rgba(120,220,150,0.85);font-family:monospace;font-size:0.5rem;cursor:pointer;">🤖 Groq</button>':'')
-      +'<button onclick="_scansysCopiarClaude('+i+',\''+tab+'\')" style="background:rgba(200,149,42,0.07);border:1px solid rgba(200,149,42,0.22);border-radius:8px;padding:2px 8px;color:rgba(200,149,42,0.7);font-family:monospace;font-size:0.5rem;cursor:pointer;">📋 Para Claude</button>'
+      +'<div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end;">'
+      +(e.tipo!=='info'?'<button onclick="_scansysAnalizar('+i+',\''+tab+'\')" style="background:rgba(80,200,120,0.1);border:1px solid rgba(80,200,120,0.3);border-radius:8px;padding:4px 14px;color:rgba(120,220,150,0.9);font-family:monospace;font-size:0.62rem;cursor:pointer;">🤖 Analizar con Groq</button>':'')
+      +'<button onclick="_scansysCopiarClaude('+i+',\''+tab+'\')" style="background:rgba(200,149,42,0.08);border:1px solid rgba(200,149,42,0.25);border-radius:8px;padding:4px 14px;color:rgba(200,149,42,0.75);font-family:monospace;font-size:0.62rem;cursor:pointer;">📋 Copiar para Claude</button>'
       +'</div>'
       +'</div>';
   }
@@ -42617,11 +42632,13 @@ if(typeof window.eliminarR2 === 'undefined'){
     }
     body.innerHTML = SS._scanResults.map(function(r){
       const ico = r.tipo==='ok'?'✅':r.tipo==='error'?'❌':'⚠️';
-      const col = r.tipo==='ok'?'rgba(80,220,100,0.8)':r.tipo==='error'?'rgba(220,80,80,0.85)':'rgba(200,149,42,0.85)';
-      const fix = r.fix ? '<button onclick="'+r.fix+';scansysEscanearManual()" style="margin-top:4px;background:rgba(80,200,120,0.08);border:1px solid rgba(80,200,120,0.25);border-radius:8px;padding:2px 8px;color:rgba(120,220,150,0.85);font-family:monospace;font-size:0.5rem;cursor:pointer;">⚡ Corregir ahora</button>' : '';
-      return '<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 8px;border-bottom:1px solid rgba(200,149,42,0.07);">'
-        +'<span style="flex-shrink:0;">'+ico+'</span>'
-        +'<div><div style="font-size:0.58rem;color:'+col+';">'+ssEscape(r.msg)+'</div>'+fix+'</div>'
+      const col = r.tipo==='ok'?'rgba(80,220,100,0.9)':r.tipo==='error'?'rgba(220,80,80,0.9)':'rgba(200,149,42,0.9)';
+      const fondo = r.tipo==='ok'?'rgba(80,220,100,0.04)':r.tipo==='error'?'rgba(220,80,80,0.06)':'rgba(200,149,42,0.05)';
+      const borde = r.tipo==='ok'?'rgba(80,220,100,0.18)':r.tipo==='error'?'rgba(220,80,80,0.28)':'rgba(200,149,42,0.25)';
+      const fix = r.fix ? '<button onclick="'+r.fix+';scansysEscanearManual()" style="margin-top:6px;background:rgba(80,200,120,0.1);border:1px solid rgba(80,200,120,0.3);border-radius:8px;padding:4px 14px;color:rgba(120,220,150,0.9);font-family:monospace;font-size:0.65rem;cursor:pointer;">⚡ Corregir ahora</button>' : '';
+      return '<div style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1px solid '+borde+';background:'+fondo+';border-radius:10px;">'
+        +'<span style="flex-shrink:0;font-size:1.1rem;">'+ico+'</span>'
+        +'<div><div style="font-size:0.75rem;color:'+col+';line-height:1.5;">'+ssEscape(r.msg)+'</div>'+fix+'</div>'
         +'</div>';
     }).join('');
   }

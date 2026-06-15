@@ -6898,6 +6898,22 @@ async function sincronizarFolio(forzarSB){
       // Esto evita que una sync tardía sobreescriba el B recién generado con solo el A.
       // Los tombstones se filtran ANTES de fusionar para que ningún cliente re-suba eliminados.
       function _mergeRecibos(sbArr, localArr) {
+        // ── BLOQUEO: proteger recibos locales de tombstones remotos obsoletos ──────
+        // En la carga inicial, un tombstone antiguo en SB puede filtrar un recibo
+        // válido del backup local antes de que llegue el primer sync.
+        // Solución: si un recibo está en el backup local y NO fue eliminado en esta
+        // sesión (_locTombs no lo tiene), darle _revivedTs = ahora.
+        // El tombstone necesita ts > _revivedTs para aplicar → como ts es del pasado
+        // y _revivedTs = ahora, el tombstone nunca gana.
+        // SEGURO para eliminaciones reales: cuando el admin borra, el tombstone se
+        // crea CON ts = Date.now(), que es >= _revivedTs de cualquier cliente → aplica.
+        localArr.forEach(function(r) {
+          if (!r || r._revivedTs) return;
+          var tieneLocTomb = _locTombs.some(function(t){
+            return String(t.folio) === String(r.folio) && (t.letra||'A') === (r.letra||'A');
+          });
+          if (!tieneLocTomb) r._revivedTs = Date.now();
+        });
         // Filtrar tombstones de ambos lados antes de cualquier fusión
         const sbFilt    = sbArr.filter(function(r){ return !_esTombstone(r); });
         const localFilt = localArr.filter(function(r){ return !_esTombstone(r); });
@@ -7232,6 +7248,10 @@ async function actualizarArchivoControl(){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
   syncStart();
   try {
+    // ── Sellar recibos activos contra tombstones remotos obsoletos ──────────────
+    // Igual que en syncEstadoSupabase: recibos sin _revivedTs son vulnerables a
+    // tombstones históricos de SB. Sellarlos antes del pre-read los protege.
+    (appData.recibos||[]).forEach(function(r){ if(r && !r._revivedTs) r._revivedTs = Date.now(); });
     // ── Leer tombstones actuales de SB antes de escribir ────────────────────
     // CRÍTICO en multi-usuario: si el admin eliminó un folio y guardó el tombstone
     // en SB, este cliente (empleada) debe leerlo y fusionarlo ANTES de subir,
@@ -19452,6 +19472,37 @@ window.lexRestaurarFolioContabilidad = function(folioNum) {
   console.log('✅ Folio '+folioNum+' restaurado en contabilidad y sincronizado con Supabase');
   if(typeof toast==='function') toast('✅ Folio '+folioNum+' restaurado en contabilidad', 'ok');
 };
+// Quita el tombstone de un folio+letra de la lista local y de Supabase.
+// Úsala en consola ANTES de restaurar el recibo por el panel "Restaurar desde PDF":
+//   lexQuitarTombstone(3, 'A')   → limpia folio 3A
+// Después de ejecutarla, usa el panel de restauración para re-registrar el recibo.
+window.lexQuitarTombstone = async function(folioNum, letra) {
+  letra = (letra || 'A').toUpperCase();
+  var folioStr = String(folioNum);
+  // 1. Quitar de memoria local
+  if (Array.isArray(appData.folios_eliminados)) {
+    var antes = appData.folios_eliminados.length;
+    appData.folios_eliminados = appData.folios_eliminados.filter(function(t){
+      return !(String(t.folio) === folioStr && (t.letra||'A') === letra);
+    });
+    console.log('[lexQuitarTombstone] Tombstones locales eliminados:', antes - appData.folios_eliminados.length);
+  }
+  // 2. Quitar de Supabase directamente
+  try {
+    var _r = await window.SB.from('app_state').select('recibos').eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+    if (_r.data && _r.data.recibos) {
+      var dat = JSON.parse(JSON.stringify(_r.data.recibos));
+      var antSB = (dat.folios_eliminados||[]).length;
+      dat.folios_eliminados = (dat.folios_eliminados||[]).filter(function(t){
+        return !(String(t.folio)===folioStr && (t.letra||'A')===letra);
+      });
+      await window.SB.from('app_state').update({ recibos: dat }).eq('despacho_id', window.SB_DESPACHO_ID);
+      console.log('[lexQuitarTombstone] Tombstones en Supabase eliminados:', antSB - dat.folios_eliminados.length);
+    }
+  } catch(e) { console.error('[lexQuitarTombstone] Error Supabase:', e); return; }
+  if(typeof toast==='function') toast('✅ Tombstone de folio '+folioNum+letra+' eliminado — ya puedes restaurar el recibo', 'ok');
+  console.log('✅ Tombstone folio '+folioNum+letra+' limpiado. Ahora usa el panel "Restaurar desde PDF" en Herramientas > Restaurar recibo desde PDF.');
+};
 // Limpia todo el caché y respaldos de localStorage — los datos se cargarán desde Supabase y R2
 window.limpiarCacheLocal = function() {
   var clavesMantener = new Set([
@@ -19795,6 +19846,15 @@ async function syncEstadoSupabase(){
                              : (D.retro_global || null),
       _juiciosModTs:         D._juiciosModTs         || 0
     };
+    // ── Sellar recibos activos contra tombstones remotos obsoletos ──────────────
+    // Recibos creados antes del sistema _revivedTs no tienen esa marca y son
+    // vulnerables a cualquier tombstone histórico de SB que coincida en folio+letra.
+    // Darles _revivedTs = ahora los protege: _tombstoneAplicaA devuelve false
+    // cuando _revivedTs > t.ts, aunque el tombstone sea muy antiguo.
+    // Solo se hace a recibos que están activos en esta sesión (en appData.recibos);
+    // si el admin acaba de eliminar un recibo, ya lo quitó de appData.recibos
+    // antes de llamar a sync → no recibe la marca y el tombstone aplica correctamente.
+    (appData.recibos||[]).forEach(function(r){ if(r && !r._revivedTs) r._revivedTs = Date.now(); });
     // ── Protección multi-usuario: leer tombstones de SB antes de escribir ──────
     // Si este browser aún no tiene los tombstones del admin (ej: empleada que no ha
     // sincronizado), su save() sobreescribiría folios_eliminados con [] y restauraría

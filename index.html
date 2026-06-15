@@ -10710,7 +10710,10 @@ async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroO
     }
 
     // ── 7. Registrar en contabilidad ──
-    if(typeof D !== 'undefined' && Array.isArray(D.movimientos) && monto > 0){
+    // Se crea el movimiento incluso cuando monto=0 (cancelación sin cambio económico)
+    // para que el folio aparezca en el año de la cancelación aunque el pago original
+    // fuera de un año diferente. El monto $0 indica que no hubo flujo de efectivo.
+    if(typeof D !== 'undefined' && Array.isArray(D.movimientos)){
       const tipoMov = tipo === 'ingreso' ? 'ingreso' : 'egreso';
       const mov = {
         id: 'M-CAN-' + recibo.folio + '-' + Date.now(),
@@ -15318,18 +15321,21 @@ function renderContab() {
       // Mes abierto si es el mes actual del año actual (y no hay filtro de mes específico)
       const esActual   = (anio === anioHoy && mes === mesHoy);
       const mesId      = `cmes-${anio}-${mes}`;
+      // Respetar estado manual de sesión; si no hay estado guardado, usar default (actual=abierto)
+      const _mesEstadoSesion = window._contabMesesAbiertos && window._contabMesesAbiertos[mesId];
+      const mesMostrar = (_mesEstadoSesion === true) ? true : (_mesEstadoSesion === false) ? false : esActual;
       return `<div style="border-bottom:2px solid var(--border);">
         <div onclick="contabToggleMes('${mesId}')" style="display:flex;align-items:center;justify-content:space-between;
           padding:10px 16px;cursor:pointer;background:var(--surface2);
           border-bottom:1px solid var(--border-l);user-select:none;transition:background 0.15s;"
           onmouseover="this.style.background='var(--gold-pale)'" onmouseout="this.style.background='var(--surface2)'">
           <div style="display:flex;align-items:center;gap:10px;">
-            <span id="${mesId}-arrow" style="font-family:monospace;font-size:0.7rem;color:var(--gold-d);transition:transform 0.2s;display:inline-block;${esActual?'transform:rotate(90deg)':''}">▶</span>
+            <span id="${mesId}-arrow" style="font-family:monospace;font-size:0.7rem;color:var(--gold-d);transition:transform 0.2s;display:inline-block;${mesMostrar?'transform:rotate(90deg)':''}">▶</span>
             <span style="font-family:serif;font-size:0.92rem;color:var(--ink);font-weight:500;">${MESES_NOMBRE[parseInt(mes)-1]} ${anio}</span>
             <span style="font-family:monospace;font-size:0.56rem;color:var(--muted);">${diasDesc.length} días</span>
           </div>
         </div>
-        <div id="${mesId}" style="display:${esActual?'block':'none'};">${diasHtml}</div>
+        <div id="${mesId}" style="display:${mesMostrar?'block':'none'};">${diasHtml}</div>
       </div>`;
     }).join('');
     granIngTotal += anioIng; granEgrTotal += anioEgr;
@@ -15339,6 +15345,9 @@ function renderContab() {
     // Año actual siempre abierto; los anteriores colapsados
     const esAnioActual = (anio === anioHoy);
     const anioId       = `canio-${anio}`;
+    // Respetar estado manual de sesión para el año
+    const _anioEstadoSesion = window._contabAniosAbiertos && window._contabAniosAbiertos[anioId];
+    const anioMostrar = (_anioEstadoSesion === true) ? true : (_anioEstadoSesion === false) ? false : esAnioActual;
     // Si solo hay un año o está filtrado por año, no mostrar acordeón de año
     if (aniosDesc.length === 1 || filtroA) return mesesHtml;
     return `<div style="margin-bottom:4px;border:1px solid var(--border-l);border-radius:var(--radius);overflow:hidden;">
@@ -15347,12 +15356,12 @@ function renderContab() {
         user-select:none;transition:background 0.15s;"
         onmouseover="this.style.background='var(--gold-bg)'" onmouseout="this.style.background='${esAnioActual?'var(--gold-bg)':'var(--surface)'}'">
         <div style="display:flex;align-items:center;gap:12px;">
-          <span id="${anioId}-arrow" style="font-family:monospace;font-size:0.8rem;color:var(--gold);transition:transform 0.2s;display:inline-block;${esAnioActual?'transform:rotate(90deg)':''}">▶</span>
+          <span id="${anioId}-arrow" style="font-family:monospace;font-size:0.8rem;color:var(--gold);transition:transform 0.2s;display:inline-block;${anioMostrar?'transform:rotate(90deg)':''}">▶</span>
           <span style="font-family:serif;font-size:1.05rem;color:var(--ink);font-weight:500;">📆 ${anio}</span>
           <span style="font-family:monospace;font-size:0.56rem;color:var(--muted);">${mesesDesc.length} mes${mesesDesc.length!==1?'es':''}</span>
         </div>
       </div>
-      <div id="${anioId}" style="display:${esAnioActual?'block':'none'};">${mesesHtml}</div>
+      <div id="${anioId}" style="display:${anioMostrar?'block':'none'};">${mesesHtml}</div>
     </div>`;
   }).join('');
   contenedor.innerHTML = html;
@@ -15368,6 +15377,11 @@ function renderContab() {
     elGT.style.display = movs.length ? 'flex' : 'none';
   }
 }
+// Estado de sesión para acordeones (en memoria, se resetea al recargar)
+// true = abierto manualmente, false = cerrado manualmente, undefined = sin tocar (usa default)
+window._contabMesesAbiertos = window._contabMesesAbiertos || {};
+window._contabAniosAbiertos = window._contabAniosAbiertos || {};
+
 // Toggle acordeón de mes
 function contabToggleMes(id) {
   const el    = document.getElementById(id);
@@ -15376,6 +15390,8 @@ function contabToggleMes(id) {
   const open = el.style.display !== 'none';
   el.style.display = open ? 'none' : 'block';
   if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
+  // Guardar estado manual en sesión
+  window._contabMesesAbiertos[id] = !open;
 }
 // Toggle acordeón de año
 function contabToggleAnio(id) {
@@ -15385,6 +15401,8 @@ function contabToggleAnio(id) {
   const open = el.style.display !== 'none';
   el.style.display = open ? 'none' : 'block';
   if (arrow) arrow.style.transform = open ? '' : 'rotate(90deg)';
+  // Guardar estado manual en sesión
+  window._contabAniosAbiertos[id] = !open;
 }
 // ── Export CSV — respeta TODOS los filtros activos ──────────────
 function exportCSV() {
@@ -35608,6 +35626,25 @@ function repararFoliosDuplicados() {
       if(typeof save === 'function') save();
     }
   }
+  // ── Deduplicar movimientos de recibo (solo copias exactas) ────────────────
+  // Solo elimina duplicados con el mismo id o con el mismo folio+letra+fecha+monto+estatus.
+  // NUNCA borra el único movimiento legítimo de un folio, aunque su recibo asociado
+  // sea duplicado — el recibo y el movimiento se crearon UNA sola vez; el duplicado
+  // llega por re-sincronización de Supabase Realtime, no por doble escritura.
+  if(typeof D !== 'undefined' && Array.isArray(D.movimientos)) {
+    const _idsMovVistos  = new Set();
+    const _keysMovVistos = new Set();
+    D.movimientos = D.movimientos.filter(function(m) {
+      if(!m) return false;
+      if(m.fuente !== 'recibo') return true;
+      if(m.id && _idsMovVistos.has(m.id)) return false;
+      if(m.id) _idsMovVistos.add(m.id);
+      const key = String(m.folio) + '|' + (m.letra||'A') + '|' + (m.fecha||'') + '|' + String(m.monto||0) + '|' + (m.estatus||'');
+      if(_keysMovVistos.has(key)) return false;
+      _keysMovVistos.add(key);
+      return true;
+    });
+  }
   const recibos = appData.recibos;
   // Agrupar por folio+letra — duplicados son SOLO los registros con AMBOS iguales.
   // ⚠️ CRÍTICO: agrupar solo por folio eliminaba versiones B/C legítimas cuando un
@@ -35675,13 +35712,6 @@ function repararFoliosDuplicados() {
           console.warn('[LEX] Protegido: no se elimina ' + r.folio + 'A — tiene sub-folios que quedarían huérfanos');
           return;
         }
-      }
-      // Limpiar movimientos del duplicado
-      if(typeof D !== 'undefined' && Array.isArray(D.movimientos)) {
-        D.movimientos = D.movimientos.filter(function(m) {
-          if(!m) return false;
-          return !(m.fuente === 'recibo' && m.folio == r.folio && (m.letra || 'A') === letra);
-        });
       }
       // Agregar a recibosExcluidosCaja solo si el folio queda sin ninguna versión;
       // si quedan otras versiones (A o B) el folio debe seguir visible en caja.
@@ -35814,6 +35844,85 @@ function repararFoliosHuerfanos() {
     if(typeof renderContab === 'function') renderContab();
     if(typeof toast === 'function') toast('🔧 ' + reparados + ' folio(s) reasignados al padre correcto', 'ok');
   }
+}
+// ── Recuperar movimientos de recibo borrados por versiones anteriores del sistema ──
+// Crea un movimiento por cada recibo que tenga anticipo > 0 y no tenga movimiento en D.movimientos.
+// Se llama manualmente desde consola o desde un botón de administración.
+function recuperarMovimientosFaltantes() {
+  if(!appData || !Array.isArray(appData.recibos)) { console.warn('[Recuperar] appData.recibos no disponible'); return; }
+  if(typeof D === 'undefined' || !Array.isArray(D.movimientos)) { console.warn('[Recuperar] D.movimientos no disponible'); return; }
+
+  const excluidos = new Set((D.recibosExcluidosCaja||[]).map(String));
+  // Construir mapa de movimientos existentes por folio+letra
+  const movExistentes = new Set(
+    D.movimientos.filter(function(m){ return m && m.fuente === 'recibo'; })
+                 .map(function(m){ return String(m.folio) + '|' + (m.letra||'A'); })
+  );
+
+  const recuperados = [];
+  appData.recibos.forEach(function(r) {
+    if(!r || r.esComplemento) return;
+    const folio = Number(r.folio);
+    if(!folio || isNaN(folio)) return;
+    if(excluidos.has(String(folio))) return;
+
+    const letra = r.letra || 'A';
+    if(movExistentes.has(String(folio) + '|' + letra)) return; // ya existe
+
+    // Usar cancelacionMonto para versiones con cancelación con dinero; anticipo para el resto
+    const monto = parseFloat(r.cancelacionMonto) > 0
+      ? parseFloat(r.cancelacionMonto)
+      : parseFloat(r.anticipo) || 0;
+    if(monto <= 0) return; // nada que recuperar
+
+    // Fecha: usar la de actualización si existe (cancelación/update), si no la del recibo
+    const fecha = ((r.cancelado || r.esActualizacion) && r.fechaActualizacion
+      ? r.fechaActualizacion
+      : (r.fecha || '')).substring(0, 10);
+    const hora  = ((r.cancelado || r.esActualizacion) && r.horaActualizacion
+      ? r.horaActualizacion
+      : (r.hora || '00:00'));
+
+    const folioStr = typeof folioConLetra === 'function'
+      ? folioConLetra(folio, r.anio_folio, letra)
+      : (String(folio) + letra);
+
+    const esCancelacion = r.cancelado && r.cancelacionTipo && r.cancelacionTipo !== 'sin';
+    const estatus = r.cancelado
+      ? 'Cancelación'
+      : ((parseFloat(r.saldoPendiente)||0) <= 0 ? 'Liquidado' : 'Anticipo');
+
+    const mov = {
+      id: 'M-RECUP-' + String(folio) + '-' + letra + '-' + Date.now(),
+      folioCaja: '',
+      fecha: fecha,
+      hora:  hora,
+      descripcion: 'Recuperado · Recibo #' + folioStr + ' · ' + (r.nombre||''),
+      nombre: r.nombre || '',
+      folio:  folio,
+      letra:  letra,
+      monto:  monto,
+      tipo:   esCancelacion && r.cancelacionTipo === 'egreso' ? 'egreso' : 'ingreso',
+      cat:    'Honorarios · #' + folioStr,
+      estatus: estatus,
+      fuente: 'recibo',
+      responsable: r.responsable || ''
+    };
+    D.movimientos.push(mov);
+    movExistentes.add(String(folio) + '|' + letra); // evitar duplicar en esta pasada
+    recuperados.push(folioStr);
+  });
+
+  if(recuperados.length > 0) {
+    if(typeof save === 'function') save();
+    if(typeof renderContab === 'function') renderContab();
+    console.log('[LEX] Movimientos recuperados:', recuperados.join(', '));
+    if(typeof toast === 'function') toast('✅ ' + recuperados.length + ' movimiento(s) recuperado(s): ' + recuperados.join(', '), 'ok');
+  } else {
+    if(typeof toast === 'function') toast('ℹ️ No hay movimientos faltantes', 'info');
+    console.log('[LEX] No se encontraron movimientos faltantes');
+  }
+  return recuperados;
 }
 // ══ FIN MÓDULO RECIBOS EN GESTIÓN ══════════════════════════════════════
 function secretariaCerrarMes(){

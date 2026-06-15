@@ -2058,6 +2058,14 @@ window.console.info = function(){};
   .pbc-chip.complemento:hover { background:#f5efd8; }
   .pbc-chip-fecha { font-size:0.52rem; opacity:0.65; }
   .pbc-empty { padding:12px; text-align:center; color:var(--muted); font-family:'DM Mono',monospace; font-size:0.68rem; font-style:italic; }
+  .mcr-row{ display:grid; grid-template-columns:56px 76px minmax(0,1fr) 90px; gap:0 10px; align-items:baseline; padding:7px 10px; border-radius:5px; font-family:'DM Mono',monospace; font-size:0.72rem; cursor:pointer; }
+  .mcr-row:hover{ background:#f3ecd8; }
+  .mcr-folio{ font-weight:700; white-space:nowrap; }
+  .mcr-fecha{ color:#7a6840; white-space:nowrap; }
+  .mcr-desc{ color:#1a1008; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.4; }
+  .mcr-estatus{ font-weight:700; white-space:nowrap; text-align:right; }
+  /* Fondo más difuminado para el modal de cliente (estilo ventana flotante) */
+  #mClienteRapido{ backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px); background:rgba(18,11,4,0.5); }
   @media print { #panel-busqueda-cliente { display:none !important; } #folio-anterior-section { display:none !important; } }
   /* Panel folio — mismo estilo que panel busqueda */
   #pfc-body { display:block; }
@@ -2544,6 +2552,39 @@ window.console.info = function(){};
   body.modo-restauracion #restauracion-banner    { display: flex !important; }
   body.modo-restauracion #frozen-banner          { display: none !important; }
   body.modo-restauracion #edicion-completa-banner { display: none !important; }
+  /* Desbloquear TODOS los controles del formulario en modo restauración,
+     incluso si recibo-frozen sigue activo (condición de carrera) */
+  body.modo-restauracion #panel-nuevo-recibo .field-group input,
+  body.modo-restauracion #panel-nuevo-recibo .field-group select,
+  body.modo-restauracion #panel-nuevo-recibo .field-group textarea,
+  body.modo-restauracion #panel-nuevo-recibo .conceptos-table input,
+  body.modo-restauracion #panel-nuevo-recibo .conceptos-table textarea,
+  body.modo-restauracion #panel-nuevo-recibo .anticipo-input,
+  body.modo-restauracion #panel-nuevo-recibo .firma-box input,
+  body.modo-restauracion #panel-nuevo-recibo .add-btn,
+  body.modo-restauracion #panel-nuevo-recibo .remove-btn,
+  body.modo-restauracion #panel-nuevo-recibo .del-concept,
+  body.modo-restauracion #panel-nuevo-recibo .tramite-btn,
+  body.modo-restauracion #panel-nuevo-recibo .doc-type-btn,
+  body.modo-restauracion #panel-nuevo-recibo .doc-check-item input[type="checkbox"],
+  body.modo-restauracion #panel-nuevo-recibo .doc-category-header,
+  body.modo-restauracion #btn-agregar-concepto,
+  body.modo-restauracion #btn-guardar-restauracion,
+  body.modo-restauracion #actions-restauracion button {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    cursor: pointer !important;
+  }
+  body.modo-restauracion #actions-restauracion .btn-primary {
+    background: var(--gold-dark) !important;
+    color: #faf4e0 !important;
+    box-shadow: 0 4px 14px rgba(154,110,24,0.3) !important;
+  }
+  body.modo-restauracion #actions-restauracion .btn-secondary {
+    background: rgba(200,149,42,0.08) !important;
+    color: #c8a850 !important;
+    border: 1px solid rgba(200,149,42,0.22) !important;
+  }
   /* BOTONES DE PAGO EN HEADER */
   #header-pago-btns {
     display: none;
@@ -3255,7 +3296,7 @@ window.addEventListener('offline', ()=>{
                onmouseout="this.style.transform='';this.style.borderColor='rgba(42,200,200,0.35)';this.style.boxShadow=''">
             <div style="width:60px;height:60px;border-radius:14px;background:#0a3a3a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">📁</div>
             <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a0e8e8;text-align:center;line-height:1.3;">Normalizar<br>Nombres R2</div>
-            <div style="font-family:monospace;font-size:0.5rem;color:rgba(160,232,232,0.6);text-align:center;line-height:1.4;padding:0 4px;">Renombra PDFs de formato antiguo (Recibo_26-083A_NOMBRE.pdf) al nuevo (26-083A_NOMBRE.pdf) y actualiza los vínculos en los recibos</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(160,232,232,0.6);text-align:center;line-height:1.4;padding:0 4px;">Renombra cualquier PDF con nombre largo al formato corto canónico. Ej: Recibo_14A_NOMBRE.pdf → 14A.pdf</div>
           </div>
           <!-- Limpiar PDFs Huérfanos R2 -->
           <div onclick="adminLimpiarPDFsHuerfanos()" style="position:relative;background:rgba(192,22,26,0.08);border:1.5px solid rgba(192,22,26,0.32);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;"
@@ -4495,16 +4536,16 @@ window.addEventListener('offline', ()=>{
     <!-- ══════════════════════════════════════════════════════
          MODAL: CLIENTE RÁPIDO (resumen + iniciar trámite)
     ═══════════════════════════════════════════════════════════ -->
-    <div class="modal-ov" id="mClienteRapido"><div class="modal" style="max-width:400px;">
+    <div class="modal-ov" id="mClienteRapido"><div class="modal" style="max-width:1190px;">
       <div class="modal-hdr"><h3>👤 Cliente encontrado</h3><button class="modal-x" onclick="cerrar('mClienteRapido')">✕</button></div>
       <div style="padding:20px 22px 6px;">
         <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
           <div id="mCR-avatar" style="width:52px;height:52px;border-radius:50%;background:rgba(200,149,42,0.13);border:2px solid rgba(200,149,42,0.35);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.15rem;color:var(--gold-dark);font-family:'DM Mono',monospace;flex-shrink:0;letter-spacing:0.04em;"></div>
           <div style="min-width:0;">
             <div id="mCR-nombre" style="font-weight:700;font-size:1rem;color:var(--ink);line-height:1.25;word-break:break-word;"></div>
-            <div id="mCR-stats" style="font-size:0.72rem;color:var(--muted);margin-top:5px;line-height:1.6;"></div>
           </div>
         </div>
+        <div id="mCR-lista" style="max-height:220px;overflow-y:auto;border:1px solid #e6d9aa;border-radius:6px;background:#fffdf8;padding:4px;margin-bottom:12px;"></div>
         <div style="display:flex;flex-direction:column;gap:7px;background:rgba(200,149,42,0.04);border:1px solid var(--border-light);border-radius:6px;padding:11px 13px;margin-bottom:6px;">
           <div style="display:flex;gap:10px;align-items:center;">
             <span style="color:var(--muted);width:68px;flex-shrink:0;font-family:'DM Mono',monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.07em;">📞 Teléfono</span>
@@ -5638,7 +5679,11 @@ window.addEventListener('offline', ()=>{
           <span>▸</span> 🚗 Documentos de Vehiculos
         </div>
         <div class="doc-category-body" style="display:none;">
-          <label class="doc-check-item"><input type="checkbox" value="Factura Original o Carta Factura"> Factura Original o Carta Factura</label>
+          <label class="doc-check-item"><input type="checkbox" value="Factura Original"> Factura Original</label>
+          <label class="doc-check-item"><input type="checkbox" value="Carta Factura Original"> Carta Factura Original</label>
+          <label class="doc-check-item"><input type="checkbox" value="Copia de la Factura"> Copia de la Factura</label>
+          <label class="doc-check-item"><input type="checkbox" value="Refactura"> Refactura</label>
+          <label class="doc-check-item"><input type="checkbox" value="Refactura Aduanal"> Refactura Aduanal</label>
           <label class="doc-check-item"><input type="checkbox" value="Tarjeta de Circulación"> Tarjeta de Circulación</label>
           <label class="doc-check-item"><input type="checkbox" value="Comprobantes de Pago (Tenencia o Refrendo)"> Comprobantes de Pago (Tenencia o Refrendo)</label>
           <label class="doc-check-item"><input type="checkbox" value="Contrato de Compraventa (Vehiculo)"> Contrato de Compraventa (Vehiculo)</label>
@@ -5779,7 +5824,7 @@ window.addEventListener('offline', ()=>{
 </div>
 <div class="actions" id="actions-restauracion" style="display:none;">
   <button class="btn btn-secondary" onclick="cancelarRestauracion()">✕ Cancelar Restauración</button>
-  <button class="btn btn-primary" id="btn-guardar-restauracion" onclick="guardarRestauracion()">🔄 Restaurar Recibo</button>
+  <button class="btn btn-primary" id="btn-guardar-restauracion" onclick="guardarRestauracionConVerificacion()">🔄 Restaurar Recibo</button>
 </div>
 <div class="historial">
   <div class="historial-header">
@@ -6853,6 +6898,22 @@ async function sincronizarFolio(forzarSB){
       // Esto evita que una sync tardía sobreescriba el B recién generado con solo el A.
       // Los tombstones se filtran ANTES de fusionar para que ningún cliente re-suba eliminados.
       function _mergeRecibos(sbArr, localArr) {
+        // ── BLOQUEO: proteger recibos locales de tombstones remotos obsoletos ──────
+        // En la carga inicial, un tombstone antiguo en SB puede filtrar un recibo
+        // válido del backup local antes de que llegue el primer sync.
+        // Solución: si un recibo está en el backup local y NO fue eliminado en esta
+        // sesión (_locTombs no lo tiene), darle _revivedTs = ahora.
+        // El tombstone necesita ts > _revivedTs para aplicar → como ts es del pasado
+        // y _revivedTs = ahora, el tombstone nunca gana.
+        // SEGURO para eliminaciones reales: cuando el admin borra, el tombstone se
+        // crea CON ts = Date.now(), que es >= _revivedTs de cualquier cliente → aplica.
+        localArr.forEach(function(r) {
+          if (!r || r._revivedTs) return;
+          var tieneLocTomb = _locTombs.some(function(t){
+            return String(t.folio) === String(r.folio) && (t.letra||'A') === (r.letra||'A');
+          });
+          if (!tieneLocTomb) r._revivedTs = Date.now();
+        });
         // Filtrar tombstones de ambos lados antes de cualquier fusión
         const sbFilt    = sbArr.filter(function(r){ return !_esTombstone(r); });
         const localFilt = localArr.filter(function(r){ return !_esTombstone(r); });
@@ -7187,6 +7248,10 @@ async function actualizarArchivoControl(){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
   syncStart();
   try {
+    // ── Sellar recibos activos contra tombstones remotos obsoletos ──────────────
+    // Igual que en syncEstadoSupabase: recibos sin _revivedTs son vulnerables a
+    // tombstones históricos de SB. Sellarlos antes del pre-read los protege.
+    (appData.recibos||[]).forEach(function(r){ if(r && !r._revivedTs) r._revivedTs = Date.now(); });
     // ── Leer tombstones actuales de SB antes de escribir ────────────────────
     // CRÍTICO en multi-usuario: si el admin eliminó un folio y guardó el tombstone
     // en SB, este cliente (empleada) debe leerlo y fusionarlo ANTES de subir,
@@ -9059,130 +9124,8 @@ async function activarModoConsulta(recibo){
       iframe.src = src;
     }
   }
-  if(recibo.pdfBase64){
-    // Sesión actual: ya tenemos el PDF en memoria
-    await mostrarBlobEnIframe(recibo.pdfBase64);
-    if(myToken !== _modoConsultaToken) return;
-  } else if(recibo.archivo && window.SB_DESPACHO_ID){
-    // Nueva sesión: buscar PDF en R2 y luego en Supabase Storage
-    const _pathSB = window.SB_DESPACHO_ID + '/recibos/' + recibo.archivo;
-    // Igual que Contabilidad y reDescargar: archivoR2 si existe, sino el nombre corto.
-    // Para folios antiguos (archivoR2 nulo) el PDF está en R2 bajo el nombre corto.
-    const _archivoR2Eff = recibo.archivoR2 || recibo.archivo;
-    // Candidatos de nombre en R2 (orden de preferencia). Tolerante a duplicados y
-    // al formato descriptivo legacy, para que purgar copias nunca rompa la lectura.
-    const _r2Cands = [];
-    if(_archivoR2Eff) _r2Cands.push(_archivoR2Eff);
-    if(recibo.archivo && _r2Cands.indexOf(recibo.archivo) === -1) _r2Cands.push(recibo.archivo);
-    if(recibo.nombre && typeof _nombreArchivoR2Legacy === 'function'){
-      var _legR2 = _nombreArchivoR2Legacy(recibo.archivo.replace(/\.pdf$/i,''), recibo.nombre);
-      if(_r2Cands.indexOf(_legR2) === -1) _r2Cands.push(_legR2);
-    }
-    let _cargado = false;
-    // 1) Intentar R2 con cada candidato hasta encontrar el PDF
-    if(!_cargado && typeof window.descargarR2 === 'function'){
-      try {
-        setStatus('loading','Cargando PDF…','loading');
-        let _blob = null;
-        for(let _ci=0; _ci<_r2Cands.length; _ci++){
-          _blob = await window.descargarR2(window.SB_DESPACHO_ID + '/recibos/' + _r2Cands[_ci], 'recibos');
-          if(myToken !== _modoConsultaToken) return; // folio cambió mientras descargaba
-          if(_blob && _blob.size > 0) break;
-        }
-        if(_blob && _blob.size > 0){
-          const _url = URL.createObjectURL(_blob);
-          if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_url);}catch(e){} return; }
-          iframe._blobUrl = _url;
-          iframe.src = _url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
-          const _rd = new FileReader();
-          _rd.onload = () => { recibo.pdfBase64 = _rd.result; };
-          _rd.readAsDataURL(_blob);
-          setStatus('ok','PDF cargado','ok');
-          _cargado = true;
-        }
-      } catch(_e){ if(myToken !== _modoConsultaToken) return; console.warn('[activarModoConsulta] R2:', _e); }
-    }
-    // 2) Intentar Supabase Storage
-    if(!_cargado && window.SB){
-      try {
-        setStatus('loading','Cargando PDF…','loading');
-        const { data: _sd, error: _se } = await window.SB.storage
-          .from(STORAGE_BUCKET).createSignedUrl(_pathSB, 120);
-        if(myToken !== _modoConsultaToken) return;
-        if(!_se && _sd && _sd.signedUrl){
-          const _res = await fetch(_sd.signedUrl);
-          if(myToken !== _modoConsultaToken) return;
-          if(_res.ok){
-            const _blob = await _res.blob();
-            if(myToken !== _modoConsultaToken) return;
-            const _url = URL.createObjectURL(_blob);
-            if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_url);}catch(e){} return; }
-            iframe._blobUrl = _url;
-            iframe.src = _url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
-            const _rd = new FileReader();
-            _rd.onload = () => { recibo.pdfBase64 = _rd.result; };
-            _rd.readAsDataURL(_blob);
-            setStatus('ok','PDF cargado','ok');
-            _cargado = true;
-          }
-        }
-      } catch(_e){ if(myToken !== _modoConsultaToken) return; console.warn('[activarModoConsulta] SB Storage:', _e); }
-    }
-    // ── Fallback: intentar versiones anteriores del mismo folio (B→A, C→B→A…) ──
-    // Ocurre cuando la subida del PDF de la última versión falló silenciosamente.
-    if(!_cargado){
-      var _versiones=((typeof appData!=='undefined'&&appData.recibos)||[])
-        .filter(function(r){ return r.folio===recibo.folio&&!r.esComplemento&&r.archivo&&r.archivo!==recibo.archivo; })
-        .sort(function(a,b){ return (b.letra||'A').localeCompare(a.letra||'A'); });
-      for(var _vi=0;_vi<_versiones.length&&!_cargado;_vi++){
-        if(myToken !== _modoConsultaToken) return;
-        var _rv=_versiones[_vi];
-        var _rvPathR2=window.SB_DESPACHO_ID+'/recibos/'+(_rv.archivoR2||_rv.archivo);
-        var _rvPathSB=window.SB_DESPACHO_ID+'/recibos/'+_rv.archivo;
-        if(typeof window.descargarR2==='function'){
-          try{
-            var _rvBlob=await window.descargarR2(_rvPathR2,'recibos');
-            if(myToken !== _modoConsultaToken) return;
-            if(_rvBlob&&_rvBlob.size>0){
-              var _rvUrl=URL.createObjectURL(_rvBlob);
-              if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_rvUrl);}catch(e){} return; }
-              iframe._blobUrl=_rvUrl; iframe.src=_rvUrl+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
-              setStatus('ok','PDF versión '+(_rv.letra||'A')+' cargado (versión más reciente no disponible)','ok');
-              _cargado=true;
-            }
-          }catch(_e2){ if(myToken !== _modoConsultaToken) return; }
-        }
-        if(!_cargado&&window.SB){
-          try{
-            var _rvSd=await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_rvPathSB,120);
-            if(myToken !== _modoConsultaToken) return;
-            if(!_rvSd.error&&_rvSd.data&&_rvSd.data.signedUrl){
-              var _rvRes=await fetch(_rvSd.data.signedUrl);
-              if(myToken !== _modoConsultaToken) return;
-              if(_rvRes.ok){
-                var _rvBlob2=await _rvRes.blob();
-                if(myToken !== _modoConsultaToken) return;
-                var _rvUrl2=URL.createObjectURL(_rvBlob2);
-                if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_rvUrl2);}catch(e){} return; }
-                iframe._blobUrl=_rvUrl2; iframe.src=_rvUrl2+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
-                setStatus('ok','PDF versión '+(_rv.letra||'A')+' cargado (versión más reciente no disponible)','ok');
-                _cargado=true;
-              }
-            }
-          }catch(_e3){ if(myToken !== _modoConsultaToken) return; }
-        }
-      }
-    }
-    if(myToken !== _modoConsultaToken) return;
-    if(!_cargado){
-      setStatus('err','No se encontró el PDF del folio #'+String(recibo.folio).padStart(4,'0'),'err');
-    }
-  } else if(!recibo.archivo){
-    if(myToken !== _modoConsultaToken) return;
-    setStatus('err','Este folio no tiene PDF generado','err');
-  }
-  // Verificación final antes de actualizar UI: si el usuario cambió el folio, no actualizar nada
-  if(myToken !== _modoConsultaToken) return;
+  // ── Pintar el layout de CONSULTA y sus datos DE INMEDIATO ──
+  // (antes de descargar el PDF: evita el parpadeo del formulario de captura mientras carga)
   // Actualizar toolbar
   const folioStr = String(recibo.folio).padStart(4,'0');
   document.getElementById('pdf-folio-badge').textContent = 'FOLIO #' + folioStr;
@@ -9234,6 +9177,60 @@ async function activarModoConsulta(recibo){
   document.body.classList.add('modo-consulta');
   // Abrir los paneles si están cerrados para que el usuario vea el folio consultado
   if(!_panelesBusquedaAbiertos) togglePanelesBusqueda();
+  if(recibo.pdfBase64 && recibo.pdfBase64.startsWith('data:application/pdf')){
+    // Sesión actual: ya tenemos el PDF en memoria (validado como PDF real)
+    await mostrarBlobEnIframe(recibo.pdfBase64);
+    if(myToken !== _modoConsultaToken) return;
+  } else if(recibo.archivo && window.SB_DESPACHO_ID){
+    // Nueva sesión: recuperación robusta y validada
+    // (R2 directo → listado del bucket → Supabase Storage → versiones_recibo), todo con %PDF.
+    let _cargado = false;
+    setStatus('loading','Cargando PDF…','loading');
+    try{
+      const _blob = await window.obtenerBlobPdfReciboValidado(recibo, function(){ return myToken !== _modoConsultaToken; });
+      if(myToken !== _modoConsultaToken) return;
+      if(_blob && _blob.size > 0){
+        const _url = URL.createObjectURL(_blob);
+        if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_url);}catch(e){} return; }
+        iframe._blobUrl = _url;
+        iframe.src = _url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
+        const _rd = new FileReader();
+        _rd.onload = () => { recibo.pdfBase64 = _rd.result; };
+        _rd.readAsDataURL(_blob);
+        setStatus('ok','PDF cargado','ok');
+        _cargado = true;
+      }
+    }catch(_e){ if(myToken !== _modoConsultaToken) return; console.warn('[activarModoConsulta] PDF:', _e); }
+    // ── Fallback: versiones anteriores del mismo folio (B→A, C→B→A…) ──
+    // Ocurre cuando la subida del PDF de la última versión falló silenciosamente.
+    if(!_cargado){
+      var _versiones=((typeof appData!=='undefined'&&appData.recibos)||[])
+        .filter(function(r){ return r.folio===recibo.folio&&!r.esComplemento&&r.archivo&&r.archivo!==recibo.archivo; })
+        .sort(function(a,b){ return (b.letra||'A').localeCompare(a.letra||'A'); });
+      for(var _vi=0;_vi<_versiones.length&&!_cargado;_vi++){
+        if(myToken !== _modoConsultaToken) return;
+        var _rv=_versiones[_vi];
+        try{
+          var _rvBlob=await window.obtenerBlobPdfReciboValidado(_rv, function(){ return myToken !== _modoConsultaToken; });
+          if(myToken !== _modoConsultaToken) return;
+          if(_rvBlob&&_rvBlob.size>0){
+            var _rvUrl=URL.createObjectURL(_rvBlob);
+            if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_rvUrl);}catch(e){} return; }
+            iframe._blobUrl=_rvUrl; iframe.src=_rvUrl+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
+            setStatus('ok','PDF versión '+(_rv.letra||'A')+' cargado (versión más reciente no disponible)','ok');
+            _cargado=true;
+          }
+        }catch(_e2){ if(myToken !== _modoConsultaToken) return; }
+      }
+    }
+    if(myToken !== _modoConsultaToken) return;
+    if(!_cargado){
+      setStatus('err','No se encontró el PDF del folio #'+String(recibo.folio).padStart(4,'0'),'err');
+    }
+  } else if(!recibo.archivo){
+    if(myToken !== _modoConsultaToken) return;
+    setStatus('err','Este folio no tiene PDF generado','err');
+  }
 }
 function salirModoConsulta(){
   _modoConsultaToken++; // cancela cualquier activarModoConsulta en vuelo
@@ -10632,7 +10629,7 @@ async function confirmarCancelacion(){
       nombre_cliente_firma: recibo.nombre_cliente_firma || ''
     });
     const docCan = await generarPDF(datosCancelado, recibo.folio, qrDataURL);
-    const nombreArch = 'Recibo_'+folio+'_'+primerNombre.replace(/\s+/g,'_')+'.pdf';
+    const nombreArch = (typeof folioConLetra==='function' ? folioConLetra(folio, recibo.anio_folio, recibo.letra||'A') : String(folio)) + '.pdf'; // nombre corto canónico
     recibo.pdfBase64 = docCan.output('datauristring');
     reemplazarPDFenDrive(docCan.output('blob'), nombreArch).catch(e=>console.warn('Drive cancel:',e));
   } catch(e){ console.warn('PDF cancelado no regenerado:', e); }
@@ -10726,7 +10723,7 @@ async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroO
     });
 
     const doc = await generarPDF(datos, recibo.folio, qrDataURL);
-    const nombreArchivo = 'Recibo_' + folioLetraStr + '_' + primerNombre.replace(/\s+/g,'_') + '.pdf';
+    const nombreArchivo = folioLetraStr + '.pdf'; // nombre corto canónico
     const pdfBase64 = doc.output('datauristring');
 
     // ── 6. Guardar el nuevo registro B en appData.recibos ──
@@ -10860,7 +10857,7 @@ async function _confirmarCancelacionReal(recibo, motivo, auth){
       nombre_cliente_firma: recibo.nombre_cliente_firma || ''
     });
     const docCan = await generarPDF(datosCancelado, recibo.folio, qrDataURL);
-    const nombreArch = 'Recibo_'+folio+'_'+primerNombre.replace(/\s+/g,'_')+'.pdf';
+    const nombreArch = (typeof folioConLetra==='function' ? folioConLetra(folio, recibo.anio_folio, recibo.letra||'A') : String(folio)) + '.pdf'; // nombre corto canónico
     recibo.pdfBase64 = docCan.output('datauristring');
     reemplazarPDFenDrive(docCan.output('blob'), nombreArch).catch(e=>console.warn('SB cancel:',e));
   } catch(e){ console.warn('PDF cancelado no regenerado:', e); }
@@ -12655,6 +12652,17 @@ function abrirFolioPBC(folio, esComplemento){
   campo.focus();
   if(typeof cargarHistorialFolio==='function') cargarHistorialFolio();
 }
+function abrirFolioDesdeCliente(folio){
+  if(typeof cerrar==='function') cerrar('mClienteRapido');
+  if(typeof ir==='function') ir('nuevo-recibo');
+  // Ir DIRECTO a la consulta del folio SIN mostrar el formulario de captura.
+  // ir('nuevo-recibo') ejecutó limpiarFormCompleto(), que quitó 'modo-consulta' y
+  // reveló el formulario vacío. Reactivamos 'modo-consulta' de inmediato (lo oculta por
+  // CSS) y cargamos de forma SÍNCRONA —sin setTimeout— para que el navegador no alcance
+  // a pintar el formulario antes de que aparezca la consulta.
+  document.body.classList.add('modo-consulta');
+  if(typeof abrirFolioPBC==='function') abrirFolioPBC(folio, false);
+}
 // ── BUSCADOR RÁPIDO DE CLIENTES ───────────────────────────────────
 function abrirClienteRapido(nombre){
   const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
@@ -12671,27 +12679,62 @@ function abrirClienteRapido(nombre){
     if(!domicilio && c.domicilio) domicilio = c.domicilio;
     if(movil && tel && domicilio) break;
   }
-  // Estadísticas
-  const validos    = recibos.filter(r => !r.cancelado && !r.esComplemento);
-  const nPagados   = validos.filter(r => !(r.saldoPendiente > 0)).length;
-  const nPendiente = validos.filter(r =>   r.saldoPendiente > 0 ).length;
-  const nCancelado = recibos.filter(r => r.cancelado).length;
-  const totalCobrado   = recibos.reduce((s,r) => s+(parseFloat(r.anticipo)||0), 0);
-  const totalPendiente = recibos.reduce((s,r) => s+(parseFloat(r.saldoPendiente)||0), 0);
-  const partes = [];
-  if(nPagados)   partes.push('<span style="color:var(--verde-d)">'+nPagados+' liquidado'+(nPagados!==1?'s':'')+'</span>');
-  if(nPendiente) partes.push('<span style="color:#9a5a10">'+nPendiente+' pendiente'+(nPendiente!==1?'s':'')+'</span>');
-  if(nCancelado) partes.push('<span style="color:var(--muted)">'+nCancelado+' cancelado'+(nCancelado!==1?'s':'')+'</span>');
-  let statsHtml = recibos.length+' trámite'+(recibos.length!==1?'s':'');
-  if(partes.length) statsHtml += ' · '+partes.join(' · ');
-  if(totalCobrado>0)   statsHtml += '<br><strong style="color:var(--gold-dark)">$'+fmtMXN(totalCobrado)+'</strong> cobrado';
-  if(totalPendiente>0) statsHtml += ' · <span style="color:var(--rojo)">$'+fmtMXN(totalPendiente)+' pendiente</span>';
+  // ── Lista de trámites (solo folios principales serie "A") ──
+  function _saldoRv(r){
+    if(r.saldoPendiente !== undefined && r.saldoPendiente !== null) return parseFloat(r.saldoPendiente)||0;
+    if(r.saldoNuevo     !== undefined && r.saldoNuevo     !== null) return parseFloat(r.saldoNuevo)||0;
+    return 0;
+  }
+  function _fechaModal(iso){
+    if(!iso) return '—';
+    var p = String(iso).split('-');
+    if(p.length < 3) return iso;
+    var _meses = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+    var dd = ('0'+parseInt(p[2],10)).slice(-2);
+    var mm = _meses[parseInt(p[1],10)-1] || '???';
+    var aa = String(p[0]).slice(-2);
+    return dd+'-'+mm+'-'+aa;
+  }
+  var _porFolio = {};
+  recibos.filter(function(r){ return !r.esComplemento; }).forEach(function(r){
+    if(_porFolio[r.folio] === undefined) _porFolio[r.folio] = [];
+    _porFolio[r.folio].push(r);
+  });
+  var _folios = Object.keys(_porFolio).map(Number).sort(function(a,b){ return b-a; });
+  var listaHtml = _folios.map(function(fol){
+    var vers = _porFolio[fol].slice().sort(function(a,b){
+      var la=(a.letra||'A'), lb=(b.letra||'A');
+      return la<lb?-1:la>lb?1:0;
+    });
+    var primero = vers[0], ultimo = vers[vers.length-1];
+    var saldoFinal = _saldoRv(ultimo);
+    var totalTram  = parseFloat(ultimo.total)||parseFloat(primero.total)||(primero.conceptos||[]).reduce(function(s,c){return s+(parseFloat(c.precio)||0);},0);
+    var cancelado  = !!ultimo.cancelado;
+    var liquidado  = !cancelado && saldoFinal <= 0 && totalTram > 0;
+    var color   = cancelado ? '#5F5E5A' : (liquidado ? '#1a7a3a' : '#b06a10');
+    var estatus = cancelado ? 'CANCELADO' : (liquidado ? 'LIQUIDADO' : 'PENDIENTE');
+    var folioTxt = folioFormato(fol) + 'A';
+    var fechaTxt = _fechaModal(primero.fecha || primero.fecha_recibo);
+    var _c0 = (primero.conceptos||[])[0] || {};
+    var _concepto = String(_c0.concepto||'').trim();
+    var _descrip  = String(_c0.descripcion||'').trim();
+    var textoFull = (_concepto + ' ' + _descrip).trim() || '(sin concepto)';
+    // Mostrar máximo 125 caracteres (ancho del modal a 1190px); el resto se corta con "…"
+    var textoCorto = textoFull.length > 125 ? textoFull.slice(0,125).replace(/\s+$/,'') + '…' : textoFull;
+    return '<div class="mcr-row" onclick="abrirFolioDesdeCliente('+fol+')" title="'+escHTML(textoFull)+'">'
+      + '<span class="mcr-folio" style="color:'+color+';">'+escHTML(folioTxt)+'</span>'
+      + '<span class="mcr-fecha">'+fechaTxt+'</span>'
+      + '<span class="mcr-desc" style="color:'+color+';font-weight:700;">'+escHTML(textoCorto)+'</span>'
+      + '<span class="mcr-estatus" style="color:'+color+';">'+estatus+'</span>'
+      + '</div>';
+  }).join('');
+  if(!listaHtml) listaHtml = '<div class="pbc-empty">Sin trámites registrados.</div>';
   // Iniciales para avatar
   const initials = nombre.trim().split(/\s+/).slice(0,2).map(w=>w[0]?.toUpperCase()||'').join('');
   const modal = document.getElementById('mClienteRapido');
   document.getElementById('mCR-avatar').textContent  = initials;
   document.getElementById('mCR-nombre').textContent  = nombre;
-  document.getElementById('mCR-stats').innerHTML     = statsHtml;
+  document.getElementById('mCR-lista').innerHTML     = listaHtml;
   document.getElementById('mCR-tel').textContent     = movil || tel || '—';
   document.getElementById('mCR-dom').textContent     = domicilio || '—';
   modal.dataset.nombre    = nombre;
@@ -13023,6 +13066,128 @@ window.borrarR2 = async function(path, bucket) {
     return res.ok;
   } catch(e) { console.error('borrarR2 excepcion', e); return false; }
 }
+// ── Recuperación robusta y validada del PDF de un recibo (compartida) ──
+// Devuelve un Blob PDF VÁLIDO (cabecera %PDF) o null. Repara la ruta guardada
+// en el recibo cuando lo encuentra por listado. No toca el DOM.
+// `abortar` (opcional): callback que, si devuelve true, cancela la operación en vuelo.
+window.obtenerBlobPdfReciboValidado = async function(recibo, abortar){
+  if(!recibo || !window.SB_DESPACHO_ID) return null;
+  const _ab = typeof abortar === 'function' ? abortar : function(){ return false; };
+  const _letra    = (recibo.letra || (typeof letraVersion==='function'?letraVersion(recibo):'A') || 'A').toUpperCase();
+  const _folioStr = typeof folioFormato==='function' ? folioFormato(recibo.folio, recibo.anio_folio) : String(recibo.folio);
+
+  // Descarga + validación de que el blob sea un PDF real (empieza con %PDF)
+  const _bajar = async function(path){
+    if(!path || typeof window.descargarR2!=='function') return null;
+    const b = await window.descargarR2(path, 'recibos', true);
+    if(_ab()) return null;
+    if(!b || b.size < 100) return null;
+    if(!(b.type.includes('pdf') || b.type==='application/octet-stream' || b.type==='')) return null;
+    const a = await b.slice(0,4).arrayBuffer();
+    return String.fromCharCode.apply(null, new Uint8Array(a)) === '%PDF' ? b : null;
+  };
+
+  let _blob = null;
+
+  // 1) Rutas directas guardadas en el recibo
+  const _cands = [];
+  if(recibo.archivoR2Raiz) _cands.push(recibo.archivoR2Raiz);
+  if(recibo.archivoR2 || recibo.archivo) _cands.push(window.SB_DESPACHO_ID + '/recibos/' + (recibo.archivoR2 || recibo.archivo));
+  if(recibo.archivo) _cands.push(window.SB_DESPACHO_ID + '/recibos/' + recibo.archivo);
+  if(recibo.nombre && recibo.archivo && typeof _nombreArchivoR2Legacy==='function'){
+    _cands.push(window.SB_DESPACHO_ID + '/recibos/' + _nombreArchivoR2Legacy(recibo.archivo.replace(/\.pdf$/i,''), recibo.nombre));
+  }
+  for(let i=0;i<_cands.length && !_blob;i++){
+    if(_ab()) return null;
+    _blob = await _bajar(_cands[i]);
+  }
+
+  // 2) Búsqueda por listado del bucket (prefijo del despacho → raíz). Repara la ruta.
+  if(!_blob && typeof window.listarR2==='function'){
+    if(_ab()) return null;
+    const _folioEsc = _folioStr.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const _reNuevo  = new RegExp('(^|[^0-9])' + _folioEsc + (_letra==='A'?'a?':_letra) + '([^0-9]|_|\\.pdf)', 'i');
+    const _reViejo  = _letra==='A' ? new RegExp('Recibo_0*' + (parseInt(recibo.folio)||0) + '_', 'i') : null;
+    const _buscar = function(objs){
+      if(!objs || !objs.length) return null;
+      let m = objs.find(o => _reNuevo.test((o.key||o.name||'').split('/').pop()));
+      if(!m && _reViejo) m = objs.find(o => _reViejo.test((o.key||o.name||'').split('/').pop()));
+      return m ? (m.key||m.name||null) : null;
+    };
+    let _key = _buscar(await window.listarR2(window.SB_DESPACHO_ID + '/recibos/', 'recibos'));
+    if(_ab()) return null;
+    if(!_key) _key = _buscar(await window.listarR2('', 'recibos'));
+    if(_ab()) return null;
+    if(_key){
+      _blob = await _bajar(_key);
+      if(_blob){
+        if(_key.startsWith(window.SB_DESPACHO_ID + '/recibos/')){
+          recibo.archivoR2 = _key.split('/').pop();
+          if(!recibo.archivo) recibo.archivo = recibo.archivoR2;
+        } else {
+          recibo.archivoR2Raiz = _key; // ruta completa en la raíz del bucket
+        }
+      }
+    }
+  }
+
+  // 3) Supabase Storage (validado %PDF)
+  if(!_blob && window.SB && recibo.archivo){
+    try{
+      const _sbPath = window.SB_DESPACHO_ID + '/recibos/' + recibo.archivo;
+      const { data:_sd, error:_se } = await window.SB.storage.from(STORAGE_BUCKET).createSignedUrl(_sbPath, 120);
+      if(_ab()) return null;
+      if(!_se && _sd && _sd.signedUrl){
+        const _res = await fetch(_sd.signedUrl);
+        if(_ab()) return null;
+        if(_res.ok){
+          const _b = await _res.blob();
+          if(_ab()) return null;
+          const _arr = await _b.slice(0,4).arrayBuffer();
+          if(String.fromCharCode.apply(null, new Uint8Array(_arr)) === '%PDF') _blob = _b;
+        }
+      }
+    }catch(_eSB){ console.warn('[obtenerBlobPdfReciboValidado] Storage:', _eSB); }
+  }
+
+  // 4) Recuperar pdfBase64 desde versiones_recibo (y re-subir a R2 en 2º plano)
+  if(!_blob && window.SB){
+    try{
+      const _anio = recibo.anio_folio || new Date().getFullYear();
+      let _vr = null;
+      const { data:_vd1 } = await window.SB.from('versiones_recibo')
+        .select('datos_completos, pdf_storage_path, letra')
+        .eq('despacho_id', window.SB_DESPACHO_ID).eq('folio_base', recibo.folio)
+        .eq('anio_folio', _anio).eq('letra', _letra).limit(1);
+      _vr = (_vd1 && _vd1.length) ? _vd1[0] : null;
+      if(!_vr){
+        const { data:_vd2 } = await window.SB.from('versiones_recibo')
+          .select('datos_completos, pdf_storage_path, letra')
+          .eq('despacho_id', window.SB_DESPACHO_ID).eq('folio_base', recibo.folio)
+          .eq('anio_folio', _anio).order('letra',{ascending:false}).limit(1);
+        _vr = (_vd2 && _vd2.length) ? _vd2[0] : null;
+      }
+      if(_ab()) return null;
+      if(_vr && _vr.datos_completos && _vr.datos_completos.pdfBase64){
+        const _b64  = _vr.datos_completos.pdfBase64;
+        const _b64d = _b64.includes(',') ? _b64.split(',')[1] : _b64;
+        const _bin  = atob(_b64d);
+        const _buf  = new Uint8Array(_bin.length);
+        for(let i=0;i<_bin.length;i++) _buf[i]=_bin.charCodeAt(i);
+        _blob = new Blob([_buf],{type:'application/pdf'});
+        recibo.pdfBase64 = _b64;
+        try{
+          const _r2path = _vr.pdf_storage_path
+            || (window.SB_DESPACHO_ID + '/recibos/' + (recibo.archivoR2 || recibo.archivo || (String(recibo.folio).padStart(4,'0') + (_vr.letra||'A') + '.pdf')));
+          const _f = new File([_blob], _r2path.split('/').pop(), {type:'application/pdf'});
+          if(typeof window.subirR2==='function') window.subirR2(_f, _r2path, 'recibos').catch(function(){});
+        }catch(_eUp){}
+      }
+    }catch(_eVR){ console.warn('[obtenerBlobPdfReciboValidado] versiones_recibo:', _eVR); }
+  }
+
+  return _blob;
+};
 // ═══ FIN R2 ═══
 
 // ── Helpers R2 para resúmenes de acuerdos ──────────────────────
@@ -14317,7 +14482,9 @@ function ir(p){
   if(p==='configuracion'){ setTimeout(ocrCargarKeyEnCfg, 100); setTimeout(cfgMostrarFolioActual, 120); }
   if(p==='nuevo-recibo'){
     // Resetear el formulario completamente al navegar a este panel
-    if(typeof limpiarFormCompleto==='function') limpiarFormCompleto();
+    // EXCEPCIÓN: si vamos en modo restauración, NO limpiar — el setTimeout de
+    // rgenConfirmar/rgenCapturar cargará los datos del recibo a restaurar justo después.
+    if(typeof limpiarFormCompleto==='function' && !window._restauracionFolio) limpiarFormCompleto();
     // Sincronizar datos con Supabase si la sesión está activa y no hay recibos cargados
     if(typeof appData !== 'undefined' && typeof sbSession !== 'undefined' && sbSession
        && (!appData.recibos || !appData.recibos.length)
@@ -19305,6 +19472,37 @@ window.lexRestaurarFolioContabilidad = function(folioNum) {
   console.log('✅ Folio '+folioNum+' restaurado en contabilidad y sincronizado con Supabase');
   if(typeof toast==='function') toast('✅ Folio '+folioNum+' restaurado en contabilidad', 'ok');
 };
+// Quita el tombstone de un folio+letra de la lista local y de Supabase.
+// Úsala en consola ANTES de restaurar el recibo por el panel "Restaurar desde PDF":
+//   lexQuitarTombstone(3, 'A')   → limpia folio 3A
+// Después de ejecutarla, usa el panel de restauración para re-registrar el recibo.
+window.lexQuitarTombstone = async function(folioNum, letra) {
+  letra = (letra || 'A').toUpperCase();
+  var folioStr = String(folioNum);
+  // 1. Quitar de memoria local
+  if (Array.isArray(appData.folios_eliminados)) {
+    var antes = appData.folios_eliminados.length;
+    appData.folios_eliminados = appData.folios_eliminados.filter(function(t){
+      return !(String(t.folio) === folioStr && (t.letra||'A') === letra);
+    });
+    console.log('[lexQuitarTombstone] Tombstones locales eliminados:', antes - appData.folios_eliminados.length);
+  }
+  // 2. Quitar de Supabase directamente
+  try {
+    var _r = await window.SB.from('app_state').select('recibos').eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+    if (_r.data && _r.data.recibos) {
+      var dat = JSON.parse(JSON.stringify(_r.data.recibos));
+      var antSB = (dat.folios_eliminados||[]).length;
+      dat.folios_eliminados = (dat.folios_eliminados||[]).filter(function(t){
+        return !(String(t.folio)===folioStr && (t.letra||'A')===letra);
+      });
+      await window.SB.from('app_state').update({ recibos: dat }).eq('despacho_id', window.SB_DESPACHO_ID);
+      console.log('[lexQuitarTombstone] Tombstones en Supabase eliminados:', antSB - dat.folios_eliminados.length);
+    }
+  } catch(e) { console.error('[lexQuitarTombstone] Error Supabase:', e); return; }
+  if(typeof toast==='function') toast('✅ Tombstone de folio '+folioNum+letra+' eliminado — ya puedes restaurar el recibo', 'ok');
+  console.log('✅ Tombstone folio '+folioNum+letra+' limpiado. Ahora usa el panel "Restaurar desde PDF" en Herramientas > Restaurar recibo desde PDF.');
+};
 // Limpia todo el caché y respaldos de localStorage — los datos se cargarán desde Supabase y R2
 window.limpiarCacheLocal = function() {
   var clavesMantener = new Set([
@@ -19648,6 +19846,15 @@ async function syncEstadoSupabase(){
                              : (D.retro_global || null),
       _juiciosModTs:         D._juiciosModTs         || 0
     };
+    // ── Sellar recibos activos contra tombstones remotos obsoletos ──────────────
+    // Recibos creados antes del sistema _revivedTs no tienen esa marca y son
+    // vulnerables a cualquier tombstone histórico de SB que coincida en folio+letra.
+    // Darles _revivedTs = ahora los protege: _tombstoneAplicaA devuelve false
+    // cuando _revivedTs > t.ts, aunque el tombstone sea muy antiguo.
+    // Solo se hace a recibos que están activos en esta sesión (en appData.recibos);
+    // si el admin acaba de eliminar un recibo, ya lo quitó de appData.recibos
+    // antes de llamar a sync → no recibe la marca y el tombstone aplica correctamente.
+    (appData.recibos||[]).forEach(function(r){ if(r && !r._revivedTs) r._revivedTs = Date.now(); });
     // ── Protección multi-usuario: leer tombstones de SB antes de escribir ──────
     // Si este browser aún no tiene los tombstones del admin (ej: empleada que no ha
     // sincronizado), su save() sobreescribiría folios_eliminados con [] y restauraría
@@ -20424,7 +20631,9 @@ async function guardarReciboInterno() {
     await generarQRRecibo();
     await new Promise(function(r){setTimeout(r,500);});
     var qrDataURL = await getQRDataURL();
-    var blob = await generarPDFRecibo(datos, folio, qrDataURL);
+    var _docRI = await generarPDF(datos, folio, qrDataURL);
+    var blob = _docRI.output('blob');
+    datos.pdfBase64 = _docRI.output('datauristring');
     lastPdfBlob = blob;
     // ── Guardar PDF en R2 con nombre descriptivo ──
     var _folioRIStr = typeof folioConLetra === 'function'
@@ -20573,116 +20782,7 @@ async function guardarReciboInterno() {
     btn.textContent = '🖨 Generar PDF e Imprimir';
   }
 }
-async function generarPDFRecibo(datos, folio, qrDataURL) {
-  var jsPDF = window.jspdf.jsPDF;
-  var doc = new jsPDF({orientation:'portrait', unit:'mm', format:'letter'});
-  var W=216, H=279, mg=14, y=mg;
-  doc.setFillColor(253,250,244); doc.rect(0,0,W,H,'F');
-  doc.setDrawColor(200,149,42); doc.setLineWidth(0.8); doc.rect(8,8,W-16,H-16);
-  doc.setLineWidth(0.3); doc.rect(9.5,9.5,W-19,H-19);
-  try { doc.addImage(LOGO_SRC,'JPEG',mg,y,38,24); } catch(e){ registrarError('catch vacio', e); }
-  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(200,149,42);
-  doc.text('LEX-MEXICO', W-mg, y+6, {align:'right'});
-  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,60,20);
-  doc.text('Despacho Juridico', W-mg, y+11, {align:'right'});
-  doc.text('Santiago Juxtlahuaca, Oaxaca', W-mg, y+15.5, {align:'right'});
-  doc.text('Tel: 953-100-0000', W-mg, y+20, {align:'right'});
-  doc.setFillColor(192,22,26); doc.roundedRect(mg,y+26,60,10,2,2,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255);
-  doc.text('RECIBO OFICIAL No. ' + folioFormato(folio), mg+30, y+32.5, {align:'center'});
-  y+=38;
-  doc.setDrawColor(200,149,42); doc.setLineWidth(0.5); doc.line(mg,y,W-mg,y); y+=5;
-  var cliH = datos.clientes.filter(function(c){return c.nombre;}).length*14+8;
-  doc.setFillColor(253,250,244); doc.setDrawColor(212,184,112); doc.setLineWidth(0.3);
-  doc.roundedRect(mg,y,W-mg*2,cliH,2,2,'FD');
-  doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(140,101,24);
-  doc.text('DATOS DEL CLIENTE', mg+4, y+5); y+=8;
-  datos.clientes.forEach(function(cl,i) {
-    if (!cl.nombre) return;
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(26,16,8);
-    doc.text((datos.clientes.length>1?(i+1)+'. ':'')+cl.nombre, mg+4, y+4);
-    var info = [];
-    if (cl.telefono) info.push('Tel: '+cl.telefono);
-    if (cl.direccion) info.push(cl.direccion);
-    if (info.length) { doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(80,60,20); doc.text(info.join('  ·  '), mg+4, y+9); }
-    y+=14;
-  });
-  y+=4;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(80,60,20);
-  var fechaFmt = datos.fecha ? datos.fecha.split('-').reverse().join('/') : '';
-  doc.text('Fecha: '+fechaFmt+'   Hora: '+datos.hora+'   Atendio: '+datos.generadoPor, mg, y); y+=7;
-  doc.setFillColor(26,16,8); doc.rect(mg,y,W-mg*2,7,'F');
-  doc.setFont('helvetica','bold'); doc.setFontSize(7.5); doc.setTextColor(253,250,244);
-  doc.text('CANT.', mg+4, y+4.5);
-  doc.text('DESCRIPCION DEL SERVICIO', mg+20, y+4.5);
-  doc.text('P.UNIT.', W-mg-40, y+4.5, {align:'right'});
-  doc.text('TOTAL', W-mg-4, y+4.5, {align:'right'});
-  y+=7;
-  datos.conceptos.forEach(function(con,i) {
-    if (!con.descripcion) return;
-    var bg = i%2===0 ? [255,255,255] : [247,243,232];
-    doc.setFillColor(bg[0],bg[1],bg[2]); doc.rect(mg,y,W-mg*2,7,'F');
-    var pu = parsePrecioR(con.precio), pt = pu*(parseInt(con.cantidad)||1);
-    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(26,16,8);
-    doc.text(String(con.cantidad||1), mg+4, y+4.5);
-    doc.text(String(con.descripcion).substring(0,60), mg+20, y+4.5);
-    if (pu>0) { doc.text('$'+pu.toFixed(2), W-mg-40, y+4.5,{align:'right'}); doc.text('$'+pt.toFixed(2), W-mg-4, y+4.5,{align:'right'}); }
-    doc.setDrawColor(212,184,112); doc.setLineWidth(0.2); doc.line(mg,y+7,W-mg,y+7); y+=7;
-  });
-  y+=2;
-  doc.setDrawColor(200,149,42); doc.setLineWidth(0.5); doc.line(W-mg-65,y,W-mg,y); y+=4;
-  [['TOTAL:',datos.total],['ANTICIPO:',datos.anticipo],['SALDO:',datos.saldo]].forEach(function(row) {
-    var lbl=row[0], monto=row[1];
-    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(80,60,20); doc.text(lbl, W-mg-63, y);
-    doc.setFontSize(10);
-    if (lbl==='SALDO:' && monto>0) doc.setTextColor(192,22,26);
-    else if (lbl==='ANTICIPO:') doc.setTextColor(26,122,58);
-    else doc.setTextColor(26,16,8);
-    doc.text('$'+Number(monto||0).toFixed(2), W-mg, y, {align:'right'}); y+=7;
-  });
-  y+=3;
-  if (datos.documentos && datos.documentos.length) {
-    var dH = Math.ceil(datos.documentos.length/3)*6+12;
-    doc.setFillColor(253,250,244); doc.setDrawColor(212,184,112); doc.setLineWidth(0.3);
-    doc.roundedRect(mg,y,W-mg*2,dH,2,2,'FD');
-    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(140,101,24);
-    doc.text(datos.tipodocRecibo || 'DOCUMENTOS ENTREGADOS', mg+4, y+5); y+=10;
-    datos.documentos.forEach(function(d,i) {
-      var col=i%3, row=Math.floor(i/3);
-      var x=mg+4+col*((W-mg*2-8)/3);
-      doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(26,122,58);
-      doc.text('ok '+d, x, y+row*6);
-    });
-    y+=Math.ceil(datos.documentos.length/3)*6+4;
-  }
-  if (datos.vehiculo) {
-    var v=datos.vehiculo;
-    doc.setFillColor(238,243,255); doc.setDrawColor(26,74,138); doc.setLineWidth(0.3);
-    doc.roundedRect(mg,y,W-mg*2,30,2,2,'FD');
-    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(26,74,138);
-    doc.text('DATOS VEHICULARES', mg+4, y+5); y+=8;
-    var vDatos=[['Clase:',v.clase],['Marca:',v.marca],['Anio:',v.anio],['Motor:',v.motor],['Serie:',v.serie],['Placas:',v.placa],['REPUVE:',v.repuve],['Tonelaje:',v.tonelaje],['Color:',v.color]].filter(function(r){return r[1];});
-    vDatos.forEach(function(r,i) {
-      var col=i%3, row=Math.floor(i/3), x=mg+4+col*((W-mg*2-8)/3);
-      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(80,60,20); doc.text(r[0],x,y+row*6);
-      doc.setFont('helvetica','normal'); doc.text(String(r[1]||''),x+16,y+row*6);
-    });
-    y+=Math.ceil(vDatos.length/3)*6+4;
-  }
-  if (datos.obs) { doc.setFont('helvetica','italic'); doc.setFontSize(7.5); doc.setTextColor(122,104,64); doc.text('Obs: '+datos.obs, mg, y); y+=7; }
-  if (qrDataURL) {
-    try { doc.addImage(qrDataURL,'PNG',W-mg-30,H-mg-50,28,28); doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.setTextColor(122,104,64); doc.text('Escanea para verificar',W-mg-16,H-mg-20,{align:'center'}); } catch(e){ registrarError('catch vacio', e); }
-  }
-  var fY=H-mg-28;
-  doc.setDrawColor(26,16,8); doc.setLineWidth(0.4);
-  doc.line(mg,fY,mg+65,fY); doc.line(W-mg-65,fY,W-mg,fY);
-  doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(80,60,20);
-  doc.text('Firma del Responsable',mg+32,fY+4,{align:'center'});
-  doc.text('Firma del Cliente',W-mg-32,fY+4,{align:'center'});
-  doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(140,101,24);
-  doc.text('LEX-MEXICO Despacho Juridico · Santiago Juxtlahuaca, Oaxaca · Comprobante oficial de pago.', W/2, H-mg+2, {align:'center'});
-  return doc.output('blob');
-}
+
 function congelarRecibo() {
   reciboFrozen = true;
   var banner = document.getElementById('recibo-frozen-banner');
@@ -24593,18 +24693,15 @@ async function adminMarcaPagadoPDFs(){
       });
       var qrTxt = 'LEX-MEXICO|Folio:' + folioStr + '|' + (r.nombre||'') + '|' + (r.fecha_recibo||r.fecha||'') + ' ' + (r.hora_recibo||r.hora||'');
       var qrURL = typeof qrToDataURL === 'function' ? await qrToDataURL(qrTxt) : null;
-      var nombrePDF = r.archivo || ('Recibo_' + folioStr + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf');
-      // Detectar tipo de recibo: sub-panel (saldo directo, sin fecha_recibo) vs flujo principal
-      var esSubpanel = (r.saldo !== undefined && r.fecha_recibo === undefined && !r.tipoTramite);
+      var nombrePDF = r.archivo || (folioStr + '.pdf'); // nombre corto canónico
       var pdfBlob;
-      if (esSubpanel && typeof generarPDFRecibo === 'function') {
-        pdfBlob = await generarPDFRecibo(datosN, r.folio, qrURL);
-      } else {
+      {
         var doc = await generarPDF(datosN, r.folio, qrURL);
         pdfBlob = doc.output('blob');
         r.pdfBase64 = doc.output('datauristring');
       }
-      if (esSubpanel) {
+      {
+        // Cachear base64 desde el blob (ya asignado arriba vía datauristring)
         r.pdfBase64 = await new Promise(function(res){
           var reader = new FileReader();
           reader.onload = function(){ res(reader.result); };
@@ -24804,8 +24901,8 @@ async function adminMigrarFoliosInfinitos() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// NORMALIZAR NOMBRES R2 — Renombra Recibo_26-083A_NOMBRE.pdf → 26-083A_NOMBRE.pdf
-// Actualiza archivoR2 en recibos que no lo tenían o tenían el nombre viejo
+// NORMALIZAR NOMBRES R2 — Renombra cualquier nombre largo a formato corto canónico
+// Ej: Recibo_14A_NOMBRE.pdf → 14A.pdf    |    26-083A_NOMBRE.pdf → 26-083A.pdf
 // ══════════════════════════════════════════════════════════════════
 async function adminNormalizarNombresR2() {
   if (!window.SB_DESPACHO_ID || typeof window.listarR2 !== 'function') {
@@ -24818,52 +24915,79 @@ async function adminNormalizarNombresR2() {
     lista = await window.listarR2(prefix, 'recibos') || [];
   } catch(e) { toast('Error al listar R2: ' + (e.message||e), 'err'); return; }
 
+  // Extrae el nombre corto canónico de cualquier variante larga.
+  // Ejemplos:
+  //   Recibo_14A_RUPERTO_ALEJANDRO.pdf → 14A.pdf
+  //   26-083A_SAMUEL_MARTINEZ.pdf      → 26-083A.pdf
+  //   90A_NOMBRE.pdf                   → 90A.pdf
+  //   14A.pdf                          → (ya está bien, se ignora)
+  function _nombreCorto(nombre) {
+    // Quitar prefijo "Recibo_" si existe
+    var n = nombre.replace(/^\.pdf$/i,'').replace(/\.pdf$/i,'');
+    n = n.replace(/^Recibo_/i, '');
+    // Extraer solo el token de folio+letra al inicio: ej "14A", "26-083A", "0014A"
+    var m = n.match(/^(\d{2}-\d{3}[A-Za-z]|\d+[A-Za-z])/i);
+    if (!m) return null; // no reconocible
+    return m[1].toUpperCase() + '.pdf';
+  }
+
   const afectar = lista.filter(function(o) {
     const nombre = (o.key || o.name || '').split('/').pop();
-    return /^Recibo_/i.test(nombre);
+    const corto = _nombreCorto(nombre);
+    return corto && corto !== nombre; // solo los que necesitan cambio
   });
 
-  if (!afectar.length) { toast('No hay archivos con prefijo "Recibo_" en R2', 'ok'); return; }
-  if (!confirm('Se encontraron ' + afectar.length + ' archivo(s) con formato antiguo (Recibo_...).\n\n¿Renombrarlos al formato nuevo (26-083A_NOMBRE.pdf)?\n\nEsto actualiza R2 y los datos en memoria. No cierre la app.')) return;
+  if (!afectar.length) { toast('✅ Todos los archivos ya tienen nombre corto canónico', 'ok'); return; }
+
+  // Mostrar preview antes de confirmar
+  const preview = afectar.slice(0,8).map(function(o){
+    const v = (o.key||o.name||'').split('/').pop();
+    return v + '  →  ' + _nombreCorto(v);
+  }).join('\n') + (afectar.length > 8 ? '\n… y ' + (afectar.length-8) + ' más' : '');
+
+  if (!confirm('Se encontraron ' + afectar.length + ' archivo(s) con nombre largo.\n\n' + preview + '\n\n¿Renombrar todos al formato corto? No cierre la app.')) return;
 
   const _arr1 = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
   const _arr2 = (typeof REC !== 'undefined' && REC.recibos) ? REC.recibos : [];
+  const _todos = [..._arr1, ..._arr2];
 
   var renombrados = 0, errores = 0;
   for (var i = 0; i < afectar.length; i++) {
     const obj = afectar[i];
-    const keyViejo   = obj.key || obj.name || '';
+    const keyViejo    = obj.key || obj.name || '';
     const nombreViejo = keyViejo.split('/').pop();
-    const nombreNuevo = nombreViejo.replace(/^Recibo_/i, '');
-    const keyNuevo   = prefix + nombreNuevo;
-    toast('⏳ Renombrando ' + (i+1) + '/' + afectar.length + ': ' + nombreNuevo);
+    const nombreNuevo = _nombreCorto(nombreViejo);
+    if (!nombreNuevo || nombreNuevo === nombreViejo) continue;
+    const keyNuevo = prefix + nombreNuevo;
+    toast('⏳ (' + (i+1) + '/' + afectar.length + ') ' + nombreViejo + ' → ' + nombreNuevo);
     try {
+      // Descargar original
       const blob = await window.descargarR2(keyViejo, 'recibos', true);
-      if (!blob || blob.size < 100) { errores++; continue; }
+      if (!blob || blob.size < 100) { errores++; console.warn('[normalizarR2] blob vacío:', nombreViejo); continue; }
+      // Subir con nombre corto
       const file = new File([blob], nombreNuevo, { type: 'application/pdf' });
       const ok = await window.subirR2(file, keyNuevo, 'recibos');
       if (!ok) { errores++; console.warn('[normalizarR2] Falló subida:', nombreNuevo); continue; }
-      await window.borrarR2(keyViejo, 'recibos');
+      // Borrar el viejo
+      await window.borrarR2(keyViejo, 'recibos').catch(function(){});
 
-      // Actualizar archivoR2 en recibos que apuntaban al nombre viejo
-      var _todos = [..._arr1, ..._arr2];
+      // Actualizar referencias en memoria (archivoR2 y archivo)
       _todos.forEach(function(r) {
         if (!r) return;
-        if (r.archivoR2 === nombreViejo || r.archivoR2 === keyViejo) {
-          r.archivoR2 = nombreNuevo;
-        }
-        if (r.archivo === nombreViejo) r.archivo = nombreNuevo;
+        if (r.archivoR2 === nombreViejo || r.archivoR2 === keyViejo) r.archivoR2 = nombreNuevo;
+        if (r.archivo   === nombreViejo) r.archivo = nombreNuevo;
       });
 
-      // Asignar archivoR2 a recibos sin él que coincidan por folio+letra en el nombre
-      var m = /^(\d{2}-\d{3})([A-Za-z])_/i.exec(nombreNuevo);
-      if (m) {
-        var folioStr = m[1], letraStr = m[2].toUpperCase();
+      // Si algún recibo aún no tiene archivoR2, intentar vincular por folio+letra
+      var mf = /^(\d{2}-\d{3}|\d+)([A-Za-z])\.pdf$/i.exec(nombreNuevo);
+      if (mf) {
+        var numStr = mf[1], letraStr = mf[2].toUpperCase();
         _todos.forEach(function(r) {
           if (!r || r.archivoR2) return;
-          var rf = typeof folioFormato === 'function' ? folioFormato(r.folio, r.anio_folio) : '';
-          var rl = (r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A').toUpperCase();
-          if (rf === folioStr && rl === letraStr) r.archivoR2 = nombreNuevo;
+          var rf = typeof folioFormato === 'function' ? folioFormato(r.folio, r.anio_folio) : String(r.folio||'');
+          var rn = String(r.folio||'');
+          var rl = (r.letra || (typeof letraVersion==='function' ? letraVersion(r) : 'A') || 'A').toUpperCase();
+          if ((rf === numStr || rn === numStr) && rl === letraStr) r.archivoR2 = nombreNuevo;
         });
       }
       renombrados++;
@@ -24876,7 +25000,8 @@ async function adminNormalizarNombresR2() {
 
   try { await actualizarArchivoControl(); } catch(e) {}
   try { await syncEstadoSupabase(); } catch(e) {}
-  toast('✅ ' + renombrados + ' archivo(s) normalizados' + (errores ? ' · ' + errores + ' errores' : ''));
+  if (typeof renderHistorial === 'function') renderHistorial();
+  toast('✅ ' + renombrados + ' renombrado(s)' + (errores ? ' · ⚠ ' + errores + ' errores' : '') + ' — nombres cortos aplicados', renombrados > 0 ? 'ok' : 'err');
 }
 // ══════════════════════════════════════════════════════════════════
 // LIMPIAR PDFs HUÉRFANOS EN R2 — Elimina archivos sin recibo vinculado
@@ -27187,7 +27312,7 @@ async function adminGuardarEdicionRecibo() {
     // 1. Guardar JSON actualizado en Drive — BLOQUEANTE
     await actualizarArchivoControl();
     // 2. Borrar PDF de Drive para que se regenere fresco al consultar
-    var nombrePDF = r.archivo || ('Recibo_' + folioFormato(r.folio, r.anio_folio) + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf');
+    var nombrePDF = r.archivo || ((typeof folioConLetra==='function' ? folioConLetra(r.folio, r.anio_folio, r.letra||'A') : folioFormato(r.folio, r.anio_folio)) + '.pdf'); // nombre corto canónico
     await borrarPDFdeDrive(nombrePDF);
     // 3. Actualizar o crear movimiento en contabilidad
     if (typeof D !== 'undefined' && Array.isArray(D.movimientos)) {
@@ -27238,8 +27363,7 @@ async function adminGuardarEdicionRecibo() {
         });
       }
     }
-    // 4. Regenerar PDF y subirlo a Supabase Storage
-    // generarPDFRecibo retorna Blob directamente; generarPDF retorna objeto jsPDF
+    // 4. Regenerar PDF y subirlo a Supabase Storage — siempre generarPDF (plantilla oficial LEX-MÉXICO)
     try {
       // Recalcular saldos antes de generar el PDF
       const _totalN    = parseFloat(r.total) || 0;
@@ -27249,12 +27373,9 @@ async function adminGuardarEdicionRecibo() {
       r.saldoPendiente = r.saldoNuevo;
       const _qrTxt = 'LEX-MEXICO|Folio:' + folioFormato(r.folio, r.anio_folio) + '|' + r.nombre + '|' + (r.fecha_recibo||r.fecha||'') + ' ' + (r.hora_recibo||r.hora||'');
       const _qrURL = typeof qrToDataURL === 'function' ? await qrToDataURL(_qrTxt) : null;
-      const _nombrePDF = 'Recibo_' + folioFormato(r.folio, r.anio_folio) + '_' + (r.nombre||'').replace(/[^a-zA-Z0-9]/g,'_').substring(0,30) + '.pdf';
+      const _nombrePDF = (typeof folioConLetra==='function' ? folioConLetra(r.folio, r.anio_folio, r.letra||'A') : folioFormato(r.folio, r.anio_folio)) + '.pdf'; // nombre corto canónico
       var _blob = null;
-      if (typeof generarPDFRecibo === 'function') {
-        // Retorna Blob directamente
-        _blob = await generarPDFRecibo(r, r.folio, _qrURL);
-      } else if (typeof generarPDF === 'function') {
+      if (typeof generarPDF === 'function') {
         const _datos = {
           folio: r.folio, clientes: r.clientes||[{nombre:r.nombre||''}],
           conceptos: r.conceptos||[], tipoTramite: r.tipoTramite||'normal',
@@ -27268,7 +27389,8 @@ async function adminGuardarEdicionRecibo() {
           ultima_tenencia:r.ultima_tenencia||'', origen:r.origen||'', combustible:r.combustible||'',
           copias:r.copias||[], costosExtra:r.costosExtra||[],
           pagosParciales:r.pagosParciales||[], fechasImpresion:r.fechasImpresion||[],
-          totalGeneral: r.total||0, totalAbonado: r.totalAbonado, saldoNuevo: r.saldoNuevo
+          totalGeneral: r.total||0, totalAbonado: r.totalAbonado, saldoNuevo: r.saldoNuevo,
+          saldoPendiente: r.saldoPendiente, letra: r.letra||'A', anio_folio: r.anio_folio
         };
         const _doc = await generarPDF(_datos, r.folio, _qrURL);
         if (_doc && typeof _doc.output === 'function') _blob = _doc.output('blob');
@@ -29639,8 +29761,11 @@ let _rgenLetra = 'A';
 let _rgenRec   = null;
 function abrirRestaurarRecibo(){
   _rgenFolio = 0; _rgenLetra = 'A'; _rgenRec = null;
-  document.getElementById('rgen-folio').value = '';
-  const _letraEl = document.getElementById('rgen-letra'); if(_letraEl) _letraEl.value = 'A';
+  const _folioElOpen = document.getElementById('rgen-folio');
+  const _letraElOpen = document.getElementById('rgen-letra');
+  // Asegurar que los inputs estén desbloqueados al abrir
+  if(_folioElOpen){ _folioElOpen.value=''; _folioElOpen.readOnly=false; _folioElOpen.style.opacity=''; _folioElOpen.style.cursor=''; }
+  if(_letraElOpen){ _letraElOpen.value='A'; _letraElOpen.disabled=false; _letraElOpen.style.opacity=''; }
   document.getElementById('rgen-paso1-msg').textContent = '';
   document.getElementById('rgen-err').textContent = '';
   document.getElementById('rgen-paso2').style.display = 'none';
@@ -29651,6 +29776,11 @@ function abrirRestaurarRecibo(){
 function cerrarRestaurarRecibo(){
   document.getElementById('overlay-restaurar-recibo').style.display = 'none';
   _rgenFolio = 0; _rgenLetra = 'A'; _rgenRec = null;
+  // ── Desbloquear inputs al cerrar ──
+  const _fi = document.getElementById('rgen-folio');
+  const _li = document.getElementById('rgen-letra');
+  if(_fi){ _fi.readOnly=false; _fi.style.opacity=''; _fi.style.cursor=''; }
+  if(_li){ _li.disabled=false; _li.style.opacity=''; }
 }
 function rgenCapturar(){
   // Abrir formulario vacío con el folio buscado — sin necesidad de PDF
@@ -29689,8 +29819,7 @@ function rgenCapturar(){
     if(typeof cargarReciboEnFormulario==='function') cargarReciboEnFormulario(recCarga);
     document.body.classList.remove('recibo-frozen','modo-actualizacion','modo-edicion-completa');
     document.body.classList.add('modo-restauracion');
-    const el = id => document.getElementById(id);
-    if(el('restauracion-folio-label')) el('restauracion-folio-label').textContent = '#'+fs;
+    const el = id => document.getElementById(id);    if(el('restauracion-folio-label')) el('restauracion-folio-label').textContent = '#'+fs;
     if(el('restauracion-fecha-label')) el('restauracion-fecha-label').textContent = '(edítala abajo)';
     if(el('btn-guardar-restauracion')) el('btn-guardar-restauracion').textContent = '🔄 Restaurar Recibo #'+fs;
     ['actions-normal','actions-consulta','actions-actualizacion','actions-post-print','actions-edicion-completa']
@@ -29728,10 +29857,15 @@ function rgenCapturar(){
     const _dispHoraR = document.getElementById('hora_recibo_display');
     if(_dispHoraR){ _dispHoraR.style.color='#8b5cf6'; _dispHoraR.style.fontWeight='700'; }
     if(typeof setStatus==='function') setStatus('ok','Modo restauración — Folio #'+fs+' · Captura los datos · Click en la fecha para cambiarla','ok');
-  }, 400);
+  }, 650);
 }
 function rgenVolverPaso1(){
   _rgenRec = null;
+  // ── Desbloquear input de folio para que pueda editarse de nuevo ──
+  const _folioInputUnlock = document.getElementById('rgen-folio');
+  const _letraInputUnlock = document.getElementById('rgen-letra');
+  if(_folioInputUnlock){ _folioInputUnlock.readOnly=false; _folioInputUnlock.style.opacity=''; _folioInputUnlock.style.cursor=''; }
+  if(_letraInputUnlock){ _letraInputUnlock.disabled=false; _letraInputUnlock.style.opacity=''; }
   document.getElementById('rgen-paso2').style.display = 'none';
   document.getElementById('rgen-paso1').style.display = 'block';
   document.getElementById('rgen-paso1-msg').textContent = '';
@@ -29756,6 +29890,11 @@ function rgenBuscarFolio(){
   }
   _rgenFolio = folioVal;
   _rgenLetra = letraVal;
+  // ── Bloquear input de folio para que no cambie accidentalmente en paso 2 ──
+  const _folioInputLock = document.getElementById('rgen-folio');
+  const _letraInputLock = document.getElementById('rgen-letra');
+  if(_folioInputLock){ _folioInputLock.readOnly=true; _folioInputLock.style.opacity='0.7'; _folioInputLock.style.cursor='not-allowed'; }
+  if(_letraInputLock){ _letraInputLock.disabled=true; _letraInputLock.style.opacity='0.7'; }
   // Buscar en respaldos locales (localStorage)
   const encontrado = _rgenBuscarEnRespaldos(folioVal, letraVal);
   document.getElementById('rgen-paso1').style.display = 'none';
@@ -30451,6 +30590,7 @@ function _rgenParsearPDF(txt) {
   // Extraer lista de documentos marcados en el recibo
   const DOCS_CONOCIDOS = ['INE','Pasaporte','CURP','RFC','Acta de Nacimiento',
     'Acta de Matrimonio','Acta de Divorcio','Matrícula Consular','Tarjeta de Circulación',
+    'Factura Original','Carta Factura Original','Copia de la Factura','Refactura','Refactura Aduanal',
     'Factura Original o Carta Factura','Contrato de Compraventa (Vehículo)',
     'Carta de No Adeudo','Recibo de Luz','Recibo de Agua','Constancia de Situación Fiscal'];
   const copias = DOCS_CONOCIDOS.filter(d => full.includes(d));
@@ -30580,7 +30720,7 @@ function rgenConfirmar(){
     const _dispHoraR = document.getElementById('hora_recibo_display');
     if(_dispHoraR){ _dispHoraR.style.color='#8b5cf6'; _dispHoraR.style.fontWeight='700'; }
     if(typeof setStatus==='function') setStatus('ok','Modo restauración — Folio #'+fs2+' · Completa y presiona Restaurar · Click en la fecha para cambiarla','ok');
-  }, 400);
+  }, 650);
 }
 function cancelarRestauracion(){
   document.body.classList.remove('modo-restauracion');
@@ -30595,9 +30735,29 @@ function cancelarRestauracion(){
   if(typeof limpiarFormCompleto==='function') limpiarFormCompleto();
   if(typeof setStatus==='function') setStatus('ok','Restauración cancelada','ok');
 }
+function guardarRestauracionConVerificacion(){
+  // Verificar sesión ANTES de intentar restaurar — muestra aviso claro si expiró
+  // Nota: sbExpiry>0 garantiza que la sesión fue establecida correctamente;
+  //       sbExpiry===0 es el valor inicial (nunca hubo login), no "expirado".
+  const _expiry = (typeof sbExpiry!=='undefined' && sbExpiry > 0) ? sbExpiry : Infinity;
+  if(typeof sbSession==='undefined'||!sbSession||Date.now()>=_expiry){
+    if(typeof toast==='function') toast('⚠ Sesión expirada — inicia sesión para poder restaurar el recibo', 'err');
+    const btn=document.getElementById('btn-guardar-restauracion');
+    if(btn){ btn.textContent='⚠ Sin sesión'; btn.style.background='var(--rojo)'; setTimeout(()=>{ btn.style.background=''; const fs=typeof folioConLetra==='function'&&window._restauracionFolio?folioConLetra(window._restauracionFolio,null,window._restauracionLetra||'A'):window._restauracionFolio||''; btn.textContent='🔄 Restaurar Recibo'+(fs?(' #'+fs):''); }, 2500); }
+    mostrarDriveOverlay('guardarRestauracion');
+    return;
+  }
+  guardarRestauracion();
+}
 async function guardarRestauracion(){
   if(!window._restauracionFolio){ alert('Error: sin folio de restauración activo.'); return; }
-  if(!sbSession||Date.now()>=sbExpiry){ mostrarDriveOverlay('guardarRestauracion'); return; }
+  // Misma corrección: sbExpiry===0 no significa expirado, significa no inicializado
+  const _expiry2 = (typeof sbExpiry!=='undefined' && sbExpiry > 0) ? sbExpiry : Infinity;
+  if(!sbSession||Date.now()>=_expiry2){
+    if(typeof toast==='function') toast('⚠ Sesión expirada — inicia sesión nuevamente para restaurar', 'err');
+    mostrarDriveOverlay('guardarRestauracion');
+    return;
+  }
   const folio    = window._restauracionFolio;
   const letra    = window._restauracionLetra || 'A';
   const fs       = typeof folioConLetra==='function'?folioConLetra(folio,null,letra):folioFormato(folio);
@@ -30618,7 +30778,18 @@ async function guardarRestauracion(){
   }
   const clientes  = typeof getClientes  ==='function' ? getClientes()  : [];
   const conceptos = typeof getConceptos ==='function' ? getConceptos() : [];
-  if(!clientes.length||!clientes[0].nombre){ setStatus('err','Ingresa el nombre del cliente','err'); return; }
+  if(!clientes.length||!clientes[0].nombre){
+    if(typeof toast==='function') toast('⚠ Ingresa el nombre del cliente antes de restaurar','err');
+    if(typeof setStatus==='function') setStatus('err','Ingresa el nombre del cliente','err');
+    const _primerNombreEl = document.querySelector('#clientes-wrapper .cliente-row input[type="text"]');
+    if(_primerNombreEl){
+      _primerNombreEl.focus();
+      _primerNombreEl.style.outline='2px solid var(--rojo)';
+      _primerNombreEl.style.boxShadow='0 0 0 3px rgba(180,30,30,0.25)';
+      setTimeout(()=>{ _primerNombreEl.style.outline=''; _primerNombreEl.style.boxShadow=''; },2500);
+    }
+    return;
+  }
   const anticipo       = parsePrecio($('anticipo').value);
   const total          = conceptos.reduce((s,c)=>s+(parseFloat(c.precio)||0),0);
   const saldoPendiente = Math.max(0,total-anticipo);
@@ -30673,7 +30844,7 @@ async function guardarRestauracion(){
     const qrDataURL= typeof qrToDataURL==='function'?await qrToDataURL(qrTexto).catch(()=>null):null;
     const doc      = await generarPDF(datos, folio, qrDataURL);
     const pdfBase64= doc.output('datauristring');
-    const nombreArchivo='Recibo_'+fs+'_'+primerNombre.replace(/\s+/g,'_')+'.pdf';
+    const nombreArchivo=fs+'.pdf'; // nombre corto canónico
     if(typeof subirPDFaDrive==='function') try{ subirPDFaDrive(doc.output('blob'),nombreArchivo); }catch(e){ registrarError('catch vacio', e); }
     // guardarEnDirectorio puede fallar si save() no retorna promesa — envolver en try
     if(typeof guardarEnDirectorio==='function') try{ await guardarEnDirectorio(datos); }catch(e){ console.warn('[RESTAURAR] directorio:',e); }
@@ -35019,13 +35190,15 @@ async function gestConfirmarRecibo(gid){
       pagosParciales:[], cancelado:false, complementos:[]
     };
     if(statusEl) statusEl.textContent='⏳ Generando PDF...';
-    // Generar PDF
+    // Generar PDF — usar SIEMPRE generarPDF (plantilla oficial LEX-MÉXICO)
     const qrTxt='LEX-MEXICO|Folio:'+folioFormato(folio)+'|'+g.cliente+'|'+fechaHoy+' '+horaAhora;
     const qrURL=typeof qrToDataURL==='function'?await qrToDataURL(qrTxt):null;
-    const pdfBlob=await generarPDFRecibo(datosRec,folio,qrURL);
+    const _docGest=await generarPDF(datosRec,folio,qrURL);
+    const pdfBlob=_docGest.output('blob');
+    datosRec.pdfBase64=_docGest.output('datauristring');
     if(statusEl) statusEl.textContent='⏳ Subiendo a Storage...';
     // Subir PDF
-    const nombrePDF='Recibo_'+folioFormato(folio)+'_'+g.cliente.replace(/[^a-zA-Z0-9]/g,'_').substring(0,30)+'.pdf';
+    const nombrePDF=(typeof folioConLetra==='function' ? folioConLetra(folio, (typeof appData!=='undefined'?appData.anioFolioActual:null)||new Date().getFullYear(), 'A') : folioFormato(folio))+'.pdf'; // nombre corto canónico
     datosRec.archivo=nombrePDF;
     await subirPDFaDrive(pdfBlob,nombrePDF);
     // Guardar en appData.recibos
@@ -39553,13 +39726,13 @@ function abrirFichaFolio(){
     var mov=null;
     if(typeof D!=='undefined'&&Array.isArray(D.movimientos)){
       mov=D.movimientos.find(function(m){
-        return (m.folio===folio||m.folio===String(folio))&&(m.letra||'A')===rletra;
+        return (m.folio===folio||m.folio===String(folio))&&(m.letra||'A')===rletra&&m.estatus!=='Complementario';
       });
     }
     // Si no está en D.movimientos buscar en sintéticos
     if(!mov){
       mov=movsDelFolio.find(function(m){
-        return (m.letra||'A')===rletra;
+        return (m.letra||'A')===rletra&&m.estatus!=='Complementario';
       });
     }
 
@@ -39601,6 +39774,39 @@ function abrirFichaFolio(){
           :'<div style="text-align:right;font-weight:700;color:#1a7a3a;font-family:monospace;">+$'+fmt(monto)+'</div><div style="text-align:right;font-size:0.68rem;color:#7a6840;">resta $'+fmt(saldo)+'</div>'
         )
       );
+    listaEl.appendChild(row);
+  });
+
+  // ── SERVICIOS COMPLEMENTARIOS INDEPENDIENTES ──────────────────────────────
+  // Son servicios pagados completos al momento (precio == abonado). NO se suman a
+  // recibo.total: se guardan como movimientos aparte con estatus 'Complementario'.
+  // Aquí se listan debajo del costo del trámite y se integran al total para que la
+  // ficha quede ajustada a la realidad (trámite + servicios complementarios).
+  var compMovs = (typeof D!=='undefined' && Array.isArray(D.movimientos))
+    ? D.movimientos.filter(function(m){
+        var folioOk = (m.folio===folio || m.folio===String(folio) || parseInt(m.folio)===parseInt(folio));
+        return folioOk && (m.estatus==='Complementario');
+      })
+    : [];
+  compMovs.forEach(function(m){
+    var monto = parseFloat(m.monto||0);
+    if(!(monto>0)) return;
+    totalTramite += monto;   // integra el servicio al costo del trámite
+    totalAbonado += monto;   // está pagado, así no altera el saldo pendiente
+    var desc = m.descripcion || '';
+    var partes = String(desc).split(' · ');
+    var conceptoC = (partes.length>1 && partes[1]) ? partes[1] : (desc || 'Servicio complementario');
+    var letraC = m.letra || '';
+    var fechaC = m.fecha ? new Date(m.fecha+'T12:00:00').toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'}) : '—';
+    var conceptoEsc = (typeof escHTML==='function') ? escHTML(conceptoC) : conceptoC;
+    var descEsc     = (typeof escHTML==='function') ? escHTML(desc) : desc;
+    var row=document.createElement('div');
+    row.style.cssText='display:grid;grid-template-columns:80px 1fr 90px 90px;gap:6px;align-items:center;padding:7px 10px;border-radius:4px;border:0.5px solid #e8c89a;font-size:0.78rem;background:#fffaf0;';
+    row.innerHTML='<div style="font-weight:700;color:#8B4500;font-family:monospace;font-size:0.72rem;">🧩&nbsp;'+(letraC||'·')+'</div>'
+      +'<div><span style="font-size:0.6rem;font-weight:700;padding:2px 7px;border-radius:20px;background:#fef0d8;color:#8B4500;">Serv. compl.</span>'
+      +'<div style="font-size:0.65rem;color:#7a6840;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+descEsc+'">'+conceptoEsc+(fechaC!=='—'?' · '+fechaC:'')+'</div></div>'
+      +'<div style="text-align:right;font-weight:700;color:#8B4500;font-family:monospace;">+$'+fmt(monto)+'</div>'
+      +'<div style="text-align:right;font-size:0.68rem;color:#7a6840;">pagado</div>';
     listaEl.appendChild(row);
   });
 

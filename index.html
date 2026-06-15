@@ -10317,18 +10317,6 @@ async function _imprimirActualizacionReal(){
       // producía que B quedara antes que A, rompiendo el display en historial y contab.
       if (typeof _revivirSiTombstone === 'function') _revivirSiTombstone(nuevoRegistro);
       appData.recibos.splice(idx + 1, 0, nuevoRegistro);
-      // Sincronizar saldo del registro original A para que PASO 2 de sincronizarPendientesPlacas
-      // no recree el pendiente en dispositivos sin lista negra de localStorage
-      const _idxOrigA = appData.recibos.findIndex(function(v){
-        return v.folio === recibo.folio && !v.esComplemento && !v.esActualizacion;
-      });
-      if(_idxOrigA >= 0){
-        appData.recibos[_idxOrigA] = Object.assign({}, appData.recibos[_idxOrigA], {
-          saldoPendiente: saldoNuevo,
-          saldoNuevo:     saldoNuevo,
-          liquidado:      saldoNuevo <= 0 ? true : (appData.recibos[_idxOrigA].liquidado || false)
-        });
-      }
       _guardarVersionEnSupabase(nuevoRegistro, letraActual, nombreArchivo).catch(e=>console.warn('[SB versiones] actualizacion:',e));
     }
   if(!appData.historialPagos) appData.historialPagos = {};
@@ -10742,16 +10730,6 @@ async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroO
       });
       if (typeof _revivirSiTombstone === 'function') _revivirSiTombstone(nuevoRegistro);
       appData.recibos.splice(idx + 1, 0, nuevoRegistro);
-
-      // Sincronizar el recibo original con estado cancelado
-      appData.recibos[idx] = Object.assign({}, appData.recibos[idx], {
-        cancelado: true,
-        fechaCancelacion: recibo.fechaCancelacion,
-        motivoCancelacion: recibo.motivoCancelacion,
-        cancelacionTipo: tipo,
-        cancelacionMonto: monto,
-        cancelacionConceptoInterno: recibo.cancelacionConceptoInterno||''
-      });
 
       if(typeof _guardarVersionEnSupabase === 'function')
         _guardarVersionEnSupabase(nuevoRegistro, letraActual, nombreArchivo).catch(e=>console.warn('[SB cancelacion]:',e));
@@ -19503,6 +19481,84 @@ window.lexQuitarTombstone = async function(folioNum, letra) {
   if(typeof toast==='function') toast('✅ Tombstone de folio '+folioNum+letra+' eliminado — ya puedes restaurar el recibo', 'ok');
   console.log('✅ Tombstone folio '+folioNum+letra+' limpiado. Ahora usa el panel "Restaurar desde PDF" en Herramientas > Restaurar recibo desde PDF.');
 };
+
+// Restaura la inmutabilidad de todos los recibos A que fueron modificados retroactivamente
+// cuando se generó un B (abono, liquidación o cancelación).
+// Uso: lexRestaurarInmutabilidadRecibos(true) → vista previa sin cambios
+//      lexRestaurarInmutabilidadRecibos()     → aplica y guarda
+window.lexRestaurarInmutabilidadRecibos = function(dryRun) {
+  if (!appData || !Array.isArray(appData.recibos)) {
+    console.warn('[lexRestaurarInmutabilidadRecibos] appData.recibos no disponible'); return;
+  }
+  // Set de folios que tienen al menos una versión B (esActualizacion:true)
+  var foliosConB = new Set(
+    (appData.recibos).filter(function(v){ return v && v.esActualizacion; }).map(function(v){ return Number(v.folio); })
+  );
+  var cambios = [];
+
+  appData.recibos.forEach(function(r, idx) {
+    if (!r || r.esActualizacion || r.esComplemento) return;
+    if (!foliosConB.has(Number(r.folio))) return; // sin B → A original intacto, no tocar
+
+    var totalOrig    = parseFloat(r.total)   || 0;
+    var anticipoOrig = parseFloat(r.anticipo) || 0;
+    var saldoOrig    = Math.max(0, totalOrig - anticipoOrig);
+    var diff = {};
+
+    // Corregir saldo si fue sobreescrito retroactivamente (solo aplica cuando hay saldo original > 0)
+    if (saldoOrig > 0) {
+      if (parseFloat(r.saldoPendiente) !== saldoOrig) diff.saldoPendiente = saldoOrig;
+      if (parseFloat(r.saldoNuevo)     !== saldoOrig) diff.saldoNuevo     = saldoOrig;
+      if (r.liquidado === true)                        diff.liquidado      = false;
+    }
+
+    // Corregir cancelado si fue pegado al A desde el B
+    if (r.cancelado) {
+      var bCancelado = appData.recibos.some(function(v){
+        return v && v.esActualizacion && Number(v.folio) === Number(r.folio) && v.cancelado;
+      });
+      if (bCancelado) {
+        diff.cancelado                          = false;
+        diff._del_fechaCancelacion              = true;
+        diff._del_motivoCancelacion             = true;
+        diff._del_cancelacionTipo               = true;
+        diff._del_cancelacionMonto              = true;
+        diff._del_cancelacionConceptoInterno    = true;
+      }
+    }
+
+    if (!Object.keys(diff).length) return;
+    cambios.push({ idx: idx, folio: r.folio, letra: r.letra || 'A', diff: diff });
+
+    if (!dryRun) {
+      var restored = Object.assign({}, r, diff);
+      ['fechaCancelacion','motivoCancelacion','cancelacionTipo','cancelacionMonto','cancelacionConceptoInterno'].forEach(function(k){
+        if (diff['_del_' + k]) { delete restored[k]; delete restored['_del_' + k]; }
+      });
+      appData.recibos[idx] = restored;
+    }
+  });
+
+  if (!cambios.length) {
+    console.log('[lexRestaurarInmutabilidadRecibos] ✅ No se encontraron recibos A corruptos.');
+    if(typeof toast === 'function') toast('✅ Todos los recibos A ya están en estado original', 'ok');
+    return [];
+  }
+
+  console.log('[lexRestaurarInmutabilidadRecibos] ' + (dryRun ? '[DRY RUN] ' : '') + cambios.length + ' recibo(s) con correcciones:');
+  console.table(cambios.map(function(c){ return { folio: c.folio, letra: c.letra, cambios: JSON.stringify(c.diff) }; }));
+
+  if (dryRun) {
+    console.log('Llama lexRestaurarInmutabilidadRecibos() sin argumentos para aplicar.');
+    return cambios;
+  }
+
+  if (typeof save === 'function') save();
+  if (typeof actualizarArchivoControl === 'function') actualizarArchivoControl();
+  if(typeof toast === 'function') toast('✅ ' + cambios.length + ' recibo(s) A restaurados a su estado original', 'ok');
+  return cambios;
+};
+
 // Limpia todo el caché y respaldos de localStorage — los datos se cargarán desde Supabase y R2
 window.limpiarCacheLocal = function() {
   var clavesMantener = new Set([
@@ -35480,9 +35536,11 @@ function sincronizarPendientesPlacas() {
     // La letra A nunca actualiza su saldo en el flujo _imprimirActualizacionReal,
     // por lo que checar solo r.saldoPendiente recrearía pendientes ya liquidados.
     var _versPaso2 = appData.recibos.filter(function(v){ return Number(v.folio) === Number(r.folio); });
+    // Si cualquier versión del folio está cancelada → no crear pendiente de placas
+    if (_versPaso2.some(function(v){ return v.cancelado; })) return;
     var _saldoMinPaso2 = _versPaso2.reduce(function(m,v){
       // Mismo criterio que PASO 1: mínimo entre saldoPendiente Y saldoNuevo
-      // para no ignorar B/C/D cuyo saldoNuevo=0 mientras A conserva su valor original.
+      // La letra A conserva su saldo ORIGINAL (inmutabilidad); B/C/D tienen el saldo actualizado.
       var minV = Infinity;
       var s  = parseFloat(v.saldoPendiente); if(!isNaN(s))  minV = Math.min(minV, s);
       var sn = parseFloat(v.saldoNuevo);     if(!isNaN(sn)) minV = Math.min(minV, sn);

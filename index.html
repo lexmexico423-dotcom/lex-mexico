@@ -19848,6 +19848,65 @@ async function sync(){
 // Reemplaza todas las funciones save*Drive con una sola sincronización
 // del estado completo (D + REC + folioActual) al app_state de Supabase.
 let _syncDebounceTimer = null;
+// ── Protección permanente de movimientos de recibo ───────────────────────────
+// Se ejecuta antes de cada subida a Supabase. Si alguna función borró en memoria
+// movimientos que aún tienen recibo de respaldo válido, los restaura aquí ANTES
+// de que el daño se persista. Registra advertencia en consola para diagnóstico.
+function _protegerMovimientosRecibo() {
+  if(typeof D === 'undefined' || !Array.isArray(D.movimientos)) return;
+  if(!appData || !Array.isArray(appData.recibos) || !appData.recibos.length) return;
+  const excluidos = new Set((D.recibosExcluidosCaja||[]).map(String));
+  // Movimientos de recibo que sobrevivieron (por folio+letra)
+  const existentes = new Set(
+    D.movimientos
+      .filter(function(m){ return m && m.fuente === 'recibo' && m.id; })
+      .map(function(m){ return String(m.folio) + '|' + (m.letra||'A'); })
+  );
+  const recuperados = [];
+  appData.recibos.forEach(function(r) {
+    if(!r || r.esComplemento) return;
+    const folio = Number(r.folio);
+    if(!folio || isNaN(folio)) return;
+    if(excluidos.has(String(folio))) return;
+    const letra = r.letra || 'A';
+    if(existentes.has(String(folio) + '|' + letra)) return;
+    const monto = parseFloat(r.cancelacionMonto) > 0
+      ? parseFloat(r.cancelacionMonto)
+      : parseFloat(r.anticipo) || 0;
+    if(monto <= 0) return;
+    const fecha = ((r.cancelado || r.esActualizacion) && r.fechaActualizacion
+      ? r.fechaActualizacion
+      : (r.fecha || '')).substring(0, 10);
+    const folioStr = typeof folioConLetra === 'function'
+      ? folioConLetra(folio, r.anio_folio, letra)
+      : (String(folio) + letra);
+    D.movimientos.push({
+      id: 'M-PROT-' + String(folio) + '-' + letra + '-' + Date.now(),
+      folioCaja: '',
+      fecha: fecha,
+      hora: r.hora || '00:00',
+      descripcion: 'Auto-recuperado · Recibo #' + folioStr + ' · ' + (r.nombre||''),
+      nombre: r.nombre || '',
+      folio:  folio,
+      letra:  letra,
+      monto:  monto,
+      tipo:   (r.cancelado && r.cancelacionTipo === 'egreso') ? 'egreso' : 'ingreso',
+      cat:    'Honorarios · #' + folioStr,
+      estatus: r.cancelado ? 'Cancelación' : ((parseFloat(r.saldoPendiente)||0) <= 0 ? 'Liquidado' : 'Anticipo'),
+      fuente: 'recibo',
+      responsable: r.responsable || '',
+      _autoRecuperado: true
+    });
+    existentes.add(String(folio) + '|' + letra);
+    recuperados.push(folioStr);
+  });
+  if(recuperados.length > 0) {
+    console.error('[LEX PROTECCIÓN] 🛡️ ' + recuperados.length +
+      ' movimiento(s) de recibo rescatados antes de guardar: ' + recuperados.join(', '));
+    if(typeof toast === 'function')
+      toast('🛡️ ' + recuperados.length + ' movimiento(s) recuperado(s) automáticamente', 'warn');
+  }
+}
 async function syncEstadoSupabase(){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
   // Prevenir llamadas concurrentes — si ya hay una en curso, usar debounce
@@ -19858,6 +19917,8 @@ async function syncEstadoSupabase(){
   }
   _syncEnCurso = true;
   syncStart();
+  // ── Protección: restaurar movimientos de recibo perdidos antes de persistir ──
+  _protegerMovimientosRecibo();
   try {
     // Limpiar movimientos sintéticos antes de persistir
     const movsLimpios = (D.movimientos||[]).filter(m => m && m.id && !/^R-\d+$/.test(m.id));

@@ -2874,6 +2874,12 @@ window.addEventListener('offline', ()=>{
       <div class="nav-item" id="nav-placas" data-panel="pendientes" onclick="ir('pendientes');setPSec('placas',document.querySelector('#panel-pendientes .pend-sec-btn[data-sec=\'placas\']'));document.getElementById('nav-pendientes-gen').classList.remove('active');"><span class="ni">🚗</span><span>Placas</span><span class="nav-badge amarillo" id="badgePlacas" style="display:none;"></span></div>
       <div class="nav-item" onclick="ir('escrituras')" id="nav-escrituras"><span class="ni">📄</span><span>Escrituras</span><span class="nav-badge amarillo" id="badgeEscrituras" style="display:none;"></span></div>
       <div class="nav-item" onclick="ir('citas')" id="nav-citas" style="border:1.5px solid rgba(200,149,42,0.35);background:rgba(200,149,42,0.07);"><span class="ni">📅</span><span>Citas</span><span class="nav-badge amarillo" id="badgeCitas" style="display:none;"></span></div>
+      <div id="nav-scansys" style="display:none;">
+        <div class="nav-item" onclick="scansysToggle()" style="border:1.5px solid rgba(192,22,26,0.35);background:rgba(192,22,26,0.07);position:relative;" title="SCANSYS — Diagnóstico del sistema en tiempo real">
+          <span class="ni">🔍</span><span>ScanSys</span>
+          <span id="scansys-badge" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#c0161a;color:#fff;border-radius:50%;min-width:17px;height:17px;font-size:0.5rem;font-family:monospace;align-items:center;justify-content:center;font-weight:700;padding:0 3px;">0</span>
+        </div>
+      </div>
     </div>
   </div>
   <!-- ═══ BARRA CAPTURA RETROACTIVA (Admin + Secretaria) ═══ -->
@@ -2889,6 +2895,51 @@ window.addEventListener('offline', ()=>{
     <button onclick="(function(){var o=document.getElementById('pr-overlay');if(o)o.remove();cerrarSesionUsuario();})()" id="btn-cerrar-sesion" style="display:none;margin-top:8px;background:rgba(192,22,26,0.08);border:1px solid rgba(192,22,26,0.25);border-radius:14px;padding:5px 14px;font-family:monospace;font-size:0.55rem;color:rgba(220,80,80,0.85);cursor:pointer;letter-spacing:0.08em;">🟢 &nbsp;Cerrar sesión</button>
   </div>
 </nav>
+<!-- ═══ SCANSYS PANEL ═══ -->
+<div id="scansys-panel" style="display:none;position:fixed;left:240px;top:0;height:100vh;width:400px;background:linear-gradient(160deg,#0e0904 0%,#130c05 100%);border-right:1px solid rgba(200,149,42,0.18);border-left:1px solid rgba(200,149,42,0.1);z-index:9997;display:none;flex-direction:column;font-family:monospace;overflow:hidden;box-shadow:4px 0 24px rgba(0,0,0,0.5);">
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:8px;padding:12px 14px 10px;border-bottom:1px solid rgba(200,149,42,0.15);flex-shrink:0;">
+    <span style="font-size:1rem;">🔍</span>
+    <span style="color:rgba(200,149,42,0.9);font-size:0.7rem;letter-spacing:0.12em;font-weight:700;">SCANSYS</span>
+    <span id="ss-status-dot" style="width:7px;height:7px;border-radius:50%;background:#3c3;margin-left:2px;flex-shrink:0;" title="Estado del monitor"></span>
+    <div style="flex:1;"></div>
+    <button onclick="scansysEscanearManual()" title="Escaneo completo ahora" style="background:rgba(200,149,42,0.1);border:1px solid rgba(200,149,42,0.3);border-radius:10px;padding:3px 9px;color:rgba(200,149,42,0.85);font-family:monospace;font-size:0.58rem;cursor:pointer;letter-spacing:0.07em;">⚡ SCAN</button>
+    <button onclick="scansysReparar()" title="Ejecutar todas las reparaciones" style="background:rgba(22,192,80,0.08);border:1px solid rgba(22,192,80,0.25);border-radius:10px;padding:3px 9px;color:rgba(80,220,120,0.85);font-family:monospace;font-size:0.58rem;cursor:pointer;letter-spacing:0.07em;">🧹 FIX</button>
+    <button onclick="scansysToggle()" style="background:none;border:none;color:rgba(200,149,42,0.45);font-size:1rem;cursor:pointer;padding:0 2px;line-height:1;">✕</button>
+  </div>
+  <!-- Contadores en vivo -->
+  <div id="ss-counters" style="display:flex;gap:0;border-bottom:1px solid rgba(200,149,42,0.1);flex-shrink:0;">
+    <div style="flex:1;padding:6px 10px;border-right:1px solid rgba(200,149,42,0.1);">
+      <div style="font-size:0.45rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;">Recibos</div>
+      <div id="ss-cnt-recibos" style="font-size:0.85rem;color:rgba(200,149,42,0.85);">—</div>
+    </div>
+    <div style="flex:1;padding:6px 10px;border-right:1px solid rgba(200,149,42,0.1);">
+      <div style="font-size:0.45rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;">Movimientos</div>
+      <div id="ss-cnt-movs" style="font-size:0.85rem;color:rgba(200,149,42,0.85);">—</div>
+    </div>
+    <div style="flex:1;padding:6px 10px;border-right:1px solid rgba(200,149,42,0.1);">
+      <div style="font-size:0.45rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;">Supabase</div>
+      <div id="ss-cnt-sb" style="font-size:0.85rem;color:#3c3;">🟢</div>
+    </div>
+    <div style="flex:1;padding:6px 10px;">
+      <div style="font-size:0.45rem;color:rgba(200,149,42,0.4);letter-spacing:0.1em;text-transform:uppercase;">Último sync</div>
+      <div id="ss-cnt-sync" style="font-size:0.62rem;color:rgba(200,149,42,0.6);">—</div>
+    </div>
+  </div>
+  <!-- Tabs -->
+  <div style="display:flex;border-bottom:1px solid rgba(200,149,42,0.1);flex-shrink:0;">
+    <button onclick="scansysTab('live')" id="ss-tab-live" style="flex:1;padding:7px 4px;font-family:monospace;font-size:0.55rem;letter-spacing:0.07em;cursor:pointer;border:none;border-bottom:2px solid rgba(200,149,42,0.7);background:rgba(200,149,42,0.06);color:rgba(200,149,42,0.9);">🔴 EN VIVO</button>
+    <button onclick="scansysTab('scan')" id="ss-tab-scan" style="flex:1;padding:7px 4px;font-family:monospace;font-size:0.55rem;letter-spacing:0.07em;cursor:pointer;border:none;border-bottom:2px solid transparent;background:none;color:rgba(200,149,42,0.45);">🔍 DIAGNÓSTICO</button>
+    <button onclick="scansysTab('log')" id="ss-tab-log"  style="flex:1;padding:7px 4px;font-family:monospace;font-size:0.55rem;letter-spacing:0.07em;cursor:pointer;border:none;border-bottom:2px solid transparent;background:none;color:rgba(200,149,42,0.45);">📋 LOG</button>
+  </div>
+  <!-- Body -->
+  <div id="ss-body" style="flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:6px;"></div>
+  <!-- Footer -->
+  <div style="padding:8px 12px;border-top:1px solid rgba(200,149,42,0.1);display:flex;gap:6px;flex-shrink:0;">
+    <button onclick="scansysExportarLog()" style="flex:1;background:rgba(200,149,42,0.06);border:1px solid rgba(200,149,42,0.18);border-radius:10px;padding:5px 8px;color:rgba(200,149,42,0.6);font-family:monospace;font-size:0.52rem;cursor:pointer;letter-spacing:0.07em;">📥 EXPORTAR</button>
+    <button onclick="scansysLimpiarLog()" style="flex:1;background:rgba(192,22,26,0.06);border:1px solid rgba(192,22,26,0.2);border-radius:10px;padding:5px 8px;color:rgba(220,80,80,0.7);font-family:monospace;font-size:0.52rem;cursor:pointer;letter-spacing:0.07em;">🗑 LIMPIAR LOG</button>
+  </div>
+</div>
 <!-- ═══ RUEDA DENTADA ADMIN ═══ -->
 <button class="admin-gear-btn" id="adminGearBtn" onclick="(function(){var o=document.getElementById('pr-overlay');if(o)o.remove();abrirAdminModal();})()" title="Administrador">
   <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -6559,6 +6610,8 @@ const _despachoOk = await obtenerDespachoActivo();
         setTimeout(lexRealtimeConectar, 1500);
         // Registrar sesión en monitor
         setTimeout(sesionesRegistrarLogin, 2000);
+        // Activar SCANSYS si es administrador
+        if(typeof scansysInit==='function' && empleadoActual.email.toLowerCase()===(typeof ADMIN_EMAIL!=='undefined'?ADMIN_EMAIL.toLowerCase():'')) setTimeout(scansysInit, 2500);
       } catch(e) {
         let msg = e.message || String(e);
         if(/invalid login credentials/i.test(msg)) msg = 'Correo o contraseña incorrectos';
@@ -20477,6 +20530,7 @@ const _despachoRestaurado = await obtenerDespachoActivo();
       // Mostrar botones según rol al restaurar sesión
       const _btnCS2 = document.getElementById('btn-cerrar-sesion'); if(_btnCS2) _btnCS2.style.display = 'block';
       const _esAdm2 = empleadoActual.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+      if(_esAdm2 && typeof scansysInit==='function') setTimeout(scansysInit, 3000);
       setTimeout(lexRealtimeConectar, 1500);
       setTimeout(sesionesRegistrarLogin, 2000);
       console.log('[SB] Sesión restaurada para:', empleadoActual.nombre);
@@ -42353,6 +42407,357 @@ if(typeof window.eliminarR2 === 'undefined'){
     } catch(e){ console.error('eliminarR2:', e); return false; }
   };
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SCANSYS — Diagnóstico en tiempo real (solo administrador)
+// ══════════════════════════════════════════════════════════════════════════════
+(function(){
+  const SS = window._scansys = {
+    abierto:      false,
+    tabActiva:    'live',
+    logs:         [],
+    maxLogs:      300,
+    errores:      0,
+    advertencias: 0,
+    infoCount:    0,
+    _interval:    null,
+    _lastMovCount: null,
+    _orig:        {},
+    _scanResults: []
+  };
+
+  /* ── Utilidad: es admin ─────────────────────────────────────────────── */
+  function esAdmin(){
+    return typeof empleadoActual !== 'undefined' && empleadoActual &&
+           typeof ADMIN_EMAIL !== 'undefined' &&
+           empleadoActual.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  }
+
+  /* ── Agregar entrada al log ─────────────────────────────────────────── */
+  function ssLog(tipo, msg, sugerencia){
+    const e = { tipo, msg: String(msg).slice(0,600), ts: new Date().toLocaleTimeString('es-MX',{hour12:false}), sugerencia: sugerencia||'', groqResp:'' };
+    SS.logs.unshift(e);
+    if(SS.logs.length > SS.maxLogs) SS.logs.pop();
+    if(tipo==='error')  SS.errores++;
+    if(tipo==='warn')   SS.advertencias++;
+    if(tipo==='info')   SS.infoCount++;
+    ssBadgeActualizar();
+    if(SS.abierto && SS.tabActiva==='live') ssRender();
+  }
+
+  /* ── Interceptar console ────────────────────────────────────────────── */
+  function ssInterceptarConsole(){
+    ['error','warn','log'].forEach(function(m){
+      SS._orig[m] = console[m].bind(console);
+      console[m] = function(){
+        SS._orig[m].apply(console, arguments);
+        if(!esAdmin()) return;
+        const txt = Array.from(arguments).map(function(a){
+          try{ return (typeof a==='object' && a!==null) ? JSON.stringify(a).slice(0,300) : String(a); }
+          catch(e){ return String(a); }
+        }).join(' ');
+        const tipo = m==='error' ? 'error' : m==='warn' ? 'warn' : 'info';
+        ssLog(tipo, '[console.'+m+'] '+txt);
+      };
+    });
+    window.addEventListener('error', function(ev){
+      if(!esAdmin()) return;
+      ssLog('error','🔴 JS sin capturar: '+ev.message+' · '+((ev.filename||'').split('/').pop())+':'+ev.lineno);
+    });
+    window.addEventListener('unhandledrejection', function(ev){
+      if(!esAdmin()) return;
+      ssLog('error','🔴 Promise sin capturar: '+(ev.reason?.message||String(ev.reason)));
+    });
+  }
+
+  /* ── Monitor automático cada 30 s ──────────────────────────────────── */
+  function ssMonitorLoop(){
+    if(SS._interval) clearInterval(SS._interval);
+    SS._interval = setInterval(ssCheckRapido, 30000);
+    setTimeout(ssCheckRapido, 1500);
+  }
+
+  function ssCheckRapido(){
+    if(!esAdmin()) return;
+    // 1. Vigilar caída en D.movimientos
+    const cntMovs = (typeof D!=='undefined' && Array.isArray(D.movimientos)) ? D.movimientos.length : null;
+    if(SS._lastMovCount !== null && cntMovs !== null && cntMovs < SS._lastMovCount){
+      const perdidos = SS._lastMovCount - cntMovs;
+      ssLog('error','🔴 D.movimientos cayó '+SS._lastMovCount+' → '+cntMovs+' ('+perdidos+' eliminado(s) en memoria)');
+    }
+    SS._lastMovCount = cntMovs;
+    // 2. Folios sin movimiento
+    if(typeof D!=='undefined' && appData && Array.isArray(appData.recibos)){
+      const excl = new Set((D.recibosExcluidosCaja||[]).map(String));
+      const mSet = new Set((D.movimientos||[]).filter(m=>m&&m.fuente==='recibo').map(m=>String(m.folio)+'|'+(m.letra||'A')));
+      const sinMov = appData.recibos.filter(function(r){
+        if(!r||r.esComplemento) return false;
+        if(excl.has(String(r.folio))) return false;
+        if((parseFloat(r.anticipo)||0)<=0) return false;
+        return !mSet.has(String(r.folio)+'|'+(r.letra||'A'));
+      });
+      if(sinMov.length){
+        const lista = sinMov.slice(0,5).map(r=>r.folio+(r.letra||'A')).join(', ')+(sinMov.length>5?' +'+( sinMov.length-5):'');
+        ssLog('warn','⚠️ '+sinMov.length+' folio(s) sin movimiento en contabilidad: '+lista,
+          'Dile a Claude: "hay '+sinMov.length+' folios sin movimiento en contabilidad ('+lista+'), ejecuta recuperarMovimientosFaltantes()"');
+      }
+    }
+    // 3. Actualizar contadores
+    ssContadoresActualizar();
+  }
+
+  /* ── Contadores en vivo ─────────────────────────────────────────────── */
+  function ssContadoresActualizar(){
+    const eRec  = document.getElementById('ss-cnt-recibos');
+    const eMov  = document.getElementById('ss-cnt-movs');
+    const eSB   = document.getElementById('ss-cnt-sb');
+    const eSync = document.getElementById('ss-cnt-sync');
+    if(eRec) eRec.textContent = (appData&&Array.isArray(appData.recibos)) ? appData.recibos.length : '—';
+    if(eMov) eMov.textContent = (typeof D!=='undefined'&&Array.isArray(D.movimientos)) ? D.movimientos.length : '—';
+    if(eSB)  eSB.textContent  = (window.SB && window.SB_DESPACHO_ID) ? '🟢' : '🔴';
+    if(eSync){
+      const ts = window._ultimoSyncPropio ? new Date(window._ultimoSyncPropio).toLocaleTimeString('es-MX',{hour12:false}) : '—';
+      eSync.textContent = ts;
+    }
+  }
+
+  /* ── Badge de errores en el botón del sidebar ──────────────────────── */
+  function ssBadgeActualizar(){
+    const b = document.getElementById('scansys-badge');
+    if(!b) return;
+    const total = SS.errores + SS.advertencias;
+    if(total > 0){
+      b.style.display = 'inline-flex';
+      b.textContent = total > 99 ? '99+' : total;
+    } else {
+      b.style.display = 'none';
+    }
+  }
+
+  /* ── Toggle panel ───────────────────────────────────────────────────── */
+  window.scansysToggle = function(){
+    const p = document.getElementById('scansys-panel');
+    if(!p) return;
+    SS.abierto = !SS.abierto;
+    p.style.display = SS.abierto ? 'flex' : 'none';
+    if(SS.abierto){ ssContadoresActualizar(); ssRender(); }
+  };
+
+  /* ── Tabs ───────────────────────────────────────────────────────────── */
+  window.scansysTab = function(tab){
+    SS.tabActiva = tab;
+    ['live','scan','log'].forEach(function(t){
+      const btn = document.getElementById('ss-tab-'+t);
+      if(!btn) return;
+      const activo = t===tab;
+      btn.style.borderBottomColor = activo ? 'rgba(200,149,42,0.7)' : 'transparent';
+      btn.style.background        = activo ? 'rgba(200,149,42,0.06)' : 'none';
+      btn.style.color             = activo ? 'rgba(200,149,42,0.9)' : 'rgba(200,149,42,0.45)';
+    });
+    ssRender();
+  };
+
+  /* ── Render principal ───────────────────────────────────────────────── */
+  function ssRender(){
+    const body = document.getElementById('ss-body');
+    if(!body) return;
+    if(SS.tabActiva==='live')  ssRenderLive(body);
+    if(SS.tabActiva==='scan')  ssRenderScan(body);
+    if(SS.tabActiva==='log')   ssRenderLog(body);
+  }
+
+  /* ── Tab: En vivo ───────────────────────────────────────────────────── */
+  function ssRenderLive(body){
+    const errWarn = SS.logs.filter(function(e){ return e.tipo==='error'||e.tipo==='warn'; });
+    if(!errWarn.length){
+      body.innerHTML = '<div style="text-align:center;color:rgba(200,149,42,0.3);font-size:0.65rem;padding:30px 10px;">✅ Sin errores detectados</div>';
+      return;
+    }
+    body.innerHTML = errWarn.map(function(e,i){ return ssEntryHTML(e,i,'live'); }).join('');
+  }
+
+  /* ── Tab: Log completo ──────────────────────────────────────────────── */
+  function ssRenderLog(body){
+    if(!SS.logs.length){
+      body.innerHTML = '<div style="text-align:center;color:rgba(200,149,42,0.3);font-size:0.65rem;padding:30px 10px;">Log vacío</div>';
+      return;
+    }
+    body.innerHTML = SS.logs.map(function(e,i){ return ssEntryHTML(e,i,'log'); }).join('');
+  }
+
+  /* ── Tarjeta de entrada del log ─────────────────────────────────────── */
+  function ssEntryHTML(e, i, tab){
+    const colorBorde = e.tipo==='error' ? 'rgba(192,22,26,0.45)' : e.tipo==='warn' ? 'rgba(200,149,42,0.45)' : 'rgba(80,150,255,0.25)';
+    const colorFondo = e.tipo==='error' ? 'rgba(192,22,26,0.06)' : e.tipo==='warn' ? 'rgba(200,149,42,0.05)' : 'rgba(80,150,255,0.04)';
+    const icono      = e.tipo==='error' ? '❌' : e.tipo==='warn' ? '⚠️' : 'ℹ️';
+    const groqHtml   = e.groqResp ? '<div style="margin-top:6px;padding:6px 8px;background:rgba(80,200,120,0.07);border-left:2px solid rgba(80,200,120,0.4);border-radius:4px;font-size:0.55rem;color:rgba(150,220,160,0.9);white-space:pre-wrap;line-height:1.5;">'+ssEscape(e.groqResp)+'</div>' : '';
+    const sugerHtml  = e.sugerencia ? '<div style="margin-top:5px;font-size:0.53rem;color:rgba(200,149,42,0.6);line-height:1.4;">💡 '+ssEscape(e.sugerencia)+'</div>' : '';
+    return '<div style="border:1px solid '+colorBorde+';background:'+colorFondo+';border-radius:8px;padding:8px 10px;font-size:0.58rem;line-height:1.5;">'
+      +'<div style="display:flex;align-items:flex-start;gap:5px;">'
+      +'<span style="flex-shrink:0;">'+icono+'</span>'
+      +'<div style="flex:1;word-break:break-word;">'
+      +'<span style="color:rgba(200,149,42,0.4);font-size:0.5rem;">'+e.ts+'</span> '
+      +'<span style="color:rgba(230,215,190,0.85);">'+ssEscape(e.msg)+'</span>'
+      +sugerHtml+groqHtml
+      +'</div></div>'
+      +'<div style="display:flex;gap:5px;margin-top:6px;justify-content:flex-end;">'
+      +(e.tipo!=='info'?'<button onclick="_scansysAnalizar('+i+',\''+tab+'\')" style="background:rgba(80,200,120,0.08);border:1px solid rgba(80,200,120,0.25);border-radius:8px;padding:2px 8px;color:rgba(120,220,150,0.85);font-family:monospace;font-size:0.5rem;cursor:pointer;">🤖 Groq</button>':'')
+      +'<button onclick="_scansysCopiarClaude('+i+',\''+tab+'\')" style="background:rgba(200,149,42,0.07);border:1px solid rgba(200,149,42,0.22);border-radius:8px;padding:2px 8px;color:rgba(200,149,42,0.7);font-family:monospace;font-size:0.5rem;cursor:pointer;">📋 Para Claude</button>'
+      +'</div>'
+      +'</div>';
+  }
+
+  function ssEscape(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  /* ── Tab: Diagnóstico completo ──────────────────────────────────────── */
+  function ssRenderScan(body){
+    if(!SS._scanResults.length){
+      body.innerHTML = '<div style="text-align:center;color:rgba(200,149,42,0.3);font-size:0.65rem;padding:30px 10px;">Presiona ⚡ SCAN para ejecutar el diagnóstico completo</div>';
+      return;
+    }
+    body.innerHTML = SS._scanResults.map(function(r){
+      const ico = r.tipo==='ok'?'✅':r.tipo==='error'?'❌':'⚠️';
+      const col = r.tipo==='ok'?'rgba(80,220,100,0.8)':r.tipo==='error'?'rgba(220,80,80,0.85)':'rgba(200,149,42,0.85)';
+      const fix = r.fix ? '<button onclick="'+r.fix+';scansysEscanearManual()" style="margin-top:4px;background:rgba(80,200,120,0.08);border:1px solid rgba(80,200,120,0.25);border-radius:8px;padding:2px 8px;color:rgba(120,220,150,0.85);font-family:monospace;font-size:0.5rem;cursor:pointer;">⚡ Corregir ahora</button>' : '';
+      return '<div style="display:flex;align-items:flex-start;gap:7px;padding:7px 8px;border-bottom:1px solid rgba(200,149,42,0.07);">'
+        +'<span style="flex-shrink:0;">'+ico+'</span>'
+        +'<div><div style="font-size:0.58rem;color:'+col+';">'+ssEscape(r.msg)+'</div>'+fix+'</div>'
+        +'</div>';
+    }).join('');
+  }
+
+  /* ── Escaneo manual completo ────────────────────────────────────────── */
+  window.scansysEscanearManual = function(){
+    if(!esAdmin()) return;
+    const res = [];
+    // 1. Integridad recibos ↔ movimientos
+    if(typeof D!=='undefined' && appData && Array.isArray(appData.recibos)){
+      const excl = new Set((D.recibosExcluidosCaja||[]).map(String));
+      const mSet = new Set((D.movimientos||[]).filter(m=>m&&m.fuente==='recibo').map(m=>String(m.folio)+'|'+(m.letra||'A')));
+      const sinMov = appData.recibos.filter(function(r){
+        if(!r||r.esComplemento) return false;
+        if(excl.has(String(r.folio))) return false;
+        return (parseFloat(r.anticipo)||0)>0 && !mSet.has(String(r.folio)+'|'+(r.letra||'A'));
+      });
+      if(sinMov.length) res.push({ tipo:'error', msg:sinMov.length+' recibo(s) SIN movimiento en contabilidad: '+sinMov.slice(0,6).map(r=>r.folio+(r.letra||'A')).join(', '), fix:'recuperarMovimientosFaltantes()' });
+      else res.push({ tipo:'ok', msg:'Todos los recibos tienen movimiento ✔' });
+      // 2. Duplicados
+      const claves={}; let dups=0;
+      appData.recibos.forEach(function(r){ if(!r||r.esComplemento) return; const k=String(r.folio)+'|'+(r.letra||'A'); claves[k]=(claves[k]||0)+1; if(claves[k]===2) dups++; });
+      if(dups) res.push({ tipo:'warn', msg:dups+' folio(s) con registros duplicados', fix:'repararFoliosDuplicados()' });
+      else res.push({ tipo:'ok', msg:'Sin recibos duplicados ✔' });
+      // 3. Huérfanos
+      const tienenA = new Set(appData.recibos.filter(r=>r&&!r.esComplemento&&(r.letra||'A')==='A').map(r=>Number(r.folio)));
+      const huerfanos = appData.recibos.filter(r=>r&&!r.esComplemento&&!r.cancelado&&!r._sinPadreVerificado&&(r.letra||'A')>'A'&&!tienenA.has(Number(r.folio)));
+      if(huerfanos.length) res.push({ tipo:'warn', msg:huerfanos.length+' folio(s) B/C/D sin versión A padre', fix:'repararFoliosHuerfanos()' });
+      else res.push({ tipo:'ok', msg:'Sin folios huérfanos ✔' });
+      // 4. Excluidos con recibo activo
+      const exclActivos = (D.recibosExcluidosCaja||[]).filter(f=>appData.recibos.some(r=>r&&!r.cancelado&&String(r.folio)===String(f)));
+      if(exclActivos.length) res.push({ tipo:'warn', msg:exclActivos.length+' folio(s) excluidos de contabilidad pero con recibo activo: '+exclActivos.join(', ') });
+      else res.push({ tipo:'ok', msg:'Sin exclusiones incorrectas ✔' });
+      // 5. Resumen general
+      res.push({ tipo:'info', msg:'Total recibos: '+appData.recibos.length+' · Movimientos: '+(D.movimientos||[]).length+' · Excluidos: '+(D.recibosExcluidosCaja||[]).length });
+    } else { res.push({ tipo:'warn', msg:'appData o D.movimientos aún no disponibles' }); }
+    // 6. Supabase
+    if(window.SB && window.SB_DESPACHO_ID) res.push({ tipo:'ok', msg:'Supabase conectado ✔ (despacho: '+window.SB_DESPACHO_ID+')' });
+    else res.push({ tipo:'error', msg:'Supabase SIN conexión' });
+    // 7. Groq
+    const gKey = typeof _groqGetKey==='function' ? _groqGetKey() : '';
+    if(gKey && gKey.length>10) res.push({ tipo:'ok', msg:'Groq conectado ✔ (llama-3.3-70b-versatile)' });
+    else res.push({ tipo:'warn', msg:'Groq sin key configurada' });
+    // 8. Movimientos duplicados en D
+    if(typeof D!=='undefined' && Array.isArray(D.movimientos)){
+      const ids=new Set(); let movDups=0;
+      D.movimientos.forEach(function(m){ if(!m||!m.id) return; if(ids.has(m.id)) movDups++; else ids.add(m.id); });
+      if(movDups) res.push({ tipo:'warn', msg:movDups+' movimiento(s) duplicados en D.movimientos (mismo id)' });
+      else res.push({ tipo:'ok', msg:'Sin movimientos duplicados ✔' });
+    }
+    SS._scanResults = res;
+    scansysTab('scan');
+    if(SS.abierto) ssRender();
+  };
+
+  /* ── Analizar con Groq ──────────────────────────────────────────────── */
+  window._scansysAnalizar = async function(i, tab){
+    const lista = tab==='log' ? SS.logs : SS.logs.filter(e=>e.tipo==='error'||e.tipo==='warn');
+    const e = lista[i];
+    if(!e) return;
+    if(typeof _groqLlamar !== 'function'){ alert('Groq no disponible'); return; }
+    e.groqResp = '⏳ Consultando Groq...';
+    ssRender();
+    const prompt = 'Eres un experto en JavaScript y sistemas web. En el sistema LEX-México (sistema de recibos jurídicos con Supabase) ocurrió el siguiente '+e.tipo+' a las '+e.ts+':\n\n'+e.msg+'\n\n'
+      +'Explica en máximo 3 oraciones:\n1. Qué causó este error.\n2. Cómo corregirlo.\n3. El prompt exacto (una línea) para pedirle a Claude Code que lo solucione.\n\nResponde en español.';
+    try {
+      e.groqResp = await _groqLlamar(prompt, 400, 0.3);
+    } catch(err) {
+      e.groqResp = '❌ Groq: ' + (err.message||String(err));
+    }
+    if(SS.abierto) ssRender();
+  };
+
+  /* ── Copiar prompt para Claude ──────────────────────────────────────── */
+  window._scansysCopiarClaude = function(i, tab){
+    const lista = tab==='log' ? SS.logs : SS.logs.filter(e=>e.tipo==='error'||e.tipo==='warn');
+    const e = lista[i];
+    if(!e) return;
+    const txt = 'En el sistema LEX-México (index.html) ocurrió este '+(e.tipo==='error'?'ERROR':'AVISO')+' a las '+e.ts+':\n\n'
+      +e.msg
+      +(e.sugerencia?'\n\nContexto: '+e.sugerencia:'')
+      +'\n\n¿Puedes identificar la causa exacta en el código y proponer la corrección?';
+    navigator.clipboard.writeText(txt).then(function(){
+      if(typeof toast==='function') toast('📋 Prompt copiado — pégalo en Claude','ok');
+    }).catch(function(){
+      prompt('Copia este prompt para Claude:', txt);
+    });
+  };
+
+  /* ── Reparar todo de una vez ────────────────────────────────────────── */
+  window.scansysReparar = function(){
+    if(!esAdmin()) return;
+    let count = 0;
+    if(typeof recuperarMovimientosFaltantes==='function'){ recuperarMovimientosFaltantes(); count++; }
+    if(typeof repararFoliosDuplicados==='function'){ repararFoliosDuplicados(); count++; }
+    if(typeof repararFoliosHuerfanos==='function'){ repararFoliosHuerfanos(); count++; }
+    ssLog('info','🧹 Reparación completa ejecutada ('+count+' funciones)');
+    setTimeout(scansysEscanearManual, 800);
+    if(typeof toast==='function') toast('🧹 Reparación completa ejecutada','ok');
+  };
+
+  /* ── Exportar log ───────────────────────────────────────────────────── */
+  window.scansysExportarLog = function(){
+    const txt = SS.logs.map(function(e){ return '['+e.ts+']['+e.tipo.toUpperCase()+'] '+e.msg+(e.groqResp?'\n  Groq: '+e.groqResp:''); }).join('\n');
+    const blob = new Blob(['SCANSYS — LEX-México\n'+new Date().toLocaleString('es-MX')+'\n\n'+txt], {type:'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'scansys-'+new Date().toISOString().slice(0,10)+'.txt';
+    a.click();
+  };
+
+  /* ── Limpiar log ────────────────────────────────────────────────────── */
+  window.scansysLimpiarLog = function(){
+    SS.logs=[]; SS.errores=0; SS.advertencias=0; SS.infoCount=0;
+    ssBadgeActualizar();
+    if(SS.abierto) ssRender();
+  };
+
+  /* ── Inicialización (se llama cuando el admin inicia sesión) ─────────── */
+  window.scansysInit = function(){
+    if(!esAdmin()) return;
+    const nav = document.getElementById('nav-scansys');
+    if(nav) nav.style.display = 'block';
+    ssInterceptarConsole();
+    ssMonitorLoop();
+    ssLog('info','🔍 SCANSYS activado — monitor cada 30 s, Groq conectado');
+  };
+
+  /* ── Auto-iniciar si el admin ya está en sesión ─────────────────────── */
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(function(){ if(esAdmin()) scansysInit(); }, 2000); });
+  } else {
+    setTimeout(function(){ if(esAdmin()) scansysInit(); }, 2000);
+  }
+})();
+// ══════════════════════════════════════════════════════════════════════════════
 
 </script>
 </body>

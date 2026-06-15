@@ -10580,17 +10580,11 @@ async function confirmarCancelacion(){
   document.getElementById('modal-cancelacion').classList.remove('show');
   const auth = window._autorizacionCancelacion || null;
   window._autorizacionCancelacion = null;
-  const folio = String(recibo.folio).padStart(4,'0');
+  // Capturar desde el DOM antes de cerrar el modal (cerrarConsulta limpia globals)
+  const _conceptoInterno = (document.getElementById('cancelacion-concepto-interno')?.value || '').trim();
   const _retroCanConf = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
   const _fechaCanConf = _retroCanConf ? window._reciboRetroactivoFechaPersonalizada : new Date().toISOString().slice(0,10);
   const _horaCanConf  = _retroCanConf ? (window._reciboRetroactivoHoraPersonalizada || '00:00') : new Date().toTimeString().slice(0,5);
-  recibo.cancelado = true;
-  recibo.fechaCancelacion = _retroCanConf ? (_fechaCanConf + 'T' + _horaCanConf + ':00.000') : new Date().toISOString();
-  recibo.motivoCancelacion = (motivo || 'Sin motivo especificado')
-    + (auth ? ' — Autorizó: ' + auth.iniciales + ' [' + auth.fechaHora + ']' : '');
-  recibo.cancelacionTipo = tipoCancelacion;
-  recibo.cancelacionMonto = montoInput;
-  recibo.cancelacionConceptoInterno = (document.getElementById('cancelacion-concepto-interno')?.value || '').trim();
   if(!appData.historialPagos) appData.historialPagos = {};
   if(!appData.historialPagos[recibo.folio]) appData.historialPagos[recibo.folio] = [];
   appData.historialPagos[recibo.folio].push({
@@ -10600,27 +10594,6 @@ async function confirmarCancelacion(){
     pago: 0,
     saldoRestante: recibo.saldoPendiente || 0
   });
-  try {
-    const clientes = recibo.clientes || [{nombre: recibo.nombre, movil:'', tel:'', domicilio:''}];
-    const primerNombre = clientes[0].nombre || recibo.nombre;
-    const qrTexto = 'LEX-MEXICO|Folio:'+folio+'|'+primerNombre+'|CANCELADO';
-    const qrDataURL = await qrToDataURL(qrTexto);
-    const datosCancelado = Object.assign({}, recibo, {
-      clientes, cancelado: true,
-      motivoCancelacion: recibo.motivoCancelacion,
-      fechaCancelacion: recibo.fechaCancelacion,
-      fecha_recibo: recibo.fecha || recibo.fecha_recibo || '',
-      hora_recibo:  recibo.hora  || recibo.hora_recibo  || '',
-      anticipo: String(recibo.anticipo || 0),
-      conceptos: recibo.conceptos || [],
-      responsable: recibo.responsable || '',
-      nombre_cliente_firma: recibo.nombre_cliente_firma || ''
-    });
-    const docCan = await generarPDF(datosCancelado, recibo.folio, qrDataURL);
-    const nombreArch = (typeof folioConLetra==='function' ? folioConLetra(folio, recibo.anio_folio, recibo.letra||'A') : String(folio)) + '.pdf'; // nombre corto canónico
-    recibo.pdfBase64 = docCan.output('datauristring');
-    reemplazarPDFenDrive(docCan.output('blob'), nombreArch).catch(e=>console.warn('Drive cancel:',e));
-  } catch(e){ console.warn('PDF cancelado no regenerado:', e); }
   actualizarArchivoControl().catch(e=>console.warn('Control:',e));
   renderHistorial();
   // Capturar retro ANTES de cerrarConsulta() que limpia los globals vía limpiarFormCompleto()
@@ -10628,11 +10601,11 @@ async function confirmarCancelacion(){
   cerrarConsulta();
   // Los tres tipos generan folio B — sin movimiento genera folio en $0 como precedente documental
   setTimeout(async () => {
-    await _lanzarFolioCancelacion(recibo, tipoCancelacion, tipoCancelacion==='sin' ? 0 : montoInput, motivo, auth, _retroOptsCanConf);
+    await _lanzarFolioCancelacion(recibo, tipoCancelacion, tipoCancelacion==='sin' ? 0 : montoInput, motivo, auth, _retroOptsCanConf, _conceptoInterno);
   }, 400);
 }
 
-async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroOpts){
+async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroOpts, conceptoInterno){
   // Etiqueta del movimiento
   const etiqueta = tipo==='ingreso' ? 'Honorarios por cancelación'
     : tipo==='egreso' ? 'Reintegro por cancelación'
@@ -10704,8 +10677,9 @@ async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroO
       letra: letraActual,
       esActualizacion: true,
       cancelado: true,
-      fechaCancelacion: recibo.fechaCancelacion,
-      motivoCancelacion: recibo.motivoCancelacion,
+      fechaCancelacion: ahora + 'T' + horaAhora + ':00.000',
+      motivoCancelacion: (motivo || 'Sin motivo especificado') + (auth ? ' — Autorizó: ' + auth.iniciales + ' [' + auth.fechaHora + ']' : ''),
+      cancelacionConceptoInterno: conceptoInterno || '',
       responsable: recibo.responsable||'',
       nombre_cliente_firma: recibo.nombre_cliente_firma||''
     });
@@ -10760,11 +10734,11 @@ async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroO
     // ── 8a. Persistir concepto interno en R2 (lex-expedientes) ──
     // Se guarda como archivo .txt separado para que sobreviva syncs ligeros.
     // Ruta: {despacho_id}/concepto_cancelacion/{anio}/{folio}.txt
-    if(recibo.cancelacionConceptoInterno && window.subirR2 && window.SB_DESPACHO_ID){
+    if(conceptoInterno && window.subirR2 && window.SB_DESPACHO_ID){
       try{
         const _anioConc  = recibo.anio_folio || new Date().getFullYear();
         const _pathConc  = window.SB_DESPACHO_ID+'/concepto_cancelacion/'+_anioConc+'/'+recibo.folio+'.txt';
-        const _blobConc  = new Blob([recibo.cancelacionConceptoInterno],{type:'text/plain'});
+        const _blobConc  = new Blob([conceptoInterno],{type:'text/plain'});
         const _fileConc  = new File([_blobConc], recibo.folio+'.txt',{type:'text/plain'});
         window.subirR2(_fileConc, _pathConc, 'expedientes').catch(e=>console.warn('[ConceptoCancelR2]',e));
       }catch(e){ console.warn('[ConceptoCancelR2 init]',e); }

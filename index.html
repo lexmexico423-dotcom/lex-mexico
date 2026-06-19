@@ -2881,7 +2881,7 @@ window.addEventListener('offline', ()=>{
       <div class="nav-item" onclick="ir('escrituras')" id="nav-escrituras"><span class="ni">📄</span><span>Escrituras</span><span class="nav-badge amarillo" id="badgeEscrituras" style="display:none;"></span></div>
       <div class="nav-item" onclick="ir('citas')" id="nav-citas"><span class="ni">📅</span><span>Citas</span><span class="nav-badge amarillo" id="badgeCitas" style="display:none;"></span></div>
       <div id="nav-scansys" style="display:none;">
-        <div class="nav-item" onclick="scansysToggle()" style="border-color:rgba(192,22,26,0.35);position:relative;" title="SCANSYS — Diagnóstico del sistema en tiempo real">
+        <div class="nav-item" onclick="(window.LEXPANEL&&LEXPANEL.abrir)?LEXPANEL.abrir():scansysToggle()" style="border-color:rgba(192,22,26,0.35);position:relative;" title="SCANSYS PRO — Diagnóstico forense de folios">
           <span class="ni">🔍</span><span>ScanSys</span>
           <span id="scansys-badge" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#c0161a;color:#fff;border-radius:50%;min-width:17px;height:17px;font-size:0.5rem;font-family:monospace;align-items:center;justify-content:center;font-weight:700;padding:0 3px;">0</span>
         </div>
@@ -44965,6 +44965,388 @@ if(typeof window.eliminarR2 === 'undefined'){
 
 })();
 // ══════════════════════════════════════════════════════════════════════════════
+
+</script>
+<!-- ═══ SCANSYS PRO (panel forense de folios) ═══ -->
+<script>
+/* ============================================================================
+ * LEX-MÉXICO · SCANSYS PRO  ·  Panel de diagnóstico forense de folios
+ * ----------------------------------------------------------------------------
+ * Reconstruye la VIDA de cada folio (emisión, abonos, liquidación) cruzando:
+ *   - appData.recibos            (versiones vivas A/B/C…)
+ *   - appData.historialVersiones (línea de tiempo: qué pasó y cuándo)
+ *   - D.movimientos              (asientos contables M-REC / M-RECUP)
+ * y explica EN ESPAÑOL por qué un folio se duplicó o descuadró, con la acción
+ * recomendada. La eliminación usa reconciliarAplicar() (ya en el index nuevo),
+ * con confirmación y respaldo. NADA se borra solo.
+ *
+ * USO: pega todo en la consola (F12) con sesión iniciada. Se abre el panel.
+ *      Para reabrirlo luego:  LEXPANEL.abrir()
+ * ==========================================================================*/
+(function () {
+  'use strict';
+
+  // ===== Helpers de datos =====
+  function num(v) { var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+  function letra(r) { return ((r && r.letra) || 'A').toString().toUpperCase(); }
+  function esExacto(c) { return c && (num(c.montoLiquidado) > 0 || c.exacto === true || c.tipo === 'exacto'); }
+  function esRecup(m) { return /^M-(RECUP|PROT)-/.test((m && m.id) || ''); }
+  function fmt(n) { return '$' + (num(n)).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+  function _recibos() {
+    var a = (typeof REC !== 'undefined' && REC && Array.isArray(REC.recibos)) ? REC.recibos : [];
+    var b = (typeof appData !== 'undefined' && appData && Array.isArray(appData.recibos)) ? appData.recibos : [];
+    var t = [].concat(a, b).filter(function (r) { return r && r.folio != null; });
+    return t.filter(function (r, i) { return t.indexOf(r) === i; });
+  }
+  function _movs() { return (typeof D !== 'undefined' && D && Array.isArray(D.movimientos)) ? D.movimientos : []; }
+  function _histVers() { return (typeof appData !== 'undefined' && appData && appData.historialVersiones) ? appData.historialVersiones : {}; }
+
+  // ===== NÚCLEO: reconstruir la vida y el diagnóstico de un folio =====
+  function reconstruirFolio(folioNum) {
+    var f = String(folioNum).replace(/[^0-9]/g, '');
+    if (!f) return null;
+
+    // Versiones vivas (no complemento) ordenadas por letra
+    var versiones = _recibos().filter(function (r) { return String(r.folio) === f && !r.esComplemento; })
+      .sort(function (a, b) { return letra(a).localeCompare(letra(b)); });
+    if (!versiones.length) return { folio: f, existe: false };
+
+    var vigente = versiones[versiones.length - 1];
+    var original = versiones[0];
+
+    // Línea de tiempo: del historial de versiones + estados de cada versión viva
+    var timeline = [];
+    var hist = (_histVers()[f] || _histVers()[Number(f)] || []);
+    hist.forEach(function (h) {
+      var snap = h.snapshot || {};
+      timeline.push({
+        fecha: h.fecha || '', hora: h.hora || '', quien: h.quien || '—',
+        evento: h.motivo || 'Modificación',
+        saldo: snap.saldoPendiente, total: snap.total, abonado: snap.totalAbonado
+      });
+    });
+    // Si no hay historial, reconstruir lo básico desde las versiones
+    if (!timeline.length) {
+      versiones.forEach(function (r) {
+        var ev = letra(r) === 'A'
+          ? (num(r.anticipo) > 0 ? 'Emitido con anticipo ' + fmt(r.anticipo) : 'Emitido sin anticipo')
+          : (num(r.saldoPendiente) <= 0 ? 'Liquidado' : 'Abono / actualización');
+        timeline.push({
+          fecha: (r.fecha || r.fecha_recibo || '').slice(0, 10), hora: r.hora || r.hora_recibo || '',
+          quien: r.generadoPor || r.responsable || '—', evento: ev + ' (' + f + letra(r) + ')',
+          saldo: r.saldoPendiente, total: r.total, abonado: r.totalAbonado
+        });
+      });
+    }
+
+    // Movimientos contables del folio
+    var movs = _movs().filter(function (m) { return m && !m.borrado && m.fuente === 'recibo' && String(m.folio) === f; })
+      .map(function (m) {
+        return { id: m.id, letra: (m.letra || 'A'), monto: num(m.monto), estatus: m.estatus || '—',
+                 fecha: (m.fecha || '').slice(0, 10), tipo: m.tipo || 'ingreso',
+                 origen: esRecup(m) ? 'AUTO-PROTECTOR' : 'AL GUARDAR', _raw: m };
+      });
+
+    // Esperado (lo realmente cobrado, según el recibo vigente)
+    var total = num(vigente.total), saldo = num(vigente.saldoPendiente);
+    var espHon = total > 0 ? (total - saldo) : num(vigente.anticipo);
+    if (espHon < 0) espHon = 0;
+    var espComp = (vigente.costosExtra || []).filter(esExacto).reduce(function (s, c) { return s + num(c.montoLiquidado); }, 0);
+    var esperado = +(espHon + espComp).toFixed(2);
+
+    var observado = +movs.reduce(function (s, m) { return s + (m.tipo === 'egreso' ? -m.monto : m.monto); }, 0).toFixed(2);
+    var dif = +(observado - esperado).toFixed(2);
+
+    // Duplicados por folio+letra
+    var porLetra = {};
+    movs.forEach(function (m) { (porLetra[m.letra] = porLetra[m.letra] || []).push(m); });
+    var hayDup = Object.keys(porLetra).some(function (k) { return porLetra[k].length > 1; });
+
+    // ===== DIAGNÓSTICO =====
+    var diag = { estado: 'OK', titulo: '', explicacion: '', recomendacion: '', idsEliminar: [], manual: false };
+
+    // Movimientos $0 que son residuo del bug (NO los "Sin Anticipo" de letra A, que son legítimos)
+    var cerosResiduo = movs.filter(function (m) {
+      if (m.monto !== 0) return false;
+      var esSinAnticipoA = (m.letra === 'A' && /sin anticipo/i.test(m.estatus));
+      return !esSinAnticipoA; // los $0 "Sin Anticipo" de A documentan un recibo emitido sin pago → conservar
+    });
+    var sumaSinResiduo = +movs.filter(function (m) { return cerosResiduo.indexOf(m) < 0; })
+      .reduce(function (s, m) { return s + (m.tipo === 'egreso' ? -m.monto : m.monto); }, 0).toFixed(2);
+
+    if (Math.abs(dif) <= 0.5 && !hayDup) {
+      diag.estado = 'OK';
+      diag.titulo = '✅ Folio sano';
+      diag.explicacion = 'La contabilidad de este folio (' + fmt(observado) + ') coincide con lo que el recibo dice que se cobró (' + fmt(esperado) + '). No hay duplicados.';
+    } else if (cerosResiduo.length && Math.abs(sumaSinResiduo - esperado) <= 0.5) {
+      diag.estado = 'DUPLICADO';
+      diag.titulo = '🔴 Duplicado por auto-protector (limpieza segura)';
+      diag.explicacion = 'El recibo dice que se cobró ' + fmt(esperado) + '. Existe(n) ' + cerosResiduo.length +
+        ' asiento(s) en $0 que el auto-protector dejó al fabricar el movimiento real. Al quitarlos, la cuenta cuadra exactamente.';
+      diag.recomendacion = 'Eliminar ' + cerosResiduo.length + ' asiento(s) en $0. Conserva el movimiento real y los registros legítimos.';
+      diag.idsEliminar = cerosResiduo.map(function (m) { return m.id; });
+    } else if (dif > 0.5) {
+      // Sobra: ¿una copia exacta lo explica?
+      var copia = null;
+      Object.keys(porLetra).forEach(function (k) {
+        var lista = porLetra[k];
+        if (lista.length > 1) {
+          for (var i = 0; i < lista.length; i++) {
+            var sinUno = movs.filter(function (x) { return x !== lista[i]; }).reduce(function (s, m) { return s + (m.tipo === 'egreso' ? -m.monto : m.monto); }, 0);
+            if (Math.abs(sinUno - esperado) <= 0.5) { copia = lista[i]; break; }
+          }
+        }
+      });
+      if (copia) {
+        diag.estado = 'DUPLICADO';
+        diag.titulo = '🔴 Copia duplicada (limpieza segura)';
+        diag.explicacion = 'El recibo dice ' + fmt(esperado) + ', pero hay ' + fmt(observado) + ' registrado. Una copia de ' + fmt(copia.monto) +
+          ' (' + copia.origen + ') está de más; al quitarla la cuenta cuadra.';
+        diag.recomendacion = 'Eliminar la copia ' + esc(copia.id) + ' (' + fmt(copia.monto) + ').';
+        diag.idsEliminar = [copia.id];
+      } else {
+        diag.estado = 'SOBRA';
+        diag.titulo = '⚠️ Sobra dinero — requiere tu criterio';
+        diag.explicacion = 'Contabilidad tiene ' + fmt(observado) + ' pero el recibo dice que se cobró ' + fmt(esperado) +
+          ' (sobran ' + fmt(Math.abs(dif)) + '). Esto puede ser: (a) un abono REAL que cobraste pero no quedó en el recibo, o (b) un duplicado con monto distinto. Revisa la línea de tiempo de arriba: si ahí ves ese pago, el problema está en el recibo, no en contabilidad.';
+        diag.recomendacion = 'NO se elimina automáticamente. Compara la línea de tiempo con el expediente físico antes de decidir.';
+        diag.manual = true;
+      }
+    } else if (dif < -0.5) {
+      diag.estado = 'FALTA';
+      diag.titulo = '⚠️ Falta dinero — revisar el recibo';
+      diag.explicacion = 'Contabilidad tiene ' + fmt(observado) + ' pero el recibo dice que se cobró ' + fmt(esperado) +
+        ' (faltan ' + fmt(Math.abs(dif)) + '). Aquí NO se borra nada: lo más probable es que el recibo no haya registrado un abono que sí entró.';
+      diag.recomendacion = 'Revisar el recibo ' + f + letra(vigente) + ' y confirmar el saldo real con el expediente.';
+      diag.manual = true;
+    } else if (hayDup) {
+      diag.estado = 'DUP_SIN_IMPACTO';
+      diag.titulo = '🟡 Registro duplicado (el total cuadra)';
+      diag.explicacion = 'El dinero cuadra (' + fmt(observado) + '), pero hay más de un asiento para la misma letra. Conviene dejar uno solo por claridad.';
+      diag.recomendacion = 'Revisa los movimientos abajo y decide cuál conservar; suelen ser idénticos.';
+      diag.manual = true;
+    }
+
+    return {
+      folio: f, existe: true, vigente: f + letra(vigente), original: f + letra(original),
+      cliente: vigente.nombre || '—',
+      total: total, saldo: saldo, abonado: num(vigente.totalAbonado),
+      esperado: esperado, observado: observado, dif: dif,
+      versiones: versiones, timeline: timeline, movimientos: movs, diag: diag
+    };
+  }
+
+  // ===== Lista de folios con problema (para el panel) =====
+  function foliosConProblema() {
+    var folios = {};
+    _recibos().forEach(function (r) { if (r && r.folio != null && !r.esComplemento) folios[String(r.folio)] = true; });
+    var res = [];
+    Object.keys(folios).forEach(function (f) {
+      var d = reconstruirFolio(f);
+      if (d && d.existe && d.diag.estado !== 'OK') res.push(d);
+    });
+    var orden = { DUPLICADO: 0, SOBRA: 1, FALTA: 1, DUP_SIN_IMPACTO: 2 };
+    res.sort(function (a, b) {
+      if (orden[a.diag.estado] !== orden[b.diag.estado]) return orden[a.diag.estado] - orden[b.diag.estado];
+      return Math.abs(b.dif) - Math.abs(a.dif);
+    });
+    return res;
+  }
+
+  // Exponer la lógica para pruebas/uso programático
+  window.LEXDX = { reconstruirFolio: reconstruirFolio, foliosConProblema: foliosConProblema };
+
+  // ===== Render del panel (si hay DOM) =====
+  if (typeof document === 'undefined') return;
+
+  function inyectarEstilos() {
+    if (document.getElementById('sxpro-css')) return;
+    var s = document.createElement('style'); s.id = 'sxpro-css';
+    s.textContent =
+      '#sxpro-ov{position:fixed;inset:0;z-index:999999;background:rgba(26,16,8,.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;font-family:"DM Mono","JetBrains Mono",monospace}' +
+      '#sxpro{width:min(1100px,96vw);height:min(88vh,900px);background:#fdfaf4;border:1.5px solid #c8952a;border-radius:14px;box-shadow:0 24px 70px rgba(26,16,8,.5);display:flex;flex-direction:column;overflow:hidden}' +
+      '#sxpro .hd{display:flex;align-items:center;gap:14px;padding:14px 18px;background:#1a1008;color:#f5f0e0;border-bottom:1.5px solid #c8952a}' +
+      '#sxpro .hd b{font-size:15px;letter-spacing:.04em;color:#e8c875}' +
+      '#sxpro .hd .sp{flex:1}' +
+      '#sxpro .pill{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid #c8952a;color:#e8c875;background:rgba(200,149,42,.12)}' +
+      '#sxpro .x{cursor:pointer;font-size:20px;color:#e8c875;background:none;border:none;padding:0 4px}' +
+      '#sxpro .tabs{display:flex;gap:0;background:#f5f0e0;border-bottom:1px solid #e2d9c0}' +
+      '#sxpro .tab{padding:11px 20px;cursor:pointer;font-size:12.5px;font-weight:600;color:#7a6840;border-bottom:2.5px solid transparent}' +
+      '#sxpro .tab.on{color:#1a1008;border-bottom-color:#c8952a;background:#fdfaf4}' +
+      '#sxpro .body{flex:1;overflow:hidden;display:flex}' +
+      '#sxpro .side{width:300px;border-right:1px solid #e2d9c0;overflow-y:auto;background:#faf6ec}' +
+      '#sxpro .main{flex:1;overflow-y:auto;padding:18px 22px}' +
+      '#sxpro .srch{padding:12px;border-bottom:1px solid #e2d9c0}' +
+      '#sxpro .srch input{width:100%;box-sizing:border-box;padding:9px 11px;border:1.5px solid #c8952a;border-radius:8px;font-family:inherit;font-size:13px;background:#fff;color:#1a1008}' +
+      '#sxpro .fitem{padding:10px 13px;border-bottom:1px solid #efe8d6;cursor:pointer;font-size:12px}' +
+      '#sxpro .fitem:hover{background:#f5efd8}' +
+      '#sxpro .fitem.on{background:#f0e6c8;border-left:3px solid #c8952a}' +
+      '#sxpro .fitem .f{font-weight:700;color:#1a1008}' +
+      '#sxpro .fitem .c{color:#7a6840;font-size:10.5px;margin-top:2px}' +
+      '#sxpro .badge{display:inline-block;font-size:9.5px;padding:1px 7px;border-radius:10px;font-weight:700;margin-left:4px}' +
+      '#sxpro .b-DUPLICADO{background:#fde8e8;color:#c0161a}#sxpro .b-SOBRA{background:#fff0db;color:#b06a00}#sxpro .b-FALTA{background:#fff0db;color:#b06a00}#sxpro .b-DUP_SIN_IMPACTO{background:#fdf6d8;color:#8a6d00}#sxpro .b-OK{background:#e6f5ea;color:#1a7a3a}' +
+      '#sxpro h3{margin:0 0 4px;font-size:18px;color:#1a1008}' +
+      '#sxpro .sub{color:#7a6840;font-size:12px;margin-bottom:16px}' +
+      '#sxpro .card{background:#fff;border:1px solid #e2d9c0;border-radius:10px;padding:14px 16px;margin-bottom:14px}' +
+      '#sxpro .card h4{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#c8952a}' +
+      '#sxpro .kv{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px dashed #efe8d6}' +
+      '#sxpro .kv b{color:#1a1008}' +
+      '#sxpro .tl{position:relative;padding-left:18px}' +
+      '#sxpro .tl .ev{position:relative;padding:6px 0 10px 0;font-size:12.5px;border-left:2px solid #e2d9c0;padding-left:14px;margin-left:2px}' +
+      '#sxpro .tl .ev:before{content:"";position:absolute;left:-6px;top:9px;width:9px;height:9px;border-radius:50%;background:#c8952a}' +
+      '#sxpro .tl .ev .d{color:#7a6840;font-size:10.5px}' +
+      '#sxpro table{width:100%;border-collapse:collapse;font-size:12px}' +
+      '#sxpro th{text-align:left;color:#7a6840;font-weight:600;padding:6px 8px;border-bottom:1.5px solid #e2d9c0;font-size:10.5px;text-transform:uppercase}' +
+      '#sxpro td{padding:7px 8px;border-bottom:1px solid #efe8d6}' +
+      '#sxpro tr.dup td{background:#fdeeee}' +
+      '#sxpro .tag{font-size:9.5px;padding:1px 6px;border-radius:8px;font-weight:700}' +
+      '#sxpro .tag.recup{background:#fde8e8;color:#c0161a}#sxpro .tag.real{background:#e6f5ea;color:#1a7a3a}' +
+      '#sxpro .dx{border-radius:10px;padding:16px;margin-bottom:14px}' +
+      '#sxpro .dx.DUPLICADO{background:#fdeeee;border:1px solid #f0b8b8}#sxpro .dx.SOBRA,#sxpro .dx.FALTA{background:#fff6e8;border:1px solid #f0d8a8}#sxpro .dx.DUP_SIN_IMPACTO{background:#fdf9e8;border:1px solid #e8dca0}#sxpro .dx.OK{background:#eef8f0;border:1px solid #b8e0c0}' +
+      '#sxpro .dx .t{font-size:15px;font-weight:700;margin-bottom:8px;color:#1a1008}' +
+      '#sxpro .dx p{margin:6px 0;font-size:13px;line-height:1.55;color:#3a2c1a}' +
+      '#sxpro .act{display:inline-block;margin-top:10px;padding:9px 16px;border-radius:8px;border:none;background:#c0161a;color:#fff;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer}' +
+      '#sxpro .act:hover{background:#a01015}' +
+      '#sxpro .act.sim{background:#1a1008}' +
+      '#sxpro .err{font-size:11.5px;border-bottom:1px solid #efe8d6;padding:9px 4px}' +
+      '#sxpro .err .m{color:#c0161a;font-weight:600}#sxpro .err .mod{color:#7a6840}#sxpro .err .st{color:#999;font-size:10px;white-space:pre-wrap;max-height:0;overflow:hidden;transition:max-height .2s}' +
+      '#sxpro .err.open .st{max-height:200px;overflow:auto}' +
+      '#sxpro .empty{color:#7a6840;text-align:center;padding:40px;font-size:13px}';
+    document.head.appendChild(s);
+  }
+
+  var _sel = null, _tab = 'dx';
+
+  function abrirPanel() {
+    inyectarEstilos();
+    var prev = document.getElementById('sxpro-ov'); if (prev) prev.remove();
+    var ov = document.createElement('div'); ov.id = 'sxpro-ov';
+    ov.innerHTML =
+      '<div id="sxpro">' +
+      '<div class="hd"><b>⚖ SCANSYS PRO</b><span class="pill" id="sxpro-n"></span><span class="sp"></span>' +
+      '<span class="pill" id="sxpro-ne"></span><button class="x" id="sxpro-x">✕</button></div>' +
+      '<div class="tabs"><div class="tab on" data-t="dx">🩺 Diagnóstico de Folios</div><div class="tab" data-t="err">⚠️ Errores del Sistema</div></div>' +
+      '<div class="body" id="sxpro-body"></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
+    document.getElementById('sxpro-x').onclick = function () { ov.remove(); };
+    Array.prototype.forEach.call(ov.querySelectorAll('.tab'), function (t) {
+      t.onclick = function () {
+        Array.prototype.forEach.call(ov.querySelectorAll('.tab'), function (x) { x.classList.remove('on'); });
+        t.classList.add('on'); _tab = t.getAttribute('data-t'); render();
+      };
+    });
+    render();
+  }
+
+  function render() {
+    var probs = foliosConProblema();
+    document.getElementById('sxpro-n').textContent = probs.length + ' folio(s) con problema';
+    var nerr = (window.LEX_ERRORS || []).length;
+    document.getElementById('sxpro-ne').textContent = nerr + ' error(es) JS';
+    var body = document.getElementById('sxpro-body');
+    if (_tab === 'err') { body.innerHTML = renderErrores(); bindErrores(); return; }
+
+    // pestaña diagnóstico
+    var side = probs.map(function (d) {
+      return '<div class="fitem' + (_sel === d.folio ? ' on' : '') + '" data-f="' + d.folio + '">' +
+        '<div class="f">#' + esc(d.vigente) + '<span class="badge b-' + d.diag.estado + '">' + d.diag.estado + '</span></div>' +
+        '<div class="c">' + esc(d.cliente.slice(0, 26)) + ' · dif ' + fmt(d.dif) + '</div></div>';
+    }).join('') || '<div class="empty">✅ Sin folios con problema</div>';
+
+    body.innerHTML =
+      '<div class="side"><div class="srch"><input id="sxpro-srch" placeholder="Buscar folio… ej: 86" /></div>' + side + '</div>' +
+      '<div class="main" id="sxpro-main">' + (_sel ? renderFicha(_sel) : '<div class="empty">Selecciona un folio de la izquierda o búscalo arriba para ver su historia completa y diagnóstico.</div>') + '</div>';
+
+    var inp = document.getElementById('sxpro-srch');
+    inp.onkeydown = function (e) { if (e.key === 'Enter') { var v = inp.value.replace(/[^0-9]/g, ''); if (v) { _sel = v; render(); } } };
+    Array.prototype.forEach.call(body.querySelectorAll('.fitem'), function (it) {
+      it.onclick = function () { _sel = it.getAttribute('data-f'); render(); };
+    });
+    bindAcciones();
+  }
+
+  function renderFicha(folio) {
+    var d = reconstruirFolio(folio);
+    if (!d || !d.existe) return '<div class="empty">No existe el folio #' + esc(folio) + ' en el sistema.</div>';
+
+    var tl = d.timeline.map(function (e) {
+      return '<div class="ev"><b>' + esc(e.evento) + '</b><div class="d">' + esc(e.fecha) + (e.hora ? ' ' + esc(e.hora) : '') +
+        ' · ' + esc(e.quien) + (e.saldo != null ? ' · saldo ' + fmt(e.saldo) : '') + '</div></div>';
+    }).join('') || '<div class="d" style="color:#7a6840;font-size:12px">Sin historial detallado guardado para este folio.</div>';
+
+    var movRows = d.movimientos.map(function (m) {
+      var dup = d.diag.idsEliminar.indexOf(m.id) >= 0;
+      return '<tr class="' + (dup ? 'dup' : '') + '"><td><code style="font-size:10.5px">' + esc(m.id) + '</code></td>' +
+        '<td>' + esc(m.letra) + '</td><td>' + fmt(m.monto) + '</td><td>' + esc(m.estatus) + '</td>' +
+        '<td><span class="tag ' + (m.origen === 'AUTO-PROTECTOR' ? 'recup' : 'real') + '">' + m.origen + '</span></td>' +
+        '<td>' + esc(m.fecha) + '</td></tr>';
+    }).join('');
+
+    var dg = d.diag;
+    var accion = '';
+    if (dg.idsEliminar.length) {
+      accion = '<button class="act sim" data-sim=\'' + JSON.stringify(dg.idsEliminar) + '\'>👁 Simular limpieza</button> ' +
+        '<button class="act" data-del=\'' + JSON.stringify(dg.idsEliminar) + '\'>🗑 Eliminar ' + dg.idsEliminar.length + ' y cuadrar en ' + fmt(d.esperado) + '</button>';
+    }
+
+    return '<h3>Folio #' + esc(d.vigente) + '</h3><div class="sub">' + esc(d.cliente) + ' · versiones: ' +
+      d.versiones.map(function (r) { return esc(d.folio + letra(r)); }).join(', ') + '</div>' +
+
+      '<div class="dx ' + dg.estado + '"><div class="t">' + esc(dg.titulo) + '</div>' +
+      '<p>' + esc(dg.explicacion) + '</p>' +
+      (dg.recomendacion ? '<p><b>Qué hacer:</b> ' + esc(dg.recomendacion) + '</p>' : '') +
+      accion + '</div>' +
+
+      '<div class="card"><h4>Cuadre</h4>' +
+      '<div class="kv"><span>Cobrado real (según recibo)</span><b>' + fmt(d.esperado) + '</b></div>' +
+      '<div class="kv"><span>Registrado en contabilidad</span><b>' + fmt(d.observado) + '</b></div>' +
+      '<div class="kv"><span>Diferencia</span><b style="color:' + (Math.abs(d.dif) <= 0.5 ? '#1a7a3a' : '#c0161a') + '">' + fmt(d.dif) + '</b></div>' +
+      '<div class="kv"><span>Total del recibo / abonado / saldo</span><b>' + fmt(d.total) + ' / ' + fmt(d.abonado) + ' / ' + fmt(d.saldo) + '</b></div></div>' +
+
+      '<div class="card"><h4>Vida del folio</h4><div class="tl">' + tl + '</div></div>' +
+
+      '<div class="card"><h4>Movimientos en contabilidad</h4><table><thead><tr><th>ID</th><th>Letra</th><th>Monto</th><th>Estatus</th><th>Origen</th><th>Fecha</th></tr></thead><tbody>' +
+      (movRows || '<tr><td colspan="6" style="color:#7a6840">Sin movimientos reales (usa el sintético).</td></tr>') + '</tbody></table></div>';
+  }
+
+  function bindAcciones() {
+    var main = document.getElementById('sxpro-main'); if (!main) return;
+    Array.prototype.forEach.call(main.querySelectorAll('[data-sim]'), function (b) {
+      b.onclick = function () {
+        var ids = JSON.parse(b.getAttribute('data-sim'));
+        if (typeof reconciliarAplicar !== 'function') { alert('Carga el index.html nuevo para poder simular/aplicar (reconciliarAplicar no está disponible).'); return; }
+        reconciliarAplicar(ids); alert('Simulación enviada a la consola (F12). No se borró nada. Revisa la tabla ahí.');
+      };
+    });
+    Array.prototype.forEach.call(main.querySelectorAll('[data-del]'), function (b) {
+      b.onclick = function () {
+        var ids = JSON.parse(b.getAttribute('data-del'));
+        if (typeof reconciliarAplicar !== 'function') { alert('Carga el index.html nuevo para poder aplicar (reconciliarAplicar no está disponible).'); return; }
+        reconciliarAplicar(ids, { confirmar: true }).then(function () { setTimeout(render, 600); });
+      };
+    });
+  }
+
+  function renderErrores() {
+    var errs = (window.LEX_ERRORS || []).slice().reverse();
+    if (!errs.length) return '<div class="main"><div class="empty">✅ No hay errores JS registrados en esta sesión.</div></div>';
+    return '<div class="main">' + errs.map(function (e, i) {
+      return '<div class="err" data-i="' + i + '"><div><span class="m">' + esc(e.mensaje) + '</span> <span class="mod">· ' + esc(e.modulo) + ' · ' + esc((e.fecha || '').replace('T', ' ').slice(0, 19)) + '</span></div>' +
+        (e.stack ? '<div class="st">' + esc(e.stack) + '</div>' : '') + '</div>';
+    }).join('') + '</div>';
+  }
+  function bindErrores() {
+    var body = document.getElementById('sxpro-body'); if (!body) return;
+    Array.prototype.forEach.call(body.querySelectorAll('.err'), function (el) {
+      el.onclick = function () { el.classList.toggle('open'); };
+    });
+  }
+
+  window.LEXPANEL = { abrir: abrirPanel };
+})();  // SCANSYS PRO — se abre desde el botón del sidebar
 
 </script>
 </body>

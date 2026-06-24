@@ -42937,10 +42937,16 @@ function abrirFichaFolio(){
     th.textContent='$'+fmt(_totalActualizado);
   }
   document.getElementById('ficha-abonado').textContent='$'+fmt(totalAbonado);
-  // "Resta" se calcula igual que el resto de la ficha (Total actualizado − Abonado),
-  // en vez de leer el campo guardado `saldoPendiente`, que no se actualizaba al
-  // agregar un servicio complementario y podía quedar desfasado.
-  document.getElementById('ficha-pendiente').textContent='$'+fmt(Math.max(0,_totalActualizado-totalAbonado));
+  // Para modo Sin Costo Total Pactado: sumar cargos internos al total
+  var _esSinCostoCalc = recibo.modoCosto === 'abierto';
+  var _totalCargosInternos = _esSinCostoCalc
+    ? (recibo._cargosInternos||[]).reduce(function(s,c){ return s+(parseFloat(c.monto)||0); }, 0)
+    : 0;
+  var _totalConCargos = _totalActualizado + _totalCargosInternos;
+  var _restaFinal = Math.max(0, _totalConCargos - totalAbonado);
+  document.getElementById('ficha-pendiente').textContent='$'+fmt(_restaFinal);
+  // Actualizar saldoPendiente en memoria para que Pago Parcial tome el valor correcto
+  if (_esSinCostoCalc) recibo.saldoPendiente = _restaFinal;
 
   // Notas y gastos
   var notasKey='ficha-notas-'+folio+'-'+anio;
@@ -43362,19 +43368,30 @@ function fichaImprimirEstadoCuenta() {
   var fmtFecha = function(iso){ if(!iso) return '—'; var p=iso.split('-'); if(p.length<3) return iso; return parseInt(p[2],10)+' de '+meses[parseInt(p[1],10)-1]+' de '+p[0]; };
   var saldoAcum = 0;
   var filas = '';
+  // Si es Sin Costo Pactado, mezclar recibos y cargos internos ordenados por fecha
+  var _esSinCostoEC = recibo.modoCosto === 'abierto';
+  var _movimientos = [];
   todosRec.forEach(function(r) {
     var letra = r.letra || (typeof letraVersion==='function'?letraVersion(r):'A') || 'A';
     var concepto = (r.conceptos&&r.conceptos[0]&&r.conceptos[0].concepto) || r.concepto || r.servicio || '—';
-    var cargo  = letra==='A' ? parseFloat(r.total||0) : 0;
-    var abono  = parseFloat(r.anticipo||0) + (r.pagosParciales||[]).filter(function(p){return (p.folioLetra||letra)===letra;}).reduce(function(s,p){return s+(parseFloat(p.cantidad)||0);},0);
-    if(letra!=='A') cargo = parseFloat(r.costosExtra&&r.costosExtra.length ? r.costosExtra.reduce(function(s,ce){return s+(parseFloat(ce.precio)||0);},0) : 0);
-    saldoAcum = saldoAcum + cargo - abono;
+    var abono = parseFloat(r.anticipo||0) + (r.pagosParciales||[]).reduce(function(s,p){return s+(parseFloat(p.cantidad)||0);},0);
+    var cargo = letra==='A' ? parseFloat(r.total||0) : (r.costosExtra||[]).reduce(function(s,ce){return s+(parseFloat(ce.precio)||0);},0);
+    _movimientos.push({ fecha: r.fecha_recibo||r.fecha, tipo: 'recibo', folio: folio+letra, concepto: concepto, cargo: cargo, abono: abono });
+  });
+  if (_esSinCostoEC) {
+    (recibo._cargosInternos||[]).forEach(function(c) {
+      _movimientos.push({ fecha: c.fecha, tipo: 'cargo', folio: '—', concepto: c.concepto + (c.descripcion?' · '+c.descripcion:''), cargo: parseFloat(c.monto||0), abono: 0 });
+    });
+    _movimientos.sort(function(a,b){ return (a.fecha||'').localeCompare(b.fecha||''); });
+  }
+  _movimientos.forEach(function(m) {
+    saldoAcum = saldoAcum + m.cargo - m.abono;
     filas += '<tr style="border-bottom:0.5px solid #e8d098;">'
-      +'<td style="padding:6px 8px;font-family:\'DM Mono\',monospace;font-size:11px;color:#1a5fa8;font-weight:700;">'+folio+letra+'</td>'
-      +'<td style="padding:6px 8px;font-size:11px;color:#3a2a0a;">'+fmtFecha(r.fecha_recibo||r.fecha)+'</td>'
-      +'<td style="padding:6px 8px;font-size:11px;color:#3a2a0a;">'+concepto.toUpperCase()+'</td>'
-      +'<td style="padding:6px 8px;font-size:11px;text-align:right;color:#a32d2d;font-weight:600;">'+(cargo>0?fmt(cargo):'—')+'</td>'
-      +'<td style="padding:6px 8px;font-size:11px;text-align:right;color:#1a7a3a;font-weight:600;">'+(abono>0?fmt(abono):'—')+'</td>'
+      +'<td style="padding:6px 8px;font-family:\'DM Mono\',monospace;font-size:11px;color:'+(m.tipo==='cargo'?'#4a6ea8':'#1a5fa8')+';font-weight:700;">'+m.folio+'</td>'
+      +'<td style="padding:6px 8px;font-size:11px;color:#3a2a0a;">'+fmtFecha(m.fecha)+'</td>'
+      +'<td style="padding:6px 8px;font-size:11px;color:#3a2a0a;">'+(m.tipo==='cargo'?'⚖️ ':'')+m.concepto.toUpperCase()+'</td>'
+      +'<td style="padding:6px 8px;font-size:11px;text-align:right;color:#a32d2d;font-weight:600;">'+(m.cargo>0?fmt(m.cargo):'—')+'</td>'
+      +'<td style="padding:6px 8px;font-size:11px;text-align:right;color:#1a7a3a;font-weight:600;">'+(m.abono>0?fmt(m.abono):'—')+'</td>'
       +'<td style="padding:6px 8px;font-size:11px;text-align:right;color:'+(saldoAcum>0?'#a32d2d':'#1a7a3a')+';font-weight:700;">'+fmt(Math.max(0,saldoAcum))+'</td>'
     +'</tr>';
   });

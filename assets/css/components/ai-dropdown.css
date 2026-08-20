@@ -1,0 +1,23 @@
+.ia-dropdown {
+      position:absolute;top:100%;left:0;right:0;z-index:9990;
+      background:#fdfaf4;border:1.5px solid #d4b870;border-radius:8px;
+      box-shadow:0 8px 28px rgba(0,0,0,0.15);overflow:hidden;margin-top:2px;
+    }
+    .ia-drop-item {
+      padding:8px 12px;cursor:pointer;font-family:sans-serif;font-size:0.82rem;
+      color:#1a1008;border-bottom:1px solid rgba(200,149,42,0.1);
+      display:flex;align-items:center;gap:8px;transition:background 0.12s;
+    }
+    .ia-drop-item:last-child{border-bottom:none;}
+    .ia-drop-item:hover,.ia-drop-item.selected{background:rgba(200,149,42,0.1);}
+    .ia-drop-item .ia-drop-icon{font-size:0.7rem;opacity:0.5;flex-shrink:0;}
+    .ia-drop-item .ia-drop-texto{flex:1;}
+    .ia-drop-item .ia-drop-badge{font-family:monospace;font-size:0.52rem;
+      background:rgba(139,92,246,0.1);color:#7c3aed;border-radius:10px;padding:1px 6px;flex-shrink:0;}
+    .ia-mejora-chip {
+      display:inline-flex;align-items:center;gap:5px;margin-top:3px;
+      background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.25);
+      border-radius:12px;padding:3px 9px;cursor:pointer;font-size:0.72rem;
+      font-family:monospace;color:#7c3aed;transition:all 0.15s;
+    }
+    .ia-mejora-chip:hover{background:rgba(139,92,246,0.18);}

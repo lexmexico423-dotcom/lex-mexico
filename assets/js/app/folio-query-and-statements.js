@@ -4384,7 +4384,19 @@ ${_formato}`;
       j.flujoEtapaActual = null;
       j.flujoEtapaActualRazon = '';
       try { saveJuicios(); } catch(e) {}
-      try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e) {}
+      // IMPORTANTE: esperar a que el guardado en Supabase quede CONFIRMADO
+      // antes de declarar éxito. saveJuicios() dispara el guardado sin
+      // esperarlo (fire-and-forget); si el usuario recargaba la página justo
+      // después de ver "✓ Flujo generado" — antes de que el guardado
+      // realmente terminara — la recarga traía de vuelta la versión vieja
+      // de Supabase y el flujo recién generado se perdía sin aviso.
+      _setLoad('Guardando flujo…');
+      try {
+        await syncEstadoSupabase();
+      } catch(eGuardar) {
+        console.warn('[Flujo] Error confirmando guardado en Supabase:', eGuardar.message);
+        if (typeof toast === 'function') toast('⚠ El flujo se generó pero no se pudo confirmar el guardado (' + eGuardar.message + ') — no recargues la página todavía, intenta guardarlo de nuevo.', 'err');
+      }
     }
     // Se guarda el texto completo (ya extraído, sin recortar) para que
     // "Profundizar con IA" en el detalle de cada etapa pueda reusarlo sin

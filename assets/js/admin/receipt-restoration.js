@@ -1648,6 +1648,85 @@ if(typeof guardarReciboInterno === 'function' && !window._guardarReciboInternoOr
   window.addEventListener('online', function() { setTimeout(_drenaQueue, 3000); });
   setInterval(function() { if (sbSession && Date.now() < sbExpiry && navigator.onLine) _drenaQueue(); }, 30 * 1000);
 })();
+// ─── E. RESPALDO LOCAL DE MOVIMIENTOS PENDIENTES DE SINCRONIZAR ────────────
+// Caso real (24-ago-2026): una empleada con internet intermitente registró
+// 2 pagos de Caja Rápida; el envío a Supabase falló en silencio y, al
+// recargar la página (D vive solo en memoria — ver limpieza de localStorage
+// en window.onload), los pagos desaparecieron sin ningún error visible
+// porque nunca habían llegado al servidor.
+// Este respaldo NO reemplaza a Supabase como fuente de verdad ni guarda todo
+// D: solo guarda una copia exacta de cada movimiento individual recién creado
+// (_registrarMovimiento) hasta que un syncEstadoSupabase() exitoso confirma
+// que ya quedó en el servidor. Al recargar/iniciar sesión, se compara contra
+// los datos YA frescos de Supabase por id — nunca se sobreescribe nada, solo
+// se reinyecta lo que de verdad falte, reutilizando el mismo dedupe por id
+// que ya usa _registrarMovimiento.
+const LEX_PEND_MOVS_KEY = 'lex_pend_caja_movs';
+function _pendMovsLeer(){
+  try { return JSON.parse(localStorage.getItem(LEX_PEND_MOVS_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+function _pendMovsEscribir(lista){
+  try { localStorage.setItem(LEX_PEND_MOVS_KEY, JSON.stringify(lista)); }
+  catch(e){ console.warn('[PendMovs] no se pudo escribir respaldo local', e); }
+}
+// Llamado justo después de que _registrarMovimiento acepta un movimiento nuevo.
+function _pendMovGuardar(mov){
+  try {
+    if(!mov || !mov.id) return;
+    var lista = _pendMovsLeer();
+    if(lista.some(function(x){ return x.id === mov.id; })) return; // ya respaldado
+    lista.push({ id: mov.id, mov: mov, ts: Date.now(), despacho: (window.SB_DESPACHO_ID||null) });
+    while(lista.length > 200) lista.shift(); // límite defensivo, no debería acercarse en uso normal
+    _pendMovsEscribir(lista);
+  } catch(e){ console.warn('[PendMovs] guardar', e); }
+}
+// Llamado tras cada syncEstadoSupabase() exitoso, con los ids exactos que
+// quedaron subidos en ESA subida (no todos — evita borrar del respaldo un
+// movimiento agregado a D.movimientos mientras esa subida ya estaba en curso).
+function _pendMovsLimpiar(idsConfirmados){
+  try {
+    var despacho = window.SB_DESPACHO_ID || null;
+    var idsSet = idsConfirmados ? new Set(idsConfirmados) : null;
+    var lista = _pendMovsLeer().filter(function(x){
+      if(despacho && x.despacho && x.despacho !== despacho) return true; // de otro despacho, no tocar
+      if(!idsSet) return false;
+      return !idsSet.has(x.id);
+    });
+    _pendMovsEscribir(lista);
+  } catch(e){ console.warn('[PendMovs] limpiar', e); }
+}
+// Llamado una vez tras sincronizarFolio()/login, cuando D ya tiene el estado
+// fresco de Supabase — recupera movimientos que se hayan quedado únicamente
+// en el respaldo local de una sesión interrumpida por mala conexión.
+window._pendMovsRecuperar = function(){
+  try {
+    var despacho = window.SB_DESPACHO_ID || null;
+    var lista = _pendMovsLeer();
+    if(!lista.length) return;
+    var recuperados = [];
+    var restantes = [];
+    lista.forEach(function(item){
+      if(despacho && item.despacho && item.despacho !== despacho){ restantes.push(item); return; }
+      var yaExiste = Array.isArray(D.movimientos) && D.movimientos.some(function(m){ return m && m.id === item.id; });
+      if(yaExiste) return; // confirmado en servidor — se descarta del respaldo
+      // No confirmado todavía: reinyectar en memoria y CONSERVAR en el respaldo
+      // por si el reintento de subida también falla (se limpia solo cuando
+      // _pendMovsLimpiar confirme el id tras un sync exitoso).
+      if(typeof _registrarMovimiento === 'function' && _registrarMovimiento(item.mov)) recuperados.push(item.mov);
+      restantes.push(item);
+    });
+    _pendMovsEscribir(restantes);
+    if(recuperados.length){
+      console.warn('[PendMovs] 🔁 Recuperados '+recuperados.length+' movimiento(s) que no habían llegado a Supabase:',
+        recuperados.map(function(m){ return (m.descripcion||m.id)+' $'+m.monto; }).join(', '));
+      if(typeof toast==='function') toast('🔄 Se recuperó '+recuperados.length+' movimiento(s) pendiente(s) de sincronizar', 'ok');
+      if(typeof renderCaja==='function') renderCaja();
+      if(typeof renderContab==='function') renderContab();
+      if(typeof save==='function') save(); // reintentar subir de inmediato
+    }
+  } catch(e){ console.warn('[PendMovs] recuperar', e); }
+};
 // ─── D. GUARDADO DE EMERGENCIA AL CERRAR PESTAÑA (beforeunload) ─────────────
 // El evento beforeunload es muy restrictivo en navegadores modernos:
 // no permite operaciones asíncronas largas. Usamos sendBeacon (no bloqueante)

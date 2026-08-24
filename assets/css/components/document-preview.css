@@ -1,0 +1,77 @@
+/* ── Nav flechas del visor ── */
+#mDocPreview .modal { position:relative; }
+.docprev-nav-btn {
+  position:absolute;
+  top:50%;transform:translateY(-50%);
+  width:54px;height:54px;border-radius:50%;
+  background:linear-gradient(135deg,#c8952a,#e8c875);
+  border:2.5px solid #fff;
+  color:#1a1008;
+  font-size:1.8rem;font-weight:900;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  z-index:20;
+  transition:all 0.18s;
+  user-select:none;
+  box-shadow:0 0 0 3px rgba(200,149,42,0.45), 0 4px 18px rgba(0,0,0,0.55);
+  line-height:1;
+}
+.docprev-nav-btn:hover {
+  background:linear-gradient(135deg,#e8c875,#fff);
+  box-shadow:0 0 0 4px rgba(232,200,117,0.7), 0 6px 24px rgba(0,0,0,0.65);
+  transform:translateY(-50%) scale(1.12);
+}
+.docprev-nav-btn:active { transform:translateY(-50%) scale(0.96); }
+.docprev-nav-btn:disabled {
+  background:rgba(80,70,50,0.35);border-color:rgba(255,255,255,0.15);
+  color:rgba(255,255,255,0.2);box-shadow:none;cursor:default;
+  transform:translateY(-50%);
+}
+.docprev-nav-btn.prev { left:-30px; }
+.docprev-nav-btn.next { right:-30px; }
+/* Etiqueta bajo la flecha */
+.docprev-nav-btn::after {
+  content:attr(data-label);
+  position:absolute;bottom:-18px;
+  font-size:0.55rem;font-family:monospace;font-weight:700;
+  color:rgba(232,200,117,0.8);letter-spacing:0.08em;
+  white-space:nowrap;
+}
+/* ── Contador ── */
+#docPreviewCounter {
+  font-family:monospace;font-size:0.78rem;font-weight:700;
+  color:#e8c875;
+  background:rgba(200,149,42,0.18);border:1.5px solid rgba(200,149,42,0.45);
+  border-radius:20px;padding:4px 14px;letter-spacing:0.08em;
+  flex-shrink:0;
+}
+/* ── Zoom barra ── */
+#docZoomBar {
+  display:none;align-items:center;gap:6px;
+  background:rgba(200,149,42,0.1);border:1px solid rgba(200,149,42,0.25);
+  border-radius:20px;padding:4px 10px;
+}
+#docZoomBar button {
+  width:26px;height:26px;border-radius:50%;
+  background:rgba(200,149,42,0.18);border:1px solid rgba(200,149,42,0.4);
+  color:var(--gold-l);font-size:1rem;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;flex-shrink:0;line-height:1;
+}
+#docZoomBar button:hover { background:rgba(200,149,42,0.38);color:#fff; }
+#docZoomLabel {
+  font-family:monospace;font-size:0.68rem;color:rgba(232,200,117,0.8);
+  min-width:36px;text-align:center;
+}
+/* ── Imagen con zoom ── */
+#docPreviewContenido {
+  overflow:auto;cursor:grab;
+}
+#docPreviewContenido:active { cursor:grabbing; }
+#docPreviewContenido img {
+  border-radius:4px;display:block;margin:0 auto;
+  transform-origin:center center;transition:transform 0.2s ease;
+}
+#docPreviewContenido iframe {
+  width:100%;height:65vh;border:none;background:#fff;border-radius:4px;display:block;
+}

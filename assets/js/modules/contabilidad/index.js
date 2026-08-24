@@ -944,6 +944,7 @@ function _registrarMovimiento(mov) {
   }
   D.movimientos.push(mov);
   _auditoriaRegistrar('creado', mov);
+  if(typeof _pendMovGuardar === 'function') _pendMovGuardar(mov);
   // Protege el movimiento recién creado (caja/retiro/manual) contra el mismo
   // parpadeo que ya se resolvía para ediciones y borrados: si un pull de
   // Supabase (polling cada 30s, cambio de pestaña, broadcast Realtime) llega
@@ -963,6 +964,7 @@ async function sync(){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
   try {
     await sincronizarFolio();
+    try { if(typeof window._pendMovsRecuperar === 'function') window._pendMovsRecuperar(); } catch(_ePend){}
     if(typeof renderCaja==='function') renderCaja();
     if(typeof renderRec==='function') renderRec();
     if(typeof renderContab==='function') renderContab();
@@ -1526,6 +1528,11 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       folios_eliminados: appData.folios_eliminados || [],
       recibos:           (appData.recibos || []).filter(function(r){ return !(appData.folios_eliminados||[]).some(function(t){ return typeof _tombstoneAplicaA === 'function' ? _tombstoneAplicaA(t, r) : (String(t.folio)===String(r.folio) && t.letra===(r.letra||'A')); }); }).map(function(r){ var c=Object.assign({},r); delete c.pdfBase64; return c; })
     };
+    // Ids que van dentro de ESTA subida — para limpiar del respaldo local
+    // (ver "RESPALDO LOCAL DE MOVIMIENTOS" en receipt-restoration.js) solo lo
+    // que de verdad quedó confirmado ahora, sin tocar algo agregado a
+    // D.movimientos mientras esta subida ya estaba en curso.
+    const _idsSubidosEstaVez = (estado.movimientos||[]).map(function(m){ return m && m.id; }).filter(Boolean);
     let _updBySy = null;
     try { _updBySy = (await Promise.race([window.SB.auth.getUser(), new Promise((_,rj)=>setTimeout(()=>rj(new Error('getUser timeout')),4000))])).data?.user?.id || null; } catch(_egu){}
     // ── Escritura condicionada a rev (optimistic concurrency) ──────────────────
@@ -1568,6 +1575,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     _ultimoSyncPropio = Date.now();
     _syncEnCurso = false;
     syncEnd(true);
+    try { if(typeof _pendMovsLimpiar === 'function') _pendMovsLimpiar(_idsSubidosEstaVez); } catch(_ePend){}
     lexRealtimeBroadcast();
     // Re-renderizar UI propia después de guardar exitosamente
     try { if(typeof renderCaja       ==='function') renderCaja();       } catch(e){ registrarError('catch vacio', e); }

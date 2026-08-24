@@ -1,7 +1,0 @@
-.carp-tr { transition: background 0.22s, box-shadow 0.22s; }
-      .carp-tr:hover { background: #FBF5E2 !important; box-shadow: 0 0 0 1.5px #C8AA60; }
-      .carp-tr:hover td:first-child { border-radius: 6px 0 0 6px; }
-      .carp-tr:hover td:last-child  { border-radius: 0 6px 6px 0; }
-      .carp-tr:hover .carp-num-badge { border-color: #C8AA60; }
-      .carp-action-btn { background:none;border:1.5px solid rgba(200,149,42,0.3);color:#b07820;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:0.8rem;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;margin:0 1px; }
-      .carp-action-btn:hover { background:rgba(200,149,42,0.15);border-color:#c8952a;transform:translateY(-1px);box-shadow:0 2px 8px rgba(200,149,42,0.2); }

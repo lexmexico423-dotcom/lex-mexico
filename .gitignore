@@ -1,11 +1,17 @@
-# Ignorar todo por defecto — esta carpeta contiene archivos ajenos al proyecto
-*
-
-# Desbloquear archivos del proyecto LEX México
-!.gitignore
-!CLAUDE.md
-!index.html
-
-# Carpeta de referencia (JS separados — no es la versión activa)
-!SEPARACIÓN DE ARCHIVOS/
-!SEPARACIÓN DE ARCHIVOS/**
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+legacy/
+private/
+exports/
+backups/
+credentials*.json
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.bak
+*.backup

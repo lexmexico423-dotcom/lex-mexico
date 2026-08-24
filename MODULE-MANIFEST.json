@@ -1,0 +1,6466 @@
+{
+  "createdAt": "2026-08-20T16:49:28.026Z",
+  "originalEngines": [
+    "assets/js/app/receipts-and-supabase.js",
+    "assets/js/app/operations-and-accounting.js",
+    "assets/js/app/folio-query-and-statements.js"
+  ],
+  "movedFunctions": 1072,
+  "retainedDuplicateFunctions": [],
+  "modules": {
+    "recibos": [
+      "agregarConcepto",
+      "_autoGrowConceptoTA",
+      "_tombstoneAplicaA",
+      "_revivirSiTombstone",
+      "_purgarTombstonesSuperados",
+      "sincronizarFolio",
+      "_cargarDatosDesdeJSON",
+      "reservarFolioEnDrive",
+      "_nombreArchivoR2",
+      "_nombreArchivoR2Legacy",
+      "_purgarPDFRecibo",
+      "subirPDFaDrive",
+      "driveGET",
+      "folioFormato",
+      "letraVersion",
+      "folioConLetra",
+      "letraDeRecibo",
+      "_blindarContadorFolio",
+      "verificarReinicioAnual",
+      "abrirSelectorEstadoPlaca",
+      "calcTotales",
+      "validarAnticipo",
+      "quitarConcepto",
+      "getConceptos",
+      "limpiarFormCompleto",
+      "dibujarEncabezadoPDF",
+      "generarPDF",
+      "cargarHistorialExpediente",
+      "cargarHistorialFolioDebounce",
+      "cargarHistorialFolio",
+      "salirModoConsulta",
+      "cerrarConsulta",
+      "_cerrarPanelesBusqueda",
+      "_restaurarPanelesBusqueda",
+      "ejecutarServicioComplementario",
+      "cancelarAbonoNuevo",
+      "abrirModoActualizacion",
+      "cancelarActualizacion",
+      "agregarCostoExtra",
+      "toggleCeLiquidado",
+      "getCostosExtra",
+      "agregarPagoParcial",
+      "quitarPagoParcial",
+      "_sincronizarFechaHoraMaestraPagos",
+      "getPagosParciales",
+      "actualizarHoraDisplay",
+      "recalcularResumenActualizacion",
+      "imprimirActualizacion",
+      "_imprimirActualizacionReal",
+      "cerrarModalCancelacion",
+      "fichaRetroToggle",
+      "fichaRetroDesactivar",
+      "fichaRetroActualizarDisplay",
+      "ejecutarTramiteCancelado",
+      "confirmarCancelacion",
+      "_confirmarCancelacionReal",
+      "descongelarFormulario",
+      "siguienteFolio",
+      "reimprimirRecibo",
+      "_mostrarVisorReciboPDF",
+      "_imprimirDesdeVisorReciboPDF",
+      "_cerrarVisorReciboPDF",
+      "imprimirDesdeBlob",
+      "actualizarLabelPlacas",
+      "confirmarVehicular",
+      "guardarDeTodasFormas",
+      "abrirConfirmacionRecibo",
+      "confirmarRecibo_Aceptar",
+      "confirmarRecibo_Cancelar",
+      "_eliminarPendientePorFolio",
+      "verHistorialVersiones",
+      "_cpdfMigrarSilencioso",
+      "descargarSnapshotPDF",
+      "restaurarVersionRecibo",
+      "restaurarVersionDesdeSupabase",
+      "reDescargar",
+      "togglePanelFolios",
+      "abrirFolioPBC",
+      "_lockIntentarAdquirir",
+      "_lockLiberar",
+      "_lockAvisoBloqueo",
+      "ir",
+      "recargarReciboFrame",
+      "_recibosMap",
+      "_folioMY",
+      "_csAbrirFolios",
+      "renderRec",
+      "filtrarRecibos",
+      "limpiarFiltrosRecibos",
+      "exportarRecibosCSV",
+      "_perfilRenderRecibos",
+      "_verDetalleCarpeta_ELIMINADA_",
+      "_juFoliosRecibo",
+      "_juGuardarFoliosRecibo",
+      "_jvrRenderActual",
+      "abrirGestionReciboJuicio",
+      "filtrarRecibosParaJuicio",
+      "vincularReciboAJuicio",
+      "desvincularReciboDeJuicio",
+      "_mJuActualizarVinculaciones",
+      "_mJuVincularRecibo",
+      "guardarJuicio",
+      "abrirVinculacionFolio",
+      "filtrarFoliosVinculacion",
+      "vincularFolioRecibo",
+      "abrirVincularArchivo",
+      "seleccionarCarpetaArchivo",
+      "desvincularArchivo",
+      "cerrarVincularArchivo",
+      "actualizarBadgeArchivoDesdeRecibo",
+      "saveJuicios",
+      "_marcarExpDigitalVinculado",
+      "toggleP",
+      "abrirPendiente",
+      "_pPlacasCargar",
+      "_pPlacasLimpiar",
+      "_pPlacasRecopilar",
+      "abrirSelectorReciboVehicular",
+      "renderSelectorReciboVehicular",
+      "pPlacasDesvincular",
+      "_pPlacasActualizarInfoRecibo",
+      "_pPlacasAbrirR2",
+      "_irAReciboVinculado",
+      "_pEscLimpiar",
+      "pEscActualizarResto",
+      "pEscCompradorInput",
+      "pSeleccionarPersona",
+      "pLimpiarFolioVinculado",
+      "pPlacasNombreInput",
+      "pPlacasSelNombre",
+      "globalSearch",
+      "backupAppData",
+      "actualizarFolioDisplayRecibo",
+      "recAgregarConcepto",
+      "_conceptoTxtDeRecibo",
+      "_lexPollingTick",
+      "hacerBackupDiario",
+      "siguienteFolioRecibo",
+      "renderConceptosRecibo",
+      "eliminarConcepto",
+      "autoCalcTotal",
+      "renderDocsRecibo",
+      "setTipoDocRecibo",
+      "congelarRecibo",
+      "descongelarRecibo",
+      "reimprimirReciboInterno",
+      "imprimirBlob",
+      "_folioSiguienteUnico",
+      "_tomarFolioSeguro",
+      "guardarFolioEnDrive",
+      "subirPDFaD",
+      "exportarCopia",
+      "importarCopia",
+      "_abrirUrlTenencia",
+      "formatPrecioLibre",
+      "renderConceptosLibre",
+      "agregarConceptoLibre",
+      "eliminarConceptoLibre",
+      "calcLibreTotal",
+      "registrarLibreCarrito",
+      "_cpdfMostrarFormGenerar",
+      "cpdfConfirmarGenerar",
+      "_vehPDFEsCandidato",
+      "_gfRecibosVivos",
+      "_gfMaxFolio",
+      "_gfFolioExiste",
+      "_gfRecibosEnRango",
+      "_gfDistintosFolios",
+      "_gfRegenerarPDFs",
+      "_gfBorrarPDFsViejos",
+      "_gfNombresNuevos",
+      "_gfMarcarVaciados",
+      "_gfLimpiarTombstonesRenumerados",
+      "_gfVerificarLibre",
+      "_gfFijarContador",
+      "_gfInsertarEjecutar",
+      "_gfEliminarEjecutar",
+      "abrirGestorFolios",
+      "_gfUIInsertar",
+      "_gfUIEliminar",
+      "_gfUICerrarHuecoVacio",
+      "_sincronizarDriveBadgeRecibo",
+      "_abrirModalEliminarRecibo",
+      "cerrarModalEliminarRecibo",
+      "_purgarPagosParcialesDeVersion",
+      "_abrirEdicionSecundario",
+      "_ajustarAnchoBannerEdicion",
+      "editarReciboEnConsulta",
+      "cancelarEdicionCompleta",
+      "guardarEdicionCompleta",
+      "borrarPDFdeDrive",
+      "verVistaPrevia",
+      "buscarReciboFolio",
+      "sincronizarFolioConREC",
+      "abrirVincularRecibo",
+      "confirmarVincularRecibo",
+      "_calcularEstadoCuenta",
+      "abrirEstadoCuenta",
+      "imprimirEstadoCuenta",
+      "abrirFichaFolio",
+      "_fichaEnviarSenalSync",
+      "_fichaActualizarTotalesConCargos",
+      "_fichaRenderCargosLista",
+      "fichaActivarEdicionConcepto",
+      "fichaCancelarEdicionConcepto",
+      "fichaAgregarCargo",
+      "fichaGuardarCargo",
+      "_cargoR2Path",
+      "_cargoR2Cargar",
+      "_cargoR2Guardar",
+      "fichaGuardarConcepto",
+      "fichaGuardarTotalEditable",
+      "fichaImprimirEstadoCuenta",
+      "_expDigPendienteActual",
+      "_expDigRenderStatus",
+      "_expDigDocsArray",
+      "_expDigAdjuntarClick",
+      "_expDigAdjuntarSinPendiente",
+      "abrirExpDigitalVehiculo",
+      "_expDigIntentarReconstruirDesdeDrive",
+      "_expDigVincularCarpeta",
+      "_expDigVerExpediente",
+      "cerrarFichaFolio",
+      "_prR2Path",
+      "_prGuardar",
+      "_prCargarDesdeR2",
+      "_prGetAll",
+      "_prEstadoColor",
+      "abrirPreRecibo",
+      "_prVolverLista",
+      "_prRenderLista",
+      "_prAgregarGastoUI",
+      "_prConfirmarGasto",
+      "_prEliminar",
+      "_prConvertirARecibo"
+    ],
+    "caja": [
+      "obtenerHistorialPagos",
+      "ejecutarPagoParcial",
+      "ejecutarLiquidacionTotal",
+      "seleccionarTipoCancelacion",
+      "filtrarHistorial",
+      "limpiarBuscaCaja",
+      "cajaBloqueada",
+      "marcarCajaCerrada",
+      "esPeriodoCerrado",
+      "_msgPeriodoCerrado",
+      "_foliosExcluidos",
+      "getSaldo",
+      "_poblarSelectorAnios",
+      "_csHome",
+      "_csAbrirSinLiquidar",
+      "_csNormPrestamo",
+      "_csPersonaPrestamo",
+      "_csIconoFlujo",
+      "_csAbrirPrestamos",
+      "exportCSV",
+      "aplicarFiltrosRecibos",
+      "renderFoliosVinculacion",
+      "renderFolioReciboDetalle",
+      "_getInfoPagoCarpeta",
+      "groqBuscarIA",
+      "_limpiarBackupsViejos",
+      "calcSaldoRecibo",
+      "calcTotalesRecibo",
+      "renderRecibosRecientes",
+      "registrarTenencia",
+      "registrarCSF",
+      "setTenModo",
+      "setCSFModo",
+      "setCopiasModo",
+      "registrarCopias",
+      "setEscanModo",
+      "registrarEscaneo",
+      "setLibreTipo",
+      "abrirLibre",
+      "registrarLibre",
+      "retroSetTipo",
+      "confirmarCapturaRetro",
+      "rcCurpCarrito",
+      "rcRegistrarCurp",
+      "_chequearCierreAutomaticoCaja",
+      "limpiarCierresDuplicados",
+      "calcRetiroPreview",
+      "_inferirTipoFolioSecundario",
+      "fichaCerrarJuicio"
+    ],
+    "contabilidad": [
+      "_lanzarFolioCancelacion",
+      "delMov",
+      "_movimientosDeCaja",
+      "_foliosYaEnCaja",
+      "_reciboAMovSintetico",
+      "confirmarCambioContable",
+      "_corregirMovimientosSinAnticipo",
+      "getAllMovs",
+      "contabBuscarDebounce",
+      "contabLimpiarFiltros",
+      "generarFolioMovCaja",
+      "_reordenarFoliosCaja",
+      "setFiltroC",
+      "_renderContabFlotante",
+      "_cerrarContabFlotante",
+      "abrirContabScanner",
+      "cerrarContabScanner",
+      "abrirContabMonitor",
+      "_monPintarTabs",
+      "cerrarContabMonitor",
+      "_monRender",
+      "_monRenderErrores",
+      "contabToggleMes",
+      "contabToggleAnio",
+      "renderCarp",
+      "_juTerminosAbiertos",
+      "eliminarPend",
+      "_registrarMovimiento",
+      "sync",
+      "_calcularRecibosFaltantes",
+      "reconciliarAplicar",
+      "reconciliarDeshacerUltimo",
+      "syncEstadoSupabase",
+      "_realtimeSincronizar",
+      "dashNombreAccion",
+      "verCierres",
+      "renderBackupsList",
+      "restaurarBackupConfirm",
+      "formatearFechaContabilidad",
+      "cerrarCajaAutomatico",
+      "autoRegistrarDiasSinActividad",
+      "sincronizarTodoAhora",
+      "abrirFichaDesdeContab",
+      "abrirPreviaDesdeContab",
+      "cerrarContabPDF",
+      "_gfBackup",
+      "cargarHistorialContabilidad",
+      "_buildHistorialHTML",
+      "renderHistorial2026",
+      "_fichaVisorMostrarVersion"
+    ],
+    "clientes": [
+      "generarQRPreview",
+      "sincronizarFirmaCliente",
+      "agregarCliente",
+      "quitarCliente",
+      "getClientes",
+      "limpiarForm",
+      "cargarReciboEnFormulario",
+      "validarAntesDeSalvar",
+      "confirmarAntesDeGuardar",
+      "_regMov",
+      "guardarRecibo",
+      "buscarClientePBC",
+      "_renderCajaBuscaResultados",
+      "buscarClienteCaja",
+      "abrirFolioDesdeCliente",
+      "abrirClienteRapido",
+      "iniciarTramiteDesdeCliente",
+      "_acuerdosBuscarDuplicados",
+      "clickSrv",
+      "_carpTextoBusqueda",
+      "guardarCarpeta",
+      "_verRecibosCliente",
+      "_juEsResponsableNuestro",
+      "_juTerminosPropiosAbiertos",
+      "renderJuicios",
+      "_abrirDetalleLegacyV1_NoUsar",
+      "confirmarEliminarJuicio",
+      "abrirJuicioEdit",
+      "_juActualizarHintResponsable",
+      "abrirNuevoTermino",
+      "editarTermino",
+      "cargarCarpetasDrive",
+      "_actualizarBadgeArchivoVinculado",
+      "_placasBuscarEnDrive",
+      "_placasNombreCopiaLibre",
+      "_placasSubirResumibleDrive",
+      "_placasSubirArchivoDrive",
+      "_placasPreguntarDuplicado",
+      "vincularReciboVehicular",
+      "_pPlacasVerExpediente",
+      "_pJuiCargar",
+      "_pJuiLimpiar",
+      "_pJuiRecopilar",
+      "vincularJuicio",
+      "pPersonaInput",
+      "renderClientesRecibo",
+      "eliminarCliente",
+      "generarQRRecibo",
+      "guardarReciboInterno",
+      "_recalcularFolioActual",
+      "registrarCarrito",
+      "rcRegistrarActa",
+      "abrirModalRetiro",
+      "confirmarRetiro",
+      "fichaImprimirHistorial",
+      "_juNuevaNota",
+      "_docRelNombreCarpetaJuicio",
+      "confirmarCerrarExpediente",
+      "analizarExpedienteIA",
+      "preguntaRapidaIA",
+      "enviarPreguntaIA"
+    ],
+    "directorio": [
+      "guardarEnDirectorio",
+      "formatTelefono",
+      "setDirF",
+      "actualizarDatalistClientes",
+      "renderDir",
+      "abrirContacto",
+      "_abrirPerfilContacto",
+      "perfilTab",
+      "perfilEditar",
+      "_abrirFormContacto",
+      "guardarContacto",
+      "eliminarContacto",
+      "limpiarBackupsViejos",
+      "load",
+      "recAgregarCliente",
+      "initRecibo",
+      "nuevoReciboLimpio",
+      "reiniciarSistema",
+      "exportarDirectorioCSV",
+      "_marcarContactoEliminadoLocal",
+      "_prAbrirFormulario",
+      "_prGuardarFormulario"
+    ],
+    "expedientes": [
+      "_actualizarSeccionModoCosto",
+      "_actualizarVisibilidadPoder",
+      "actualizarDriveBadge",
+      "respCancelar",
+      "setFiltroHistorial",
+      "_r2ResumenPath",
+      "_r2CargarResumen",
+      "_acuerdosClave",
+      "driveBuscarCarpetaId",
+      "driveListarArchivosCarpeta",
+      "_parsearArchivoAcuerdoDrive",
+      "cargarAcuerdosDrive",
+      "_acuerdosListarDriveFresco",
+      "guardarAcuerdosDrive",
+      "renderAcuerdosDrive",
+      "_editarNotifAcuerdo",
+      "eliminarAcuerdoDrive",
+      "_acuerdosAgruparDuplicados",
+      "subirAcuerdoDrive",
+      "subirAcuerdoDriveFiles",
+      "driveObtenerOCrearCarpeta",
+      "agregarEntradaHistorialDesdeAcuerdo",
+      "verAcuerdoPDF",
+      "cerrarVisorAcuerdo",
+      "verResumenAcuerdoModal",
+      "verResumenAcuerdo",
+      "initAcuerdosDrive",
+      "_perfilRenderPendientes",
+      "_perfilRenderJuicios",
+      "setCarpF",
+      "abrirDetallesCarpeta",
+      "imprimirCarpeta",
+      "abrirMenuCarpeta",
+      "kActualizarSubtipo",
+      "_kObsActualizar",
+      "eliminarCarpeta",
+      "setJF",
+      "_juEstadoTermino",
+      "_juTerminoUrgente",
+      "_juRenderListaTabla",
+      "proximaAudienciaDeTerminos",
+      "cerrarDetalle",
+      "_mJuVincularCarpeta",
+      "abrirJuicio",
+      "renderAcuerdos",
+      "abrirNuevoAcuerdo",
+      "previewAcuerdoPDF",
+      "guardarAcuerdo",
+      "eliminarAcuerdo",
+      "verPDFAcuerdo",
+      "resumirUltimoAcuerdoIA",
+      "renderTerminos",
+      "guardarTermino",
+      "toggleTermino",
+      "eliminarTermino",
+      "abrirVinculacionDrive",
+      "editarControlInterno",
+      "desvincularCarpetaDrive",
+      "subirPDFaJuicio",
+      "renderCarpetasDriveModal",
+      "filtrarCarpetasDrive",
+      "seleccionarCarpetaDrive",
+      "confirmarVinculacionDrive",
+      "mVAFiltrar",
+      "vaciarResueltosDefinitivo",
+      "_inferirSeccion",
+      "setPSec",
+      "_pendEstadoPorClave",
+      "_pendEstadoPorEdad",
+      "_pendEstatus",
+      "_placasVerDocFromCard",
+      "_placasResolverPend",
+      "_pendPurgarResueltosViejos",
+      "_verDetallePendiente",
+      "_construirPendienteBase",
+      "_persistirPendiente",
+      "pSecCambio",
+      "pPlacasAdjuntar",
+      "pPlacasEliminarDoc",
+      "pEscEliminarDoc",
+      "abrirSelectorJuicio",
+      "renderSelectorJuicio",
+      "pJuiDesvincular",
+      "_pJuiActualizarVinculacionUI",
+      "_irAJuicio",
+      "_pAdjuntarArchivos",
+      "_pVerDoc",
+      "_pVerDocEliminar",
+      "renderVencimientos",
+      "badges",
+      "guardarTodo",
+      "saveCarpetas",
+      "sugerirNumeroCarpeta",
+      "_marcarJuicioEliminadoLocal",
+      "_marcarCitaEliminadaLocal",
+      "_expDigVerDoc",
+      "_expDigListarCarpetaDrive",
+      "_expDigEnviar",
+      "fichaGuardarNotas",
+      "abrirDetalle",
+      "_juFijarEtapa",
+      "_juFijarEtapaFlujo",
+      "_juRenderAvisoTermino",
+      "_juCumplirTermino",
+      "_juCumplirTerminoUrgente",
+      "_juEditarCarpetaFisica",
+      "_juGuardarCarpetaFisica",
+      "_juRenderPestanas",
+      "_juAplicarTab",
+      "_juRenderNotas",
+      "_docRelCargar",
+      "_docRelSubirFiles",
+      "_juRenderBarraIA",
+      "_juPintarSugerencia",
+      "_juConfirmarSugerencia",
+      "cerrarModalExpediente",
+      "cargarDocsR2",
+      "subirDocR2",
+      "verDocR2",
+      "eliminarDocR2",
+      "ocrDocR2",
+      "renderHistorialModal",
+      "guardarFechaNotificacion",
+      "abrirResumenDesdeHistorial",
+      "guardarEntradaHistorial",
+      "getLeyesDespacho",
+      "setLeyesDespacho",
+      "actualizarContadorLeyes",
+      "abrirModalLeyes",
+      "cerrarModalLeyes",
+      "renderListaLeyes",
+      "toggleLeyActiva",
+      "subirNuevaLey",
+      "_leyesObtenerCarpetaDrive",
+      "_leyesListarDrive",
+      "cerrarModalCargarLeyes",
+      "_leyesVerPDF",
+      "_leyesEliminar",
+      "_leyesHandleFiles",
+      "abrirSelectorFlujo",
+      "_leyLocalizarSeccion",
+      "_flujoGenerarConLey",
+      "_flujoRender",
+      "_flujoAbrirDetalle",
+      "_flujoMarcarEtapaActual",
+      "_flujoDetectarEtapa",
+      "_acuerdoAbrirChatEscrito",
+      "abrirModalEscrito",
+      "generarEscritorIA",
+      "_obtenerTextoLeyesActivas",
+      "_iaLlamarGrounded",
+      "_llamarGeminiIAConLeyes"
+    ],
+    "documentos": [
+      "toggleVehiculo",
+      "getDocumentosSeleccionados",
+      "validarLimiteDocumentos",
+      "iniciarDriveAuth",
+      "setSyncState",
+      "renderSyncIndicator",
+      "reemplazarPDFenDrive",
+      "formatearPlaca",
+      "_abrevEstadoPlaca",
+      "_nombreCompletoEstadoPlaca",
+      "_sincronizarDisplayEstadoPlaca",
+      "_escEstadoPlacaKey",
+      "cerrarSelectorEstadoPlaca",
+      "_elegirEstadoPlaca",
+      "_escGuiaClasesKey",
+      "cerrarGuiaClasesVehiculo",
+      "abrirGuiaClasesVehiculo",
+      "_fmtFHEncabezado",
+      "_fmtFHNueva",
+      "mostrarPlacasEnPantalla",
+      "verificarHoraConDrive",
+      "sincronizarHoraCDMX",
+      "labelFuente",
+      "iniciarRelojBadge",
+      "mostrarDriveOverlay",
+      "cerrarDriveOverlay",
+      "conectarDriveDesdeOverlay",
+      "pedirDatosPlacas",
+      "togglePlacasSinPlacasFromRow",
+      "aplicarEstadoSinPlacas",
+      "cerrarModalPlacas",
+      "omitirModalPlacas",
+      "formatearCampoPlacas",
+      "confirmarModalPlacas",
+      "verPDFVersionSupabase",
+      "_docFamilia",
+      "_ahoraVerificado",
+      "_lockSessionId",
+      "_r2AuthToken",
+      "_r2GuardarResumen",
+      "calcularConectividadDrive",
+      "actualizarMedidorDrive",
+      "cerrarVisorPDF",
+      "_placasAdjBtnEstado",
+      "_placasNombreLimpio",
+      "_placasPutConProgreso",
+      "_placasLeerBase64",
+      "_placasProgreso",
+      "guardarPend",
+      "setPlacasTipo",
+      "_pPlacasMostrarResultadoSubida",
+      "_pPlacasFormatearTamano",
+      "_pPlacasRenderDocs",
+      "pPlacasVerDoc",
+      "_pEscCargar",
+      "_pEscRecopilar",
+      "pEscAdjuntar",
+      "_pEscRenderDocs",
+      "pEscVerDoc",
+      "_pVerDocRender",
+      "_pVerDocNav",
+      "_pVerDocDescargar",
+      "backupLocal",
+      "listarBackups",
+      "restaurarBackup",
+      "driveChipClick",
+      "obtenerTimestampDrive",
+      "verificarConflicto",
+      "rec_getDocumentosSeleccionados",
+      "recToggleVehiculo",
+      "abrirPanelTenencia",
+      "registrarTenenciaCarrito",
+      "rcMostrar",
+      "rcEnviarWA",
+      "rcCalcCurpTotal",
+      "rcAdjCurp",
+      "rec_iniciarDriveAuth",
+      "_checkDriveAntesDe",
+      "mostrarModalDriveDesconectado",
+      "cerrarModalDriveDesconectado",
+      "generarPDFEstadoCuenta",
+      "_expDigRenderArchivos",
+      "_docRelClave",
+      "_juRenderDocRel",
+      "_docRelCambiarCat",
+      "_docRelRender",
+      "_docRelInputChange",
+      "_prInicializarPanel"
+    ],
+    "integraciones": [
+      "initSupabase",
+      "obtenerDespachoActivo",
+      "tokenOk",
+      "mostrarLoginSupabase",
+      "syncStart",
+      "syncEnd",
+      "_sbConTimeout",
+      "_syncWatchdog",
+      "actualizarEstadoConexion",
+      "_ppSyncFechaRetro",
+      "forzarSincronizacionHora",
+      "_dObsSyncBoton",
+      "_groqGsClick",
+      "save",
+      "iniciarAuth",
+      "syncEstadoSupabaseDebounced",
+      "forzarBackup",
+      "guardarConVerificacion",
+      "vaciarCarrito",
+      "toggleSyncSheetsUI",
+      "actualizarSyncUI",
+      "_gfActualizarVersionesSB",
+      "_sha256File",
+      "_flujoProfundizarEtapa",
+      "_llamarGeminiIA",
+      "_llamarGeminiIADirecto"
+    ],
+    "administracion": [
+      "setTipoTramite",
+      "actualizarAmbossBadges",
+      "detectarEmpleado",
+      "crearArchivoControl",
+      "actualizarArchivoControl",
+      "adminLimpiarDuplicadosR2",
+      "adminRecuperarPDFsFaltantesR2",
+      "actualizarFolioDisplay",
+      "activarModoConsulta",
+      "pintarPagosParciales",
+      "nuevaFechaHoraStr",
+      "congelarFormulario",
+      "pedirAutorizacion",
+      "confirmarAutorizacion",
+      "cerrarModalAnticipo",
+      "esAdministrador",
+      "elegirResponsable",
+      "_guardarSnapshotRecibo",
+      "_guardarVersionEnSupabase",
+      "adminAbrirConsultarPDF",
+      "adminConsultarPDFCargar",
+      "adminConsultarPDFRender",
+      "adminAbrirURLVersion",
+      "adminMigrarFoliosAVersiones",
+      "aplicarEstadoCierre",
+      "_teObtener",
+      "_horarioEstado",
+      "_primerNombreEmpleado",
+      "_horarioGateCerrar",
+      "horarioGateLogin",
+      "_avisoProgramadoVistoHoyKey",
+      "_avisoProgramadoChequear",
+      "recargarPaginaForzado",
+      "manejarAtajos",
+      "renderCaja",
+      "verificarYCorregirMovimientosSinAnticipo",
+      "renderContab",
+      "_monRenderBitacora",
+      "_monRenderReconciliacion",
+      "abrirCarpeta",
+      "_finResumen",
+      "_pendEsAdminGlobal",
+      "_pendMarcarEnviado",
+      "renderPend",
+      "_placasAdjuntarDoc",
+      "_auditoriaRegistrar",
+      "_filtrarMovsAuditado",
+      "_protegerMovimientosRecibo",
+      "lexRealtimeConectar",
+      "lexRealtimeBroadcast",
+      "renderConfig",
+      "dashAccionAdmin",
+      "dashEjecutarAccion",
+      "cambiarEmpleado",
+      "limpiarDiaActual",
+      "doLogin",
+      "verificarLogin",
+      "actualizarInfoSesion",
+      "rcAbrirCurpGov",
+      "cerrarCaja",
+      "adminEliminarRecibosDuplicados",
+      "adminLimpiarDupContab",
+      "adminLimpiarDupContabAplicar",
+      "retirarTodo",
+      "_esAdminReal",
+      "abrirAdminModal",
+      "cerrarAdminModal",
+      "adminDelFolioBtnClick",
+      "adminLogin",
+      "adminMostrarPanel",
+      "adminVerificarConflicto",
+      "adminCorteDeCaja",
+      "adminDiagnosticoSaldo",
+      "adminRepararFoliosCaja",
+      "cerrarSesionUsuario",
+      "_checkCuentaHabilitada",
+      "_forzarCierreSesionPorDeshabilitado",
+      "adminLogout",
+      "adminDesbloquearCaja",
+      "adminAbrirEliminarMovimiento",
+      "adminElimMovRender",
+      "adminElimMovConfirmar",
+      "adminBorrarCobrosHoy",
+      "adminAbrirR2Recovery",
+      "_r2RecoveryVincular",
+      "adminVincularPDFsR2",
+      "adminModernizarPDFs",
+      "adminRegenerarPDFsDocumentos",
+      "adminRegenerarPDFsVehiculares",
+      "adminCorregirLetrasMovimientos",
+      "adminSimplificarDescripcionesRecibos",
+      "adminAgruparDescripcionesCarrito",
+      "adminVincularHistorialContab",
+      "_autoCorregirLetrasR2",
+      "adminMarcaPagadoPDFs",
+      "adminMigrarFoliosInfinitos",
+      "adminNormalizarNombresR2",
+      "adminLimpiarPDFsHuerfanos",
+      "adminAbrirBorrarPorFecha",
+      "adminBorrarFechaPreview",
+      "adminBorrarMovimientosPorFecha",
+      "adminAbrirEditarCobros",
+      "adminVolverEditarCobros",
+      "adminFiltroTipo",
+      "adminActualizarBotonesFiltro",
+      "adminFiltrarMovsEditar",
+      "adminRenderMovsEditar",
+      "adminAbrirEditarMovDesdeEditar",
+      "adminGuardarEdicion2Mov",
+      "adminAbrirBorrarEspecifico",
+      "adminVolverPanel",
+      "adminFiltrarMovimientos",
+      "adminRenderMovimientos",
+      "adminBorrarMovEspec",
+      "adminEditarMovEspec",
+      "adminVolverBorrar",
+      "adminGuardarEdicionMov",
+      "adminAbrirHistoricos",
+      "adminVolverDesdeHistoricos",
+      "adminHistTab",
+      "adminRetroInicializar",
+      "adminRetroSetTipo",
+      "adminConfirmarRetro",
+      "adminTogglePass",
+      "adminReordenarFolios",
+      "adminConfirmarReordenarFolios",
+      "adminUsarSiguienteHueco",
+      "adminAbrirGestionRecibos",
+      "adminFiltrarRecibos",
+      "adminAbrirCorregirMovs",
+      "adminCorregirRender",
+      "adminCorregirCambiarLetra",
+      "adminCorregirEliminarMov",
+      "adminFiltrarRecibosArr",
+      "adminRenderRecibos",
+      "adminBulkActivar",
+      "adminBulkToggle",
+      "adminBulkActualizarContador",
+      "adminBulkSeleccionarTodos",
+      "adminBulkDeseleccionarTodos",
+      "adminBulkCancelar",
+      "adminBulkEliminarSeleccionados",
+      "confirmarEliminarRecibo",
+      "adminCrearPendientePlacas",
+      "adminEliminarReciboPorFolio",
+      "adminEliminarRecibo",
+      "adminAbrirCambiarFecha",
+      "adminCFSetModo",
+      "adminCFMarcarTodos",
+      "adminConfirmarCambioFecha",
+      "adminRevertirLetraA",
+      "adminAbrirEditarRecibo",
+      "adminEditRecalcSaldo",
+      "abrirEdicionCompletaSidebar",
+      "adminAbrirEdicionCompletaZona",
+      "adminEdicionFiltrar",
+      "adminSeleccionarParaEditar",
+      "adminAbrirEdicionCompleta",
+      "adminVolverGestion",
+      "adminGuardarEdicionRecibo",
+      "abrirHistorialContabilidad",
+      "pedirClaveHistorial",
+      "_fichaEsAdmin",
+      "_fichaCargoRow",
+      "fichaEditarCargo",
+      "fichaGuardarEdicionCargo",
+      "fichaEliminarCargo",
+      "cerrarExpDigital",
+      "_juRenderEtapas",
+      "_juExtraerDatosAcuerdo",
+      "_leyesInicializarBtnAdmin",
+      "abrirModalCargarLeyes",
+      "_leyesRenderAdmin",
+      "_flujoInicializarBtn",
+      "_escritoEnviar"
+    ],
+    "core": [
+      "$",
+      "$invalidate",
+      "debounce",
+      "fmtFecha",
+      "fmtMXN",
+      "numeroALetras",
+      "setModoCosto",
+      "togglePoderSection",
+      "toggleCategoria",
+      "setTipoDoc",
+      "_lexSplashOcultar",
+      "parsePrecio",
+      "_guiaAplicarPan",
+      "_guiaAplicarZoom",
+      "_guiaMouseDown",
+      "_guiaMouseMove",
+      "_guiaMouseUp",
+      "_guiaWheel",
+      "_guiaCalcularMinScale",
+      "formatPrecio",
+      "_quitarAcentosQR",
+      "qrToDataURL",
+      "setStatus",
+      "getLogoDataURL",
+      "dibujarMarcaAgua",
+      "_parseFHTexto",
+      "_fmtFHDesdeTexto",
+      "escHTML",
+      "pintarCostosExtra",
+      "quitarCostoExtra",
+      "_ppParsearFechaHoraExistente",
+      "fechaLocalISO",
+      "ahoraCDMX",
+      "partesHoraCDMX",
+      "fechaCDMX_ISO",
+      "horaCDMX_HHMM",
+      "fechaHoraCDMX_Str",
+      "setHoraBadge",
+      "fichaRetroEditar",
+      "calcularIniciales",
+      "calcularInicialesEnVivo",
+      "cerrarModalAutorizacion",
+      "cerrarModalVehicular",
+      "cerrarModalValidacion",
+      "respSeleccionar",
+      "respConfirmar",
+      "renderHistorial",
+      "showModal",
+      "cerrarModal",
+      "togglePanelesBusqueda",
+      "togglePanelBusqueda",
+      "limpiarPBC",
+      "toNumero",
+      "toEntero",
+      "_capturaRetroApagar",
+      "_capturaRetroVigente",
+      "_docEstilo",
+      "_minutosDeHHMM",
+      "_minutosAhora",
+      "_teClaveHoy",
+      "_teEstaAbierto",
+      "_teDescribir",
+      "_saludoPorHora",
+      "_lexCortinaQuitar",
+      "_horarioGateMostrar",
+      "_horarioGateCountdownIniciar",
+      "_formatoFaltaTiempo",
+      "_avisoProgramadoMostrar",
+      "toast",
+      "animarNumero",
+      "cerrar",
+      "confirmarBonito",
+      "pedirTexto",
+      "escapeHtml",
+      "cerrarModalesAbiertos",
+      "mostrarAtajosAyuda",
+      "setModo",
+      "renderSrvs",
+      "_ordenarMovs",
+      "getMovHoy",
+      "_monRecalcularTodo",
+      "_csTarjeta",
+      "_carpObsArray",
+      "_carpObsHtmlEnum",
+      "_dObsRender",
+      "_dObsAutoGrow",
+      "_dObsActualizar",
+      "_dObsAgregar",
+      "fmtCarpNumHTML",
+      "_fechaHoyCorta",
+      "_fechaCorta",
+      "_kObsRender",
+      "_kObsAutoGrow",
+      "_kObsAgregar",
+      "_kObsQuitar",
+      "_juCatalogoPlazos",
+      "_juInhabilesExtra",
+      "_juEsHabil",
+      "_juISO",
+      "_juCalcVencimiento",
+      "_juEtapas",
+      "_juEtapaActual",
+      "_juPillEstatus",
+      "switchJTab",
+      "_juLlenarCatalogoPlazos",
+      "_juPlazoCatCambio",
+      "_juRecalcularVenc",
+      "setPF",
+      "verPendResueltos",
+      "_seccionDe",
+      "_pendDiasAbierto",
+      "_pendInyectarEstiloEnvio",
+      "_pendAnimarEnvio",
+      "_pOtrosCargar",
+      "_pOtrosLimpiar",
+      "_pOtrosRecopilar",
+      "_docZoom",
+      "_docZoomReset",
+      "_docZoomApply",
+      "_docZoomUpdateLabel",
+      "_docPanInit",
+      "_gsClick",
+      "globalSearchCerrar",
+      "globalSearchKey",
+      "reloj",
+      "setBadge",
+      "lexRealtimeDesconectar",
+      "lexPollingIniciar",
+      "parsePrecioR",
+      "formatPrecioR",
+      "getQRDataURL",
+      "dashActualizarIndicadores",
+      "abrirPanelBackups",
+      "selEstadoTen",
+      "selEstadoTenOtro",
+      "toggleTenExtra",
+      "adjTen",
+      "calcTenTotal",
+      "abrirPanelCSF",
+      "calcCSFTotal",
+      "registrarCSFCarrito",
+      "abrirLogin",
+      "updateCarritoBadge",
+      "agregarAlCarrito",
+      "abrirCarrito",
+      "renderCarrito",
+      "quitarCarritoItem",
+      "_agruparCarritoDescs",
+      "abrirCopias",
+      "selCopia",
+      "adjCopias",
+      "calcCopiaTotal",
+      "registrarCopiasCarrito",
+      "setEscanTam",
+      "abrirEscaneo",
+      "adjEscan",
+      "calcEscanTotal",
+      "registrarEscaneoCarrito",
+      "_precioLibreFmt",
+      "setLibreModo",
+      "abrirCapturaRetro",
+      "abrirRegistroCivil",
+      "rcAbrirSubpanel",
+      "rcActualizarVista",
+      "rcSelTipoActa",
+      "_rcBuildOtroDropdown",
+      "rcToggleOtroDropdown",
+      "rcSelEstadoActa",
+      "rcSelEstadoActaOtro",
+      "rcActualizarIndicadorActa",
+      "rcCalcActaTotal",
+      "rcAdjActa",
+      "_rcActaValidar",
+      "_rcActaDesc",
+      "_rcActaWA",
+      "rcActaCarrito",
+      "escH",
+      "fmtMx",
+      "fmtM2",
+      "fmtFIMonto",
+      "_ymdAddDays",
+      "_gfLog",
+      "_gfBloquear",
+      "_fechaDDMMAAAA",
+      "_normalizarFechaBusqueda",
+      "_marcarMovEditadoLocal",
+      "_marcarMovEliminadoLocal",
+      "_marcarPendEliminadoLocal",
+      "escHtml",
+      "_abrirHistorialReal",
+      "_fechaCortaEC",
+      "cerrarEstadoCuenta",
+      "_fichaExtraerIniciales",
+      "fichaToggleCargoBtns",
+      "fichaActivarEdicionTotal",
+      "fichaCancelarEdicionTotal",
+      "fichaToggleNotas",
+      "_juRenderDatosDuros",
+      "_juTab",
+      "_juSugRecalc",
+      "_juDescartarSugerencia",
+      "_blobToBase64",
+      "abrirFormHistorial",
+      "cerrarFormHistorial",
+      "_flujoRepararYParsear",
+      "_escritoCopiar",
+      "_prById",
+      "_prTotalGastos",
+      "_prNuevo",
+      "_prRenderGastos",
+      "_prEliminarGasto",
+      "_prImprimirEstadoCuenta",
+      "cerrarModalEscrito",
+      "_agregarMensajeIA"
+    ]
+  },
+  "manifest": [
+    {
+      "name": "$",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "$invalidate",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "debounce",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "agregarConcepto",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_autoGrowConceptoTA",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "fmtFecha",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "fmtMXN",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "numeroALetras",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "setTipoTramite",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "setModoCosto",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_actualizarSeccionModoCosto",
+      "domain": "expedientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "togglePoderSection",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_actualizarVisibilidadPoder",
+      "domain": "expedientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "toggleCategoria",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "toggleVehiculo",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "setTipoDoc",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "getDocumentosSeleccionados",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "validarLimiteDocumentos",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "initSupabase",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "obtenerDespachoActivo",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "tokenOk",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "iniciarDriveAuth",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_lexSplashOcultar",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "mostrarLoginSupabase",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "actualizarDriveBadge",
+      "domain": "expedientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "setSyncState",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "syncStart",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "syncEnd",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_tombstoneAplicaA",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_revivirSiTombstone",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_purgarTombstonesSuperados",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_sbConTimeout",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_syncWatchdog",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "renderSyncIndicator",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "actualizarEstadoConexion",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "actualizarAmbossBadges",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "detectarEmpleado",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "sincronizarFolio",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_cargarDatosDesdeJSON",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "reservarFolioEnDrive",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "crearArchivoControl",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "actualizarArchivoControl",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_nombreArchivoR2",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_nombreArchivoR2Legacy",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_purgarPDFRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "adminLimpiarDuplicadosR2",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "adminRecuperarPDFsFaltantesR2",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "subirPDFaDrive",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "reemplazarPDFenDrive",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "driveGET",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "guardarEnDirectorio",
+      "domain": "directorio",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "folioFormato",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "letraVersion",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "folioConLetra",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "letraDeRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_blindarContadorFolio",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "verificarReinicioAnual",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "actualizarFolioDisplay",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "formatTelefono",
+      "domain": "directorio",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "parsePrecio",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "formatearPlaca",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_abrevEstadoPlaca",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_nombreCompletoEstadoPlaca",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_sincronizarDisplayEstadoPlaca",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_escEstadoPlacaKey",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarSelectorEstadoPlaca",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_elegirEstadoPlaca",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "abrirSelectorEstadoPlaca",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_escGuiaClasesKey",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_guiaAplicarPan",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_guiaAplicarZoom",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_guiaMouseDown",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_guiaMouseMove",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_guiaMouseUp",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_guiaWheel",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_guiaCalcularMinScale",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarGuiaClasesVehiculo",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "abrirGuiaClasesVehiculo",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "formatPrecio",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "calcTotales",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "validarAnticipo",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_quitarAcentosQR",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "generarQRPreview",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "qrToDataURL",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "sincronizarFirmaCliente",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "agregarCliente",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "quitarCliente",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "getClientes",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "quitarConcepto",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "getConceptos",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "limpiarForm",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "limpiarFormCompleto",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "setStatus",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "getLogoDataURL",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "dibujarEncabezadoPDF",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "dibujarMarcaAgua",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_fmtFHEncabezado",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_fmtFHNueva",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_parseFHTexto",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_fmtFHDesdeTexto",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "generarPDF",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "obtenerHistorialPagos",
+      "domain": "caja",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cargarHistorialExpediente",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cargarHistorialFolioDebounce",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cargarHistorialFolio",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "activarModoConsulta",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "salirModoConsulta",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cargarReciboEnFormulario",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "mostrarPlacasEnPantalla",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "escHTML",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarConsulta",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_cerrarPanelesBusqueda",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_restaurarPanelesBusqueda",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "ejecutarPagoParcial",
+      "domain": "caja",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "ejecutarServicioComplementario",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cancelarAbonoNuevo",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "abrirModoActualizacion",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cancelarActualizacion",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "pintarCostosExtra",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "agregarCostoExtra",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "toggleCeLiquidado",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "quitarCostoExtra",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "getCostosExtra",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "pintarPagosParciales",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_ppParsearFechaHoraExistente",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "agregarPagoParcial",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "quitarPagoParcial",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_ppSyncFechaRetro",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_sincronizarFechaHoraMaestraPagos",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "getPagosParciales",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "nuevaFechaHoraStr",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "actualizarHoraDisplay",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "fechaLocalISO",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "ahoraCDMX",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "partesHoraCDMX",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "fechaCDMX_ISO",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "horaCDMX_HHMM",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "fechaHoraCDMX_Str",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "verificarHoraConDrive",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "sincronizarHoraCDMX",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "labelFuente",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "setHoraBadge",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "iniciarRelojBadge",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "forzarSincronizacionHora",
+      "domain": "integraciones",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "recalcularResumenActualizacion",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "imprimirActualizacion",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_imprimirActualizacionReal",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "ejecutarLiquidacionTotal",
+      "domain": "caja",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarModalCancelacion",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "fichaRetroToggle",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "fichaRetroDesactivar",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "fichaRetroEditar",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "fichaRetroActualizarDisplay",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "seleccionarTipoCancelacion",
+      "domain": "caja",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "ejecutarTramiteCancelado",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "confirmarCancelacion",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_lanzarFolioCancelacion",
+      "domain": "contabilidad",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_confirmarCancelacionReal",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "mostrarDriveOverlay",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarDriveOverlay",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "conectarDriveDesdeOverlay",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "congelarFormulario",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "descongelarFormulario",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "siguienteFolio",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "reimprimirRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_mostrarVisorReciboPDF",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_imprimirDesdeVisorReciboPDF",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_cerrarVisorReciboPDF",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "imprimirDesdeBlob",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "calcularIniciales",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "calcularInicialesEnVivo",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "pedirAutorizacion",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarModalAutorizacion",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "confirmarAutorizacion",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "pedirDatosPlacas",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "togglePlacasSinPlacasFromRow",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "aplicarEstadoSinPlacas",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarModalAnticipo",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarModalPlacas",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "omitirModalPlacas",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "actualizarLabelPlacas",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "formatearCampoPlacas",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "confirmarModalPlacas",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarModalVehicular",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "confirmarVehicular",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "validarAntesDeSalvar",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarModalValidacion",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "guardarDeTodasFormas",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "confirmarAntesDeGuardar",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "abrirConfirmacionRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "confirmarRecibo_Aceptar",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "confirmarRecibo_Cancelar",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_eliminarPendientePorFolio",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "esAdministrador",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_regMov",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "elegirResponsable",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "respSeleccionar",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "respConfirmar",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "respCancelar",
+      "domain": "expedientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "guardarRecibo",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "setFiltroHistorial",
+      "domain": "expedientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_guardarSnapshotRecibo",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_guardarVersionEnSupabase",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "verHistorialVersiones",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "adminAbrirConsultarPDF",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_cpdfMigrarSilencioso",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "adminConsultarPDFCargar",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "adminConsultarPDFRender",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "adminAbrirURLVersion",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "adminMigrarFoliosAVersiones",
+      "domain": "administracion",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "descargarSnapshotPDF",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "restaurarVersionRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "verPDFVersionSupabase",
+      "domain": "documentos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "restaurarVersionDesdeSupabase",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "filtrarHistorial",
+      "domain": "caja",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "renderHistorial",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "reDescargar",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "showModal",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cerrarModal",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "togglePanelesBusqueda",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "togglePanelBusqueda",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "togglePanelFolios",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "buscarClientePBC",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "limpiarPBC",
+      "domain": "core",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "_renderCajaBuscaResultados",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "buscarClienteCaja",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "limpiarBuscaCaja",
+      "domain": "caja",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "abrirFolioPBC",
+      "domain": "recibos",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "abrirFolioDesdeCliente",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "abrirClienteRapido",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "iniciarTramiteDesdeCliente",
+      "domain": "clientes",
+      "source": "assets/js/app/receipts-and-supabase.js"
+    },
+    {
+      "name": "cajaBloqueada",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "marcarCajaCerrada",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "esPeriodoCerrado",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_msgPeriodoCerrado",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "aplicarEstadoCierre",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "toNumero",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "toEntero",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_capturaRetroApagar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_capturaRetroVigente",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_docFamilia",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_docEstilo",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_minutosDeHHMM",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_ahoraVerificado",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_minutosAhora",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_teClaveHoy",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_teObtener",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_teEstaAbierto",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_teDescribir",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_horarioEstado",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_saludoPorHora",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_primerNombreEmpleado",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_lexCortinaQuitar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_horarioGateMostrar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_horarioGateCountdownIniciar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_horarioGateCerrar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "horarioGateLogin",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_formatoFaltaTiempo",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_avisoProgramadoVistoHoyKey",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_avisoProgramadoChequear",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_avisoProgramadoMostrar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_lockSessionId",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_lockIntentarAdquirir",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_lockLiberar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_lockAvisoBloqueo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_r2AuthToken",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_r2ResumenPath",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_r2GuardarResumen",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_r2CargarResumen",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_acuerdosClave",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "driveBuscarCarpetaId",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "driveListarArchivosCarpeta",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_parsearArchivoAcuerdoDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cargarAcuerdosDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_acuerdosListarDriveFresco",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarAcuerdosDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderAcuerdosDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_editarNotifAcuerdo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "eliminarAcuerdoDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_acuerdosAgruparDuplicados",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_acuerdosBuscarDuplicados",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "subirAcuerdoDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "subirAcuerdoDriveFiles",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "driveObtenerOCrearCarpeta",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "agregarEntradaHistorialDesdeAcuerdo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "verAcuerdoPDF",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarVisorAcuerdo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "verResumenAcuerdoModal",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "verResumenAcuerdo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "initAcuerdosDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "toast",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "recargarPaginaForzado",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "calcularConectividadDrive",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "actualizarMedidorDrive",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "animarNumero",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "confirmarBonito",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pedirTexto",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "escapeHtml",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "manejarAtajos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarModalesAbiertos",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "mostrarAtajosAyuda",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "ir",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "recargarReciboFrame",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setModo",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderSrvs",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "clickSrv",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_ordenarMovs",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderCaja",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "delMov",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_movimientosDeCaja",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_recibosMap",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_foliosExcluidos",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_foliosYaEnCaja",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_reciboAMovSintetico",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "confirmarCambioContable",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_corregirMovimientosSinAnticipo",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "verificarYCorregirMovimientosSinAnticipo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "getAllMovs",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "getMovHoy",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "getSaldo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "contabBuscarDebounce",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "contabLimpiarFiltros",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_poblarSelectorAnios",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_folioMY",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "generarFolioMovCaja",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_reordenarFoliosCaja",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setFiltroC",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderContab",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_renderContabFlotante",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_cerrarContabFlotante",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirContabScanner",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarContabScanner",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirContabMonitor",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_monPintarTabs",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarContabMonitor",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_monRender",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_monRenderBitacora",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_monRenderErrores",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_monRenderReconciliacion",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_monRecalcularTodo",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_csTarjeta",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_csHome",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_csAbrirSinLiquidar",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_csNormPrestamo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_csPersonaPrestamo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_csIconoFlujo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_csAbrirPrestamos",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_csAbrirFolios",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "contabToggleMes",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "contabToggleAnio",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "exportCSV",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderRec",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "aplicarFiltrosRecibos",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "filtrarRecibos",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "limpiarFiltrosRecibos",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "exportarRecibosCSV",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setDirF",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "actualizarDatalistClientes",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderDir",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirContacto",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_abrirPerfilContacto",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_perfilRenderRecibos",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_perfilRenderPendientes",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_perfilRenderJuicios",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "perfilTab",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "perfilEditar",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_abrirFormContacto",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarContacto",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "eliminarContacto",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setCarpF",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_carpObsArray",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_carpObsHtmlEnum",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_carpTextoBusqueda",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirDetallesCarpeta",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_dObsSyncBoton",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_dObsRender",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_dObsAutoGrow",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_dObsActualizar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_dObsAgregar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_verDetalleCarpeta_ELIMINADA_",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "fmtCarpNumHTML",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderCarp",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "imprimirCarpeta",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirMenuCarpeta",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "kActualizarSubtipo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_fechaHoyCorta",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_fechaCorta",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_kObsRender",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_kObsAutoGrow",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_kObsActualizar",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_kObsAgregar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_kObsQuitar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirCarpeta",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarCarpeta",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "eliminarCarpeta",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setJF",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_finResumen",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_verRecibosCliente",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juFoliosRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juGuardarFoliosRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_jvrRenderActual",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirGestionReciboJuicio",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "filtrarRecibosParaJuicio",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "vincularReciboAJuicio",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "desvincularReciboDeJuicio",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juCatalogoPlazos",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juInhabilesExtra",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juEsHabil",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juISO",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juCalcVencimiento",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juEstadoTermino",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juTerminosAbiertos",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juEsResponsableNuestro",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juTerminosPropiosAbiertos",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juTerminoUrgente",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juEtapas",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juEtapaActual",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juPillEstatus",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juRenderListaTabla",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderJuicios",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "proximaAudienciaDeTerminos",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_abrirDetalleLegacyV1_NoUsar",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarDetalle",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "confirmarEliminarJuicio",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "switchJTab",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirJuicioEdit",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_mJuActualizarVinculaciones",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_mJuVincularCarpeta",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_mJuVincularRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirJuicio",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarJuicio",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderAcuerdos",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirNuevoAcuerdo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "previewAcuerdoPDF",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarAcuerdo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "eliminarAcuerdo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "verPDFAcuerdo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarVisorPDF",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "resumirUltimoAcuerdoIA",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderTerminos",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juActualizarHintResponsable",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirNuevoTermino",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "editarTermino",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juLlenarCatalogoPlazos",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juPlazoCatCambio",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_juRecalcularVenc",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarTermino",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "toggleTermino",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "eliminarTermino",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirVinculacionDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "editarControlInterno",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "desvincularCarpetaDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cargarCarpetasDrive",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "subirPDFaJuicio",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderCarpetasDriveModal",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "filtrarCarpetasDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "seleccionarCarpetaDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "confirmarVinculacionDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirVinculacionFolio",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "filtrarFoliosVinculacion",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderFoliosVinculacion",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "vincularFolioRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderFolioReciboDetalle",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirVincularArchivo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "mVAFiltrar",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_getInfoPagoCarpeta",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "seleccionarCarpetaArchivo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "desvincularArchivo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarVincularArchivo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_actualizarBadgeArchivoVinculado",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "actualizarBadgeArchivoDesdeRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "saveJuicios",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setPF",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "verPendResueltos",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "vaciarResueltosDefinitivo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_inferirSeccion",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_seccionDe",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setPSec",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pendDiasAbierto",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pendEstadoPorClave",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pendEstadoPorEdad",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pendEsAdminGlobal",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pendMarcarEnviado",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pendInyectarEstiloEnvio",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pendAnimarEnvio",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderPend",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pendEstatus",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasVerDocFromCard",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasAdjBtnEstado",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasNombreLimpio",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasBuscarEnDrive",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasNombreCopiaLibre",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasPutConProgreso",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasSubirResumibleDrive",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasSubirArchivoDrive",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasPreguntarDuplicado",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasLeerBase64",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_marcarExpDigitalVinculado",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasResolverPend",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasProgreso",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_placasAdjuntarDoc",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "toggleP",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pendPurgarResueltosViejos",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirPendiente",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarPend",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_verDetallePendiente",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_construirPendienteBase",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_persistirPendiente",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "eliminarPend",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pSecCambio",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pPlacasCargar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pPlacasLimpiar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pPlacasRecopilar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setPlacasTipo",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirSelectorReciboVehicular",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderSelectorReciboVehicular",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "vincularReciboVehicular",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pPlacasDesvincular",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pPlacasActualizarInfoRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pPlacasAdjuntar",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pPlacasMostrarResultadoSubida",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pPlacasFormatearTamano",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pPlacasRenderDocs",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pPlacasVerDoc",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pPlacasVerExpediente",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pPlacasAbrirR2",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pPlacasEliminarDoc",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_irAReciboVinculado",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pEscCargar",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pEscLimpiar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pEscRecopilar",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pEscActualizarResto",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pEscAdjuntar",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pEscRenderDocs",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pEscVerDoc",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pEscEliminarDoc",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pEscCompradorInput",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pJuiCargar",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pJuiLimpiar",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pJuiRecopilar",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirSelectorJuicio",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderSelectorJuicio",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "vincularJuicio",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pJuiDesvincular",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pJuiActualizarVinculacionUI",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_irAJuicio",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pOtrosCargar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pOtrosLimpiar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pOtrosRecopilar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pAdjuntarArchivos",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pVerDoc",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pVerDocRender",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_docZoom",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_docZoomReset",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_docZoomApply",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_docZoomUpdateLabel",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_docPanInit",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pVerDocNav",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pVerDocDescargar",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_pVerDocEliminar",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pPersonaInput",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pSeleccionarPersona",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pLimpiarFolioVinculado",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pPlacasNombreInput",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pPlacasSelNombre",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "globalSearch",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gsClick",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "globalSearchCerrar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "globalSearchKey",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "groqBuscarIA",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_groqGsClick",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderVencimientos",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "badges",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "reloj",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_registrarMovimiento",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_auditoriaRegistrar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_filtrarMovsAuditado",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "save",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarTodo",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "backupLocal",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "listarBackups",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "restaurarBackup",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "limpiarBackupsViejos",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "backupAppData",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_limpiarBackupsViejos",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "saveCarpetas",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "load",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "driveChipClick",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "calcSaldoRecibo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "actualizarFolioDisplayRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "recAgregarCliente",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "recAgregarConcepto",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "iniciarAuth",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setBadge",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "sync",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_conceptoTxtDeRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_calcularRecibosFaltantes",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_protegerMovimientosRecibo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "reconciliarAplicar",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "reconciliarDeshacerUltimo",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "syncEstadoSupabase",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "syncEstadoSupabaseDebounced",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "lexRealtimeConectar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_realtimeSincronizar",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "lexRealtimeBroadcast",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "lexRealtimeDesconectar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "lexPollingIniciar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_lexPollingTick",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "hacerBackupDiario",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "forzarBackup",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "obtenerTimestampDrive",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "verificarConflicto",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarConVerificacion",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "siguienteFolioRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderClientesRecibo",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "eliminarCliente",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderConceptosRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "eliminarConcepto",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "autoCalcTotal",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "parsePrecioR",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "formatPrecioR",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "calcTotalesRecibo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderDocsRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rec_getDocumentosSeleccionados",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setTipoDocRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "recToggleVehiculo",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "generarQRRecibo",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "getQRDataURL",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "initRecibo",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarReciboInterno",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "congelarRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "descongelarRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "nuevoReciboLimpio",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "reimprimirReciboInterno",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "imprimirBlob",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_folioSiguienteUnico",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_recalcularFolioActual",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_tomarFolioSeguro",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarFolioEnDrive",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "subirPDFaD",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderRecibosRecientes",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderConfig",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "dashActualizarIndicadores",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "dashAccionAdmin",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "dashNombreAccion",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "dashEjecutarAccion",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cambiarEmpleado",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "limpiarDiaActual",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "reiniciarSistema",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "exportarCopia",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "importarCopia",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "verCierres",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirPanelBackups",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "sugerirNumeroCarpeta",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderBackupsList",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "restaurarBackupConfirm",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirPanelTenencia",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "selEstadoTen",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "selEstadoTenOtro",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "toggleTenExtra",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adjTen",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "calcTenTotal",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_abrirUrlTenencia",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarTenencia",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarTenenciaCarrito",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirPanelCSF",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "calcCSFTotal",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarCSF",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarCSFCarrito",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirLogin",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "doLogin",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "verificarLogin",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "actualizarInfoSesion",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "updateCarritoBadge",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "agregarAlCarrito",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirCarrito",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderCarrito",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "quitarCarritoItem",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "vaciarCarrito",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_agruparCarritoDescs",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarCarrito",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setTenModo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setCSFModo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirCopias",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "selCopia",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adjCopias",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "calcCopiaTotal",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setCopiasModo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarCopias",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarCopiasCarrito",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setEscanTam",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirEscaneo",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adjEscan",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "calcEscanTotal",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setEscanModo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarEscaneo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarEscaneoCarrito",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setLibreTipo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirLibre",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_precioLibreFmt",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "formatPrecioLibre",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderConceptosLibre",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "agregarConceptoLibre",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "eliminarConceptoLibre",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "calcLibreTotal",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "setLibreModo",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarLibre",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "registrarLibreCarrito",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirCapturaRetro",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "retroSetTipo",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "confirmarCapturaRetro",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirRegistroCivil",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcMostrar",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcAbrirSubpanel",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcEnviarWA",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcAbrirCurpGov",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcActualizarVista",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcCalcCurpTotal",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcAdjCurp",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcCurpCarrito",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcRegistrarCurp",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcSelTipoActa",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_rcBuildOtroDropdown",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcToggleOtroDropdown",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcSelEstadoActa",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcSelEstadoActaOtro",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcActualizarIndicadorActa",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcCalcActaTotal",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcAdjActa",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_rcActaValidar",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_rcActaDesc",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_rcActaWA",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcRegistrarActa",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rcActaCarrito",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "escH",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "fmtMx",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "fmtM2",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "fmtFIMonto",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "formatearFechaContabilidad",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "exportarDirectorioCSV",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarCaja",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarCajaAutomatico",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_chequearCierreAutomaticoCaja",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_ymdAddDays",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminEliminarRecibosDuplicados",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminLimpiarDupContab",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminLimpiarDupContabAplicar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "limpiarCierresDuplicados",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "autoRegistrarDiasSinActividad",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirModalRetiro",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "retirarTodo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "calcRetiroPreview",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "confirmarRetiro",
+      "domain": "clientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "sincronizarTodoAhora",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "toggleSyncSheetsUI",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "actualizarSyncUI",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_esAdminReal",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirAdminModal",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarAdminModal",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminDelFolioBtnClick",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirFichaDesdeContab",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirPreviaDesdeContab",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_cpdfMostrarFormGenerar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cpdfConfirmarGenerar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarContabPDF",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminLogin",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminMostrarPanel",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminVerificarConflicto",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminCorteDeCaja",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminDiagnosticoSaldo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminRepararFoliosCaja",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarSesionUsuario",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_checkCuentaHabilitada",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_forzarCierreSesionPorDeshabilitado",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminLogout",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminDesbloquearCaja",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirEliminarMovimiento",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminElimMovRender",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminElimMovConfirmar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBorrarCobrosHoy",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirR2Recovery",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_r2RecoveryVincular",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminVincularPDFsR2",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminModernizarPDFs",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminRegenerarPDFsDocumentos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_vehPDFEsCandidato",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminRegenerarPDFsVehiculares",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfRecibosVivos",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfMaxFolio",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfFolioExiste",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfRecibosEnRango",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfDistintosFolios",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfBackup",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfRegenerarPDFs",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfBorrarPDFsViejos",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfNombresNuevos",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfActualizarVersionesSB",
+      "domain": "integraciones",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfMarcarVaciados",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfLimpiarTombstonesRenumerados",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfVerificarLibre",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfFijarContador",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfInsertarEjecutar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfEliminarEjecutar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirGestorFolios",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfLog",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfBloquear",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfUIInsertar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfUIEliminar",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_gfUICerrarHuecoVacio",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminCorregirLetrasMovimientos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminSimplificarDescripcionesRecibos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAgruparDescripcionesCarrito",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminVincularHistorialContab",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_autoCorregirLetrasR2",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminMarcaPagadoPDFs",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminMigrarFoliosInfinitos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminNormalizarNombresR2",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminLimpiarPDFsHuerfanos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirBorrarPorFecha",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBorrarFechaPreview",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBorrarMovimientosPorFecha",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirEditarCobros",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminVolverEditarCobros",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminFiltroTipo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminActualizarBotonesFiltro",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminFiltrarMovsEditar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_fechaDDMMAAAA",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_normalizarFechaBusqueda",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminRenderMovsEditar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirEditarMovDesdeEditar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_marcarMovEditadoLocal",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_marcarMovEliminadoLocal",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_marcarPendEliminadoLocal",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_marcarJuicioEliminadoLocal",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_marcarContactoEliminadoLocal",
+      "domain": "directorio",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_marcarCitaEliminadaLocal",
+      "domain": "expedientes",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminGuardarEdicion2Mov",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirBorrarEspecifico",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminVolverPanel",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminFiltrarMovimientos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminRenderMovimientos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBorrarMovEspec",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminEditarMovEspec",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminVolverBorrar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminGuardarEdicionMov",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirHistoricos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminVolverDesdeHistoricos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminHistTab",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "escHtml",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminRetroInicializar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminRetroSetTipo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminConfirmarRetro",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminTogglePass",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "rec_iniciarDriveAuth",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_sincronizarDriveBadgeRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_checkDriveAntesDe",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "mostrarModalDriveDesconectado",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarModalDriveDesconectado",
+      "domain": "documentos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminReordenarFolios",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminConfirmarReordenarFolios",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminUsarSiguienteHueco",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirGestionRecibos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminFiltrarRecibos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirCorregirMovs",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminCorregirRender",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminCorregirCambiarLetra",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminCorregirEliminarMov",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminFiltrarRecibosArr",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminRenderRecibos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBulkActivar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBulkToggle",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBulkActualizarContador",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBulkSeleccionarTodos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBulkDeseleccionarTodos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBulkCancelar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminBulkEliminarSeleccionados",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_abrirModalEliminarRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cerrarModalEliminarRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "confirmarEliminarRecibo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminCrearPendientePlacas",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminEliminarReciboPorFolio",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_purgarPagosParcialesDeVersion",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminEliminarRecibo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirCambiarFecha",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminCFSetModo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminCFMarcarTodos",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminConfirmarCambioFecha",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminRevertirLetraA",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_inferirTipoFolioSecundario",
+      "domain": "caja",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_abrirEdicionSecundario",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirEditarRecibo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminEditRecalcSaldo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirEdicionCompletaSidebar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirEdicionCompletaZona",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminEdicionFiltrar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminSeleccionarParaEditar",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_ajustarAnchoBannerEdicion",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "editarReciboEnConsulta",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminAbrirEdicionCompleta",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cancelarEdicionCompleta",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "guardarEdicionCompleta",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminVolverGestion",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "adminGuardarEdicionRecibo",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "borrarPDFdeDrive",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "cargarHistorialContabilidad",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_buildHistorialHTML",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirHistorialContabilidad",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "pedirClaveHistorial",
+      "domain": "administracion",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_abrirHistorialReal",
+      "domain": "core",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "renderHistorial2026",
+      "domain": "contabilidad",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "verVistaPrevia",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "buscarReciboFolio",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "sincronizarFolioConREC",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "abrirVincularRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "confirmarVincularRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/operations-and-accounting.js"
+    },
+    {
+      "name": "_fechaCortaEC",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_calcularEstadoCuenta",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirEstadoCuenta",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "cerrarEstadoCuenta",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "generarPDFEstadoCuenta",
+      "domain": "documentos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "imprimirEstadoCuenta",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_fichaExtraerIniciales",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirFichaFolio",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_fichaEnviarSenalSync",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_fichaEsAdmin",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_fichaActualizarTotalesConCargos",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_fichaRenderCargosLista",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_fichaCargoRow",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaToggleCargoBtns",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaEditarCargo",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaGuardarEdicionCargo",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaEliminarCargo",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaActivarEdicionTotal",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaCancelarEdicionTotal",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaActivarEdicionConcepto",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaCancelarEdicionConcepto",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaAgregarCargo",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaGuardarCargo",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_cargoR2Path",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_cargoR2Cargar",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_cargoR2Guardar",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaCerrarJuicio",
+      "domain": "caja",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaGuardarConcepto",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaGuardarTotalEditable",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaImprimirEstadoCuenta",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigPendienteActual",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigRenderStatus",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigDocsArray",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigRenderArchivos",
+      "domain": "documentos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigVerDoc",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigAdjuntarClick",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigAdjuntarSinPendiente",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirExpDigitalVehiculo",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigListarCarpetaDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigIntentarReconstruirDesdeDrive",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "cerrarExpDigital",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigVincularCarpeta",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigEnviar",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_expDigVerExpediente",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_fichaVisorMostrarVersion",
+      "domain": "contabilidad",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "cerrarFichaFolio",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaToggleNotas",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaGuardarNotas",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "fichaImprimirHistorial",
+      "domain": "clientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirDetalle",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juRenderEtapas",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juFijarEtapa",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juFijarEtapaFlujo",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juRenderAvisoTermino",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juCumplirTermino",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juCumplirTerminoUrgente",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juRenderDatosDuros",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juEditarCarpetaFisica",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juGuardarCarpetaFisica",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juRenderPestanas",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juTab",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juAplicarTab",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juRenderNotas",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juNuevaNota",
+      "domain": "clientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_docRelNombreCarpetaJuicio",
+      "domain": "clientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_docRelClave",
+      "domain": "documentos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juRenderDocRel",
+      "domain": "documentos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_docRelCambiarCat",
+      "domain": "documentos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_docRelCargar",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_docRelRender",
+      "domain": "documentos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_docRelInputChange",
+      "domain": "documentos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_docRelSubirFiles",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juRenderBarraIA",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juExtraerDatosAcuerdo",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juPintarSugerencia",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juSugRecalc",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juDescartarSugerencia",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_juConfirmarSugerencia",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "cerrarModalExpediente",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "confirmarCerrarExpediente",
+      "domain": "clientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "cargarDocsR2",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "subirDocR2",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "verDocR2",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "eliminarDocR2",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "ocrDocR2",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_blobToBase64",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "renderHistorialModal",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "guardarFechaNotificacion",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirResumenDesdeHistorial",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirFormHistorial",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "cerrarFormHistorial",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "guardarEntradaHistorial",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "getLeyesDespacho",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "setLeyesDespacho",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "actualizarContadorLeyes",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirModalLeyes",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "cerrarModalLeyes",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "renderListaLeyes",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "toggleLeyActiva",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "subirNuevaLey",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_leyesInicializarBtnAdmin",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_leyesObtenerCarpetaDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_sha256File",
+      "domain": "integraciones",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_leyesListarDrive",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirModalCargarLeyes",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "cerrarModalCargarLeyes",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_leyesRenderAdmin",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_leyesVerPDF",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_leyesEliminar",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_leyesHandleFiles",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_flujoInicializarBtn",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirSelectorFlujo",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_flujoRepararYParsear",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_leyLocalizarSeccion",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_flujoGenerarConLey",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_flujoRender",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_flujoAbrirDetalle",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_flujoProfundizarEtapa",
+      "domain": "integraciones",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_flujoMarcarEtapaActual",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_flujoDetectarEtapa",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_acuerdoAbrirChatEscrito",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_escritoEnviar",
+      "domain": "administracion",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_escritoCopiar",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prR2Path",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prGuardar",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prCargarDesdeR2",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prGetAll",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prById",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prEstadoColor",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prTotalGastos",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirPreRecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prInicializarPanel",
+      "domain": "documentos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prNuevo",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prVolverLista",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prRenderLista",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prAbrirFormulario",
+      "domain": "directorio",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prRenderGastos",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prAgregarGastoUI",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prConfirmarGasto",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prEliminarGasto",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prGuardarFormulario",
+      "domain": "directorio",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prEliminar",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prConvertirARecibo",
+      "domain": "recibos",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_prImprimirEstadoCuenta",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "abrirModalEscrito",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "cerrarModalEscrito",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "generarEscritorIA",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_obtenerTextoLeyesActivas",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_iaLlamarGrounded",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_llamarGeminiIAConLeyes",
+      "domain": "expedientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "analizarExpedienteIA",
+      "domain": "clientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "preguntaRapidaIA",
+      "domain": "clientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "enviarPreguntaIA",
+      "domain": "clientes",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_agregarMensajeIA",
+      "domain": "core",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_llamarGeminiIA",
+      "domain": "integraciones",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    },
+    {
+      "name": "_llamarGeminiIADirecto",
+      "domain": "integraciones",
+      "source": "assets/js/app/folio-query-and-statements.js"
+    }
+  ]
+}

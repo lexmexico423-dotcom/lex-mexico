@@ -293,6 +293,7 @@ const _despachoOk = await obtenerDespachoActivo();
         actualizarAmbossBadges(true);
         setStatus('loading','Cargando datos del despacho...','loading');
         await sincronizarFolio();
+        try { if(typeof window._pendMovsRecuperar === 'function') window._pendMovsRecuperar(); } catch(_ePend){}
         setStatus('ok','Sistema conectado — ' + empleadoActual.nombre,'ok');
         const _btnCS = document.getElementById('btn-cerrar-sesion'); if(_btnCS) _btnCS.style.display = 'block';
         auditoriaRegistrar('login', 'Inicio de sesión — ' + empleadoActual.email);

@@ -2947,8 +2947,8 @@ function getAllMovs() {
     .filter(m => !((parseFloat(m.monto) || 0) === 0 && yaEnCajaCero.has(Number(m.folio))));
   return _ordenarMovs([...movsCaja, ...sinteticos]);
 }
-function getMovHoy() {
-  const h = hoy();
+function getMovHoy(fechaOverride) {
+  const h = fechaOverride || hoy();
   return getAllMovs().filter(m => m.fecha === h);
 }
 function getSaldo() {
@@ -14298,12 +14298,36 @@ function cerrarCaja() {
 // Misma lógica que cerrarCaja(), pero sin confirm() y sin depender de que
 // ningún empleado haga clic; el responsable queda marcado como el sistema.
 // ═══════════════════════════════════════════════════════════════
-async function cerrarCajaAutomatico() {
-  if (cajaBloqueada()) return;
-  const m = getMovHoy();
+async function cerrarCajaAutomatico(fechaObjetivo) {
+  // fechaObjetivo es la fecha (YYYY-MM-DD, hora CDMX) que el SERVIDOR detectó
+  // como pendiente de cierre — ver columna app_state.caja_auto_cierre_fecha.
+  // Antes esta función siempre usaba hoy() sin importar qué día había
+  // quedado pendiente: si un viernes/domingo nadie tenía el sistema abierto
+  // a las 5:30 p.m., el aviso se quedaba esperando, y en cuanto alguien
+  // abría el sistema — aunque fuera lunes en la mañana — se cerraba la caja
+  // de ESE día (el que se acababa de abrir) en vez del día realmente
+  // atrasado. Ahora se cierra el día correcto, y "hoy" solo se bloquea si de
+  // verdad es el día que corresponde cerrar.
+  const fechaCierre = fechaObjetivo || hoy();
+  const esHoy = fechaCierre === hoy();
+  if (esHoy && cajaBloqueada()) return;
+  // Defensa extra: si ya existe un cierre para esa fecha (otro cliente se
+  // adelantó, o se cerró manualmente mientras tanto), no duplicar — solo
+  // limpiar la bandera pendiente.
+  if ((D.cierres || []).some(c => c && c.fecha === fechaCierre)) {
+    try {
+      if (window.SB && window.SB_DESPACHO_ID) {
+        await window.SB.from('app_state')
+          .update({ caja_auto_cierre_pendiente: false, caja_auto_cierre_fecha: null })
+          .eq('despacho_id', window.SB_DESPACHO_ID);
+      }
+    } catch(e) { registrarError('cerrarCajaAutomatico: limpiar bandera (ya existía)', e); }
+    return;
+  }
+  const m = getMovHoy(fechaCierre);
   if (!m.length) {
     const cierreSM = {
-      fecha: hoy(), hora: hora(),
+      fecha: fechaCierre, hora: hora(),
       ingresos: 0, egresos: 0, saldo: 0,
       movimientos: 0,
       sinMovimientos: true,
@@ -14317,21 +14341,25 @@ async function cerrarCajaAutomatico() {
     const ing  = m.filter(x => x.tipo === 'ingreso').reduce((s,x) => s + x.monto, 0);
     const egr  = m.filter(x => x.tipo === 'egreso').reduce((s,x)  => s + x.monto, 0);
     const saldo = ing - egr;
-    const cierre = { fecha: hoy(), hora: hora(), ingresos: ing, egresos: egr, saldo, movimientos: m.length, automatico: true };
+    const cierre = { fecha: fechaCierre, hora: hora(), ingresos: ing, egresos: egr, saldo, movimientos: m.length, automatico: true };
     D.cierres.unshift(cierre);
     if (!D.saldoAcumulado) D.saldoAcumulado = 0;
     D.saldoAcumulado += saldo;
   }
-  marcarCajaCerrada();
+  // Solo se bloquea la caja de HOY si la fecha pendiente de verdad es hoy —
+  // si se está poniendo al corriente un día atrasado, hoy se queda libre.
+  if (esHoy) marcarCajaCerrada();
   save();
   aplicarEstadoCierre();
-  toast('🔒 Caja cerrada automáticamente — horario laboral concluido (5:30 p.m.)');
+  toast(esHoy
+    ? '🔒 Caja cerrada automáticamente — horario laboral concluido (5:30 p.m.)'
+    : '📅 Se registró el cierre pendiente del ' + fechaCierre + ' (nadie tuvo el sistema abierto esa tarde) — hoy sigue disponible con normalidad.');
   syncEstadoSupabaseDebounced();
   // Avisar a Supabase que ya se atendió — limpia la bandera para no repetirlo.
   try {
     if (window.SB && window.SB_DESPACHO_ID) {
       await window.SB.from('app_state')
-        .update({ caja_auto_cierre_pendiente: false })
+        .update({ caja_auto_cierre_pendiente: false, caja_auto_cierre_fecha: null })
         .eq('despacho_id', window.SB_DESPACHO_ID);
     }
   } catch(e) { registrarError('cerrarCajaAutomatico: limpiar bandera', e); }
@@ -14343,12 +14371,17 @@ async function _chequearCierreAutomaticoCaja() {
   try {
     if (!window.SB || !window.SB_DESPACHO_ID) return;
     const { data } = await window.SB.from('app_state')
-      .select('caja_auto_cierre_pendiente')
+      .select('caja_auto_cierre_pendiente, caja_auto_cierre_fecha')
       .eq('despacho_id', window.SB_DESPACHO_ID)
       .single();
-    if (data && data.caja_auto_cierre_pendiente === true && !cajaBloqueada()) {
-      await cerrarCajaAutomatico();
-    }
+    if (!data || data.caja_auto_cierre_pendiente !== true) return;
+    const fechaObjetivo = data.caja_auto_cierre_fecha || hoy();
+    // Si la fecha pendiente es HOY y hoy ya está cerrada (por click manual o
+    // por otra pestaña que ya la procesó), no hay nada que repetir. Si la
+    // fecha pendiente es un día ANTERIOR, se procesa siempre — que hoy esté
+    // bloqueada o no es irrelevante para poner al corriente un día atrasado.
+    if (fechaObjetivo === hoy() && cajaBloqueada()) return;
+    await cerrarCajaAutomatico(fechaObjetivo);
   } catch(e) { registrarError('_chequearCierreAutomaticoCaja', e); }
 }
 // ═══════════════════════════════════════════════════════════════

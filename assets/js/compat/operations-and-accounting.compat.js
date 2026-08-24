@@ -2000,7 +2000,7 @@ window.onload=async function(){
   // ── LIMPIEZA PERMANENTE DE localStorage ─────────────────────────────────
   // Todo dato de caché/respaldo se elimina al cargar. Solo se conservan credenciales de sesión.
   (function() {
-    var mantener = new Set(['empleado_email','empleado_nombre','drive_token','drive_expiry','lex-supabase-auth','lex-supabase-session']);
+    var mantener = new Set(['empleado_email','empleado_nombre','drive_token','drive_expiry','lex-supabase-auth','lex-supabase-session','lex_pend_caja_movs']);
     var borrar = [];
     for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && !mantener.has(k)) borrar.push(k); }
     borrar.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
@@ -2097,6 +2097,7 @@ const _despachoRestaurado = await obtenerDespachoActivo();
       if(!_despachoRestaurado) return;
       actualizarAmbossBadges(true);
       await sincronizarFolio();
+      try { if(typeof window._pendMovsRecuperar === 'function') window._pendMovsRecuperar(); } catch(_ePend){}
       // El splash NO se oculta aquí todavía — se deja como cortina (mismo
       // fondo negro texturizado) hasta que horarioGateLogin() esté listo para
       // mostrar su aviso (o de inmediato si es admin). Así, igual que en el

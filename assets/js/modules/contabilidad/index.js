@@ -120,6 +120,14 @@ async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroO
         esActualizacion: true,
         fechaActualizacion: ahora,
         horaActualizacion: horaAhora,
+        // ⚠️ FIX (mismo caso que en la actualización/abono — folio 115B): "datos"
+        // trae fecha_recibo/hora_recibo copiados del recibo QUE SE CANCELA (la
+        // versión anterior), no la fecha/hora real de ESTA cancelación. Se
+        // sobreescriben aquí explícitamente con "ahora"/"horaAhora".
+        fecha: ahora,
+        fecha_recibo: ahora,
+        hora: horaAhora,
+        hora_recibo: horaAhora,
         cancelado: true,
         cancelacionTipo: tipo,
         cancelacionMonto: monto,

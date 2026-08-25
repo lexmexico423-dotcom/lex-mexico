@@ -63,12 +63,14 @@ async function initSupabase(){
         // Cargar credenciales de Cloudflare Workers AI (respaldo de Groq / lector de documentos)
         setTimeout(_cargarCfaiCreds, 550);
         // Re-disparar si los IIFE ya agotaron reintentos antes del login
+        // ⚠️ FIX: ya no se advierte si no hay key personal de Groq — desde que
+        // Groq pasa por el Worker (secreto GROQ_API_KEY del lado del servidor,
+        // ver /ai/groq), no tener una key personal en esta pestaña es el
+        // estado NORMAL para todos, no un error. La key personal en
+        // ⚙️ Configuración queda solo como respaldo manual opcional.
         setTimeout(function(){
           if(!window._groqKeyCached || window._groqKeyCached.length <= 10){
-            _cargarGroqKey().then(function(){
-              if(!window._groqKeyCached || window._groqKeyCached.length <= 10)
-                console.warn('[Groq] ⚠ Key no encontrada tras login — configúrala en ⚙️ Configuración');
-            });
+            _cargarGroqKey();
           }
         }, 1000);
       }

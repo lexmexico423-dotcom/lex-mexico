@@ -2529,8 +2529,6 @@ function _groqSaveKey(k){
 }
 // ── Llamada principal a Groq ───────────────────────────────────────────
 async function _groqLlamar(prompt, maxTokens, temperatura, perfil){
-  const key = _groqGetKey();
-  if(!key || key.length < 10) throw new Error('GROQ_SIN_KEY');
   const systemContent = _perfilPrompt(perfil);
   // Groq (plan gratis) limita a 8,000 tokens por MINUTO por petición, y ese
   // límite cuenta el texto de ENTRADA + el max_tokens de SALIDA que se pide
@@ -2551,35 +2549,50 @@ async function _groqLlamar(prompt, maxTokens, temperatura, perfil){
     }
     console.warn('[Groq] Petición grande: max_tokens recortado de ' + (maxTokens||1024) + ' a ' + maxTokensFinal + ' para respetar el límite de 8,000 TPM.');
   }
-  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer ' + key
-    },
-    body: JSON.stringify({
-      // Groq dio de baja 'llama-3.3-70b-versatile' el 16/ago/2026 (ver
-      // console.groq.com/docs/deprecations). Reemplazo oficial recomendado
-      // por Groq: 'openai/gpt-oss-120b'.
-      model: 'openai/gpt-oss-120b',
-      messages: [{ role: 'system', content: systemContent }, { role: 'user', content: prompt }],
-      max_tokens: maxTokensFinal,
-      temperature: temperatura || 0.3,
-      // gpt-oss-120b es un modelo de "razonamiento": antes de responder gasta
-      // tokens pensando en un campo aparte (message.reasoning), tokens que
-      // salen del mismo max_tokens. Con presupuestos chicos (llamadas cortas
-      // tipo clasificación/JSON breve) el razonamiento se comía todo el
-      // presupuesto y no quedaba nada para la respuesta → "GROQ_SIN_RESPUESTA".
-      // 'low' reduce ese gasto interno para dejarle espacio a la respuesta real.
-      reasoning_effort: 'low'
-    })
-  });
+  const bodyReq = {
+    // Groq dio de baja 'llama-3.3-70b-versatile' el 16/ago/2026 (ver
+    // console.groq.com/docs/deprecations). Reemplazo oficial recomendado
+    // por Groq: 'openai/gpt-oss-120b'.
+    model: 'openai/gpt-oss-120b',
+    messages: [{ role: 'system', content: systemContent }, { role: 'user', content: prompt }],
+    max_tokens: maxTokensFinal,
+    temperature: temperatura || 0.3,
+    // gpt-oss-120b es un modelo de "razonamiento": antes de responder gasta
+    // tokens pensando en un campo aparte (message.reasoning), tokens que
+    // salen del mismo max_tokens. Con presupuestos chicos (llamadas cortas
+    // tipo clasificación/JSON breve) el razonamiento se comía todo el
+    // presupuesto y no quedaba nada para la respuesta → "GROQ_SIN_RESPUESTA".
+    // 'low' reduce ese gasto interno para dejarle espacio a la respuesta real.
+    reasoning_effort: 'low'
+  };
+  // ⚠️ FIX (aviso "[Groq] Key no encontrada tras login"): antes esta función
+  // SIEMPRE exigía una key personal guardada en sessionStorage, que se perdía
+  // al cerrar la pestaña y había que volver a pegar en ⚙️ Configuración cada
+  // sesión. Ahora, si alguien dejó una key personal en Configuración se sigue
+  // usando directo (respaldo manual / pruebas); si no hay ninguna — el caso
+  // normal de aquí en adelante — se llama al mismo Worker que ya usa
+  // Cloudflare Workers AI, donde la key real vive como secreto del servidor
+  // (GROQ_API_KEY) y nunca toca el navegador.
+  const keyPersonal = _groqGetKey();
+  const usaKeyPersonal = !!(keyPersonal && keyPersonal.length > 10);
+  const resp = usaKeyPersonal
+    ? await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + keyPersonal },
+        body: JSON.stringify(bodyReq)
+      })
+    : await fetch(R2_WORKER + '/ai/groq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Token': await _r2AuthToken() },
+        body: JSON.stringify(bodyReq)
+      });
   if(!resp.ok){
     const err = await resp.json().catch(()=>({}));
-    const msg = err?.error?.message || 'Error ' + resp.status;
+    const msg = err?.error?.message || err?.error || 'Error ' + resp.status;
     if(resp.status === 429 && /reduce your message size|too large|request too large/i.test(msg)) throw new Error('GROQ_TEXTO_DEMASIADO_LARGO: ' + msg);
     if(resp.status === 429) throw new Error('GROQ_RATE_LIMIT: ' + msg);
-    if(resp.status === 401) throw new Error('GROQ_KEY_INVALIDA: Verifica tu API Key de Groq en ⚙️ Configuración');
+    if(resp.status === 401 || resp.status === 403) throw new Error(usaKeyPersonal ? 'GROQ_KEY_INVALIDA: Verifica tu API Key de Groq en ⚙️ Configuración' : 'GROQ_KEY_INVALIDA: ' + msg);
+    if(!usaKeyPersonal && resp.status === 500) throw new Error('GROQ_SIN_KEY: falta configurar el secreto GROQ_API_KEY en el Worker de Cloudflare');
     throw new Error('GROQ_ERROR: ' + msg);
   }
   const data = await resp.json();
@@ -6792,20 +6805,29 @@ async function groqTestKey(){
   const inp = document.getElementById('cfg-groq-key');
   const st  = document.getElementById('cfg-groq-st');
   const key = (inp?.value || '').trim() || _groqGetKey();
-  if(!key){ if(st) { st.textContent = '⚠ Ingresa una API Key de Groq'; st.style.color = 'var(--rojo)'; } return; }
+  // ⚠️ FIX: si no hay key personal, ya no es un error — se prueba la conexión
+  // vía el Worker (que usa el secreto GROQ_API_KEY del servidor). Solo se
+  // llama directo a api.groq.com si hay una key personal en el campo.
   if(st){ st.textContent = '🔄 Probando conexión con Groq...'; st.style.color = 'var(--muted)'; }
   try {
-    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-      body: JSON.stringify({ model:'openai/gpt-oss-120b', messages:[{role:'user',content:'Responde: OK'}], max_tokens:5 })
-    });
+    const resp = key
+      ? await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+          body: JSON.stringify({ model:'openai/gpt-oss-120b', messages:[{role:'user',content:'Responde: OK'}], max_tokens:5 })
+        })
+      : await fetch(R2_WORKER + '/ai/groq', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Auth-Token': await _r2AuthToken() },
+          body: JSON.stringify({ messages:[{role:'user',content:'Responde: OK'}], max_tokens:5 })
+        });
     if(resp.ok){
-      if(st){ st.textContent = '✅ Groq conectado correctamente — key válida'; st.style.color = 'var(--verde)'; }
+      if(st){ st.textContent = key ? '✅ Groq conectado correctamente — key personal válida' : '✅ Groq conectado correctamente — vía el Worker (sin key personal)'; st.style.color = 'var(--verde)'; }
       if(typeof toast==='function') toast('✅ Groq listo','ok');
     } else {
       const e = await resp.json().catch(()=>({}));
-      if(st){ st.textContent = '❌ ' + (e?.error?.message || 'Error '+resp.status); st.style.color = 'var(--rojo)'; }
+      const msg = e?.error?.message || e?.error || 'Error '+resp.status;
+      if(st){ st.textContent = '❌ ' + msg + (key ? '' : ' — configura el secreto GROQ_API_KEY en el Worker'); st.style.color = 'var(--rojo)'; }
     }
   } catch(e) {
     if(st){ st.textContent = '❌ ' + e.message; st.style.color = 'var(--rojo)'; }

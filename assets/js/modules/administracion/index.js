@@ -5439,6 +5439,29 @@ function adminVolverEditarCobros() {
   adminRenderMovsEditar(q, _adminEditarTipoFiltro);
 }
 
+// FIX (fecha/hora retroactiva en Editar Cobros/Egresos, sin pasar por Edición
+// Completa): adminRenderMovsEditar() solo muestra por defecto los movimientos
+// de HOY cuando el buscador está vacío. Si se edita un cobro y se le pone una
+// fecha retroactiva, el guardado SÍ funciona, pero al volver a la lista con
+// adminVolverEditarCobros() (buscador vacío) el movimiento recién editado
+// desaparece de la vista porque ya no es de hoy — parece que "no funcionó"
+// aunque el dato quedó bien guardado. Esta variante deja el buscador con la
+// fecha del movimiento editado para que quede visible de inmediato como
+// confirmación, en vez de desaparecer silenciosamente.
+function adminVolverEditarCobrosMostrando(fecha) {
+  var z1 = document.getElementById('adminEditarMovDesdeEditarZone');
+  if(z1) z1.classList.remove('show');
+  var z2 = document.getElementById('adminEditarCobrosZone');
+  if(z2) z2.classList.add('show');
+  var hoyStr = (typeof _hoyReal === 'function') ? _hoyReal() : ((typeof hoy === 'function') ? hoy() : '');
+  var inp = document.getElementById('adminBuscarMovEditar');
+  // Si la fecha editada NO es hoy, se deja como filtro para que no se pierda
+  // de vista. Si SÍ es hoy, se limpia el buscador (comportamiento normal).
+  var q = (fecha && fecha !== hoyStr) ? fecha : '';
+  if(inp) inp.value = q;
+  adminRenderMovsEditar(q, _adminEditarTipoFiltro);
+}
+
 function adminFiltroTipo(tipo) {
   _adminEditarTipoFiltro = tipo;
   adminActualizarBotonesFiltro(tipo);
@@ -5580,11 +5603,14 @@ function adminGuardarEdicion2Mov() {
   promesas.push(syncEstadoSupabaseDebounced().catch(function(e){ console.warn('guardado Supabase:', e); }));
   if(typeof actualizarArchivoControl==='function')
     promesas.push(actualizarArchivoControl().catch(function(e){ console.warn('guardado archivo control:', e); }));
+  var _fechaGuardada = m.fecha;
+  var _hoyStrEd = (typeof _hoyReal === 'function') ? _hoyReal() : ((typeof hoy === 'function') ? hoy() : '');
   Promise.all(promesas).then(function(){
-    if(typeof toast==='function') toast('✅ Movimiento guardado y sincronizado en todos los registros','ok');
+    var _avisoRetro = (_fechaGuardada && _fechaGuardada !== _hoyStrEd) ? ' — fecha retroactiva: ' + _fechaGuardada : '';
+    if(typeof toast==='function') toast('✅ Movimiento guardado y sincronizado en todos los registros'+_avisoRetro,'ok');
     if(btnGuardar){ btnGuardar.disabled=false; btnGuardar.textContent='💾 Guardar Cambios'; }
     if(typeof window._marcarGuardadoOk==='function') window._marcarGuardadoOk();
-    adminVolverEditarCobros();
+    adminVolverEditarCobrosMostrando(_fechaGuardada);
   }).catch(function(){
     // Incluso si Drive falla, el cambio ya está en localStorage — encolar para reintentar
     if(typeof window._encolarGuardadoPendiente==='function'){
@@ -5592,7 +5618,7 @@ function adminGuardarEdicion2Mov() {
     }
     if(typeof toast==='function') toast('⚠️ Guardado local OK · se sincronizará cuando haya conexión','warn');
     if(btnGuardar){ btnGuardar.disabled=false; btnGuardar.textContent='💾 Guardar Cambios'; }
-    adminVolverEditarCobros();
+    adminVolverEditarCobrosMostrando(_fechaGuardada);
   });
 }
 

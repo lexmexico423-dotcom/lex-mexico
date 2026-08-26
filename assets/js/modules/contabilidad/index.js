@@ -1505,7 +1505,33 @@ async function syncEstadoSupabase(_intentoConcurrencia){
           });
           // Conjunto a persistir: no-recibo (local) + recibo local vivo NO tombstoneado + recuperados de SB
           const _movsRecVivos = _movsRecLocal.filter(function(m){ return _esReciboVivo(m) && !_movTombSet.has(m.id); });
-          estado.movimientos = _movsNoRec.concat(_movsRecVivos, _recuperadosSB);
+          // ⚠️ FIX (26-ago-2026 — 188 movimientos duplicados en TODA la contabilidad,
+          // reaparecidos tras limpiarlos en la base de datos): esta función confiaba en
+          // que D.movimientos ya llegara sin duplicados. Si la memoria de ESTA pestaña
+          // ya traía duplicados (por la corrupción original, una fusión previa, u otra
+          // pestaña vieja abierta), cada sync los volvía a subir tal cual y PISABA la
+          // limpieza hecha directamente en Supabase — de ahí "desapareció un momento y
+          // volvió a duplicarse". Ahora se deduplica (por id, y si no hay id por clave
+          // folio+letra+fecha+hora+monto+estatus) justo antes de subir, sin importar
+          // qué tan sucia venga la memoria local.
+          const _dedupVistoIds  = new Set();
+          const _dedupVistoKeys = new Set();
+          const _movsRecVivosDedup = _movsRecVivos.filter(function(m){
+            if(!m) return false;
+            if(m.id){
+              if(_dedupVistoIds.has(m.id)) return false;
+              _dedupVistoIds.add(m.id);
+            }
+            const k = _logKey(m);
+            if(_dedupVistoKeys.has(k)) return false;
+            _dedupVistoKeys.add(k);
+            return true;
+          });
+          if(_movsRecVivosDedup.length < _movsRecVivos.length){
+            console.warn('[SB] ⚠ Duplicados detectados en memoria local antes de subir — se excluyeron ' +
+              (_movsRecVivos.length - _movsRecVivosDedup.length) + ' movimiento(s) de recibo duplicado(s).');
+          }
+          estado.movimientos = _movsNoRec.concat(_movsRecVivosDedup, _recuperadosSB);
           // ⚠️ FIX (caso real: folio 88A tras editar): este bloque solo limpiaba
           // duplicados/tombstoneados en "estado.movimientos" (lo que se SUBE a
           // Supabase), pero nunca los quitaba de D.movimientos (la memoria local
@@ -1513,12 +1539,18 @@ async function syncEstadoSupabase(_intentoConcurrencia){
           // servidor quedaba correcto de inmediato, pero en pantalla se seguía
           // viendo el duplicado hasta que algo más (ej. el polling de respaldo)
           // recargaba todo desde SB — de ahí el "aparece duplicado y luego se
-          // arregla solo". Ahora se aplica el mismo filtro también en memoria.
+          // arregla solo". Ahora se aplica el mismo filtro también en memoria,
+          // incluyendo los duplicados lógicos detectados arriba.
+          const _idsDuplicadosLocal = new Set(
+            _movsRecVivos.filter(function(m){ return _movsRecVivosDedup.indexOf(m) === -1; })
+                         .map(function(m){ return m && m.id; }).filter(Boolean)
+          );
           D.movimientos = D.movimientos.filter(function(m){
             if(!m || !m.id) return true;
             if(m.fuente !== 'recibo') return true; // no tocar caja/retiro/manual
             if(_movTombSet.has(m.id)) return false; // tombstoneado — quitar ya
             if(!_esReciboVivo(m)) return false;     // folio excluido/borrado
+            if(_idsDuplicadosLocal.has(m.id)) return false; // duplicado lógico detectado antes de subir
             return true;
           });
           // Reflejar SOLO lo recuperado en memoria local (no perder sintéticos ni no-recibo)

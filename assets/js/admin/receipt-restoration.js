@@ -6345,10 +6345,21 @@ function repararFoliosDuplicados() {
   // NUNCA borra el único movimiento legítimo de un folio, aunque su recibo asociado
   // sea duplicado — el recibo y el movimiento se crearon UNA sola vez; el duplicado
   // llega por re-sincronización de Supabase Realtime, no por doble escritura.
+  // ⚠️ FIX (26-ago-2026 — 188 movimientos duplicados en TODA la contabilidad):
+  // esta deduplicación de D.movimientos NUNCA guardaba por sí sola — el
+  // save()/sync de más abajo solo se disparaba si además había RECIBOS
+  // duplicados que eliminar. Si el problema era solo en los movimientos de
+  // caja/contabilidad (como pasó: 188 movimientos idénticos duplicados sin que
+  // los recibos en sí estuvieran duplicados), el arreglo quedaba solo en
+  // memoria de esa pestaña y el siguiente sync lo revertía trayendo de vuelta
+  // los duplicados desde Supabase — por eso el aviso decía "reparado" pero
+  // los duplicados seguían apareciendo. Ahora se guarda _movsQuitados para
+  // forzar el guardado más abajo si aquí sí se quitó algo.
+  var _movsQuitados = 0;
   if(typeof D !== 'undefined' && Array.isArray(D.movimientos)) {
     const _idsMovVistos  = new Set();
     const _keysMovVistos = new Set();
-    _filtrarMovsAuditado(function(m) {
+    _movsQuitados = _filtrarMovsAuditado(function(m) {
       if(!m) return false;
       if(m.fuente !== 'recibo') return true;
       if(m.id && _idsMovVistos.has(m.id)) return false;
@@ -6449,10 +6460,17 @@ function repararFoliosDuplicados() {
       appData.folioActual = maxExistente + 1;
       if(typeof REC !== 'undefined') REC.folioActual = appData.folioActual;
     }
-    if(typeof save === 'function') save();
-    if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
     if(typeof toast === 'function') toast('🔧 ' + indicesAEliminar.length + ' recibo(s) duplicado(s) eliminado(s)', 'ok');
     console.log('[LEX] Reparación de folios completada: ' + indicesAEliminar.length + ' duplicado(s) eliminado(s).');
+  }
+  // ⚠️ FIX: guardar SIEMPRE que se haya quitado algo — recibos duplicados,
+  // movimientos de contabilidad duplicados, o ambos. Antes esto solo vivía
+  // dentro del "if" de arriba (recibos), dejando sin persistir la limpieza de
+  // D.movimientos cuando solo esos estaban duplicados.
+  if(indicesAEliminar.length > 0 || _movsQuitados > 0) {
+    if(typeof save === 'function') save();
+    if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
+    if(_movsQuitados > 0) console.log('[LEX] Reparación de movimientos duplicados en contabilidad: ' + _movsQuitados + ' eliminado(s).');
   }
   // Después de limpiar duplicados, reparar folios huérfanos (B/C sin A padre)
   repararFoliosHuerfanos();

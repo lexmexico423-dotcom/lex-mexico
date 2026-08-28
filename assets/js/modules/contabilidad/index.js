@@ -1352,6 +1352,16 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     // el UPDATE afecta 0 filas y se reintenta desde cero (releer+fusionar+escribir)
     // en vez de sobrescribir a ciegas.
     let _revPreSync = null;
+    // ⚠️ FIX (27-ago-2026 — reversión completa a datos de julio en la pestaña de
+    // una empleada, "de la nada" mientras trabajaba): si UNA sola pestaña con
+    // memoria vieja/incompleta (una computadora olvidada, una pestaña dormida
+    // semanas) hace CUALQUIER guardado, este UPDATE sube su copia entera y
+    // sobreescribe la de todos — y como el Realtime propaga cada guardado al
+    // instante, todas las demás sesiones (aunque estuvieran correctas) ven el
+    // retroceso sin ni siquiera recargar. Estas dos variables capturan cuántos
+    // recibos/movimientos hay AHORA MISMO en Supabase para comparar más abajo,
+    // antes de escribir, contra lo que esta pestaña está a punto de subir.
+    let _sbRecibosCountGuard = null, _sbMovsCountGuard = null;
     try {
       const { data: _sbPreSync } = await _sbConTimeout(window.SB
         .from('app_state').select('recibos, data, rev')
@@ -1359,6 +1369,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       _revPreSync = (_sbPreSync && typeof _sbPreSync.rev === 'number') ? _sbPreSync.rev : null;
       const _sbTombsPreSync = (_sbPreSync && _sbPreSync.recibos && _sbPreSync.recibos.folios_eliminados) || [];
       const _sbRecibosPreSync = (_sbPreSync && _sbPreSync.recibos && Array.isArray(_sbPreSync.recibos.recibos)) ? _sbPreSync.recibos.recibos : [];
+      _sbRecibosCountGuard = _sbRecibosPreSync.length;
       // Fusionar tombstones
       if (_sbTombsPreSync.length > 0) {
         if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
@@ -1427,6 +1438,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       // para no romper sus borrados, que no tienen recibo de respaldo.
       try {
         const _sbMovs = (_sbPreSync && _sbPreSync.data && Array.isArray(_sbPreSync.data.movimientos)) ? _sbPreSync.data.movimientos : [];
+        _sbMovsCountGuard = _sbMovs.length;
         // ── Tombstones de movimientos: unión de los de SB y los locales ───────────
         // Igual que folios_eliminados pero para movimientos. Garantiza que un
         // movimiento eliminado por reconciliación NO regrese desde otro dispositivo.
@@ -1568,6 +1580,37 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       folios_eliminados: appData.folios_eliminados || [],
       recibos:           (appData.recibos || []).filter(function(r){ return !(appData.folios_eliminados||[]).some(function(t){ return typeof _tombstoneAplicaA === 'function' ? _tombstoneAplicaA(t, r) : (String(t.folio)===String(r.folio) && t.letra===(r.letra||'A')); }); }).map(function(r){ var c=Object.assign({},r); delete c.pdfBase64; return c; })
     };
+    // ⚠️ GUARDRAIL (27-ago-2026): si esta pestaña está a punto de subir MUCHOS
+    // menos recibos o movimientos de los que YA HAY en Supabase ahora mismo,
+    // es la señal clara de una memoria local vieja/incompleta (pestaña dormida
+    // días o semanas) a punto de borrar de un plumazo el trabajo de todos los
+    // demás. Se aborta el guardado en vez de sobreescribir a ciegas — el
+    // usuario debe recargar (Ctrl+Shift+R) para traer la copia real antes de
+    // volver a intentar guardar. Umbral: solo dispara si la caída es grande
+    // (más de 10 registros Y menos del 70% de lo que hay en el servidor), para
+    // no bloquear eliminaciones normales de uno o dos registros.
+    function _caidaSospechosa(nuevo, actual){
+      if (actual == null || nuevo == null) return false;
+      if (actual - nuevo <= 10) return false;
+      return nuevo < actual * 0.7;
+    }
+    if (_caidaSospechosa(recibos.recibos.length, _sbRecibosCountGuard) ||
+        _caidaSospechosa(estado.movimientos.length, _sbMovsCountGuard)) {
+      _syncEnCurso = false;
+      const _msjGuard = '⚠ Guardado bloqueado por seguridad: tu copia local tiene muchos menos datos (' +
+        recibos.recibos.length + ' recibos, ' + estado.movimientos.length + ' movimientos) que el servidor (' +
+        _sbRecibosCountGuard + ' recibos, ' + _sbMovsCountGuard + ' movimientos). ' +
+        'Esta pestaña parece desactualizada. Presiona Ctrl+Shift+R para recargar antes de seguir trabajando.';
+      console.error('[SB] ' + _msjGuard);
+      if (typeof registrarError === 'function') registrarError('syncEstadoSupabase.guardrailCaida', _msjGuard, {
+        recibosLocal: recibos.recibos.length, recibosSB: _sbRecibosCountGuard,
+        movsLocal: estado.movimientos.length, movsSB: _sbMovsCountGuard
+      });
+      if (typeof toast === 'function') toast(_msjGuard, 'err');
+      else try { alert(_msjGuard); } catch(_eAl){}
+      syncEnd(false, 'Guardado bloqueado — recarga la página (Ctrl+Shift+R)');
+      return;
+    }
     // Ids que van dentro de ESTA subida — para limpiar del respaldo local
     // (ver "RESPALDO LOCAL DE MOVIMIENTOS" en receipt-restoration.js) solo lo
     // que de verdad quedó confirmado ahora, sin tocar algo agregado a

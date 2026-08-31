@@ -4163,6 +4163,15 @@ async function _iaLlamarGrounded(promptBase, textoLeyes, maxTokens, temperatura,
   const promptFinal = promptBase +
     '\n\nFUNDAMENTO LEGAL — TEXTO DE LAS LEYES ACTIVAS DEL CASO (fuente única y obligatoria para citar artículos, plazos y datos exactos; usa comillas al citar; si un dato no aparece en este texto dilo explícitamente — NUNCA lo inventes):' +
     textoLeyes;
+  // ⚠️ CAMBIO (31-ago-2026): Gemini primero — sin límite de tokens por minuto
+  // ni "impuesto de razonamiento", y con ventana de contexto de 1M tokens
+  // cubre leyes largas completas sin recortes (mejor que el "contexto largo"
+  // de Cloudflare, que aquí se probaba primero antes de este cambio).
+  const geminiKeyGr = typeof ocrModGetKey === 'function' ? ocrModGetKey() : '';
+  if (geminiKeyGr && geminiKeyGr.length > 10) {
+    try { return await _geminiGenerarTexto(promptFinal, maxTokens, temperatura, perfil); }
+    catch(e){ console.warn('[IA] Gemini (grounded) falló (' + e.message + '); intentando con Cloudflare...'); }
+  }
   const cfaiOk = !!(_cfaiGetAccountId() && _cfaiGetToken());
   if (cfaiOk) {
     try { return await _cfaiLlamarContextoLargo(promptFinal, maxTokens, temperatura, perfil); }

@@ -2803,31 +2803,49 @@ async function _cfaiVision(imagenB64, prompt, maxTokens, perfil){
 // y luego exigía tarjeta. Cloudflare no puede cobrar sin que tú actives el
 // plan de pago manualmente — ver nota arriba.)
 async function _iaLlamar(prompt, maxTokens, temperatura, perfil){
-  // Groq es el proveedor PRINCIPAL para texto/chat
+  // ⚠️ CAMBIO (31-ago-2026, a solicitud del despacho — cuenta de Gemini con
+  // facturación activa): Gemini es ahora el proveedor PRINCIPAL para
+  // texto/chat en TODO el sistema (antes era Groq). No tiene el "impuesto de
+  // razonamiento" de Groq (openai/gpt-oss-120b) ni su límite de 8,000 tokens
+  // por minuto, así que responde completo incluso con prompts largos. Groq
+  // queda como respaldo automático si Gemini falla o no hay key de Gemini
+  // configurada, y Cloudflare Workers AI como último respaldo — igual que
+  // antes.
+  const geminiKey = typeof ocrModGetKey === 'function' ? ocrModGetKey() : '';
+  if (geminiKey && geminiKey.length > 10) {
+    try {
+      const res = await _geminiGenerarTexto(prompt, maxTokens, temperatura, perfil);
+      console.log('[IA] ✅ Respuesta via Gemini');
+      return res;
+    } catch(e) {
+      console.warn('[IA] Gemini falló (' + (e && e.message) + '), intentando Groq como respaldo...');
+    }
+  }
+  // Groq — respaldo automático de Gemini (o principal si no hay key de Gemini)
   const groqKey = _groqGetKey();
   if(groqKey && groqKey.length > 10){
     try {
       const res = await _groqLlamar(prompt, maxTokens, temperatura, perfil);
-      console.log('[IA] ✅ Respuesta via Groq');
+      console.log('[IA] ✅ Respuesta via Groq' + (geminiKey ? ' (respaldo)' : ''));
       return res;
     } catch(e){
-      if(e.message.startsWith('GROQ_KEY_INVALIDA')){
+      if(e.message.startsWith('GROQ_KEY_INVALIDA') && !geminiKey){
         throw new Error('🔑 Key de Groq inválida. Verifica en ⚙️ Configuración > Groq.');
       }
-      if(e.message.includes('GROQ_RATE_LIMIT')){
+      if(e.message.includes('GROQ_RATE_LIMIT') && !geminiKey){
         throw new Error('⏳ Límite de Groq alcanzado. Espera un momento e intenta de nuevo.');
       }
       // Otro error de Groq — solo advertencia, intentar Cloudflare como respaldo
       console.warn('[IA] Groq falló (' + e.message + '), intentando Cloudflare Workers AI como respaldo...');
     }
   }
-  // Cloudflare Workers AI como RESPALDO (solo si Groq no está configurado o tuvo error no crítico)
+  // Cloudflare Workers AI como ÚLTIMO respaldo
   const cfAcc = _cfaiGetAccountId(), cfTok = _cfaiGetToken();
   if(!cfAcc || !cfTok){
-    if(!groqKey || groqKey.length < 10){
-      throw new Error('🔑 Configura Groq (gratis en console.groq.com) en ⚙️ Configuración para usar la IA.');
+    if(!geminiKey && (!groqKey || groqKey.length < 10)){
+      throw new Error('🔑 Configura Gemini o Groq (gratis en console.groq.com) en ⚙️ Configuración para usar la IA.');
     }
-    throw new Error('⚠ Error de Groq y sin Cloudflare Workers AI configurado como respaldo. Verifica ⚙️ Configuración.');
+    throw new Error('⚠ Ningún motor de IA respondió y no hay Cloudflare Workers AI configurado como respaldo. Verifica ⚙️ Configuración.');
   }
   try {
     const res = await _cfaiLlamar(prompt, maxTokens, temperatura, perfil);
@@ -2836,7 +2854,7 @@ async function _iaLlamar(prompt, maxTokens, temperatura, perfil){
   } catch(e){
     if(e.message.startsWith('CFAI_KEY_INVALIDA')) throw new Error('🔑 Credenciales de Cloudflare inválidas. Verifica en ⚙️ Configuración.');
     if(e.message.startsWith('CFAI_LIMITE')) throw new Error(e.message.replace('CFAI_LIMITE: ',''));
-    throw new Error('⚠ Error de Groq y de Cloudflare (respaldo). ' + e.message);
+    throw new Error('⚠ Ningún motor de IA respondió (Gemini/Groq/Cloudflare). ' + e.message);
   }
 }
 // Cargar key de Groq al inicio desde localStorage (Supabase se carga en onAuthStateChange)
@@ -8670,13 +8688,19 @@ async function _geminiOCR(file, onProgreso){
 // tiene un cupo diario limitado. Requiere key de pago ya guardada.
 // Lanza (throw) en vez de devolver null para que el llamador pueda decidir
 // si hace fallback a otro motor.
-async function _geminiGenerarTexto(prompt, maxTokens, temperatura){
+async function _geminiGenerarTexto(prompt, maxTokens, temperatura, perfil){
   const key = typeof ocrModGetKey === 'function' ? ocrModGetKey() : '';
   if(!key || key.length < 10) throw new Error('GEMINI_SIN_KEY: no hay API Key de Gemini configurada');
+  // ⚠️ Mismo "system prompt" jurídico por tarea que usa Groq (_perfilPrompt) —
+  // ahora que Gemini es el motor principal, debe razonar con el mismo enfoque
+  // especializado según la función que lo llame (procesal, plazos, redacción,
+  // etc.), no con un tono genérico.
+  const systemContent = (perfil && typeof _perfilPrompt === 'function') ? _perfilPrompt(perfil) : null;
   const body = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { temperature: (temperatura==null ? 0.3 : temperatura), maxOutputTokens: maxTokens || 8192 }
   };
+  if (systemContent) body.systemInstruction = { parts: [{ text: systemContent }] };
   const resp = await fetch(
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key,
     {

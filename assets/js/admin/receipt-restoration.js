@@ -2821,29 +2821,31 @@ async function _iaLlamar(prompt, maxTokens, temperatura, perfil){
       console.warn('[IA] Gemini falló (' + (e && e.message) + '), intentando Groq como respaldo...');
     }
   }
-  // Groq — respaldo automático de Gemini (o principal si no hay key de Gemini)
-  const groqKey = _groqGetKey();
-  if(groqKey && groqKey.length > 10){
-    try {
-      const res = await _groqLlamar(prompt, maxTokens, temperatura, perfil);
-      console.log('[IA] ✅ Respuesta via Groq' + (geminiKey ? ' (respaldo)' : ''));
-      return res;
-    } catch(e){
-      if(e.message.startsWith('GROQ_KEY_INVALIDA') && !geminiKey){
-        throw new Error('🔑 Key de Groq inválida. Verifica en ⚙️ Configuración > Groq.');
-      }
-      if(e.message.includes('GROQ_RATE_LIMIT') && !geminiKey){
-        throw new Error('⏳ Límite de Groq alcanzado. Espera un momento e intenta de nuevo.');
-      }
-      // Otro error de Groq — solo advertencia, intentar Cloudflare como respaldo
-      console.warn('[IA] Groq falló (' + e.message + '), intentando Cloudflare Workers AI como respaldo...');
+  // Groq — respaldo automático de Gemini (o principal si no hay key de Gemini).
+  // _groqLlamar ya decide internamente si usa una key personal guardada en
+  // Configuración o el Worker con el secreto GROQ_API_KEY del servidor, así
+  // que SIEMPRE se intenta aquí — no hay que exigir una key personal primero
+  // (ese requisito era el bug: bloqueaba Groq en el caso normal, sin key
+  // personal, que es el que usa el Worker).
+  try {
+    const res = await _groqLlamar(prompt, maxTokens, temperatura, perfil);
+    console.log('[IA] ✅ Respuesta via Groq' + (geminiKey ? ' (respaldo)' : ''));
+    return res;
+  } catch(e){
+    if(e.message.startsWith('GROQ_KEY_INVALIDA') && !geminiKey){
+      throw new Error('🔑 Key de Groq inválida. Verifica en ⚙️ Configuración > Groq.');
     }
+    if(e.message.includes('GROQ_RATE_LIMIT') && !geminiKey){
+      throw new Error('⏳ Límite de Groq alcanzado. Espera un momento e intenta de nuevo.');
+    }
+    // Otro error de Groq — solo advertencia, intentar Cloudflare como respaldo
+    console.warn('[IA] Groq falló (' + e.message + '), intentando Cloudflare Workers AI como respaldo...');
   }
   // Cloudflare Workers AI como ÚLTIMO respaldo
   const cfAcc = _cfaiGetAccountId(), cfTok = _cfaiGetToken();
   if(!cfAcc || !cfTok){
-    if(!geminiKey && (!groqKey || groqKey.length < 10)){
-      throw new Error('🔑 Configura Gemini o Groq (gratis en console.groq.com) en ⚙️ Configuración para usar la IA.');
+    if(!geminiKey){
+      throw new Error('🔑 Configura Gemini (⚙️ Configuración) o revisa el secreto GROQ_API_KEY del Worker para usar la IA.');
     }
     throw new Error('⚠ Ningún motor de IA respondió y no hay Cloudflare Workers AI configurado como respaldo. Verifica ⚙️ Configuración.');
   }

@@ -122,7 +122,7 @@ async function sincronizarFolio(forzarSB){
         console.log('[SB] No hay estado previo — creando inicial...');
         await window.SB.from('app_state').insert({
           despacho_id: window.SB_DESPACHO_ID,
-          data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],cuentasPorCobrar:[],saldoAcumulado:0,leyes:[]},
+          data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],tareasHoy:[],adeudosSinRecibo:[],saldoAcumulado:0,leyes:[]},
           recibos: {folioActual:1, recibos:[]},
           folio_actual: 100
         });
@@ -579,28 +579,48 @@ async function sincronizarFolio(forzarSB){
           const _soloLocalesEsc = _localEscrituras.filter(function(e){ return !_sbEscNums.has(e.num); });
           D.escrituras = [..._fusionadasEsc, ..._soloLocalesEsc];
         })();
-        // Merge cuentas por cobrar (gastos pagados a nombre de clientes viejos
-        // que se deben cobrar después) — mismo patrón que escrituras: se
-        // compara fechaMod y gana la más reciente; las que solo existen en
-        // memoria local (recién creadas o marcadas "cobrado" sin confirmar
-        // aún en Supabase) se conservan.
+        // Merge tareas para hoy (recordatorios libres del día — módulo aparte
+        // de Pendientes) — mismo patrón que escrituras: se compara fechaMod y
+        // gana la más reciente; las que solo existen en memoria local (recién
+        // creadas o marcadas "resuelta" sin confirmar aún en Supabase) se
+        // conservan.
         (function(){
-          const _sbCxc = data.data.cuentasPorCobrar || [];
-          const _localCxc = Array.isArray(D.cuentasPorCobrar) ? D.cuentasPorCobrar : [];
-          const _mapaLocalCxc = {};
-          _localCxc.forEach(function(c){ if(c && c.id) _mapaLocalCxc[c.id] = c; });
-          const _sbCxcIds = new Set(_sbCxc.map(function(c){ return c.id; }));
-          const _fusionadasCxc = _sbCxc.map(function(c){
-            const _loc = c && c.id ? _mapaLocalCxc[c.id] : null;
+          const _sbTareas = data.data.tareasHoy || [];
+          const _localTareas = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
+          const _mapaLocalTareas = {};
+          _localTareas.forEach(function(t){ if(t && t.id) _mapaLocalTareas[t.id] = t; });
+          const _sbTareasIds = new Set(_sbTareas.map(function(t){ return t.id; }));
+          const _fusionadasTareas = _sbTareas.map(function(t){
+            const _loc = t && t.id ? _mapaLocalTareas[t.id] : null;
             if (_loc) {
               const tsLoc = Date.parse(_loc.fechaMod || 0) || 0;
-              const tsSb  = Date.parse(c.fechaMod || 0) || 0;
+              const tsSb  = Date.parse(t.fechaMod || 0) || 0;
               if (tsLoc > tsSb) return _loc;
             }
-            return c;
+            return t;
           });
-          const _soloLocalesCxc = _localCxc.filter(function(c){ return c && c.id && !_sbCxcIds.has(c.id); });
-          D.cuentasPorCobrar = [..._fusionadasCxc, ..._soloLocalesCxc];
+          const _soloLocalesTareas = _localTareas.filter(function(t){ return t && t.id && !_sbTareasIds.has(t.id); });
+          D.tareasHoy = [..._fusionadasTareas, ..._soloLocalesTareas];
+        })();
+        // Merge adeudos sin recibo (gastos/deudas de clientes fuera del
+        // sistema de folios) — mismo patrón id + fechaMod que tareasHoy.
+        (function(){
+          const _sbAdeudos = data.data.adeudosSinRecibo || [];
+          const _localAdeudos = Array.isArray(D.adeudosSinRecibo) ? D.adeudosSinRecibo : [];
+          const _mapaLocalAdeudos = {};
+          _localAdeudos.forEach(function(a){ if(a && a.id) _mapaLocalAdeudos[a.id] = a; });
+          const _sbAdeudosIds = new Set(_sbAdeudos.map(function(a){ return a.id; }));
+          const _fusionadasAdeudos = _sbAdeudos.map(function(a){
+            const _loc = a && a.id ? _mapaLocalAdeudos[a.id] : null;
+            if (_loc) {
+              const tsLoc = Date.parse(_loc.fechaMod || 0) || 0;
+              const tsSb  = Date.parse(a.fechaMod || 0) || 0;
+              if (tsLoc > tsSb) return _loc;
+            }
+            return a;
+          });
+          const _soloLocalesAdeudos = _localAdeudos.filter(function(a){ return a && a.id && !_sbAdeudosIds.has(a.id); });
+          D.adeudosSinRecibo = [..._fusionadasAdeudos, ..._soloLocalesAdeudos];
         })();
         // Estos dos son listas de folios (strings) que se agregan/quitan desde
         // varias funciones admin — se unen local+SB (en vez de sobreescribir)
@@ -5699,7 +5719,6 @@ function abrirPendiente(idx){
     else {
       const _s=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
       _s('pOtrosNombre',p.persona);_s('pOtrosDesc',p.obs||p.texto);
-      _s('pOtrosPri',p.prioridad||'normal');_s('pOtrosResp',p.resp||'Antonieta');_s('pOtrosFecha',p.fechaLimite||'');
     }
     const priEl=document.getElementById('pPri');if(priEl)priEl.value=p.prioridad||'normal';
     const reEl=document.getElementById('pRe');if(reEl)reEl.value=p.resp||'Antonieta';
@@ -5712,8 +5731,6 @@ function abrirPendiente(idx){
     ['pPri','pRe','pFecha','pCarpeta','pOtrosNombre','pOtrosDesc'].forEach(id=>{
       const e=document.getElementById(id);if(e)e.value = id==='pPri'?'normal':id==='pRe'?'Antonieta':'';
     });
-    const _sO=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v;};
-    _sO('pOtrosPri','normal');_sO('pOtrosResp','Antonieta');_sO('pOtrosFecha','');
   }
   const modal = document.getElementById('mPendiente');
   if(modal) modal.classList.add('show');

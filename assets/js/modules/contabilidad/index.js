@@ -1310,6 +1310,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       citas:                 D.citas                 || [],
       cierres:               D.cierres               || [],
       prestamos:             D.prestamos             || [],
+      cuentasPorCobrar:      D.cuentasPorCobrar      || [],
       saldoAcumulado:        D.saldoAcumulado        || 0,
       escrituras:            D.escrituras            || [],
       recibosExcluidosCaja:  D.recibosExcluidosCaja  || [],

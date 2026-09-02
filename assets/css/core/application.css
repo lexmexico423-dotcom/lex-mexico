@@ -526,23 +526,6 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
 .modal-ov.show{display:flex;}
 .modal{background:var(--surface);border-radius:10px;width:100%;max-width:490px;box-shadow:var(--shadow-lg);border:1px solid var(--border);display:flex;flex-direction:column;max-height:92vh;}
 .modal.wide{max-width:640px;}
-/* Modal de pantalla completa (listas tipo "Pendientes": Tareas para hoy,
-   Adeudos sin Recibo) — ocupa todo el viewport, sin bordes redondeados. */
-.modal-ov-full{padding:0;}
-.modal-ov-full .modal{max-width:100%;width:100%;height:100%;max-height:100%;border-radius:0;}
-.modal-ov-full .modal-hdr{border-radius:0;}
-.modal-ov-full .modal-body{display:flex;flex-direction:column;height:100%;overflow-y:hidden;}
-/* FIX: assets/css/modules/receipts.css define ".modal .btn{width:100%}"
-   pensado para modales de confirmación con botones apilados — esa regla
-   (0,0,2,0 de especificidad) alcanza CUALQUIER .btn dentro de CUALQUIER
-   .modal, incluyendo los botones de la barra de búsqueda de estas dos
-   pantallas (✓ Resueltas/Cobrados, ＋ Nueva/Nuevo), estirándolos a barras
-   de ancho completo. Se sobreescribe aquí con selector por ID (más
-   específico) para que vuelvan a su tamaño de contenido normal.
-   Corrección al conjunto anterior — nunca se comprobó visualmente en
-   navegador cuando se agregó "pantalla completa", solo con node --check. */
-#mTareasHoy .modal-body .btn,
-#mAdeudosSinRecibo .modal-body .btn{width:auto;flex:0 0 auto;}
 .modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border-l);display:flex;align-items:center;justify-content:space-between;background:var(--surface2);flex-shrink:0;border-radius:10px 10px 0 0;position:sticky;top:0;z-index:2;}
 .modal-hdr h3{font-family:serif;font-size:1rem;color:var(--ink);font-weight:500;}
 .modal-x{background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--muted);padding:2px 6px;border-radius:4px;transition:all 0.15s;}

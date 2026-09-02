@@ -257,7 +257,7 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
 @keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 /* ───────── STATS ───────── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px;}
-.caja-top-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;align-items:stretch;}
+.caja-top-row{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:12px;margin-bottom:20px;align-items:stretch;}
 .stats-grid-4{grid-template-columns:repeat(4,1fr);}
 @media (max-width:900px){.stats-grid-4{grid-template-columns:repeat(2,1fr);}}
 .stat{
@@ -759,7 +759,7 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
   text-transform:uppercase;color:var(--muted);margin-bottom:10px;
 }
 .caja-acciones-grid{
-  display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:18px;
+  display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:18px;
 }
 .caja-accion-btn{
   display:flex;align-items:center;justify-content:center;gap:12px;

@@ -10879,8 +10879,8 @@ function renderTareasHoyLista(){
       ? '<span style="background:#1a7a3a;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">RESUELTA</span>'
       : '<span style="background:#8c6518;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">PENDIENTE</span>';
     const circulo = resuelta
-      ? '<div style="width:20px;height:20px;border-radius:50%;background:#2a7a3a;flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;">✓</div>'
-      : '<div style="width:20px;height:20px;border-radius:50%;border:2px solid #2a7a3a;flex-shrink:0;"></div>';
+      ? '<div onclick="event.stopPropagation();reabrirTareaHoy(\''+t.id+'\')" title="Reabrir" style="width:20px;height:20px;border-radius:50%;background:#2a7a3a;flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;cursor:pointer;">✓</div>'
+      : '<div onclick="event.stopPropagation();marcarTareaResuelta(\''+t.id+'\')" title="Marcar resuelto" style="width:20px;height:20px;border-radius:50%;border:2px solid #2a7a3a;flex-shrink:0;cursor:pointer;"></div>';
     const tituloEstilo = resuelta ? 'text-decoration:line-through;color:var(--muted);' : 'color:#8c6518;';
     const acciones = resuelta
       ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
@@ -11053,8 +11053,8 @@ function renderAdeudosLista(){
       ? '<span style="background:#1a7a3a;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">COBRADO</span>'
       : '<span style="background:#8c6518;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">PENDIENTE</span>';
     const circulo = cobrado
-      ? '<div style="width:20px;height:20px;border-radius:50%;background:#2a7a3a;flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;">✓</div>'
-      : '<div style="width:20px;height:20px;border-radius:50%;border:2px solid #2a7a3a;flex-shrink:0;"></div>';
+      ? '<div onclick="event.stopPropagation();reabrirAdeudo(\''+a.id+'\')" title="Reabrir" style="width:20px;height:20px;border-radius:50%;background:#2a7a3a;flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;cursor:pointer;">✓</div>'
+      : '<div onclick="event.stopPropagation();marcarAdeudoCobrado(\''+a.id+'\')" title="Marcar cobrado" style="width:20px;height:20px;border-radius:50%;border:2px solid #2a7a3a;flex-shrink:0;cursor:pointer;"></div>';
     const tituloEstilo = cobrado ? 'text-decoration:line-through;color:var(--muted);' : 'color:#8c6518;';
     const conceptos = (a.conceptos||[]);
     const conceptosHtml = conceptos.map(function(c){

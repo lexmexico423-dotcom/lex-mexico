@@ -135,7 +135,7 @@ async function obtenerDespachoActivo(){
   await sb.from('miembros').insert({ despacho_id: d.id, user_id: user.id, rol: 'admin', nombre: user.email.split('@')[0] });
   await sb.from('app_state').insert({
     despacho_id: d.id,
-    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[]},
+    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],cuentasPorCobrar:[],saldoAcumulado:0,leyes:[]},
     recibos: {folioActual:1, recibos:[]}
   });
   window.SB_DESPACHO_ID = d.id;

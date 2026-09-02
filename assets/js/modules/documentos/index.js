@@ -889,12 +889,15 @@ function guardarPend(){
     const nombre = document.getElementById('pOtrosNombre')?.value.trim()||document.getElementById('pPersona')?.value.trim()||'';
     const desc   = document.getElementById('pOtrosDesc')?.value.trim()||document.getElementById('pTxt')?.value.trim()||'';
     if(!desc){ toast('La descripción es obligatoria','err'); return; }
+    // Prioridad/Responsable/Fecha límite de "Otros" tienen sus propios campos
+    // dedicados (pOtrosPri/pOtrosResp/pOtrosFecha) — antes se leían de los
+    // genéricos pPri/pRe/pFecha, que pSecCambio() oculta siempre.
     especifico = {
       id: (eiP>=0 && D.pendientes[eiP]?.id) || ('P-'+Date.now()),
       texto: desc, persona: nombre, seccion: sec,
-      prioridad: document.getElementById('pPri')?.value||'normal',
-      resp: document.getElementById('pRe')?.value||'Antonieta',
-      fechaLimite: document.getElementById('pFecha')?.value||'',
+      prioridad: document.getElementById('pOtrosPri')?.value||'normal',
+      resp: document.getElementById('pOtrosResp')?.value||'Antonieta',
+      fechaLimite: document.getElementById('pOtrosFecha')?.value||'',
       carpeta: document.getElementById('pCarpeta')?.value.trim()||'',
       obs: document.getElementById('pOb')?.value.trim()||''
     };
@@ -1829,3 +1832,4 @@ async function _prInicializarPanel() {
   await _prCargarDesdeR2();
   _prRenderLista();
 }
+

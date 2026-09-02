@@ -623,7 +623,7 @@ const ATAJOS = [
 // Activar atajos globales
 document.addEventListener('keydown', manejarAtajos);
 // ═══ NAVEGACIÓN ═══
-const TITULOS={'pre-recibo':'📋 Pre-Recibos',sesiones:'👁 Monitor de Sesiones',caja:'🏠 Principal','registro-civil':'📋 Impresión Registro Civil',contabilidad:'📊 Contabilidad',recibos:'🧾 Recibos Oficiales','nuevo-recibo':'✍️ Nuevo Recibo','configuracion':'⚙️ Configuración',directorio:'👥 Directorio',carpetas:'🗂️ Carpetas',juicios:'⚖️ Juicios',pendientes:'📌 Pendientes',escrituras:'📄 Control de Escrituras',gestiones:'📋 Recibos en Gestión',citas:'📅 Citas'};
+const TITULOS={'pre-recibo':'📋 Pre-Recibos',sesiones:'👁 Monitor de Sesiones',caja:'🏠 Principal','registro-civil':'📋 Impresión Registro Civil',contabilidad:'📊 Contabilidad',recibos:'🧾 Recibos Oficiales','nuevo-recibo':'✍️ Nuevo Recibo','configuracion':'⚙️ Configuración',directorio:'👥 Directorio',carpetas:'🗂️ Carpetas',juicios:'⚖️ Juicios',pendientes:'📌 Pendientes',escrituras:'📄 Control de Escrituras',gestiones:'📋 Recibos en Gestión',citas:'📅 Citas','tareas-hoy':'📌 Tareas para hoy','adeudos-sin-recibo':'💰 Adeudos sin Recibo'};
 /* Movido a modules/recibos/index.js: ir */
 // ═══ RECIBOS — SISTEMA EXTERNO (iframe) ═══
 /* Movido a modules/recibos/index.js: recargarReciboFrame */

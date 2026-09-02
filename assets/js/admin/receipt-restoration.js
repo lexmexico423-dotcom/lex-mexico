@@ -10842,9 +10842,8 @@ function abrirTareasHoy(){
   const btn = document.getElementById('tareasVerResueltasBtn');
   if(btn){ btn.textContent = '✓ Resueltas'; btn.style.background=''; btn.style.color=''; }
   const buscar = document.getElementById('tareasBuscar'); if(buscar) buscar.value = '';
+  ir('tareas-hoy');
   renderTareasHoyLista();
-  const modal = document.getElementById('mTareasHoy');
-  if(modal) modal.classList.add('show');
 }
 
 function toggleTareasResueltas(){
@@ -11013,9 +11012,8 @@ function abrirAdeudosSinRecibo(){
   const btn = document.getElementById('adeudosVerCobradosBtn');
   if(btn){ btn.textContent = '✓ Cobrados'; btn.style.background=''; btn.style.color=''; }
   const buscar = document.getElementById('adeudosBuscar'); if(buscar) buscar.value = '';
+  ir('adeudos-sin-recibo');
   renderAdeudosLista();
-  const modal = document.getElementById('mAdeudosSinRecibo');
-  if(modal) modal.classList.add('show');
 }
 
 function toggleAdeudosCobrados(){

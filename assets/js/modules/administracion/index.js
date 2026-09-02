@@ -162,7 +162,7 @@ async function crearArchivoControl(){
   if(!window.SB || !window.SB_DESPACHO_ID) return 'supabase';
   const { error } = await window.SB.from('app_state').upsert({
     despacho_id: window.SB_DESPACHO_ID,
-    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],cuentasPorCobrar:[],saldoAcumulado:0,leyes:[]},
+    data: {movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],cierres:[],prestamos:[],tareasHoy:[],adeudosSinRecibo:[],saldoAcumulado:0,leyes:[]},
     recibos: { folioActual:1, anioFolioActual: new Date().getFullYear(), recibos:[] },
     folio_actual: 100
   });
@@ -1428,7 +1428,7 @@ function renderCaja(){
     }
   }
   safeExec('renderVencimientos', () => renderVencimientos());
-  safeExec('renderPendientesHoyCard', () => renderPendientesHoyCard());
+  safeExec('renderTareasHoyCount', () => renderTareasHoyCount());
   const tb=$('tbMovHoy'),vacio=$('movVacio');
   if(!movs.length){tb.innerHTML='';vacio.style.display='block';$('movCnt').textContent='0 registros';return;}
   vacio.style.display='none';$('movCnt').textContent=movs.length+' registros';
@@ -5371,7 +5371,8 @@ async function adminBorrarMovimientosPorFecha() {
         pendientes:           D.pendientes           || [],
         citas:                D.citas                || [],
         prestamos:            D.prestamos            || [],
-        cuentasPorCobrar:     D.cuentasPorCobrar      || [],
+        tareasHoy:            D.tareasHoy            || [],
+        adeudosSinRecibo:     D.adeudosSinRecibo     || [],
         saldoAcumulado:       D.saldoAcumulado       || 0,
         escrituras:           D.escrituras           || [],
         recibosExcluidosCaja: D.recibosExcluidosCaja || [],
@@ -7232,7 +7233,8 @@ async function adminRevertirLetraA(idx) {
         juicios:     D.juicios     || [], pendientes: D.pendientes || [],
         citas:       D.citas       || [],
         cierres:     D.cierres     || [], prestamos:  D.prestamos || [],
-        cuentasPorCobrar: D.cuentasPorCobrar || [],
+        tareasHoy: D.tareasHoy || [],
+        adeudosSinRecibo: D.adeudosSinRecibo || [],
         saldoAcumulado: D.saldoAcumulado || 0,
         escrituras:  D.escrituras  || [],
         recibosExcluidosCaja: D.recibosExcluidosCaja || [],

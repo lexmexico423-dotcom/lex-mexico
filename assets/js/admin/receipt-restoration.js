@@ -1767,7 +1767,8 @@ window._pendMovsRecuperar = function(){
         pendientes:     D.pendientes    || [],
         citas:          D.citas         || [],
         prestamos:      D.prestamos     || [],
-        cuentasPorCobrar: D.cuentasPorCobrar || [],
+        tareasHoy:      D.tareasHoy     || [],
+        adeudosSinRecibo: D.adeudosSinRecibo || [],
         saldoAcumulado: D.saldoAcumulado || 0
       };
       const recibos = {
@@ -6699,7 +6700,7 @@ async function adminBorradoTotal(){
     // Resetear D en memoria
     if(typeof D!=='undefined'){
       D.movimientos=[]; D.carpetas=[]; D.juicios=[];
-      D.pendientes=[]; D.cierres=[]; D.prestamos=[]; D.cuentasPorCobrar=[];
+      D.pendientes=[]; D.cierres=[]; D.prestamos=[]; D.tareasHoy=[]; D.adeudosSinRecibo=[];
       D.saldoAcumulado=0; D.directorio=directorioActual;
     }
     // Resetear recibos
@@ -6710,7 +6711,7 @@ async function adminBorradoTotal(){
       const { error } = await window.SB.from('app_state')
         .update({
           data:{ movimientos:[], directorio:directorioActual, carpetas:[], juicios:[],
-                 pendientes:[], cierres:[], prestamos:[], cuentasPorCobrar:[], saldoAcumulado:0, leyes:[] },
+                 pendientes:[], cierres:[], prestamos:[], tareasHoy:[], adeudosSinRecibo:[], saldoAcumulado:0, leyes:[] },
           recibos:{ folioActual:1, recibos:[] },
           folio_actual:1,
           sesiones_log:[]
@@ -10814,4 +10815,423 @@ if(typeof toast==='function') toast('✅ Token de Drive guardado — haz clic en
     const btnDrive = document.getElementById('ocr-btn-drive');
     if(btnDrive) ocrModTab('drive', btnDrive);
   }, 300);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 📌 TAREAS PARA HOY — recordatorios de texto libre del día a día (llamadas,
+// mandados, pagos...). Módulo independiente de Pendientes: mismo espíritu
+// (crear/resolver/editar/eliminar, con persistencia y sync), pero sin
+// secciones (Placas/Escrituras/Juicios) — solo Título + texto libre.
+// D.tareasHoy[] = [{id, titulo, texto, estado:'pendiente'|'resuelta',
+//   creadoPor, fechaCreacion, fechaResolucion, fechaMod}]
+// ═══════════════════════════════════════════════════════════════════════
+let _tareaEdId = null;
+let _tareasVerResueltas = false;
+
+function renderTareasHoyCount(){
+  const cnt = document.getElementById('tareasHoyCount');
+  const sub = document.getElementById('tareasHoySub');
+  if(!cnt) return;
+  const pend = (Array.isArray(D.tareasHoy) ? D.tareasHoy : []).filter(function(t){ return t && t.estado !== 'resuelta'; });
+  cnt.textContent = pend.length;
+  if(sub) sub.textContent = pend.length === 1 ? 'pendiente' : 'pendientes';
+}
+
+function abrirTareasHoy(){
+  _tareasVerResueltas = false;
+  const btn = document.getElementById('tareasVerResueltasBtn');
+  if(btn){ btn.textContent = '✓ Resueltas'; btn.style.background=''; btn.style.color=''; }
+  const buscar = document.getElementById('tareasBuscar'); if(buscar) buscar.value = '';
+  renderTareasHoyLista();
+  const modal = document.getElementById('mTareasHoy');
+  if(modal) modal.classList.add('show');
+}
+
+function toggleTareasResueltas(){
+  _tareasVerResueltas = !_tareasVerResueltas;
+  const btn = document.getElementById('tareasVerResueltasBtn');
+  if(btn){
+    btn.textContent = _tareasVerResueltas ? '← Pendientes' : '✓ Resueltas';
+    btn.style.background = _tareasVerResueltas ? 'var(--gold-d)' : '';
+    btn.style.color = _tareasVerResueltas ? '#fff' : '';
+  }
+  renderTareasHoyLista();
+}
+
+function renderTareasHoyLista(){
+  const cont = document.getElementById('tareasHoyLista');
+  if(!cont) return;
+  const q = (document.getElementById('tareasBuscar')?.value || '').toLowerCase().trim();
+  const todas = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
+  let lista = todas.filter(function(t){ return t && (_tareasVerResueltas ? t.estado==='resuelta' : t.estado!=='resuelta'); });
+  if(q) lista = lista.filter(function(t){ return (t.titulo||'').toLowerCase().includes(q) || (t.texto||'').toLowerCase().includes(q); });
+  lista = lista.slice().sort(function(a,b){ return (b.fechaCreacion||'').localeCompare(a.fechaCreacion||''); });
+  const contador = document.getElementById('tareasHoyContador');
+  if(contador) contador.textContent = lista.length + (_tareasVerResueltas ? ' resuelta(s)' : ' pendiente(s)');
+  if(!lista.length){
+    cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;">'
+      + (_tareasVerResueltas ? 'No hay tareas resueltas todavía.' : 'No hay tareas pendientes — ¡todo al día! ✓')
+      + '</div>';
+    return;
+  }
+  cont.innerHTML = lista.map(function(t){
+    const resuelta = t.estado === 'resuelta';
+    const badge = resuelta
+      ? '<span style="background:#1a7a3a;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">RESUELTA</span>'
+      : '<span style="background:#8c6518;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">PENDIENTE</span>';
+    const circulo = resuelta
+      ? '<div style="width:20px;height:20px;border-radius:50%;background:#2a7a3a;flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;">✓</div>'
+      : '<div style="width:20px;height:20px;border-radius:50%;border:2px solid #2a7a3a;flex-shrink:0;"></div>';
+    const tituloEstilo = resuelta ? 'text-decoration:line-through;color:var(--muted);' : 'color:#8c6518;';
+    const acciones = resuelta
+      ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
+        + '<div style="font-size:0.62rem;color:var(--muted);">Resuelta: '+esc((t.fechaResolucion||'').slice(0,10))+'</div>'
+        + '<button onclick="reabrirTareaHoy(\''+t.id+'\')" style="background:none;border:1px solid var(--border-l);color:var(--muted);font-size:0.66rem;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;">↩ REABRIR</button>'
+        + '</div>'
+      : '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
+        + '<div style="font-size:0.62rem;color:var(--muted);">'+esc(t.creadoPor||'')+' · '+esc((t.fechaCreacion||'').slice(0,10))+'</div>'
+        + '<div style="display:flex;gap:6px;">'
+        + '<button onclick="marcarTareaResuelta(\''+t.id+'\')" style="background:#eaf3de;color:#3b6d11;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">RESUELTO</button>'
+        + '<button onclick="abrirEditarTarea(\''+t.id+'\')" style="background:#e6f1fb;color:#185fa5;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">EDITAR</button>'
+        + '</div></div>';
+    return '<div style="background:var(--surface,#fdfaf4);border:1px solid var(--border-l);border-radius:10px;padding:12px 14px;margin-bottom:8px;'+(resuelta?'opacity:0.65;':'')+'">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
+      + '<div style="display:flex;align-items:center;gap:10px;">'+circulo
+      + '<div style="font-weight:700;font-size:0.85rem;'+tituloEstilo+'">'+esc(t.titulo||'(sin título)')+'</div></div>'
+      + badge + '</div>'
+      + (t.texto ? '<div style="margin:6px 0 0 30px;font-size:0.78rem;color:var(--ink);">'+esc(t.texto)+'</div>' : '')
+      + acciones
+      + '</div>';
+  }).join('');
+}
+
+function abrirNuevaTarea(){
+  _tareaEdId = null;
+  const t = document.getElementById('tareaEditarTitulo'); if(t) t.textContent = '📌 Nueva tarea';
+  const elElim = document.getElementById('tareaBtnElim'); if(elElim) elElim.style.display = 'none';
+  const ti = document.getElementById('tareaTitulo'); if(ti) ti.value = '';
+  const tx = document.getElementById('tareaTexto'); if(tx) tx.value = '';
+  const modal = document.getElementById('mTareaEditar');
+  if(modal) modal.classList.add('show');
+}
+
+function abrirEditarTarea(id){
+  const tarea = (D.tareasHoy||[]).find(function(x){ return x && x.id === id; });
+  if(!tarea) return;
+  _tareaEdId = id;
+  const t = document.getElementById('tareaEditarTitulo'); if(t) t.textContent = '✏ Editar tarea';
+  const elElim = document.getElementById('tareaBtnElim'); if(elElim) elElim.style.display = 'inline-flex';
+  const ti = document.getElementById('tareaTitulo'); if(ti) ti.value = tarea.titulo || '';
+  const tx = document.getElementById('tareaTexto'); if(tx) tx.value = tarea.texto || '';
+  const modal = document.getElementById('mTareaEditar');
+  if(modal) modal.classList.add('show');
+}
+
+function guardarTareaHoy(){
+  const titulo = document.getElementById('tareaTitulo')?.value.trim() || '';
+  const texto  = document.getElementById('tareaTexto')?.value.trim() || '';
+  if(!titulo){ if(typeof toast==='function') toast('El título es obligatorio','err'); return; }
+  if(!Array.isArray(D.tareasHoy)) D.tareasHoy = [];
+  if(_tareaEdId){
+    const tarea = D.tareasHoy.find(function(x){ return x && x.id === _tareaEdId; });
+    if(tarea){
+      tarea.titulo = titulo; tarea.texto = texto; tarea.fechaMod = new Date().toISOString();
+    }
+  } else {
+    D.tareasHoy.unshift({
+      id: 'TH-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+      titulo: titulo, texto: texto, estado: 'pendiente',
+      creadoPor: (typeof empleadoActual !== 'undefined' && empleadoActual) ? empleadoActual.nombre : (typeof NOMBRE_TITULAR !== 'undefined' ? NOMBRE_TITULAR : ''),
+      fechaCreacion: new Date().toISOString(), fechaResolucion: '',
+      fechaMod: new Date().toISOString()
+    });
+  }
+  cerrar('mTareaEditar');
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('✅ Tarea guardada — sincronizando...');
+  renderTareasHoyLista();
+  renderTareasHoyCount();
+}
+
+function marcarTareaResuelta(id){
+  const tarea = (D.tareasHoy||[]).find(function(x){ return x && x.id === id; });
+  if(!tarea) return;
+  tarea.estado = 'resuelta';
+  tarea.fechaResolucion = new Date().toISOString();
+  tarea.fechaMod = new Date().toISOString();
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('✅ Tarea resuelta');
+  renderTareasHoyLista();
+  renderTareasHoyCount();
+}
+
+function reabrirTareaHoy(id){
+  const tarea = (D.tareasHoy||[]).find(function(x){ return x && x.id === id; });
+  if(!tarea) return;
+  tarea.estado = 'pendiente';
+  tarea.fechaResolucion = '';
+  tarea.fechaMod = new Date().toISOString();
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('↩ Tarea reabierta como pendiente');
+  renderTareasHoyLista();
+  renderTareasHoyCount();
+}
+
+function eliminarTareaHoy(){
+  if(!_tareaEdId) return;
+  const tarea = (D.tareasHoy||[]).find(function(x){ return x && x.id === _tareaEdId; });
+  if(!tarea) return;
+  if(!confirm('¿Eliminar definitivamente la tarea "'+tarea.titulo+'"?')) return;
+  D.tareasHoy = (D.tareasHoy||[]).filter(function(x){ return x && x.id !== _tareaEdId; });
+  cerrar('mTareaEditar');
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('🗑 Tarea eliminada');
+  renderTareasHoyLista();
+  renderTareasHoyCount();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 💰 ADEUDOS SIN RECIBO — gastos/deudas de clientes fuera del sistema de
+// folios (trámites viejos, pagos que la oficina cubrió y debe cobrar
+// después). Espacio independiente: NO usa folio, NO usa D.pendientes ni
+// D.tareasHoy. Cada ficha es por CLIENTE y puede acumular varios conceptos
+// a lo largo del tiempo (+ Agregar concepto). El total solo se muestra
+// cuando hay 2 o más conceptos.
+// D.adeudosSinRecibo[] = [{id, cliente, conceptos:[{id,descripcion,fecha,monto}],
+//   estado:'pendiente'|'cobrado', creadoPor, fechaCreacion, fechaResolucion, fechaMod}]
+// ═══════════════════════════════════════════════════════════════════════
+let _adeudoEdId = null;
+let _adeudosVerCobrados = false;
+let _adeudoConceptoSeq = 0;
+
+function abrirAdeudosSinRecibo(){
+  _adeudosVerCobrados = false;
+  const btn = document.getElementById('adeudosVerCobradosBtn');
+  if(btn){ btn.textContent = '✓ Cobrados'; btn.style.background=''; btn.style.color=''; }
+  const buscar = document.getElementById('adeudosBuscar'); if(buscar) buscar.value = '';
+  renderAdeudosLista();
+  const modal = document.getElementById('mAdeudosSinRecibo');
+  if(modal) modal.classList.add('show');
+}
+
+function toggleAdeudosCobrados(){
+  _adeudosVerCobrados = !_adeudosVerCobrados;
+  const btn = document.getElementById('adeudosVerCobradosBtn');
+  if(btn){
+    btn.textContent = _adeudosVerCobrados ? '← Pendientes' : '✓ Cobrados';
+    btn.style.background = _adeudosVerCobrados ? 'var(--gold-d)' : '';
+    btn.style.color = _adeudosVerCobrados ? '#fff' : '';
+  }
+  renderAdeudosLista();
+}
+
+function _adeudoTotal(a){
+  return (a.conceptos||[]).reduce(function(s,c){ return s + (parseFloat(c.monto)||0); }, 0);
+}
+
+function renderAdeudosLista(){
+  const cont = document.getElementById('adeudosLista');
+  if(!cont) return;
+  const q = (document.getElementById('adeudosBuscar')?.value || '').toLowerCase().trim();
+  const todos = Array.isArray(D.adeudosSinRecibo) ? D.adeudosSinRecibo : [];
+  let lista = todos.filter(function(a){ return a && (_adeudosVerCobrados ? a.estado==='cobrado' : a.estado!=='cobrado'); });
+  if(q) lista = lista.filter(function(a){ return (a.cliente||'').toLowerCase().includes(q); });
+  lista = lista.slice().sort(function(a,b){ return (b.fechaCreacion||'').localeCompare(a.fechaCreacion||''); });
+  const contador = document.getElementById('adeudosContador');
+  if(contador) contador.textContent = lista.length + (_adeudosVerCobrados ? ' cobrado(s)' : ' pendiente(s)');
+  if(!lista.length){
+    cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;">'
+      + (_adeudosVerCobrados ? 'No hay adeudos cobrados todavía.' : 'No hay adeudos pendientes.')
+      + '</div>';
+    return;
+  }
+  cont.innerHTML = lista.map(function(a){
+    const cobrado = a.estado === 'cobrado';
+    const badge = cobrado
+      ? '<span style="background:#1a7a3a;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">COBRADO</span>'
+      : '<span style="background:#8c6518;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">PENDIENTE</span>';
+    const circulo = cobrado
+      ? '<div style="width:20px;height:20px;border-radius:50%;background:#2a7a3a;flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;">✓</div>'
+      : '<div style="width:20px;height:20px;border-radius:50%;border:2px solid #2a7a3a;flex-shrink:0;"></div>';
+    const tituloEstilo = cobrado ? 'text-decoration:line-through;color:var(--muted);' : 'color:#8c6518;';
+    const conceptos = (a.conceptos||[]);
+    const conceptosHtml = conceptos.map(function(c){
+      return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.76rem;color:var(--ink);padding:2px 0;">'
+        + '<span>'+esc(c.descripcion||'(sin descripción)')+(c.fecha?' <span style="color:var(--muted);">· '+esc(c.fecha.slice(0,10))+'</span>':'')+'</span>'
+        + '<span style="white-space:nowrap;font-family:monospace;">$'+(parseFloat(c.monto)||0).toFixed(2)+'</span>'
+        + '</div>';
+    }).join('');
+    const totalHtml = conceptos.length >= 2
+      ? '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.78rem;font-weight:700;border-top:1px solid rgba(200,149,42,0.25);margin-top:4px;padding-top:4px;">'
+        + '<span>TOTAL</span><span style="font-family:monospace;">$'+_adeudoTotal(a).toFixed(2)+'</span></div>'
+      : '';
+    const acciones = cobrado
+      ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
+        + '<div style="font-size:0.62rem;color:var(--muted);">Cobrado: '+esc((a.fechaResolucion||'').slice(0,10))+'</div>'
+        + '<button onclick="reabrirAdeudo(\''+a.id+'\')" style="background:none;border:1px solid var(--border-l);color:var(--muted);font-size:0.66rem;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;">↩ REABRIR</button>'
+        + '</div>'
+      : '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
+        + '<div style="font-size:0.62rem;color:var(--muted);">'+esc(a.creadoPor||'')+' · '+esc((a.fechaCreacion||'').slice(0,10))+'</div>'
+        + '<div style="display:flex;gap:6px;">'
+        + '<button onclick="marcarAdeudoCobrado(\''+a.id+'\')" style="background:#eaf3de;color:#3b6d11;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">COBRADO</button>'
+        + '<button onclick="abrirEditarAdeudo(\''+a.id+'\')" style="background:#e6f1fb;color:#185fa5;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">EDITAR</button>'
+        + '</div></div>';
+    return '<div style="background:var(--surface,#fdfaf4);border:1px solid var(--border-l);border-radius:10px;padding:12px 14px;margin-bottom:8px;'+(cobrado?'opacity:0.65;':'')+'">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
+      + '<div style="display:flex;align-items:center;gap:10px;">'+circulo
+      + '<div style="font-weight:700;font-size:0.85rem;'+tituloEstilo+'">'+esc(a.cliente||'(sin nombre)')+'</div></div>'
+      + badge + '</div>'
+      + (conceptosHtml ? '<div style="margin:6px 0 0 30px;">'+conceptosHtml+totalHtml+'</div>' : '')
+      + acciones
+      + '</div>';
+  }).join('');
+}
+
+function _renderAdeudoConceptosLista(conceptos){
+  const cont = document.getElementById('adeudoConceptosLista');
+  if(!cont) return;
+  if(!conceptos.length){
+    cont.innerHTML = '<div style="font-size:0.74rem;color:var(--muted);padding:4px 0;">Sin conceptos — agrega uno.</div>';
+    return;
+  }
+  cont.innerHTML = conceptos.map(function(c){
+    return '<div class="adeudo-concepto-row" data-cid="'+c.id+'" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'
+      + '<input type="text" class="ac-desc" value="'+esc(c.descripcion||'')+'" placeholder="Descripción" style="flex:2;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+      + '<input type="date" class="ac-fecha" value="'+esc((c.fecha||'').slice(0,10))+'" style="flex:1;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+      + '<input type="number" class="ac-monto" value="'+(c.monto!=null?c.monto:'')+'" placeholder="Monto" step="0.01" style="width:90px;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+      + '<button type="button" onclick="quitarConceptoAdeudo(this)" style="background:none;border:none;color:var(--rojo,#b91c1c);font-size:1rem;cursor:pointer;padding:2px 6px;">✕</button>'
+      + '</div>';
+  }).join('');
+}
+
+function agregarConceptoAdeudo(){
+  const cont = document.getElementById('adeudoConceptosLista');
+  if(!cont) return;
+  if(cont.children.length===1 && !cont.querySelector('.adeudo-concepto-row')) cont.innerHTML='';
+  const id = 'C-' + Date.now() + '-' + (_adeudoConceptoSeq++);
+  const row = document.createElement('div');
+  row.className = 'adeudo-concepto-row';
+  row.setAttribute('data-cid', id);
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
+  row.innerHTML = '<input type="text" class="ac-desc" placeholder="Descripción" style="flex:2;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+    + '<input type="date" class="ac-fecha" style="flex:1;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+    + '<input type="number" class="ac-monto" placeholder="Monto" step="0.01" style="width:90px;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+    + '<button type="button" onclick="quitarConceptoAdeudo(this)" style="background:none;border:none;color:var(--rojo,#b91c1c);font-size:1rem;cursor:pointer;padding:2px 6px;">✕</button>';
+  cont.appendChild(row);
+}
+
+function quitarConceptoAdeudo(btn){
+  const row = btn.closest('.adeudo-concepto-row');
+  if(row) row.remove();
+  const cont = document.getElementById('adeudoConceptosLista');
+  if(cont && !cont.querySelector('.adeudo-concepto-row')){
+    cont.innerHTML = '<div style="font-size:0.74rem;color:var(--muted);padding:4px 0;">Sin conceptos — agrega uno.</div>';
+  }
+}
+
+function abrirNuevoAdeudo(){
+  _adeudoEdId = null;
+  const t = document.getElementById('adeudoEditarTitulo'); if(t) t.textContent = '💰 Nuevo adeudo';
+  const elElim = document.getElementById('adeudoBtnElim'); if(elElim) elElim.style.display = 'none';
+  const cl = document.getElementById('adeudoCliente'); if(cl) cl.value = '';
+  _renderAdeudoConceptosLista([]);
+  agregarConceptoAdeudo();
+  const modal = document.getElementById('mAdeudoEditar');
+  if(modal) modal.classList.add('show');
+}
+
+function abrirEditarAdeudo(id){
+  const adeudo = (D.adeudosSinRecibo||[]).find(function(x){ return x && x.id === id; });
+  if(!adeudo) return;
+  _adeudoEdId = id;
+  const t = document.getElementById('adeudoEditarTitulo'); if(t) t.textContent = '✏ Editar adeudo';
+  const elElim = document.getElementById('adeudoBtnElim'); if(elElim) elElim.style.display = 'inline-flex';
+  const cl = document.getElementById('adeudoCliente'); if(cl) cl.value = adeudo.cliente || '';
+  _renderAdeudoConceptosLista(adeudo.conceptos || []);
+  const modal = document.getElementById('mAdeudoEditar');
+  if(modal) modal.classList.add('show');
+}
+
+function _leerConceptosAdeudoForm(){
+  const rows = document.querySelectorAll('#adeudoConceptosLista .adeudo-concepto-row');
+  const out = [];
+  rows.forEach(function(row){
+    const desc = row.querySelector('.ac-desc')?.value.trim() || '';
+    const fecha = row.querySelector('.ac-fecha')?.value || '';
+    const montoRaw = row.querySelector('.ac-monto')?.value || '';
+    const monto = parseFloat(montoRaw) || 0;
+    if(!desc && !monto) return;
+    let cid = row.getAttribute('data-cid');
+    if(!cid) cid = 'C-' + Date.now() + '-' + (_adeudoConceptoSeq++);
+    out.push({ id: cid, descripcion: desc, fecha: fecha, monto: monto });
+  });
+  return out;
+}
+
+function guardarAdeudo(){
+  const cliente = document.getElementById('adeudoCliente')?.value.trim() || '';
+  if(!cliente){ if(typeof toast==='function') toast('El nombre del cliente es obligatorio','err'); return; }
+  const conceptos = _leerConceptosAdeudoForm();
+  if(!conceptos.length){ if(typeof toast==='function') toast('Agrega al menos un concepto','err'); return; }
+  if(!Array.isArray(D.adeudosSinRecibo)) D.adeudosSinRecibo = [];
+  if(_adeudoEdId){
+    const adeudo = D.adeudosSinRecibo.find(function(x){ return x && x.id === _adeudoEdId; });
+    if(adeudo){
+      adeudo.cliente = cliente; adeudo.conceptos = conceptos; adeudo.fechaMod = new Date().toISOString();
+    }
+  } else {
+    D.adeudosSinRecibo.unshift({
+      id: 'AR-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+      cliente: cliente, conceptos: conceptos, estado: 'pendiente',
+      creadoPor: (typeof empleadoActual !== 'undefined' && empleadoActual) ? empleadoActual.nombre : (typeof NOMBRE_TITULAR !== 'undefined' ? NOMBRE_TITULAR : ''),
+      fechaCreacion: new Date().toISOString(), fechaResolucion: '',
+      fechaMod: new Date().toISOString()
+    });
+  }
+  cerrar('mAdeudoEditar');
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('✅ Adeudo guardado — sincronizando...');
+  renderAdeudosLista();
+}
+
+function marcarAdeudoCobrado(id){
+  const adeudo = (D.adeudosSinRecibo||[]).find(function(x){ return x && x.id === id; });
+  if(!adeudo) return;
+  adeudo.estado = 'cobrado';
+  adeudo.fechaResolucion = new Date().toISOString();
+  adeudo.fechaMod = new Date().toISOString();
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('✅ Adeudo marcado como cobrado');
+  renderAdeudosLista();
+}
+
+function reabrirAdeudo(id){
+  const adeudo = (D.adeudosSinRecibo||[]).find(function(x){ return x && x.id === id; });
+  if(!adeudo) return;
+  adeudo.estado = 'pendiente';
+  adeudo.fechaResolucion = '';
+  adeudo.fechaMod = new Date().toISOString();
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('↩ Adeudo reabierto como pendiente');
+  renderAdeudosLista();
+}
+
+function eliminarAdeudo(){
+  if(!_adeudoEdId) return;
+  const adeudo = (D.adeudosSinRecibo||[]).find(function(x){ return x && x.id === _adeudoEdId; });
+  if(!adeudo) return;
+  if(!confirm('¿Eliminar definitivamente el adeudo de "'+adeudo.cliente+'"?')) return;
+  D.adeudosSinRecibo = (D.adeudosSinRecibo||[]).filter(function(x){ return x && x.id !== _adeudoEdId; });
+  cerrar('mAdeudoEditar');
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('🗑 Adeudo eliminado');
+  renderAdeudosLista();
 }

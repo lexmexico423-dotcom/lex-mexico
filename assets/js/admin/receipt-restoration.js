@@ -1767,6 +1767,7 @@ window._pendMovsRecuperar = function(){
         pendientes:     D.pendientes    || [],
         citas:          D.citas         || [],
         prestamos:      D.prestamos     || [],
+        cuentasPorCobrar: D.cuentasPorCobrar || [],
         saldoAcumulado: D.saldoAcumulado || 0
       };
       const recibos = {
@@ -6698,7 +6699,7 @@ async function adminBorradoTotal(){
     // Resetear D en memoria
     if(typeof D!=='undefined'){
       D.movimientos=[]; D.carpetas=[]; D.juicios=[];
-      D.pendientes=[]; D.cierres=[]; D.prestamos=[];
+      D.pendientes=[]; D.cierres=[]; D.prestamos=[]; D.cuentasPorCobrar=[];
       D.saldoAcumulado=0; D.directorio=directorioActual;
     }
     // Resetear recibos
@@ -6709,7 +6710,7 @@ async function adminBorradoTotal(){
       const { error } = await window.SB.from('app_state')
         .update({
           data:{ movimientos:[], directorio:directorioActual, carpetas:[], juicios:[],
-                 pendientes:[], cierres:[], prestamos:[], saldoAcumulado:0, leyes:[] },
+                 pendientes:[], cierres:[], prestamos:[], cuentasPorCobrar:[], saldoAcumulado:0, leyes:[] },
           recibos:{ folioActual:1, recibos:[] },
           folio_actual:1,
           sesiones_log:[]

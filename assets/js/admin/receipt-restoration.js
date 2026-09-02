@@ -10860,13 +10860,27 @@ function toggleTareasResueltas(){
 function renderTareasHoyLista(){
   const cont = document.getElementById('tareasHoyLista');
   if(!cont) return;
+  const TCOL = '#1a4a8a'; // azul — color de tema de "Tareas para hoy"
   const q = (document.getElementById('tareasBuscar')?.value || '').toLowerCase().trim();
   const todas = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
   let lista = todas.filter(function(t){ return t && (_tareasVerResueltas ? t.estado==='resuelta' : t.estado!=='resuelta'); });
   if(q) lista = lista.filter(function(t){ return (t.titulo||'').toLowerCase().includes(q) || (t.texto||'').toLowerCase().includes(q); });
+  // N° de ficha — posición entre las tareas ACTIVAS (no resueltas), ordenadas
+  // por antigüedad (la más vieja = 1). Igual que en Pendientes, se recalcula
+  // solo en cada render; las resueltas no muestran número.
+  const _tareasNumMapa = (function(){
+    const activas = todas.filter(function(x){ return x && x.estado !== 'resuelta'; });
+    const orden = activas.slice().sort(function(a,b){
+      const ka=a.fechaCreacion||'', kb=b.fechaCreacion||'';
+      return ka<kb?-1:ka>kb?1:0;
+    });
+    const mapa = new Map();
+    orden.forEach(function(x,pos){ mapa.set(x, pos+1); });
+    return mapa;
+  })();
   lista = lista.slice().sort(function(a,b){ return (b.fechaCreacion||'').localeCompare(a.fechaCreacion||''); });
   const contador = document.getElementById('tareasHoyContador');
-  if(contador) contador.textContent = lista.length + (_tareasVerResueltas ? ' resuelta(s)' : ' pendiente(s)');
+  if(contador) contador.textContent = lista.length;
   if(!lista.length){
     cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;">'
       + (_tareasVerResueltas ? 'No hay tareas resueltas todavía.' : 'No hay tareas pendientes — ¡todo al día! ✓')
@@ -10875,13 +10889,15 @@ function renderTareasHoyLista(){
   }
   cont.innerHTML = lista.map(function(t){
     const resuelta = t.estado === 'resuelta';
+    const numFicha = resuelta ? '' : (_tareasNumMapa.get(t)||'');
     const badge = resuelta
-      ? '<span style="background:#1a7a3a;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">RESUELTA</span>'
+      ? '<span style="background:'+TCOL+';color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">RESUELTA</span>'
       : '<span style="background:#8c6518;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">PENDIENTE</span>';
     const circulo = resuelta
-      ? '<div onclick="event.stopPropagation();reabrirTareaHoy(\''+t.id+'\')" title="Reabrir" style="width:20px;height:20px;border-radius:50%;background:#2a7a3a;flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;cursor:pointer;">✓</div>'
-      : '<div onclick="event.stopPropagation();marcarTareaResuelta(\''+t.id+'\')" title="Marcar resuelto" style="width:20px;height:20px;border-radius:50%;border:2px solid #2a7a3a;flex-shrink:0;cursor:pointer;"></div>';
-    const tituloEstilo = resuelta ? 'text-decoration:line-through;color:var(--muted);' : 'color:#8c6518;';
+      ? '<div onclick="event.stopPropagation();reabrirTareaHoy(\''+t.id+'\')" title="Reabrir" style="width:20px;height:20px;border-radius:50%;background:'+TCOL+';flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;cursor:pointer;">✓</div>'
+      : '<div onclick="event.stopPropagation();marcarTareaResuelta(\''+t.id+'\')" title="Marcar resuelto" style="width:20px;height:20px;border-radius:50%;border:2px solid '+TCOL+';flex-shrink:0;cursor:pointer;"></div>';
+    const fichaHtml = numFicha ? '<div title="N° de ficha — posición entre las tareas activas, se recalcula solo" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Tarea</span><span style="color:'+TCOL+';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">'+numFicha+'</span></div>' : '';
+    const tituloEstilo = resuelta ? 'text-decoration:line-through;color:var(--muted);' : 'color:'+TCOL+';';
     const acciones = resuelta
       ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
         + '<div style="font-size:0.62rem;color:var(--muted);">Resuelta: '+esc((t.fechaResolucion||'').slice(0,10))+'</div>'
@@ -10890,16 +10906,19 @@ function renderTareasHoyLista(){
       : '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
         + '<div style="font-size:0.62rem;color:var(--muted);">'+esc(t.creadoPor||'')+' · '+esc((t.fechaCreacion||'').slice(0,10))+'</div>'
         + '<div style="display:flex;gap:6px;">'
-        + '<button onclick="marcarTareaResuelta(\''+t.id+'\')" style="background:#eaf3de;color:#3b6d11;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">RESUELTO</button>'
+        + '<button onclick="marcarTareaResuelta(\''+t.id+'\')" style="background:#eef3ff;color:'+TCOL+';font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">RESUELTO</button>'
         + '<button onclick="abrirEditarTarea(\''+t.id+'\')" style="background:#e6f1fb;color:#185fa5;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">EDITAR</button>'
         + '</div></div>';
-    return '<div style="background:var(--surface,#fdfaf4);border:1px solid var(--border-l);border-radius:10px;padding:12px 14px;margin-bottom:8px;'+(resuelta?'opacity:0.65;':'')+'">'
+    return '<div style="position:relative;display:flex;align-items:stretch;background:var(--surface,#fdfaf4);border:1px solid var(--border-l);border-radius:10px;margin-bottom:8px;overflow:hidden;'+(resuelta?'opacity:0.65;':'')+'">'
+      + '<div style="width:5px;background:'+TCOL+';flex-shrink:0;"></div>'
+      + '<div style="flex:1;min-width:0;padding:12px 14px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
-      + '<div style="display:flex;align-items:center;gap:10px;">'+circulo
+      + '<div style="display:flex;align-items:center;gap:10px;">'+circulo+fichaHtml
       + '<div style="font-weight:700;font-size:0.85rem;'+tituloEstilo+'">'+esc(t.titulo||'(sin título)')+'</div></div>'
       + badge + '</div>'
       + (t.texto ? '<div style="margin:6px 0 0 30px;font-size:0.78rem;color:var(--ink);">'+esc(t.texto)+'</div>' : '')
       + acciones
+      + '</div>'
       + '</div>';
   }).join('');
 }
@@ -11034,13 +11053,27 @@ function _adeudoTotal(a){
 function renderAdeudosLista(){
   const cont = document.getElementById('adeudosLista');
   if(!cont) return;
+  const ACOL = '#c8781a'; // naranja — color de tema de "Adeudos sin Recibo"
   const q = (document.getElementById('adeudosBuscar')?.value || '').toLowerCase().trim();
   const todos = Array.isArray(D.adeudosSinRecibo) ? D.adeudosSinRecibo : [];
   let lista = todos.filter(function(a){ return a && (_adeudosVerCobrados ? a.estado==='cobrado' : a.estado!=='cobrado'); });
   if(q) lista = lista.filter(function(a){ return (a.cliente||'').toLowerCase().includes(q); });
+  // N° de ficha — posición entre los adeudos ACTIVOS (no cobrados), ordenados
+  // por antigüedad (el más viejo = 1). Igual que en Pendientes, se recalcula
+  // solo en cada render; los cobrados no muestran número.
+  const _adeudosNumMapa = (function(){
+    const activos = todos.filter(function(x){ return x && x.estado !== 'cobrado'; });
+    const orden = activos.slice().sort(function(a,b){
+      const ka=a.fechaCreacion||'', kb=b.fechaCreacion||'';
+      return ka<kb?-1:ka>kb?1:0;
+    });
+    const mapa = new Map();
+    orden.forEach(function(x,pos){ mapa.set(x, pos+1); });
+    return mapa;
+  })();
   lista = lista.slice().sort(function(a,b){ return (b.fechaCreacion||'').localeCompare(a.fechaCreacion||''); });
   const contador = document.getElementById('adeudosContador');
-  if(contador) contador.textContent = lista.length + (_adeudosVerCobrados ? ' cobrado(s)' : ' pendiente(s)');
+  if(contador) contador.textContent = lista.length;
   if(!lista.length){
     cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;">'
       + (_adeudosVerCobrados ? 'No hay adeudos cobrados todavía.' : 'No hay adeudos pendientes.')
@@ -11049,13 +11082,15 @@ function renderAdeudosLista(){
   }
   cont.innerHTML = lista.map(function(a){
     const cobrado = a.estado === 'cobrado';
+    const numFicha = cobrado ? '' : (_adeudosNumMapa.get(a)||'');
     const badge = cobrado
-      ? '<span style="background:#1a7a3a;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">COBRADO</span>'
+      ? '<span style="background:'+ACOL+';color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">COBRADO</span>'
       : '<span style="background:#8c6518;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">PENDIENTE</span>';
     const circulo = cobrado
-      ? '<div onclick="event.stopPropagation();reabrirAdeudo(\''+a.id+'\')" title="Reabrir" style="width:20px;height:20px;border-radius:50%;background:#2a7a3a;flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;cursor:pointer;">✓</div>'
-      : '<div onclick="event.stopPropagation();marcarAdeudoCobrado(\''+a.id+'\')" title="Marcar cobrado" style="width:20px;height:20px;border-radius:50%;border:2px solid #2a7a3a;flex-shrink:0;cursor:pointer;"></div>';
-    const tituloEstilo = cobrado ? 'text-decoration:line-through;color:var(--muted);' : 'color:#8c6518;';
+      ? '<div onclick="event.stopPropagation();reabrirAdeudo(\''+a.id+'\')" title="Reabrir" style="width:20px;height:20px;border-radius:50%;background:'+ACOL+';flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;cursor:pointer;">✓</div>'
+      : '<div onclick="event.stopPropagation();marcarAdeudoCobrado(\''+a.id+'\')" title="Marcar cobrado" style="width:20px;height:20px;border-radius:50%;border:2px solid '+ACOL+';flex-shrink:0;cursor:pointer;"></div>';
+    const fichaHtml = numFicha ? '<div title="N° de ficha — posición entre los adeudos activos, se recalcula solo" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Adeudo</span><span style="color:'+ACOL+';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">'+numFicha+'</span></div>' : '';
+    const tituloEstilo = cobrado ? 'text-decoration:line-through;color:var(--muted);' : 'color:'+ACOL+';';
     const conceptos = (a.conceptos||[]);
     const conceptosHtml = conceptos.map(function(c){
       return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.76rem;color:var(--ink);padding:2px 0;">'
@@ -11075,16 +11110,19 @@ function renderAdeudosLista(){
       : '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
         + '<div style="font-size:0.62rem;color:var(--muted);">'+esc(a.creadoPor||'')+' · '+esc((a.fechaCreacion||'').slice(0,10))+'</div>'
         + '<div style="display:flex;gap:6px;">'
-        + '<button onclick="marcarAdeudoCobrado(\''+a.id+'\')" style="background:#eaf3de;color:#3b6d11;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">COBRADO</button>'
+        + '<button onclick="marcarAdeudoCobrado(\''+a.id+'\')" style="background:#fff3e6;color:'+ACOL+';font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">COBRADO</button>'
         + '<button onclick="abrirEditarAdeudo(\''+a.id+'\')" style="background:#e6f1fb;color:#185fa5;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">EDITAR</button>'
         + '</div></div>';
-    return '<div style="background:var(--surface,#fdfaf4);border:1px solid var(--border-l);border-radius:10px;padding:12px 14px;margin-bottom:8px;'+(cobrado?'opacity:0.65;':'')+'">'
+    return '<div style="position:relative;display:flex;align-items:stretch;background:var(--surface,#fdfaf4);border:1px solid var(--border-l);border-radius:10px;margin-bottom:8px;overflow:hidden;'+(cobrado?'opacity:0.65;':'')+'">'
+      + '<div style="width:5px;background:'+ACOL+';flex-shrink:0;"></div>'
+      + '<div style="flex:1;min-width:0;padding:12px 14px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
-      + '<div style="display:flex;align-items:center;gap:10px;">'+circulo
+      + '<div style="display:flex;align-items:center;gap:10px;">'+circulo+fichaHtml
       + '<div style="font-weight:700;font-size:0.85rem;'+tituloEstilo+'">'+esc(a.cliente||'(sin nombre)')+'</div></div>'
       + badge + '</div>'
       + (conceptosHtml ? '<div style="margin:6px 0 0 30px;">'+conceptosHtml+totalHtml+'</div>' : '')
       + acciones
+      + '</div>'
       + '</div>';
   }).join('');
 }

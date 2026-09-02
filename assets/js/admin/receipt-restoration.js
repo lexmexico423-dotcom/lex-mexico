@@ -10914,7 +10914,7 @@ function renderTareasHoyLista(){
       + '<div style="flex:1;min-width:0;padding:12px 14px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
       + '<div style="display:flex;align-items:center;gap:10px;">'+circulo+fichaHtml
-      + '<div style="font-weight:700;font-size:0.85rem;'+tituloEstilo+'">'+esc(t.titulo||'(sin título)')+'</div></div>'
+      + '<div style="font-size:13.5px;font-weight:600;font-family:\'Outfit\',sans-serif;letter-spacing:0.025em;text-transform:uppercase;opacity:0.92;'+tituloEstilo+'">👤 '+esc(t.titulo||'(sin título)')+'</div></div>'
       + badge + '</div>'
       + (t.texto ? '<div style="margin:6px 0 0 30px;font-size:0.78rem;color:var(--ink);">'+esc(t.texto)+'</div>' : '')
       + acciones
@@ -11095,12 +11095,12 @@ function renderAdeudosLista(){
     const conceptosHtml = conceptos.map(function(c){
       return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.76rem;color:var(--ink);padding:2px 0;">'
         + '<span>'+esc(c.descripcion||'(sin descripción)')+(c.fecha?' <span style="color:var(--muted);">· '+esc(c.fecha.slice(0,10))+'</span>':'')+'</span>'
-        + '<span style="white-space:nowrap;font-family:monospace;">$'+(parseFloat(c.monto)||0).toFixed(2)+'</span>'
+        + '<span style="white-space:nowrap;font-family:monospace;">$'+(typeof fmt==='function'?fmt(c.monto):(parseFloat(c.monto)||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}))+'</span>'
         + '</div>';
     }).join('');
     const totalHtml = conceptos.length >= 2
       ? '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.78rem;font-weight:700;border-top:1px solid rgba(200,149,42,0.25);margin-top:4px;padding-top:4px;">'
-        + '<span>TOTAL</span><span style="font-family:monospace;">$'+_adeudoTotal(a).toFixed(2)+'</span></div>'
+        + '<span>TOTAL</span><span style="font-family:monospace;">$'+(typeof fmt==='function'?fmt(_adeudoTotal(a)):_adeudoTotal(a).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}))+'</span></div>'
       : '';
     const acciones = cobrado
       ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
@@ -11118,7 +11118,7 @@ function renderAdeudosLista(){
       + '<div style="flex:1;min-width:0;padding:12px 14px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
       + '<div style="display:flex;align-items:center;gap:10px;">'+circulo+fichaHtml
-      + '<div style="font-weight:700;font-size:0.85rem;'+tituloEstilo+'">'+esc(a.cliente||'(sin nombre)')+'</div></div>'
+      + '<div style="font-size:13.5px;font-weight:600;font-family:\'Outfit\',sans-serif;letter-spacing:0.025em;text-transform:uppercase;opacity:0.92;'+tituloEstilo+'">👤 '+esc(a.cliente||'(sin nombre)')+'</div></div>'
       + badge + '</div>'
       + (conceptosHtml ? '<div style="margin:6px 0 0 30px;">'+conceptosHtml+totalHtml+'</div>' : '')
       + acciones

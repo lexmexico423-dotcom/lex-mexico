@@ -13,7 +13,7 @@ let driveFoldersCache=[]; // cache de carpetas de Drive vinculadas a juicios
 let driveFolderSeleccionado=null; // {id, name} carpeta seleccionada en modal
 let acuerdoPDFPendiente=null; // File object pendiente de subir
 // ═══ ESTADO ═══
-let D={movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],citas:[],cierres:[],prestamos:[],saldoAcumulado:0,leyes:[],tiempoExtra:{}};
+let D={movimientos:[],directorio:[],carpetas:[],juicios:[],pendientes:[],citas:[],cierres:[],prestamos:[],cuentasPorCobrar:[],saldoAcumulado:0,leyes:[],tiempoExtra:{}};
 let REC={folioActual:100,recibos:[]}; // Se sobrescribe con datos de Drive al conectar
 let filtroC='todo',filtroDT='todos',filtroCT='todas',filtroJ='todos',filtroP='activos',filtroSeccion='todas',modo='ingreso';
 let eiC=-1,eiK=-1,eiJ=-1,eiP=-1;

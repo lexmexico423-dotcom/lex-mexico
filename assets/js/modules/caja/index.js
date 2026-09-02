@@ -306,6 +306,7 @@ function _csHome(){
   if(!body) return;
   body.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">'
     + _csTarjeta('💰','Préstamos','Ver préstamos y pagos registrados en Caja Rápida, con total prestado/pagado/pendiente.','_csAbrirPrestamos()')
+    + _csTarjeta('📒','Cuentas por Cobrar','Gastos pagados a nombre de clientes (trámites viejos, sin folio en el sistema) pendientes de cobro.','_csAbrirCuentasPorCobrar()')
     + _csTarjeta('📋','Folios sin Liquidar','Lista completa de folios con saldo pendiente &gt; $0, ordenados de mayor a menor.','_csAbrirSinLiquidar()')
     + _csTarjeta('🚗','Folios Vehiculares','Folios de trámite vehicular: en proceso, liquidados y cancelados.',"_csAbrirFolios('vehicular')")
     + _csTarjeta('📁','Folios Normales','Folios de trámite normal: en proceso, liquidados y cancelados.',"_csAbrirFolios('normal')")
@@ -468,6 +469,146 @@ function _csAbrirPrestamos(){
       + '</div>';
   }
   body.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 📒 CUENTAS POR COBRAR — gastos pagados a nombre de clientes que no están
+// en el sistema (trámites viejos, sin folio) y que hay que cobrarles
+// después. A diferencia de Préstamos (que se detecta solo escaneando
+// descripciones), esto es un registro propio: D.cuentasPorCobrar[], con
+// persistencia y sincronización igual que Pendientes/Escrituras.
+// ═══════════════════════════════════════════════════════════════════════
+function _csAbrirCuentasPorCobrar(){
+  const sub = document.getElementById('cs-subtitulo');
+  if(sub) sub.textContent = 'CUENTAS POR COBRAR';
+  _csCxcRenderLista();
+}
+
+function _csCxcRenderLista(){
+  const body = document.getElementById('cs-body');
+  if(!body) return;
+  const todas = Array.isArray(D.cuentasPorCobrar) ? D.cuentasPorCobrar : [];
+  const pendientes = todas.filter(function(c){ return c && c.estado !== 'cobrado'; })
+    .sort(function(a,b){ return (a.fecha||'').localeCompare(b.fecha||''); });
+  const cobradas = todas.filter(function(c){ return c && c.estado === 'cobrado'; })
+    .sort(function(a,b){ return (b.fechaCobro||'').localeCompare(a.fechaCobro||''); });
+  const totalPend = pendientes.reduce(function(s,c){ return s + (parseFloat(c.monto)||0); }, 0);
+  let html = '<button onclick="_csHome()" style="background:none;border:1.5px solid rgba(200,149,42,0.4);border-radius:20px;padding:6px 14px;font-size:0.74rem;color:#8c6518;cursor:pointer;margin-bottom:14px;">← Volver</button>';
+  html += '<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">'
+    + '<div style="flex:1;min-width:140px;background:#fff8e8;border:1.5px solid #e0c060;border-radius:8px;padding:10px 14px;">'
+    +   '<div style="font-size:0.6rem;color:#8c6518;letter-spacing:0.05em;">CUENTAS PENDIENTES</div>'
+    +   '<div style="font-size:1.1rem;font-weight:700;color:#8c6518;">'+pendientes.length+'</div>'
+    + '</div>'
+    + '<div style="flex:1;min-width:140px;background:#fff0f0;border:1.5px solid #e0a0a0;border-radius:8px;padding:10px 14px;">'
+    +   '<div style="font-size:0.6rem;color:#a03030;letter-spacing:0.05em;">TOTAL POR COBRAR</div>'
+    +   '<div style="font-size:1.1rem;font-weight:700;color:#c0161a;">$'+fmt(totalPend)+'</div>'
+    + '</div>'
+    + '</div>';
+  html += '<button onclick="_csCxcForm()" class="btn btn-primary" style="margin-bottom:14px;">＋ Nueva cuenta por cobrar</button>';
+  const renderItem = function(c, esCobrada){
+    const badge = esCobrada
+      ? '<span style="color:#1a7a3a;font-weight:700;font-size:0.7rem;">✅ Cobrado'+(c.fechaCobro?' ('+esc(c.fechaCobro)+')':'')+'</span>'
+      : '<span style="color:#c0161a;font-weight:700;font-size:0.7rem;">⏳ Pendiente</span>';
+    const acciones = esCobrada
+      ? '<button onclick="_csCxcReabrir(\''+c.id+'\')" style="background:none;border:1px solid rgba(200,149,42,0.4);border-radius:6px;padding:4px 10px;font-size:0.68rem;color:#8c6518;cursor:pointer;">↩ Reabrir</button>'
+      : '<button onclick="_csCxcMarcarCobrado(\''+c.id+'\')" style="background:#1a7a3a;border:none;border-radius:6px;padding:4px 10px;font-size:0.68rem;color:#fff;cursor:pointer;margin-right:6px;">✅ Marcar cobrado</button>'
+      + '<button onclick="_csCxcEliminar(\''+c.id+'\')" style="background:none;border:1px solid rgba(192,22,26,0.4);border-radius:6px;padding:4px 10px;font-size:0.68rem;color:#c0161a;cursor:pointer;">🗑 Eliminar</button>';
+    return '<div style="border:1.5px solid rgba(200,149,42,0.3);border-radius:8px;padding:10px 14px;margin-bottom:8px;'+(esCobrada?'opacity:0.7;':'')+'">'
+      + '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">'
+      +   '<span style="font-weight:700;color:#3a2a10;font-size:0.85rem;">'+esc(c.cliente||'(sin nombre)')+'</span>'
+      +   badge
+      + '</div>'
+      + '<div style="font-size:0.78rem;color:#4a3a1a;margin-top:3px;">'+esc(c.concepto||'')+' — <b>$'+fmt(parseFloat(c.monto)||0)+'</b></div>'
+      + '<div style="font-size:0.65rem;color:#9a8050;margin-top:2px;">'+esc(c.fecha||'')+(c.obs?' · '+esc(c.obs):'')+'</div>'
+      + '<div style="margin-top:8px;">'+acciones+'</div>'
+      + '</div>';
+  };
+  if(!pendientes.length && !cobradas.length){
+    html += '<div style="padding:24px;text-align:center;color:#9a8050;">No hay cuentas por cobrar registradas todavía.</div>';
+  } else {
+    html += pendientes.map(function(c){ return renderItem(c, false); }).join('');
+    if(cobradas.length){
+      html += '<div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#7a6840;margin:16px 0 8px;">Ya cobradas ('+cobradas.length+')</div>';
+      html += cobradas.map(function(c){ return renderItem(c, true); }).join('');
+    }
+  }
+  body.innerHTML = html;
+}
+
+function _csCxcForm(){
+  const body = document.getElementById('cs-body');
+  if(!body) return;
+  const hoyStr = (typeof hoy === 'function') ? hoy() : new Date().toISOString().slice(0,10);
+  let html = '<button onclick="_csAbrirCuentasPorCobrar()" style="background:none;border:1.5px solid rgba(200,149,42,0.4);border-radius:20px;padding:6px 14px;font-size:0.74rem;color:#8c6518;cursor:pointer;margin-bottom:14px;">← Volver</button>';
+  html += '<div style="font-family:monospace;font-size:0.62rem;letter-spacing:0.14em;text-transform:uppercase;color:#555;font-weight:700;margin-bottom:10px;">📒 Nueva Cuenta por Cobrar</div>';
+  html += '<div class="field"><label>👤 Cliente *</label><input id="cxcCliente" type="text" placeholder="Nombre del cliente..."></div>';
+  html += '<div class="field"><label>📝 Concepto *</label><input id="cxcConcepto" type="text" placeholder="Ej: Pago de recibo predial 2022..."></div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">'
+    + '<div class="field"><label>💵 Monto *</label><input id="cxcMonto" type="number" step="0.01" min="0" placeholder="0.00"></div>'
+    + '<div class="field"><label>📅 Fecha del gasto</label><input id="cxcFecha" type="date" value="'+hoyStr+'"></div>'
+    + '</div>';
+  html += '<div class="field"><label>📝 Observaciones (opcional)</label><textarea id="cxcObs" rows="2" placeholder="Contexto adicional..."></textarea></div>';
+  html += '<button onclick="_csCxcGuardarNueva()" class="btn btn-primary">💾 Guardar</button>';
+  body.innerHTML = html;
+}
+
+function _csCxcGuardarNueva(){
+  const cliente  = document.getElementById('cxcCliente')?.value.trim() || '';
+  const concepto = document.getElementById('cxcConcepto')?.value.trim() || '';
+  const monto    = parseFloat(document.getElementById('cxcMonto')?.value) || 0;
+  const fecha    = document.getElementById('cxcFecha')?.value || ((typeof hoy === 'function') ? hoy() : new Date().toISOString().slice(0,10));
+  const obs      = document.getElementById('cxcObs')?.value.trim() || '';
+  if(!cliente){ if(typeof toast==='function') toast('El cliente es obligatorio','err'); return; }
+  if(!concepto){ if(typeof toast==='function') toast('El concepto es obligatorio','err'); return; }
+  if(!monto || monto <= 0){ if(typeof toast==='function') toast('El monto debe ser mayor a 0','err'); return; }
+  if(!Array.isArray(D.cuentasPorCobrar)) D.cuentasPorCobrar = [];
+  D.cuentasPorCobrar.unshift({
+    id: 'CXC-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+    cliente: cliente, concepto: concepto, monto: monto, fecha: fecha, obs: obs,
+    estado: 'pendiente', fechaCobro: '',
+    creadoPor: (typeof empleadoActual !== 'undefined' && empleadoActual) ? empleadoActual.nombre : (typeof NOMBRE_TITULAR !== 'undefined' ? NOMBRE_TITULAR : ''),
+    fechaMod: new Date().toISOString()
+  });
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('✅ Cuenta por cobrar guardada — sincronizando...');
+  _csAbrirCuentasPorCobrar();
+}
+
+function _csCxcMarcarCobrado(id){
+  const c = (D.cuentasPorCobrar||[]).find(function(x){ return x && x.id === id; });
+  if(!c) return;
+  if(!confirm('¿Marcar como cobrado el pago de "'+c.cliente+'" por $'+fmt(parseFloat(c.monto)||0)+'?')) return;
+  c.estado = 'cobrado';
+  c.fechaCobro = (typeof hoy === 'function') ? hoy() : new Date().toISOString().slice(0,10);
+  c.fechaMod = new Date().toISOString();
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('✅ Marcado como cobrado — sincronizando...');
+  _csCxcRenderLista();
+}
+
+function _csCxcReabrir(id){
+  const c = (D.cuentasPorCobrar||[]).find(function(x){ return x && x.id === id; });
+  if(!c) return;
+  c.estado = 'pendiente';
+  c.fechaCobro = '';
+  c.fechaMod = new Date().toISOString();
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('↩ Cuenta reabierta como pendiente');
+  _csCxcRenderLista();
+}
+
+function _csCxcEliminar(id){
+  const c = (D.cuentasPorCobrar||[]).find(function(x){ return x && x.id === id; });
+  if(!c) return;
+  if(!confirm('¿Eliminar definitivamente esta cuenta por cobrar de "'+c.cliente+'"?')) return;
+  D.cuentasPorCobrar = (D.cuentasPorCobrar||[]).filter(function(x){ return x && x.id !== id; });
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('🗑 Cuenta por cobrar eliminada');
+  _csCxcRenderLista();
 }
 
 function exportCSV() {

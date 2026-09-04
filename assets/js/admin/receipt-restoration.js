@@ -4296,7 +4296,8 @@ function escMostrarDetalle(e){
     urgente:{col:'#c0161a',bg:'rgba(192,22,26,0.08)',lbl:'🔴 Urgente'},
     proceso:{col:'#9a6010',bg:'rgba(200,149,42,0.08)',lbl:'🟡 En Proceso'},
     listo:  {col:'#1a7a3a',bg:'rgba(26,122,58,0.08)', lbl:'🟢 Listo p/Entregar'},
-    espera: {col:'#7a6840',bg:'rgba(0,0,0,0.04)',      lbl:'⬜ En Espera'}
+    espera: {col:'#7a6840',bg:'rgba(0,0,0,0.04)',      lbl:'⬜ En Espera'},
+    archivado:{col:'#7a6840',bg:'rgba(122,104,64,0.08)',lbl:'🗄 Archivado'}
   };
   const st = cfg[e.estado||'proceso']||cfg.proceso;
   const fila = (lbl,val) => val ? `<div style="margin-bottom:8px;">
@@ -4313,16 +4314,22 @@ function escMostrarDetalle(e){
   }).join('');
   const fechaFmt = e.fechaFirma
     ? new Date(e.fechaFirma+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'})
-    : '—';
+    : (e.fechaFirmaTexto ? esc(e.fechaFirmaTexto) : '—');
   if(el_header) el_header.innerHTML = `
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px;">
       <div style="flex:1;min-width:0;">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
           ${fila('Tipo de Escritura', esc(e.tipo||'—'))}
           ${fila('Notaría No.', esc(e.notaria||'—'))}
-          ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||'—')}
+          ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
           ${fila('Fecha de Firma', fechaFmt)}
         </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
+          ${fila('Predio', esc(e.predio||'—'))}
+          ${fila('Ubicación', esc(e.ubicacion||'—'))}
+          ${fila('Tipo de Trámite', esc(e.tramite||'—'))}
+        </div>
+        ${e.folios?fila('Folios (sist. notarial)', esc(e.folios)):''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
           <div>
             <div style="font-family:monospace;font-size:0.58rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">🛒 Compradores / Donatarios</div>
@@ -4336,8 +4343,40 @@ function escMostrarDetalle(e){
         ${e.descripcion?`<div style="font-size:0.78rem;color:#7a6840;background:rgba(200,149,42,0.06);border-left:3px solid var(--gold);padding:8px 10px;border-radius:0 6px 6px 0;line-height:1.5;">${esc(e.descripcion)}</div>`:''}
       </div>
       <span style="font-size:0.65rem;font-weight:700;color:${st.col};background:${st.bg};padding:4px 12px;border-radius:12px;white-space:nowrap;flex-shrink:0;border:1px solid ${st.col}44;">${st.lbl}</span>
+    </div>
+    <div style="border-top:1px solid var(--border-l);padding-top:12px;margin-top:4px;">
+      <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">🕒 Bitácora</div>
+      <div id="esc-bitacora-lista" style="margin-bottom:10px;">${escRenderBitacora(e.bitacora||[])}</div>
+      <div style="display:flex;gap:6px;">
+        <textarea id="esc-nota-nueva" rows="2" placeholder="Agregar nota a la bitácora..." style="flex:1;resize:vertical;font-family:sans-serif;font-size:0.8rem;"></textarea>
+        <button type="button" onclick="escAgregarNota()" style="background:var(--gold);border:none;color:#1a1008;border-radius:8px;padding:0 14px;cursor:pointer;font-weight:700;font-size:0.8rem;font-family:sans-serif;">＋ Nota</button>
+      </div>
     </div>`;
   escActualizarTimelineDetalle(e.pasos||[]);
+}
+function escRenderBitacora(lista){
+  if(!lista || !lista.length) return '<div style="font-size:0.75rem;color:var(--muted);font-style:italic;">Sin notas todavía.</div>';
+  return lista.map(n=>{
+    const etiqueta = n.fecha ? esc(n.fecha) : esc(n.origen||'Sin fecha');
+    return `<div style="display:flex;gap:8px;margin-bottom:6px;">
+      <div style="font-size:0.65rem;color:var(--muted);white-space:nowrap;padding-top:1px;flex-shrink:0;">${etiqueta}</div>
+      <div style="font-size:0.8rem;color:var(--ink);line-height:1.4;">${esc(n.texto||'')}</div>
+    </div>`;
+  }).join('');
+}
+function escAgregarNota(){
+  if(_escIdx<0 || !D.escrituras[_escIdx]){ toast('Abre la escritura primero','err'); return; }
+  const ta = document.getElementById('esc-nota-nueva');
+  const texto = (ta?.value||'').trim();
+  if(!texto){ toast('Escribe algo para agregar a la bitácora','err'); return; }
+  const e = D.escrituras[_escIdx];
+  if(!Array.isArray(e.bitacora)) e.bitacora=[];
+  e.bitacora.push({texto, fecha:(typeof _fechaHoyCorta==='function'?_fechaHoyCorta():new Date().toLocaleDateString('es-MX'))});
+  if(ta) ta.value='';
+  escSyncYRefrescar();
+  const cont = document.getElementById('esc-bitacora-lista');
+  if(cont) cont.innerHTML = escRenderBitacora(e.bitacora);
+  toast('📝 Nota agregada a la bitácora');
 }
 function escActualizarTimelineDetalle(pasos){
   const arr = Array(5).fill(null).map((_,i)=>pasos[i]||{estado:'pendiente',notas:'',fecha:''});
@@ -4402,6 +4441,7 @@ function escRender(){
     proceso:  {col:'#9a6010',bg:'rgba(200,149,42,0.08)',dot:'#c8952a',lbl:'🟡 En Proceso'},
     listo:    {col:'#1a7a3a',bg:'rgba(26,122,58,0.08)',dot:'#1a7a3a',lbl:'🟢 Listo p/Entregar'},
     espera:   {col:'#7a6840',bg:'rgba(0,0,0,0.04)',dot:'#aaa',lbl:'⬜ En Espera'},
+    archivado:{col:'#7a6840',bg:'rgba(122,104,64,0.08)',dot:'#7a6840',lbl:'🗄 Archivado'},
   };
   cont.innerHTML = lista.map(e=>{
     const idx = D.escrituras.indexOf(e);
@@ -4442,6 +4482,17 @@ function escRender(){
       </div>
       <div style="display:flex;align-items:center;gap:4px;">${miniTimeline}</div>
       ${e.descripcion?`<div style="font-size:0.72rem;color:var(--muted);margin-top:8px;line-height:1.4;">${esc(e.descripcion.substring(0,120))}${e.descripcion.length>120?'…':''}</div>`:''}
+      ${(()=>{
+        const chips=[];
+        if(e.predio)   chips.push('Predio: '+esc(e.predio));
+        if(e.ubicacion)chips.push('Ubicación: '+esc(e.ubicacion));
+        if(e.volInstr) chips.push('Vol./Instr.: '+esc(e.volInstr));
+        if(e.folios)   chips.push('Folios: '+esc(e.folios));
+        if(e.tramite)  chips.push(esc(e.tramite));
+        if(!chips.length) return '';
+        return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'+chips.map(c=>`<span style="background:rgba(200,149,42,0.08);color:#7a6840;font-size:0.62rem;padding:2px 8px;border-radius:6px;">${c}</span>`).join('')+'</div>';
+      })()}
+      ${(e.bitacora&&e.bitacora.length)?`<div style="font-size:0.62rem;color:var(--muted);margin-top:6px;">🕒 ${e.bitacora.length} nota${e.bitacora.length===1?'':'s'} en bitácora</div>`:''}
     </div>`;
   }).join('');
 }
@@ -4480,6 +4531,12 @@ function escAbrirDetalle(idx){
     document.getElementById('eFechaFirma').value  = e.fechaFirma||'';
     document.getElementById('eTipo').value        = e.tipo||'';
     document.getElementById('eDescripcion').value = e.descripcion||'';
+    const _eFFT = document.getElementById('eFechaFirmaTexto'); if(_eFFT) _eFFT.value = e.fechaFirmaTexto||'';
+    const _ePre = document.getElementById('ePredio');    if(_ePre) _ePre.value = e.predio||'';
+    const _eUbi = document.getElementById('eUbicacion'); if(_eUbi) _eUbi.value = e.ubicacion||'';
+    const _eVoI = document.getElementById('eVolInstr');  if(_eVoI) _eVoI.value = e.volInstr||'';
+    const _eFol = document.getElementById('eFolios');    if(_eFol) _eFol.value = e.folios||'';
+    const _eTra = document.getElementById('eTramite');   if(_eTra) _eTra.value = e.tramite||'';
     (e.compradores||[]).forEach(p=>escAgregarPersona('comprador', typeof p==='string'?{nombre:p}:p));
     (e.vendedores||[]).forEach(p=>escAgregarPersona('vendedor',   typeof p==='string'?{nombre:p}:p));
     escSetEstado(e.estado||'proceso');
@@ -4496,8 +4553,9 @@ function escAbrirDetalle(idx){
   }
 }
 function _escLimpiarForm(){
-  ['eNum','eNotaria','eInstrumento','eVolumen','eFechaFirma','eDescripcion'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['eNum','eNotaria','eInstrumento','eVolumen','eFechaFirma','eDescripcion','ePredio','eUbicacion','eVolInstr','eFolios','eFechaFirmaTexto'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('eTipo').value='';
+  const eTramite = document.getElementById('eTramite'); if(eTramite) eTramite.value='';
   document.getElementById('eCompradores-list').innerHTML='';
   document.getElementById('eVendedores-list').innerHTML='';
   escActualizarTimeline([]);
@@ -4592,11 +4650,19 @@ function escGuardar(){
       instrumento: (document.getElementById('eInstrumento')?.value||'').trim(),
       volumen:     (document.getElementById('eVolumen')?.value||'').trim(),
       fechaFirma:  document.getElementById('eFechaFirma')?.value||'',
+      fechaFirmaTexto: (document.getElementById('eFechaFirmaTexto')?.value||'').trim(),
       tipo:        document.getElementById('eTipo')?.value||'',
+      predio:      (document.getElementById('ePredio')?.value||'').trim(),
+      ubicacion:   (document.getElementById('eUbicacion')?.value||'').trim(),
+      volInstr:    (document.getElementById('eVolInstr')?.value||'').trim(),
+      folios:      (document.getElementById('eFolios')?.value||'').trim(),
+      tramite:     document.getElementById('eTramite')?.value||'',
       estado:      document.getElementById('eEstado')?.value||'proceso',
       compradores,
       vendedores:  leerPersonas('eVendedores-list'),
       descripcion: (document.getElementById('eDescripcion')?.value||'').trim(),
+      bitacora:    _escIdx>=0 ? (D.escrituras[_escIdx].bitacora||[]) : [],
+      origenExcelNo: _escIdx>=0 ? (D.escrituras[_escIdx].origenExcelNo||'') : '',
       pasos,
       fechaMod:    new Date().toISOString()
     };
@@ -4763,6 +4829,138 @@ function escGuardarPaso(){
   }catch(err){
     console.error('[escGuardarPaso]', err);
     toast('Error al guardar paso: '+err.message,'err');
+  }
+}
+// ── Importar Escrituras desde Excel (.xlsx/.xlsm/.csv) ─────────────────
+// Vuelca la información EXACTA de cada fila, sin interpretarla: no se
+// inventan fechas, no se reparte el estado del semáforo por adivinanza, y
+// las Observaciones 1/2/3 pasan tal cual a la bitácora (una nota por
+// columna no vacía, sin fecha inventada). Toda escritura debe corresponder
+// a una carpeta real de Carpetas (mismo requisito que al capturar a mano),
+// así que se crea una carpeta mínima nueva por cada fila importada.
+function escImportarExcel(){
+  const inp = document.getElementById('escImportInput');
+  if(inp) inp.click();
+}
+function _escNorm(s){
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();
+}
+function _escBuscarCol(fila, candidatos){
+  const keys = Object.keys(fila);
+  for(const cand of candidatos){
+    const k = keys.find(k2=>_escNorm(k2)===_escNorm(cand));
+    if(k!==undefined && fila[k]!==undefined && fila[k]!==null && String(fila[k]).trim()!=='') return fila[k];
+  }
+  return '';
+}
+async function escProcesarArchivoExcel(input){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  if(typeof XLSX==='undefined'){
+    toast('⚠ La librería de Excel aún no ha terminado de cargar. Espera un momento e inténtalo de nuevo.','err');
+    input.value=''; return;
+  }
+  try{
+    const buf = await file.arrayBuffer();
+    const wb  = XLSX.read(buf, {type:'array', cellDates:true});
+    const hoja = wb.Sheets[wb.SheetNames[0]];
+    const filas = XLSX.utils.sheet_to_json(hoja, {defval:'', raw:true});
+    const filasValidas = filas.filter(f=>{
+      const cliente   = _escBuscarCol(f,['Cliente']);
+      const comprador = _escBuscarCol(f,['Comprador','Comprador ']);
+      const no        = _escBuscarCol(f,['No.','No','Núm.','Num.']);
+      return String(cliente).trim()!=='' || String(comprador).trim()!=='' || String(no).trim()!=='';
+    });
+    if(!filasValidas.length){
+      toast('No se detectaron filas con datos (se busca Cliente, Comprador o No.) — revisa el archivo','err');
+      input.value=''; return;
+    }
+    const mensaje = 'Se detectaron '+filasValidas.length+' fila(s) con datos.\n\n'
+      +'Se creará una carpeta y una escritura nueva por cada fila, con la información EXACTA del Excel — nada se reescribe ni se interpreta.\n\n'
+      +'Como el Excel no indica en qué estado va cada trámite, todas se importan como "🗄 Archivado" y con los 5 pasos en pendiente; puedes reclasificarlas después una por una.\n\n'
+      +'¿Continuar?';
+    const ok = typeof confirmarBonito==='function'
+      ? await confirmarBonito({titulo:'Importar Escrituras desde Excel', mensaje, btnSi:'Sí, importar', btnNo:'Cancelar'})
+      : confirm(mensaje);
+    if(!ok){ input.value=''; return; }
+    if(!Array.isArray(D.carpetas))   D.carpetas=[];
+    if(!Array.isArray(D.escrituras)) D.escrituras=[];
+    let maxCarp = 0;
+    D.carpetas.forEach(c=>{
+      const m = /^CARP\.- (\d+)$/.exec(c.num||'');
+      if(m) maxCarp = Math.max(maxCarp, parseInt(m[1],10));
+    });
+    let creadas = 0;
+    filasValidas.forEach(f=>{
+      const no        = String(_escBuscarCol(f,['No.','No','Núm.','Num.'])).trim();
+      const cliente   = String(_escBuscarCol(f,['Cliente'])).trim();
+      const tramite   = String(_escBuscarCol(f,['Tipo de Trámite','Tipo de Tramite'])).trim();
+      const predio    = String(_escBuscarCol(f,['Predio'])).trim();
+      const comprador = String(_escBuscarCol(f,['Comprador','Comprador '])).trim();
+      const vendedor  = String(_escBuscarCol(f,['Vendedor'])).trim();
+      const ubicacion = String(_escBuscarCol(f,['Ubicación','Ubicacion'])).trim();
+      const fechaRaw  = _escBuscarCol(f,['Fecha de Firma']);
+      const notaria   = String(_escBuscarCol(f,['Notaría','Notaria'])).trim();
+      const volInstr  = String(_escBuscarCol(f,['Vol./Instr.','Vol. / Instr.','Vol/Instr'])).trim();
+      const folios    = String(_escBuscarCol(f,['FOLIOS- SIST. NOT.','FOLIOS - SIST. NOT.','Folios- Sist. Not.','Folios'])).trim();
+      const obs1      = String(_escBuscarCol(f,['Observaciones 1'])).trim();
+      const obs2      = String(_escBuscarCol(f,['Observaciones 2'])).trim();
+      const obs3      = String(_escBuscarCol(f,['Observaciones 3'])).trim();
+
+      let fechaFirma='', fechaFirmaTexto='';
+      if(fechaRaw instanceof Date && !isNaN(fechaRaw)){
+        fechaFirma = fechaRaw.toISOString().slice(0,10);
+      } else if(fechaRaw!==''&&fechaRaw!==undefined&&fechaRaw!==null){
+        fechaFirmaTexto = String(fechaRaw).trim();
+      }
+      const bitacora=[];
+      if(obs1) bitacora.push({texto:obs1, fecha:'', origen:'Observación 1 (Excel)'});
+      if(obs2) bitacora.push({texto:obs2, fecha:'', origen:'Observación 2 (Excel)'});
+      if(obs3) bitacora.push({texto:obs3, fecha:'', origen:'Observación 3 (Excel)'});
+
+      maxCarp++;
+      const numCarpeta = 'CARP.- '+maxCarp;
+      const nombreComprador = comprador || cliente;
+      D.carpetas.push({
+        num: numCarpeta,
+        cliente: cliente || comprador || ('Escritura importada #'+(no||maxCarp)),
+        descripcion:'',
+        estatus:'Importado de Excel (Escrituras)', ingreso:'',
+        celebEscritura:'',
+        obsLista:[], obs:'',
+        reciboOficial:'',
+        estadoArchivo:'', prioridad:'', totalPactado:0,
+        tipoTramite:'escritura',
+        fechaCreacion: new Date().toISOString(),
+        fechaModificacion: new Date().toISOString(),
+        juicioDesc:'', escNotario:notaria, escVolumen:'', escInstrumento:'', escTipo:'',
+        regCivilTipo:'', docDesc:''
+      });
+      D.escrituras.push({
+        num: numCarpeta,
+        notaria, instrumento:'', volumen:'',
+        fechaFirma, fechaFirmaTexto,
+        tipo:'',
+        predio, ubicacion, volInstr, folios, tramite,
+        estado:'archivado',
+        compradores: nombreComprador ? [{nombre:nombreComprador}] : [],
+        vendedores:  vendedor ? [{nombre:vendedor}] : [],
+        descripcion:'',
+        bitacora,
+        origenExcelNo: no,
+        pasos: Array(5).fill(null).map(()=>({estado:'pendiente',notas:'',fecha:''})),
+        fechaMod: new Date().toISOString()
+      });
+      creadas++;
+    });
+    escSyncYRefrescar();
+    if(typeof renderCarp==='function') renderCarp();
+    toast('✅ '+creadas+' escritura(s) importada(s) desde Excel — se crearon '+creadas+' carpeta(s) vinculadas');
+  }catch(err){
+    console.error('[escProcesarArchivoExcel]', err);
+    toast('Error al importar el Excel: '+err.message,'err');
+  }finally{
+    input.value='';
   }
 }
 // ── Chat IA del paso ──────────────────────────────────────────────────

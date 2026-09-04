@@ -16,19 +16,21 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- SDK de Supabase (carga clásica, no módulo dinámico — evita problemas con Brave/adblockers) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/integrations/oauth-popup-relay.js?v=20260901o"></script>
-<link rel="stylesheet" href="assets/css/core/application.css?v=20260901o">
+<script src="assets/js/integrations/oauth-popup-relay.js?v=20260904a"></script>
+<link rel="stylesheet" href="assets/css/core/application.css?v=20260904a">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!-- PDF.js: extracción de texto de PDFs con capa de texto (gratuito, sin API) -->
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
 <!-- Tesseract.js: OCR local en el navegador para imágenes y PDFs escaneados (gratuito) -->
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
-<script src="assets/js/diagnostics/network-console.js?v=20260901o"></script>
+<!-- SheetJS: lectura de Excel/.xlsm en el navegador para importar Escrituras -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+<script src="assets/js/diagnostics/network-console.js?v=20260904a"></script>
   <!-- ═══ CSS SISTEMA DE RECIBOS (index.html) ═══ -->
   <link rel="stylesheet" href="assets/css/modules/receipts.css">
 <link rel="stylesheet" href="assets/css/components/modal-states.css">
-<script src="assets/js/core/error-guard.js?v=20260901o"></script>
+<script src="assets/js/core/error-guard.js?v=20260904a"></script>
 <link rel="stylesheet" href="assets/css/components/ai-dropdown.css"></head>
 <body>
 <!-- ══ SPLASH DE CARGA — oculta la app hasta confirmar sesión ══ -->
@@ -49,7 +51,7 @@
   <div id="lex-splash-texto" style="font-family:sans-serif;font-size:0.7rem;letter-spacing:0.12em;color:rgba(200,149,42,0.65);text-transform:uppercase;">LEX-MÉXICO · Verificando sesión</div>
   <button id="lex-splash-reintentar" onclick="location.reload()" style="display:none;margin-top:18px;padding:8px 20px;border-radius:8px;border:1.5px solid rgba(200,149,42,0.5);background:transparent;color:#c8952a;font-family:monospace;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;cursor:pointer;">↻ REINTENTAR</button>
 </div>
-<script src="assets/js/ui/legal-background.js?v=20260901o"></script>
+<script src="assets/js/ui/legal-background.js?v=20260904a"></script>
 <div style="display:flex;min-height:100vh;">
 <!-- SIDEBAR -->
 <nav class="sidebar">
@@ -14770,6 +14772,8 @@ Recibo original im…</td>
     <div id="panel-escrituras" class="panel">
       <div class="search-row">
         <input class="search-inp" placeholder="🔍 Buscar por nombre, archivo, notaría..." id="escQ" oninput="escRender()">
+        <input type="file" id="escImportInput" accept=".xlsx,.xls,.xlsm,.csv" style="display:none" onchange="escProcesarArchivoExcel(this)">
+        <button class="btn" onclick="escImportarExcel()" style="background:rgba(200,149,42,0.12);border:1.5px solid var(--gold);color:var(--gold-d);font-weight:700;">📥 Importar Excel</button>
         <button class="btn btn-primary" onclick="escAbrirNueva()">＋ Nueva Escritura</button>
       </div>
       <!-- Semáforo / Filtros -->
@@ -14779,6 +14783,7 @@ Recibo original im…</td>
         <button class="fbtn" id="escF-proceso" onclick="escSetFiltro(&#39;proceso&#39;,this)" style="background:rgba(200,149,42,0.08);border:1.5px solid rgba(200,149,42,0.25);color:#9a6010;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">🟡 En Proceso</button>
         <button class="fbtn" id="escF-listo" onclick="escSetFiltro(&#39;listo&#39;,this)" style="background:rgba(26,122,58,0.08);border:1.5px solid rgba(26,122,58,0.25);color:#1a7a3a;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">🟢 Listo p/Entregar</button>
         <button class="fbtn" id="escF-espera" onclick="escSetFiltro(&#39;espera&#39;,this)" style="background:rgba(0,0,0,0.05);border:1.5px solid rgba(0,0,0,0.12);color:#7a6840;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">⚫ En Espera</button>
+        <button class="fbtn" id="escF-archivado" onclick="escSetFiltro(&#39;archivado&#39;,this)" style="background:rgba(122,104,64,0.1);border:1.5px dashed rgba(122,104,64,0.4);color:#7a6840;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">🗄 Archivado</button>
       </div>
       <div id="esc-lista" style="padding:0 12px 24px;"></div>
     </div><!-- fin panel-escrituras -->
@@ -15068,6 +15073,7 @@ Recibo original im…</td>
             <div class="field">
               <label>📅 Fecha de Firma</label>
               <input id="eFechaFirma" type="date">
+              <input id="eFechaFirmaTexto" type="text" placeholder="O fecha aproximada (ej. &#34;2019&#34;) si no hay día exacto" style="margin-top:5px;font-size:0.72rem;">
             </div>
             <div class="field">
               <label>📋 Tipo de Escritura</label>
@@ -15085,14 +15091,42 @@ Recibo original im…</td>
               </select>
             </div>
           </div>
+          <!-- Campos del Excel de Escrituras (Predio, Ubicación, Vol./Instr., Folios, Trámite) -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div class="field">
+              <label>🏞️ Predio</label>
+              <input id="ePredio" type="text" placeholder="Terreno Rústico, Local de Negocio...">
+            </div>
+            <div class="field">
+              <label>📍 Ubicación</label>
+              <input id="eUbicacion" type="text" placeholder="Ubicación del predio">
+            </div>
+            <div class="field">
+              <label>📚 Vol./Instr. (sist. notarial)</label>
+              <input id="eVolInstr" type="text" placeholder="Ej. 124/9,020">
+            </div>
+            <div class="field">
+              <label>🗂️ Folios (sist. notarial)</label>
+              <input id="eFolios" type="text" placeholder="Ej. 15,157 y 15,343">
+            </div>
+            <div class="field" style="grid-column:1/-1;">
+              <label>📄 Tipo de Trámite</label>
+              <select id="eTramite">
+                <option value="">— Selecciona —</option>
+                <option>Escritura Total</option>
+                <option>Escritura Parcial</option>
+              </select>
+            </div>
+          </div>
           <!-- Semáforo -->
           <div class="field" style="margin-bottom:12px;">
             <label>🚦 Estado / Prioridad</label>
-            <div style="display:flex;gap:8px;">
-              <button type="button" onclick="escSetEstado(&#39;urgente&#39;,this)" data-estado="urgente" class="esc-estado-btn" style="flex:1;padding:8px;border-radius:8px;border:2px solid rgba(192,22,26,0.3);background:rgba(192,22,26,0.08);color:#c0161a;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">🔴 Urgente</button>
-              <button type="button" onclick="escSetEstado(&#39;proceso&#39;,this)" data-estado="proceso" class="esc-estado-btn" style="flex:1;padding:8px;border-radius:8px;border:2px solid rgba(200,149,42,0.3);background:rgba(200,149,42,0.08);color:#9a6010;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">🟡 En Proceso</button>
-              <button type="button" onclick="escSetEstado(&#39;listo&#39;,this)" data-estado="listo" class="esc-estado-btn" style="flex:1;padding:8px;border-radius:8px;border:2px solid rgba(26,122,58,0.3);background:rgba(26,122,58,0.08);color:#1a7a3a;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">🟢 Listo p/Entregar</button>
-              <button type="button" onclick="escSetEstado(&#39;espera&#39;,this)" data-estado="espera" class="esc-estado-btn" style="flex:1;padding:8px;border-radius:8px;border:2px solid rgba(0,0,0,0.15);background:rgba(0,0,0,0.04);color:#7a6840;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">⬜ En Espera</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button type="button" onclick="escSetEstado(&#39;urgente&#39;,this)" data-estado="urgente" class="esc-estado-btn" style="flex:1;min-width:110px;padding:8px;border-radius:8px;border:2px solid rgba(192,22,26,0.3);background:rgba(192,22,26,0.08);color:#c0161a;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">🔴 Urgente</button>
+              <button type="button" onclick="escSetEstado(&#39;proceso&#39;,this)" data-estado="proceso" class="esc-estado-btn" style="flex:1;min-width:110px;padding:8px;border-radius:8px;border:2px solid rgba(200,149,42,0.3);background:rgba(200,149,42,0.08);color:#9a6010;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">🟡 En Proceso</button>
+              <button type="button" onclick="escSetEstado(&#39;listo&#39;,this)" data-estado="listo" class="esc-estado-btn" style="flex:1;min-width:110px;padding:8px;border-radius:8px;border:2px solid rgba(26,122,58,0.3);background:rgba(26,122,58,0.08);color:#1a7a3a;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">🟢 Listo p/Entregar</button>
+              <button type="button" onclick="escSetEstado(&#39;espera&#39;,this)" data-estado="espera" class="esc-estado-btn" style="flex:1;min-width:110px;padding:8px;border-radius:8px;border:2px solid rgba(0,0,0,0.15);background:rgba(0,0,0,0.04);color:#7a6840;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">⬜ En Espera</button>
+              <button type="button" onclick="escSetEstado(&#39;archivado&#39;,this)" data-estado="archivado" class="esc-estado-btn" style="flex:1;min-width:110px;padding:8px;border-radius:8px;border:2px dashed rgba(122,104,64,0.4);background:rgba(122,104,64,0.08);color:#7a6840;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">🗄 Archivado</button>
             </div>
             <input type="hidden" id="eEstado" value="proceso">
           </div>
@@ -17289,19 +17323,19 @@ Recibo original im…</td>
 </div>
 <!-- ═══ FIN EXPEDIENTE DIGITAL VEHICULAR ═══ -->
 
-<script src="assets/js/config/public-config.js?v=20260901o"></script>
-<script src="assets/js/modules/recibos/index.js?v=20260901o"></script>
-<script src="assets/js/modules/caja/index.js?v=20260901o"></script>
-<script src="assets/js/modules/contabilidad/index.js?v=20260901o"></script>
-<script src="assets/js/modules/clientes/index.js?v=20260901o"></script>
-<script src="assets/js/modules/directorio/index.js?v=20260901o"></script>
-<script src="assets/js/modules/expedientes/index.js?v=20260901o"></script>
-<script src="assets/js/modules/documentos/index.js?v=20260901o"></script>
-<script src="assets/js/modules/integraciones/index.js?v=20260901o"></script>
-<script src="assets/js/modules/administracion/index.js?v=20260901o"></script>
-<script src="assets/js/modules/core/index.js?v=20260901o"></script>
-<script src="assets/js/compat/receipts-and-supabase.compat.js?v=20260901o"></script>
-<script src="assets/js/compat/operations-and-accounting.compat.js?v=20260901o"></script>
+<script src="assets/js/config/public-config.js?v=20260904a"></script>
+<script src="assets/js/modules/recibos/index.js?v=20260904a"></script>
+<script src="assets/js/modules/caja/index.js?v=20260904a"></script>
+<script src="assets/js/modules/contabilidad/index.js?v=20260904a"></script>
+<script src="assets/js/modules/clientes/index.js?v=20260904a"></script>
+<script src="assets/js/modules/directorio/index.js?v=20260904a"></script>
+<script src="assets/js/modules/expedientes/index.js?v=20260904a"></script>
+<script src="assets/js/modules/documentos/index.js?v=20260904a"></script>
+<script src="assets/js/modules/integraciones/index.js?v=20260904a"></script>
+<script src="assets/js/modules/administracion/index.js?v=20260904a"></script>
+<script src="assets/js/modules/core/index.js?v=20260904a"></script>
+<script src="assets/js/compat/receipts-and-supabase.compat.js?v=20260904a"></script>
+<script src="assets/js/compat/operations-and-accounting.compat.js?v=20260904a"></script>
 <!-- PANEL FLOTANTE: Botones de actualización en esquina inferior derecha (fuera de la hoja del recibo) -->
     </div>
     <div id="panel-configuracion" class="panel">
@@ -19114,7 +19148,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/integrations/session-cleanup.js?v=20260901o"></script>
+<script src="assets/js/integrations/session-cleanup.js?v=20260904a"></script>
 <!-- Modal: Historial de versiones de recibo -->
 <div class="modal-overlay" id="modal-versiones" style="z-index:200;">
   <div class="modal" style="max-width:540px;width:94%;max-height:80vh;display:flex;flex-direction:column;">
@@ -19225,20 +19259,20 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20260901o"></script>
-<script src="assets/js/ui/form-navigation.js?v=20260901o"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=20260904a"></script>
+<script src="assets/js/ui/form-navigation.js?v=20260904a"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->
 <!-- Ficha del Folio movida a la vista de consulta, ver #pdf-consulta-wrap -->
 <!-- ═══ FIN MODAL FICHA DEL FOLIO ═══ -->
-<script src="assets/js/compat/folio-query-and-statements.compat.js?v=20260901o"></script>
+<script src="assets/js/compat/folio-query-and-statements.compat.js?v=20260904a"></script>
 <!-- ═══ SCANSYS PRO (panel forense de folios) ═══ -->
-<script src="assets/js/admin/scansys-engine.js?v=20260901o"></script>
+<script src="assets/js/admin/scansys-engine.js?v=20260904a"></script>
 
-<script src="assets/js/admin/accounting-restoration.js?v=20260901o"></script>
+<script src="assets/js/admin/accounting-restoration.js?v=20260904a"></script>
 
 
-<script src="assets/js/admin/cash-cut-management.js?v=20260901o"></script>
+<script src="assets/js/admin/cash-cut-management.js?v=20260904a"></script>
 
 <!-- ── Flechas fijas de navegación rápida en Contabilidad (subir/bajar) ── -->
 <div id="cs-scroll-arrows" style="position:fixed;right:6px;top:50%;transform:translateY(-50%);z-index:400;display:none;flex-direction:column;gap:14px;">
@@ -19251,6 +19285,6 @@ Recibo original im…</td>
     onmouseover="this.style.color='#e8c875';this.style.borderColor='#e8c875';this.style.background='rgba(232,200,117,0.14)';"
     onmouseout="this.style.color='rgba(200,149,42,0.45)';this.style.borderColor='rgba(200,149,42,0.25)';this.style.background='rgba(22,9,5,0.45)';">▼</button>
 </div>
-<script src="assets/js/ui/accounting-scroll.js?v=20260901o"></script>
+<script src="assets/js/ui/accounting-scroll.js?v=20260904a"></script>
 
 </body></html>

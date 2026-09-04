@@ -10844,20 +10844,9 @@ function _tareasFechaHoyTexto(){
   return dias[d.getDay()]+' '+d.getDate()+' de '+meses[d.getMonth()]+' de '+d.getFullYear();
 }
 
-function _tareasPoblarResponsables(){
-  const sel = document.getElementById('tareasResponsableSel');
-  if(!sel) return;
-  const prev = sel.value;
-  const todas = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
-  const nombres = Array.from(new Set(todas.map(function(t){ return t.creadoPor; }).filter(Boolean))).sort();
-  sel.innerHTML = '<option value="">Responsable</option>' + nombres.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
-  if(nombres.indexOf(prev) !== -1) sel.value = prev;
-}
-
 function abrirTareasHoy(){
   const buscar = document.getElementById('tareasBuscar'); if(buscar) buscar.value = '';
   const fechaEl = document.getElementById('tareasFechaHoy'); if(fechaEl) fechaEl.textContent = _tareasFechaHoyTexto();
-  _tareasPoblarResponsables();
   ir('tareas-hoy');
   tareasSetTab(false);
 }
@@ -10883,14 +10872,12 @@ function renderTareasHoyLista(){
   if(!cont) return;
   const TCOL = '#1a4a8a'; // azul — color de tema de "Tareas para hoy"
   const q = (document.getElementById('tareasBuscar')?.value || '').toLowerCase().trim();
-  const resp = (document.getElementById('tareasResponsableSel')?.value || '');
   const todas = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
   const pendCount = todas.filter(function(t){ return t && t.estado !== 'resuelta'; }).length;
   const contador = document.getElementById('tareasHoyContador');
   if(contador) contador.textContent = pendCount;
   let lista = todas.filter(function(t){ return t && (_tareasVerResueltas ? t.estado==='resuelta' : t.estado!=='resuelta'); });
   if(q) lista = lista.filter(function(t){ return (t.titulo||'').toLowerCase().includes(q) || (t.texto||'').toLowerCase().includes(q); });
-  if(resp) lista = lista.filter(function(t){ return (t.creadoPor||'') === resp; });
   // N° de ficha — posición entre las tareas ACTIVAS (no resueltas), ordenadas
   // por antigüedad (la más vieja = 1). Igual que en Pendientes, se recalcula
   // solo en cada render; las resueltas no muestran número.

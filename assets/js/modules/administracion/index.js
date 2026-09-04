@@ -2449,7 +2449,8 @@ function renderPend(){
     }
     return `<div data-pend-idx="${idx}" style="position:relative;display:flex;align-items:stretch;background:var(--surface,#fdfaf4);border:1.5px solid var(--border-l,#d4b870);border-radius:8px;margin-bottom:8px;overflow:visible;opacity:${p.resuelto?'0.5':'1'};${p.resuelto?'filter:grayscale(0.3);':''}transition:box-shadow 0.15s,border-color 0.15s;">
       <div style="width:5px;background:${col};flex-shrink:0;border-radius:8px 0 0 8px;"></div>
-      <div style="padding:10px 5px 10px 8px;display:flex;align-items:flex-start;padding-top:12px;flex-shrink:0;">
+      <div style="padding:10px 5px 10px 8px;display:flex;align-items:flex-start;padding-top:12px;flex-shrink:0;gap:4px;">
+        ${p.resuelto?`<input type="checkbox" onclick="event.stopPropagation();_pendToggleSeleccion('${p.id}')" ${(typeof _pendSeleccion!=='undefined'&&_pendSeleccion.has(p.id))?'checked':''} title="Seleccionar para borrar" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;margin-top:1px;">`:''}
         ${(p.seccion==='placas'||p.reciboVinculadoFolio)?'':`<div onclick="event.stopPropagation();toggleP(${idx})" title="${p.resuelto?'Reabrir':'Marcar resuelto'}" style="width:18px;height:18px;border-radius:50%;border:2px solid ${p.resuelto?'#1a7a3a':col};background:${p.resuelto?'#1a7a3a':'transparent'};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:#fff;font-size:0.65rem;transition:all 0.15s;">${p.resuelto?'✓':''}</div>`}
       </div>
       <div style="flex:1;min-width:0;padding:10px 6px 10px 4px;">

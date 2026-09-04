@@ -4865,14 +4865,17 @@ async function escProcesarArchivoExcel(input){
     const wb  = XLSX.read(buf, {type:'array', cellDates:true});
     const hoja = wb.Sheets[wb.SheetNames[0]];
     const filas = XLSX.utils.sheet_to_json(hoja, {defval:'', raw:true});
+    // Solo Cliente o Comprador cuentan como evidencia real de una fila con datos.
+    // La columna "No." se descarta como criterio por sí sola: en Excel es común
+    // que quede autonumerada por arrastre hasta el final de la hoja aunque esas
+    // filas de abajo estén vacías, lo que antes colaba cientos de filas fantasma.
     const filasValidas = filas.filter(f=>{
       const cliente   = _escBuscarCol(f,['Cliente']);
       const comprador = _escBuscarCol(f,['Comprador','Comprador ']);
-      const no        = _escBuscarCol(f,['No.','No','Núm.','Num.']);
-      return String(cliente).trim()!=='' || String(comprador).trim()!=='' || String(no).trim()!=='';
+      return String(cliente).trim()!=='' || String(comprador).trim()!=='';
     });
     if(!filasValidas.length){
-      toast('No se detectaron filas con datos (se busca Cliente, Comprador o No.) — revisa el archivo','err');
+      toast('No se detectaron filas con Cliente o Comprador — revisa el archivo','err');
       input.value=''; return;
     }
     const mensaje = 'Se detectaron '+filasValidas.length+' fila(s) con datos.\n\n'
@@ -4962,6 +4965,41 @@ async function escProcesarArchivoExcel(input){
   }finally{
     input.value='';
   }
+}
+// ── Limpiar filas fantasma de una importación de Excel ─────────────────
+// Solo borra escrituras que: (a) vinieron de una importación (tienen
+// origenExcelNo) y (b) no tienen NINGÚN dato real — sin comprador/cliente,
+// sin notaría, sin instrumento/volumen/Vol.Instr., sin folios, sin predio,
+// sin ubicación y sin notas en la bitácora. Nunca toca una escritura
+// capturada a mano ni una importada que sí tenga algún dato. También borra
+// la carpeta placeholder que se creó junto con esa fila vacía (se identifica
+// porque su cliente quedó como "Escritura importada #N", nunca un nombre real).
+function _escEsFilaVacia(e){
+  const sinComprador = !e.compradores || !e.compradores.length;
+  const sinVendedor   = !e.vendedores || !e.vendedores.length;
+  const sinTexto = !e.notaria && !e.instrumento && !e.volumen && !e.volInstr && !e.folios && !e.predio && !e.ubicacion && !e.descripcion;
+  const sinBitacora = !e.bitacora || !e.bitacora.length;
+  return sinComprador && sinVendedor && sinTexto && sinBitacora;
+}
+async function escLimpiarImportacionesVacias(){
+  if(!Array.isArray(D.escrituras) || !D.escrituras.length){ toast('No hay escrituras registradas','err'); return; }
+  const vacias = D.escrituras.filter(e => (e.origenExcelNo!==undefined && e.origenExcelNo!=='') && _escEsFilaVacia(e));
+  if(!vacias.length){ toast('No se encontraron filas vacías de una importación anterior','ok'); return; }
+  const mensaje = 'Se encontraron '+vacias.length+' escritura(s) importada(s) sin ningún dato real (sin comprador, sin notaría, sin instrumento/volumen, sin datos).\n\n'
+    +'Se borrarán junto con la carpeta vacía que se creó para cada una. No se toca ninguna escritura o carpeta con datos reales.\n\n¿Continuar?';
+  const ok = typeof confirmarBonito==='function'
+    ? await confirmarBonito({titulo:'Limpiar importaciones vacías', mensaje, btnSi:'Sí, borrar', btnNo:'Cancelar', peligro:true})
+    : confirm(mensaje);
+  if(!ok) return;
+  const vaciasSet = new Set(vacias); // identidad de objeto: nunca borra por número compartido
+  const numsABorrar = new Set(vacias.map(e=>e.num));
+  D.escrituras = D.escrituras.filter(e => !vaciasSet.has(e));
+  if(Array.isArray(D.carpetas)){
+    D.carpetas = D.carpetas.filter(c => !(numsABorrar.has(c.num) && /^Escritura importada #/.test(c.cliente||'') && c.estatus==='Importado de Excel (Escrituras)'));
+  }
+  escSyncYRefrescar();
+  if(typeof renderCarp==='function') renderCarp();
+  toast('🗑 '+vacias.length+' escritura(s) vacía(s) y su(s) carpeta(s) borradas');
 }
 // ── Chat IA del paso ──────────────────────────────────────────────────
 async function escIaEnviar(){

@@ -10844,32 +10844,120 @@ function _tareasFechaHoyTexto(){
   return dias[d.getDay()]+' '+d.getDate()+' de '+meses[d.getMonth()]+' de '+d.getFullYear();
 }
 
+window._tareasSeleccion = window._tareasSeleccion || new Set();
+
+function _tareaToggleSeleccion(id){
+  if(_tareasSeleccion.has(id)) _tareasSeleccion.delete(id); else _tareasSeleccion.add(id);
+  const chkTodas = document.getElementById('tareasSelTodasChk');
+  if(chkTodas) chkTodas.checked = false;
+}
+
+function _tareaSeleccionarTodas(marcar){
+  const resueltas = (Array.isArray(D.tareasHoy)?D.tareasHoy:[]).filter(function(t){ return t && t.estado === 'resuelta'; });
+  _tareasSeleccion.clear();
+  if(marcar) resueltas.forEach(function(t){ _tareasSeleccion.add(t.id); });
+  renderTareasHoyLista();
+}
+
+// Borra para siempre (Drive) los archivos adjuntos de un conjunto de tareas —
+// se usa tanto al vaciar resueltos a mano como en la purga automática de 2 días.
+async function _tareasBorrarDocsDeDrive(tareas){
+  const conDocs = (tareas||[]).filter(function(t){ return t && Array.isArray(t.documentos) && t.documentos.some(function(d){ return d && d.driveFileId; }); });
+  if(!conDocs.length) return;
+  let token = '';
+  try{ token = typeof driveGetAccessToken === 'function' ? await driveGetAccessToken() : ''; }catch(e){ token = ''; }
+  if(!token){ console.warn('[Drive tareas] sin token — no se pudieron borrar adjuntos en Drive, solo se quitan de la lista.'); return; }
+  for(const t of conDocs){
+    for(const d of t.documentos){
+      if(!d || !d.driveFileId) continue;
+      try{
+        const _p = fetch('https://www.googleapis.com/drive/v3/files/'+d.driveFileId, {method:'DELETE', headers:{Authorization:'Bearer '+token}});
+        await (typeof _sbConTimeout === 'function' ? _sbConTimeout(_p, 15000, 'Drive eliminar') : _p);
+      }catch(e){ console.warn('[Drive tareas] no se pudo eliminar adjunto '+(d.nombre||'')+':', e); }
+    }
+  }
+}
+
+// Purga automática: tareas resueltas con más de 2 días desde su resolución se
+// eliminan solas, junto con sus archivos adjuntos en Drive. Se revisa en cada
+// render (igual que _pendPurgarResueltosViejos con Pendientes), es barato si
+// no hay nada que purgar.
+async function _tareasPurgarResueltosViejos(){
+  const lista = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
+  const LIMITE_DIAS = 2;
+  const ahoraMs = Date.now();
+  const aBorrar = lista.filter(function(t){
+    if(!t || t.estado !== 'resuelta' || !t.fechaResolucion) return false;
+    const fMs = Date.parse(t.fechaResolucion);
+    if(isNaN(fMs)) return false;
+    return (ahoraMs - fMs) / 86400000 > LIMITE_DIAS;
+  });
+  if(!aBorrar.length) return false;
+  await _tareasBorrarDocsDeDrive(aBorrar);
+  const idsBorrar = new Set(aBorrar.map(function(t){ return t.id; }));
+  D.tareasHoy = lista.filter(function(t){ return !(t && idsBorrar.has(t.id)); });
+  aBorrar.forEach(function(t){ _tareasSeleccion.delete(t.id); });
+  console.warn('[Tareas hoy] 🗑 Purgadas '+aBorrar.length+' resuelta(s) con más de '+LIMITE_DIAS+' días — adjuntos borrados de Drive');
+  if(typeof save === 'function') save();
+  return true;
+}
+
 function abrirTareasHoy(){
   const buscar = document.getElementById('tareasBuscar'); if(buscar) buscar.value = '';
   const fechaEl = document.getElementById('tareasFechaHoy'); if(fechaEl) fechaEl.textContent = _tareasFechaHoyTexto();
+  _tareasVerResueltas = false;
+  _tareasSeleccion.clear();
+  const p = document.getElementById('tareasEstadoPendientes'); if(p) p.style.display = 'flex';
+  const r = document.getElementById('tareasEstadoResueltos'); if(r) r.style.display = 'none';
   ir('tareas-hoy');
-  tareasSetTab(false);
+  renderTareasHoyLista();
 }
 
-function tareasSetTab(resueltas){
-  _tareasVerResueltas = !!resueltas;
-  const tp = document.getElementById('tareasTabPend');
-  const tr = document.getElementById('tareasTabResueltas');
-  if(tp && tr){
-    if(_tareasVerResueltas){
-      tp.style.color = 'var(--muted)'; tp.style.fontWeight = '600'; tp.style.borderBottom = 'none';
-      tr.style.color = '#1a4a8a'; tr.style.fontWeight = '700'; tr.style.borderBottom = '2.5px solid #1a4a8a';
-    } else {
-      tr.style.color = 'var(--muted)'; tr.style.fontWeight = '600'; tr.style.borderBottom = 'none';
-      tp.style.color = '#1a4a8a'; tp.style.fontWeight = '700'; tp.style.borderBottom = '2.5px solid #1a4a8a';
-    }
+function toggleTareasResueltas(){
+  _tareasVerResueltas = !_tareasVerResueltas;
+  _tareasSeleccion.clear();
+  const chkTodas = document.getElementById('tareasSelTodasChk');
+  if(chkTodas) chkTodas.checked = false;
+  const p = document.getElementById('tareasEstadoPendientes');
+  const r = document.getElementById('tareasEstadoResueltos');
+  if(p && r){
+    p.style.display = _tareasVerResueltas ? 'none' : 'flex';
+    r.style.display = _tareasVerResueltas ? 'flex' : 'none';
   }
   renderTareasHoyLista();
+}
+
+async function vaciarTareasResueltas(){
+  const ids = Array.from(_tareasSeleccion);
+  if(!ids.length){ if(typeof toast==='function') toast('Selecciona al menos una tarea resuelta (o marca "Todas") para vaciar','err'); return; }
+  const todas = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
+  const idsSet = new Set(ids);
+  const aBorrar = todas.filter(function(t){ return t && idsSet.has(t.id); });
+  if(!confirm('¿Eliminar definitivamente '+aBorrar.length+' tarea(s) resuelta(s) seleccionada(s) y sus archivos adjuntos? Esta acción no se puede deshacer.')) return;
+  if(typeof _placasProgreso === 'function') _placasProgreso('🗑 Eliminando archivos adjuntos…');
+  await _tareasBorrarDocsDeDrive(aBorrar);
+  if(typeof _placasProgreso === 'function') _placasProgreso(null);
+  D.tareasHoy = todas.filter(function(t){ return !(t && idsSet.has(t.id)); });
+  _tareasSeleccion.clear();
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast==='function') toast('🗑 '+aBorrar.length+' tarea(s) resuelta(s) eliminada(s)','ok');
+  toggleTareasResueltas();
+}
+
+// Convierte *texto* en negritas rojo brillante. Se aplica DESPUÉS de esc()
+// para que las etiquetas <strong> inyectadas no se escapen — el contenido
+// entre asteriscos ya viene escapado, así que es seguro.
+function _negritaRoja(strEscapado){
+  return String(strEscapado||'').replace(/\*([^*]+?)\*/g, '<strong style="color:#ff1a1a;font-weight:800;">$1</strong>');
 }
 
 function renderTareasHoyLista(){
   const cont = document.getElementById('tareasHoyLista');
   if(!cont) return;
+  if(typeof _tareasPurgarResueltosViejos === 'function'){
+    _tareasPurgarResueltosViejos().then(function(cambio){ if(cambio) renderTareasHoyLista(); }).catch(function(e){ console.warn('[Tareas hoy] purga automática falló:', e); });
+  }
   const TCOL = '#1a4a8a'; // azul — color de tema de "Tareas para hoy"
   const q = (document.getElementById('tareasBuscar')?.value || '').toLowerCase().trim();
   const todas = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
@@ -10907,6 +10995,7 @@ function renderTareasHoyLista(){
     const circulo = resuelta
       ? '<div onclick="event.stopPropagation();reabrirTareaHoy(\''+t.id+'\')" title="Reabrir" style="width:20px;height:20px;border-radius:50%;background:'+TCOL+';flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;cursor:pointer;">✓</div>'
       : '<div onclick="event.stopPropagation();marcarTareaResuelta(\''+t.id+'\')" title="Marcar resuelto" style="width:20px;height:20px;border-radius:50%;border:2px solid '+TCOL+';flex-shrink:0;cursor:pointer;"></div>';
+    const checkSel = resuelta ? '<input type="checkbox" onclick="event.stopPropagation();_tareaToggleSeleccion(\''+t.id+'\')" '+(_tareasSeleccion.has(t.id)?'checked':'')+' title="Seleccionar para borrar" style="width:16px;height:16px;cursor:pointer;flex-shrink:0;">' : '';
     const fichaHtml = numFicha ? '<div title="N° de ficha — posición entre las tareas activas, se recalcula solo" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Tarea</span><span style="color:'+TCOL+';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">'+numFicha+'</span></div>' : '';
     const tituloEstilo = resuelta ? 'text-decoration:line-through;color:var(--muted);' : 'color:'+TCOL+';';
     const acciones = resuelta
@@ -10924,14 +11013,214 @@ function renderTareasHoyLista(){
       + '<div style="width:5px;background:'+TCOL+';flex-shrink:0;"></div>'
       + '<div style="flex:1;min-width:0;padding:12px 14px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">'
-      + '<div style="display:flex;align-items:center;gap:10px;">'+circulo+fichaHtml
-      + '<div style="font-size:13.5px;font-weight:600;font-family:\'Outfit\',sans-serif;letter-spacing:0.025em;text-transform:uppercase;opacity:0.92;'+tituloEstilo+'">👤 '+esc(t.titulo||'(sin título)')+'</div></div>'
+      + '<div style="display:flex;align-items:center;gap:10px;">'+checkSel+circulo+fichaHtml
+      + '<div style="font-size:13.5px;font-weight:600;font-family:\'Outfit\',sans-serif;letter-spacing:0.025em;text-transform:uppercase;opacity:0.92;'+tituloEstilo+'">👤 '+_negritaRoja(esc(t.titulo||'(sin título)'))+'</div></div>'
       + badge + '</div>'
-      + (t.texto ? '<div style="margin:6px 0 0 30px;font-size:0.78rem;color:var(--ink);">'+esc(t.texto)+'</div>' : '')
+      + (t.texto ? '<div style="margin:6px 0 0 30px;font-size:0.78rem;color:var(--ink);">'+_negritaRoja(esc(t.texto))+'</div>' : '')
+      + ((t.documentos && t.documentos.length) ? '<div style="margin:6px 0 0 30px;display:flex;flex-wrap:wrap;gap:4px;">'+t.documentos.map(function(d,di){ return _tareaDocChip(t.id,d,di); }).join('')+'</div>' : '')
       + acciones
       + '</div>'
       + '</div>';
   }).join('');
+}
+
+// ── Adjuntos de "Tareas para hoy" — mismo mecanismo que Placas (Drive con
+// respaldo local en base64), reutilizando las funciones globales ya
+// existentes (driveGetAccessToken, driveObtenerOCrearCarpeta,
+// _placasSubirArchivoDrive, _placasNombreLimpio, _placasLeerBase64,
+// _placasProgreso, _sbConTimeout, _docEstilo) para no duplicar esa lógica.
+window._tareasDriveFolderCache = window._tareasDriveFolderCache || {};
+
+function _tareaDocChip(id, d, di){
+  const nm = d.nombre || 'archivo';
+  const lbl = nm.length > 18 ? nm.substring(0,18)+'…' : nm;
+  const st = typeof _docEstilo === 'function' ? _docEstilo(nm, d.tipo) : {bg:'#f1efe8',borde:'#b4b2a9',texto:'#444441',icono:'📄'};
+  return '<span style="font-size:9.5px;background:'+st.bg+';border:1px solid '+st.borde+';border-radius:4px;padding:2px 7px;color:'+st.texto+';cursor:pointer;display:inline-flex;align-items:center;gap:3px;" onclick="event.stopPropagation();_tareaVerDoc(\''+id+'\','+di+')" title="'+esc(nm)+'">'+st.icono+' '+esc(lbl)+'</span>';
+}
+
+function _tareaVerDoc(id, docIdx){
+  const t = (D.tareasHoy||[]).find(function(x){ return x && x.id === id; });
+  const d = t && t.documentos && t.documentos[docIdx];
+  if(!d) return;
+  if(d.driveFileId){
+    window.open('https://drive.google.com/file/d/'+d.driveFileId+'/view', '_blank');
+  } else if(d.base64){
+    const a = document.createElement('a');
+    a.href = d.base64; a.download = d.nombre || 'archivo';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+}
+
+async function _tareaEliminarDoc(id, docIdx){
+  const t = (D.tareasHoy||[]).find(function(x){ return x && x.id === id; });
+  if(!t || !t.documentos) return;
+  const d = t.documentos[docIdx];
+  if(!d) return;
+  if(!confirm('¿Eliminar el archivo "'+(d.nombre||'')+'"? Esta acción no se puede deshacer.')) return;
+  if(d.driveFileId){
+    try{
+      const token = typeof driveGetAccessToken === 'function' ? await driveGetAccessToken() : '';
+      if(token){
+        const _p = fetch('https://www.googleapis.com/drive/v3/files/'+d.driveFileId, {method:'DELETE', headers:{Authorization:'Bearer '+token}});
+        await (typeof _sbConTimeout === 'function' ? _sbConTimeout(_p, 15000, 'Drive eliminar') : _p);
+      }
+    }catch(e){ console.warn('[Drive tareas] no se pudo eliminar de Drive:', e); }
+  }
+  t.documentos.splice(docIdx, 1);
+  t.fechaMod = new Date().toISOString();
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  if(typeof toast === 'function') toast('Archivo eliminado', 'ok');
+  renderTareasHoyLista();
+  _tareaRenderAdjuntosModal(id);
+}
+
+function _tareaAdjBtnEstado(estado){
+  const btn = document.getElementById('tareaModalAdjBtn');
+  if(!btn) return;
+  if(estado === 'subiendo'){
+    btn.textContent = '⏳ Subiendo…'; btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none';
+  } else {
+    btn.textContent = '📎 Adjuntar archivo'; btn.style.opacity = ''; btn.style.pointerEvents = '';
+  }
+}
+
+function _tareaRenderAdjuntosModal(id){
+  const cont = document.getElementById('tareaModalAdjuntos');
+  if(!cont) return;
+  const t = (D.tareasHoy||[]).find(function(x){ return x && x.id === id; });
+  const docs = (t && t.documentos) || [];
+  if(!docs.length){ cont.innerHTML = '<span style="font-size:0.68rem;color:var(--muted);">Sin archivos adjuntos.</span>'; return; }
+  cont.innerHTML = docs.map(function(d,di){
+    return '<span style="display:inline-flex;align-items:center;gap:3px;">'+_tareaDocChip(id,d,di)
+      + '<span onclick="event.stopPropagation();_tareaEliminarDoc(\''+id+'\','+di+')" style="cursor:pointer;color:var(--rojo,#b91c1c);font-size:11px;padding:0 2px;" title="Quitar">✕</span></span>';
+  }).join('');
+}
+
+async function _tareaAdjuntarDoc(id){
+  const tareaInicial = (D.tareasHoy||[]).find(function(x){ return x && x.id === id; });
+  if(!tareaInicial) return;
+  if(window._tareasSubiendo && window._tareasSubiendo[id]){
+    if(typeof toast === 'function') toast('Ya se está subiendo un archivo para esta tarea, espera a que termine.', 'err');
+    return;
+  }
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.accept = '.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx'; inp.multiple = true;
+  inp.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0;';
+  document.body.appendChild(inp);
+  const _quitar = function(){ try{ inp.remove(); }catch(e){} };
+  window.addEventListener('focus', function _lim(){
+    setTimeout(function(){ if(!inp.files || !inp.files.length) _quitar(); window.removeEventListener('focus', _lim); }, 800);
+  });
+  inp.onchange = async function(){
+    if(!inp.files || !inp.files.length){ _quitar(); return; }
+    const t = (D.tareasHoy||[]).find(function(x){ return x && x.id === id; }) || tareaInicial;
+    if(!t.documentos) t.documentos = [];
+    if(!window._tareasSubiendo) window._tareasSubiendo = {};
+    window._tareasSubiendo[id] = true;
+    _tareaAdjBtnEstado('subiendo');
+    const MAX_BYTES = 200 * 1024 * 1024;
+    const MAX_BYTES_LOCAL = 8 * 1024 * 1024;
+    const _mb = function(b){ return (b/1024/1024).toFixed(1)+' MB'; };
+    const TIPOS_VALIDOS = ['image/png','image/jpeg','image/jpg','image/webp','application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const EXT_VALIDAS = ['.pdf','.jpg','.jpeg','.png','.webp','.doc','.docx'];
+    const _extValida = function(nombre){ const n=(nombre||'').toLowerCase(); return EXT_VALIDAS.some(function(e){ return n.endsWith(e); }); };
+    const todos = Array.from(inp.files);
+    const archivos = [], rechazados = [];
+    todos.forEach(function(file){
+      if(file.size > MAX_BYTES){ rechazados.push(file.name+' (máximo 200 MB)'); return; }
+      if(!TIPOS_VALIDOS.includes(file.type) && !_extValida(file.name)){ rechazados.push(file.name+' (tipo no válido)'); return; }
+      archivos.push(file);
+    });
+    if(!archivos.length){
+      if(typeof toast === 'function') toast('Ningún archivo válido: '+rechazados.join(', '), 'err');
+      window._tareasSubiendo[id] = false; _tareaAdjBtnEstado('normal'); _quitar();
+      return;
+    }
+    if(typeof toast === 'function') toast('Subiendo '+archivos.length+' archivo(s)...', 'ok');
+    if(typeof _placasProgreso === 'function') _placasProgreso('⏳ Subiendo '+archivos.length+' archivo(s)… no cierres esta ventana');
+    try{
+      let token = '', carpeta = '';
+      const carpetaNombre = typeof _placasNombreLimpio === 'function' ? _placasNombreLimpio((t.titulo||'tarea').substring(0,40)) : (t.titulo||'tarea').substring(0,40);
+      const cacheKey = 'TareasHoy/'+id;
+      try{
+        token = typeof driveGetAccessToken === 'function' ? await _sbConTimeout(driveGetAccessToken(), 10000, 'Drive token') : '';
+        if(token){
+          if(window._tareasDriveFolderCache[cacheKey]){
+            carpeta = window._tareasDriveFolderCache[cacheKey];
+          } else {
+            const DRIVE_ROOT = '1TtVVL0Jbw6BFkwLw8Wo1LZfxLN0I_ndU';
+            const carpetaTareas = window._tareasDriveFolderCache['TareasHoy'] ||
+              await _sbConTimeout(driveObtenerOCrearCarpeta(token, 'Tareas Hoy', DRIVE_ROOT), 10000, 'Drive carpeta Tareas Hoy');
+            window._tareasDriveFolderCache['TareasHoy'] = carpetaTareas;
+            carpeta = await _sbConTimeout(driveObtenerOCrearCarpeta(token, carpetaNombre+' · '+id.slice(-6), carpetaTareas), 10000, 'Drive carpeta tarea');
+            window._tareasDriveFolderCache[cacheKey] = carpeta;
+          }
+        }
+      }catch(e){
+        console.warn('[Drive tareas] preparación de carpeta falló:', e);
+        token = ''; carpeta = '';
+      }
+      if(!token || !carpeta){
+        if(typeof _placasProgreso === 'function') _placasProgreso('⚠️ Sin conexión con Drive — guardando respaldo local…');
+      }
+      const resultados = await Promise.all(archivos.map(async function(file){
+        const nombreLimpio = typeof _placasNombreLimpio === 'function' ? _placasNombreLimpio(file.name) : file.name;
+        let _res = null;
+        if(token && carpeta){
+          const _nomCorto = nombreLimpio.length > 28 ? nombreLimpio.slice(0,28)+'…' : nombreLimpio;
+          const r = await _placasSubirArchivoDrive(file, token, carpeta, nombreLimpio, null, function(pct){
+            if(typeof _placasProgreso === 'function') _placasProgreso('⏳ Subiendo '+_nomCorto+' — '+pct+'%');
+          });
+          if(r) _res = { file, ok:true, drive:true, driveFileId:r.id, nombreArchivo:r.nombreArchivo };
+        }
+        if(!_res){
+          if(file.size > MAX_BYTES_LOCAL){
+            _res = { file, ok:false, motivo:'Drive no aceptó el archivo y pesa demasiado ('+_mb(file.size)+') para respaldo local' };
+          } else {
+            try{
+              const dataURL = await _placasLeerBase64(file);
+              _res = { file, ok:true, drive:false, base64:dataURL, nombreArchivo:nombreLimpio };
+            }catch(e){ _res = { file, ok:false }; }
+          }
+        }
+        return _res;
+      }));
+      if(typeof _placasProgreso === 'function') _placasProgreso('💾 Guardando…');
+      const tFresco = (D.tareasHoy||[]).find(function(x){ return x && x.id === id; }) || t;
+      if(!tFresco.documentos) tFresco.documentos = [];
+      let agregados = 0, drive = 0, base64 = 0;
+      resultados.forEach(function(r){
+        if(!r.ok) return;
+        if(r.drive){ tFresco.documentos.push({nombre:r.nombreArchivo, tipo:r.file.type, bytes:r.file.size, driveFileId:r.driveFileId}); drive++; }
+        else { tFresco.documentos.push({nombre:r.nombreArchivo, tipo:r.file.type, base64:r.base64}); base64++; }
+        agregados++;
+      });
+      const fallidos = resultados.filter(function(r){ return !r.ok; }).map(function(r){ return r.file.name + (r.motivo?' — '+r.motivo:''); });
+      if(agregados > 0){
+        tFresco.fechaMod = new Date().toISOString();
+        if(typeof save === 'function') save();
+        if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+        renderTareasHoyLista();
+        _tareaRenderAdjuntosModal(id);
+      }
+      const detalle = drive && base64 ? ' ('+drive+' Drive, '+base64+' local)' : drive ? ' (Drive)' : base64 ? ' (local)' : '';
+      if(typeof toast === 'function'){
+        if(!fallidos.length) toast(agregados+' archivo(s) adjuntado(s)'+detalle+' ✓', 'ok');
+        else toast(agregados+' adjuntado(s)'+detalle+', '+fallidos.length+' rechazado(s): '+rechazados.concat(fallidos).join(', '), agregados>0?'ok':'err');
+      }
+    }catch(errAdj){
+      console.error('[Tareas] error al adjuntar:', errAdj);
+      if(typeof registrarError === 'function') registrarError('Tareas hoy · adjuntar documento', errAdj, {tarea:id});
+      if(typeof toast === 'function') toast('❌ Error al adjuntar: '+((errAdj&&errAdj.message)||errAdj), 'err');
+    } finally {
+      if(typeof _placasProgreso === 'function') _placasProgreso(null);
+      _quitar();
+      window._tareasSubiendo[id] = false;
+      _tareaAdjBtnEstado('normal');
+    }
+  };
+  inp.click();
 }
 
 function abrirNuevaTarea(){
@@ -10940,6 +11229,9 @@ function abrirNuevaTarea(){
   const elElim = document.getElementById('tareaBtnElim'); if(elElim) elElim.style.display = 'none';
   const ti = document.getElementById('tareaTitulo'); if(ti) ti.value = '';
   const tx = document.getElementById('tareaTexto'); if(tx) tx.value = '';
+  const adjBtn = document.getElementById('tareaModalAdjBtn'); if(adjBtn) adjBtn.style.display = 'none';
+  const adjCont = document.getElementById('tareaModalAdjuntos'); if(adjCont) adjCont.innerHTML = '';
+  const adjHint = document.getElementById('tareaModalAdjHint'); if(adjHint) adjHint.style.display = 'inline';
   const modal = document.getElementById('mTareaEditar');
   if(modal) modal.classList.add('show');
 }
@@ -10952,6 +11244,10 @@ function abrirEditarTarea(id){
   const elElim = document.getElementById('tareaBtnElim'); if(elElim) elElim.style.display = 'inline-flex';
   const ti = document.getElementById('tareaTitulo'); if(ti) ti.value = tarea.titulo || '';
   const tx = document.getElementById('tareaTexto'); if(tx) tx.value = tarea.texto || '';
+  const adjHint = document.getElementById('tareaModalAdjHint'); if(adjHint) adjHint.style.display = 'none';
+  const adjBtn = document.getElementById('tareaModalAdjBtn');
+  if(adjBtn){ adjBtn.style.display = 'inline-flex'; adjBtn.onclick = function(){ _tareaAdjuntarDoc(id); }; }
+  _tareaRenderAdjuntosModal(id);
   const modal = document.getElementById('mTareaEditar');
   if(modal) modal.classList.add('show');
 }

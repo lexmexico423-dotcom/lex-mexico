@@ -1837,23 +1837,29 @@ function mVAFiltrar() {
 }
 
 async function vaciarResueltosDefinitivo(){
-  const resueltos = (D.pendientes||[]).filter(p=>p && p.resuelto);
-  if(!resueltos.length){ toast('No hay pendientes resueltos que borrar.'); return; }
+  const todosResueltos = (D.pendientes||[]).filter(p=>p && p.resuelto);
+  if(!todosResueltos.length){ toast('No hay pendientes resueltos que borrar.'); return; }
+  const seleccionIds = (typeof _pendSeleccion !== 'undefined') ? _pendSeleccion : new Set();
+  const resueltos = todosResueltos.filter(function(p){ return seleccionIds.has(p.id); });
+  if(!resueltos.length){ toast('Selecciona al menos un pendiente resuelto (o marca "Todas") para vaciar','err'); return; }
   const auth = await pedirAutorizacion();
   if(auth === null) return;
   const ok = await confirmarBonito({
     titulo: 'Vaciar Resueltos',
-    mensaje: 'Se borrarán para siempre '+resueltos.length+' pendiente(s) resuelto(s), sin esperar los 35 días.\n\nEsta acción no se puede deshacer.',
-    btnSi: 'Sí, borrar todo', btnNo: 'Cancelar', peligro: true
+    mensaje: 'Se borrarán para siempre '+resueltos.length+' pendiente(s) resuelto(s) seleccionado(s), sin esperar los 35 días.\n\nEsta acción no se puede deshacer.',
+    btnSi: 'Sí, borrar', btnNo: 'Cancelar', peligro: true
   });
   if(!ok) return;
   resueltos.forEach(function(p){ _marcarPendEliminadoLocal(p.id); });
   const idsBorrar = new Set(resueltos.map(function(p){ return p.id; }));
   D.pendientes = (D.pendientes||[]).filter(function(p){ return !(p && idsBorrar.has(p.id)); });
+  if(typeof _pendSeleccion !== 'undefined') _pendSeleccion.clear();
   filtroP = 'activos';
   const btn = $('pendBtnResueltos'); const btnVaciar = $('pendBtnVaciarResueltos');
+  const lblTodas = $('pendSelTodasLabel');
   if(btn){ btn.textContent = '✓ Resueltos'; btn.style.background='var(--surface)'; btn.style.color='var(--muted)'; }
   if(btnVaciar) btnVaciar.style.display = 'none';
+  if(lblTodas) lblTodas.style.display = 'none';
   save();renderPend();badges();syncEstadoSupabaseDebounced().catch((e)=>{ registrarError('Promise catch vacio', e); });
   toast('🗑 '+resueltos.length+' resuelto(s) borrado(s) para siempre — autorizó '+auth.nombre);
 }
@@ -1894,6 +1900,8 @@ function setPSec(sec, el){
   if (sec === 'placas') {
     const btnVaciar = document.getElementById('pendBtnVaciarResueltos');
     if (btnVaciar) btnVaciar.style.display = 'none';
+    const lblTodas = document.getElementById('pendSelTodasLabel');
+    if (lblTodas) lblTodas.style.display = 'none';
     if (filtroP === 'resuelto') filtroP = 'activos';
   }
   // Caja grande con el total de pendientes de la sección activa. Antes solo
@@ -2447,54 +2455,6 @@ function renderVencimientos() {
   }
 }
 
-// ── Tarjeta "Pendientes de hoy" en Principal ──────────────────────────────
-// Muestra los pendientes sueltos (sección "Otros" — recordatorios como
-// "llamar a fulano", "recoger paquetería", "pagar la renta") que están sin
-// resolver y o bien no tienen fecha límite (recordatorio abierto, se muestra
-// hasta que se resuelva) o su fecha límite ya llegó/pasó. Mismo patrón visual
-// que la tarjeta de Vencimientos próximos (venc-card-wrap).
-function renderPendientesHoyCard(){
-  if (typeof D === 'undefined' || !Array.isArray(D.pendientes)) return;
-  const card    = document.getElementById('pendhoy-card-wrap');
-  const grupos  = document.getElementById('pendhoy-grupos');
-  const resumen = document.getElementById('pendhoy-resumen');
-  if (!card || !grupos) return;
-  const hoyStr = (typeof fechaCDMX_ISO === 'function') ? fechaCDMX_ISO() : new Date().toISOString().slice(0,10);
-  const items = D.pendientes
-    .filter(p => p && !p.resuelto && p.seccion === 'otros' && (!p.fechaLimite || p.fechaLimite <= hoyStr))
-    .map(p => ({
-      texto:       p.texto || p.obs || '(sin descripción)',
-      persona:     p.persona || '',
-      resp:        p.resp || 'Antonieta',
-      fechaLimite: p.fechaLimite || '',
-      vencido:     !!(p.fechaLimite && p.fechaLimite < hoyStr)
-    }))
-    .sort((a, b) => {
-      const rank = x => x.vencido ? 0 : x.fechaLimite ? 1 : 2; // atrasados, luego hoy, luego sin fecha
-      const r = rank(a) - rank(b);
-      return r !== 0 ? r : (a.fechaLimite||'').localeCompare(b.fechaLimite||'');
-    });
-  if (!items.length) { card.style.display = 'none'; return; }
-  card.style.display = '';
-  const vencidos = items.filter(x => x.vencido);
-  if (resumen) {
-    resumen.textContent = vencidos.length
-      ? vencidos.length + ' atrasado' + (vencidos.length > 1 ? 's' : '')
-      : items.length + ' pendiente' + (items.length > 1 ? 's' : '');
-    resumen.style.color = vencidos.length ? 'var(--rojo,#c0161a)' : 'var(--amarillo,#9a6010)';
-  }
-  grupos.innerHTML = items.map(x => {
-    const badgeTxt = x.vencido ? 'Atrasado' : (x.fechaLimite === hoyStr ? 'HOY' : 'Sin fecha');
-    const color = x.vencido ? '#c0161a' : (x.fechaLimite === hoyStr ? '#9a6010' : 'var(--muted)');
-    return '<div onclick="ir(\'pendientes\')" style="cursor:pointer;display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(200,149,42,0.07);">'
-      + '<span style="font-family:monospace;font-size:0.62rem;font-weight:700;color:'+color+';background:rgba(192,22,26,0.08);border-radius:5px;padding:1px 6px;flex-shrink:0;">'+badgeTxt+'</span>'
-      + '<div style="flex:1;min-width:0;">'
-      + '<div style="font-size:0.75rem;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+esc(x.texto)+'</div>'
-      + '<div style="font-size:0.6rem;color:var(--muted);">'+(x.persona ? esc(x.persona)+' · ' : '')+'Responsable: '+esc(x.resp)+'</div>'
-      + '</div></div>';
-  }).join('');
-}
-
 function badges(){
   const uj=D.juicios.filter(j=>j.estatus==='urgente').length;
   const up=D.pendientes.filter(p=>!p.resuelto&&p.prioridad==='urgente').length;
@@ -2508,7 +2468,7 @@ function badges(){
   const uc=(D.citas||[]).filter(c=>c.fecha>=hoy2).length;
   const bc=$('badgeCitas');
   if(bc){bc.textContent=uc||'';bc.style.display=uc?'':'none';}
-  safeExec('renderPendientesHoyCard', () => renderPendientesHoyCard());
+  if (typeof renderTareasHoyCount === 'function') renderTareasHoyCount();
 }
 
 async function guardarTodo() {

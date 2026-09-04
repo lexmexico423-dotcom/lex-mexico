@@ -1249,17 +1249,39 @@ function setPF(f,el){
   renderPend();
 }
 
+window._pendSeleccion = window._pendSeleccion || new Set();
+
+function _pendToggleSeleccion(id){
+  if(_pendSeleccion.has(id)) _pendSeleccion.delete(id); else _pendSeleccion.add(id);
+  const chkTodas = $('pendSelTodasChk');
+  if(chkTodas) chkTodas.checked = false;
+}
+
+function _pendSeleccionarTodas(marcar){
+  const resueltos = (D.pendientes||[]).filter(function(p){ return p && p.resuelto; });
+  _pendSeleccion.clear();
+  if(marcar) resueltos.forEach(function(p){ _pendSeleccion.add(p.id); });
+  renderPend();
+}
+
 function verPendResueltos(){
   const btn = $('pendBtnResueltos');
   const btnVaciar = $('pendBtnVaciarResueltos');
+  const lblTodas = $('pendSelTodasLabel');
   if(filtroP === 'resuelto'){
     filtroP = 'activos';
     if(btn){ btn.textContent = '✓ Resueltos'; btn.style.background='var(--surface)'; btn.style.color='var(--muted)'; }
     if(btnVaciar) btnVaciar.style.display = 'none';
+    if(lblTodas) lblTodas.style.display = 'none';
+    _pendSeleccion.clear();
   } else {
     filtroP = 'resuelto';
     if(btn){ btn.textContent = '← Activos'; btn.style.background='var(--gold-d)'; btn.style.color='#fff'; }
     if(btnVaciar) btnVaciar.style.display = '';
+    if(lblTodas) lblTodas.style.display = 'flex';
+    _pendSeleccion.clear();
+    const chkTodas = $('pendSelTodasChk');
+    if(chkTodas) chkTodas.checked = false;
   }
   renderPend();
 }

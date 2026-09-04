@@ -10837,22 +10837,43 @@ function renderTareasHoyCount(){
   if(sub) sub.textContent = pend.length === 1 ? 'pendiente' : 'pendientes';
 }
 
-function abrirTareasHoy(){
-  _tareasVerResueltas = false;
-  const btn = document.getElementById('tareasVerResueltasBtn');
-  if(btn){ btn.textContent = '✓ Resueltas'; btn.style.background=''; btn.style.color=''; }
-  const buscar = document.getElementById('tareasBuscar'); if(buscar) buscar.value = '';
-  ir('tareas-hoy');
-  renderTareasHoyLista();
+function _tareasFechaHoyTexto(){
+  const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const d = new Date();
+  return dias[d.getDay()]+' '+d.getDate()+' de '+meses[d.getMonth()]+' de '+d.getFullYear();
 }
 
-function toggleTareasResueltas(){
-  _tareasVerResueltas = !_tareasVerResueltas;
-  const btn = document.getElementById('tareasVerResueltasBtn');
-  if(btn){
-    btn.textContent = _tareasVerResueltas ? '← Pendientes' : '✓ Resueltas';
-    btn.style.background = _tareasVerResueltas ? 'var(--gold-d)' : '';
-    btn.style.color = _tareasVerResueltas ? '#fff' : '';
+function _tareasPoblarResponsables(){
+  const sel = document.getElementById('tareasResponsableSel');
+  if(!sel) return;
+  const prev = sel.value;
+  const todas = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
+  const nombres = Array.from(new Set(todas.map(function(t){ return t.creadoPor; }).filter(Boolean))).sort();
+  sel.innerHTML = '<option value="">Responsable</option>' + nombres.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
+  if(nombres.indexOf(prev) !== -1) sel.value = prev;
+}
+
+function abrirTareasHoy(){
+  const buscar = document.getElementById('tareasBuscar'); if(buscar) buscar.value = '';
+  const fechaEl = document.getElementById('tareasFechaHoy'); if(fechaEl) fechaEl.textContent = _tareasFechaHoyTexto();
+  _tareasPoblarResponsables();
+  ir('tareas-hoy');
+  tareasSetTab(false);
+}
+
+function tareasSetTab(resueltas){
+  _tareasVerResueltas = !!resueltas;
+  const tp = document.getElementById('tareasTabPend');
+  const tr = document.getElementById('tareasTabResueltas');
+  if(tp && tr){
+    if(_tareasVerResueltas){
+      tp.style.color = 'var(--muted)'; tp.style.fontWeight = '600'; tp.style.borderBottom = 'none';
+      tr.style.color = '#1a4a8a'; tr.style.fontWeight = '700'; tr.style.borderBottom = '2.5px solid #1a4a8a';
+    } else {
+      tr.style.color = 'var(--muted)'; tr.style.fontWeight = '600'; tr.style.borderBottom = 'none';
+      tp.style.color = '#1a4a8a'; tp.style.fontWeight = '700'; tp.style.borderBottom = '2.5px solid #1a4a8a';
+    }
   }
   renderTareasHoyLista();
 }
@@ -10862,9 +10883,14 @@ function renderTareasHoyLista(){
   if(!cont) return;
   const TCOL = '#1a4a8a'; // azul — color de tema de "Tareas para hoy"
   const q = (document.getElementById('tareasBuscar')?.value || '').toLowerCase().trim();
+  const resp = (document.getElementById('tareasResponsableSel')?.value || '');
   const todas = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
+  const pendCount = todas.filter(function(t){ return t && t.estado !== 'resuelta'; }).length;
+  const contador = document.getElementById('tareasHoyContador');
+  if(contador) contador.textContent = pendCount;
   let lista = todas.filter(function(t){ return t && (_tareasVerResueltas ? t.estado==='resuelta' : t.estado!=='resuelta'); });
   if(q) lista = lista.filter(function(t){ return (t.titulo||'').toLowerCase().includes(q) || (t.texto||'').toLowerCase().includes(q); });
+  if(resp) lista = lista.filter(function(t){ return (t.creadoPor||'') === resp; });
   // N° de ficha — posición entre las tareas ACTIVAS (no resueltas), ordenadas
   // por antigüedad (la más vieja = 1). Igual que en Pendientes, se recalcula
   // solo en cada render; las resueltas no muestran número.
@@ -10879,8 +10905,6 @@ function renderTareasHoyLista(){
     return mapa;
   })();
   lista = lista.slice().sort(function(a,b){ return (b.fechaCreacion||'').localeCompare(a.fechaCreacion||''); });
-  const contador = document.getElementById('tareasHoyContador');
-  if(contador) contador.textContent = lista.length;
   if(!lista.length){
     cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;">'
       + (_tareasVerResueltas ? 'No hay tareas resueltas todavía.' : 'No hay tareas pendientes — ¡todo al día! ✓')

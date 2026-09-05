@@ -17,7 +17,7 @@
 <!-- SDK de Supabase (carga clásica, no módulo dinámico — evita problemas con Brave/adblockers) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="assets/js/integrations/oauth-popup-relay.js?v=20260904d"></script>
-<link rel="stylesheet" href="assets/css/core/application.css?v=20260904f">
+<link rel="stylesheet" href="assets/css/core/application.css?v=20260904g">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!-- PDF.js: extracción de texto de PDFs con capa de texto (gratuito, sin API) -->
@@ -14780,7 +14780,6 @@ Recibo original im…</td>
       <!-- Semáforo / Filtros -->
       <div style="display:flex;gap:8px;padding:10px 16px;flex-wrap:wrap;">
         <button class="fbtn activo" id="escF-todos" onclick="escSetFiltro(&#39;todos&#39;,this)" style="background:rgba(200,149,42,0.12);border:1.5px solid rgba(200,149,42,0.3);color:var(--gold-d);border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">Todos</button>
-        <button class="fbtn" id="escF-urgente" onclick="escSetFiltro(&#39;urgente&#39;,this)" style="background:rgba(192,22,26,0.08);border:1.5px solid rgba(192,22,26,0.25);color:#c0161a;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">🔴 Urgente</button>
         <button class="fbtn" id="escF-proceso" onclick="escSetFiltro(&#39;proceso&#39;,this)" style="background:rgba(200,149,42,0.08);border:1.5px solid rgba(200,149,42,0.25);color:#9a6010;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">🟡 En Proceso</button>
         <button class="fbtn" id="escF-listo" onclick="escSetFiltro(&#39;listo&#39;,this)" style="background:rgba(26,122,58,0.08);border:1.5px solid rgba(26,122,58,0.25);color:#1a7a3a;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">🟢 Listo p/Entregar</button>
         <button class="fbtn" id="escF-espera" onclick="escSetFiltro(&#39;espera&#39;,this)" style="background:rgba(0,0,0,0.05);border:1.5px solid rgba(0,0,0,0.12);color:#7a6840;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">⚫ En Espera</button>
@@ -15043,7 +15042,17 @@ Recibo original im…</td>
     <div class="modal-ov" id="mEscritura">
       <div class="modal wide" style="max-width:960px;width:95vw;max-height:92vh;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;margin:auto;">
         <div class="modal-hdr">
-          <h3 id="mEscTitulo">Nueva Escritura</h3>
+          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+            <h3 id="mEscTitulo">Nueva Escritura</h3>
+            <div id="eFolioBadgeHdr" onclick="escVerFolioVinculado()" title="Ver ficha del recibo vinculado" style="display:none;cursor:pointer;background:rgba(59,130,246,0.08);border:1.5px solid rgba(59,130,246,0.3);border-radius:8px;padding:3px 12px;text-align:center;line-height:1.25;flex-shrink:0;">
+              <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.1em;color:#7a8ba0;font-weight:700;">FOLIO</div>
+              <div id="eFolioBadgeHdrVal" style="font-family:monospace;font-size:0.9rem;color:#1a4a8a;font-weight:800;">—</div>
+            </div>
+            <div id="eFoliosHdr" style="display:none;text-align:left;flex-shrink:0;">
+              <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.08em;color:var(--muted);font-weight:700;text-transform:uppercase;">Folios (sist. notarial)</div>
+              <div id="eFoliosHdrVal" style="font-size:0.8rem;color:var(--ink);font-weight:700;">—</div>
+            </div>
+          </div>
           <button class="modal-x" onclick="cerrar(&#39;mEscritura&#39;)">✕</button>
         </div>
         <div class="modal-body" id="modal-body-form" style="padding:16px;">
@@ -15057,26 +15066,32 @@ Recibo original im…</td>
               <div style="font-size:0.6rem;letter-spacing:0.08em;color:rgba(255,255,255,0.85);font-weight:700;">FOLIOS SISTEMA NOTARIAL</div>
               <input id="eFolios" type="text" placeholder="Ej. 15,157 y 15,343" style="width:100%;box-sizing:border-box;background:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#1a1008;margin-top:2px;">
             </div>
-            <div style="color:rgba(255,255,255,0.85);font-size:0.75rem;font-weight:700;flex-shrink:0;">FOLIO / 🔗 vincular</div>
+            <button type="button" id="eFolioVincularBtn" onclick="escAbrirVincularFolio()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:6px;color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;flex-shrink:0;padding:6px 10px;">FOLIO / 🔗 vincular</button>
+            <input type="hidden" id="eFolioVinculo" value="">
           </div>
 
-          <!-- ══ Acto jurídico y datos notariales ══ -->
-          <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:10px;">
+          <!-- ══ Tipos de Movimiento / Tipo de Trámite (Catastro) ══ -->
+          <div style="display:grid;grid-template-columns:1fr 2fr;gap:8px;margin-bottom:8px;">
             <div>
-              <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">ACTO JURÍDICO</div>
-              <select id="eTipo" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
+              <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">TIPOS DE MOVIMIENTOS</div>
+              <select id="eTipoMovimiento" onchange="escActualizarTipoTramiteCatastro()" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
                 <option value="">— Selecciona —</option>
-                <option>Compraventa</option>
-                <option>Donación</option>
-                <option>Donación con Usufructo Vitalicio</option>
-                <option>Subdivisión</option>
-                <option>Fusión de Predio</option>
-                <option>Rectificación</option>
-                <option>Protocolización</option>
-                <option>Jurisdicción Voluntaria</option>
-                <option>Otro</option>
+                <option value="1">1. TRASLADOS DE DOMINIO</option>
+                <option value="2">2. RECTIFICACIONES</option>
+                <option value="3">3. INTEGRACIONES</option>
+                <option value="4">4. OTROS TRÁMITES</option>
+                <option value="5">5. TRÁMITES PARCIALES</option>
               </select>
             </div>
+            <div>
+              <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">TIPO DE TRÁMITE</div>
+              <select id="eTipoTramiteCatastro" disabled onchange="escActualizarCaracterEnPersonas()" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;background:#f2ede0;">
+                <option value="">— Selecciona primero Tipos de Movimientos —</option>
+              </select>
+            </div>
+          </div>
+          <!-- ══ Datos notariales ══ -->
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px;">
             <div>
               <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">NOTARÍA NO.</div>
               <input id="eNotaria" type="text" placeholder="75 / 81" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
@@ -15091,40 +15106,98 @@ Recibo original im…</td>
             </div>
             <div>
               <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">FECHA DE FIRMA</div>
-              <input id="eFechaFirma" type="date" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
-              <input id="eFechaFirmaTexto" type="text" placeholder="O aprox. (ej. &#34;2019&#34;)" style="width:100%;box-sizing:border-box;margin-top:4px;border:1px solid #d4b870;border-radius:6px;padding:4px 6px;font-size:0.62rem;">
+              <input id="eFechaFirma" type="text" placeholder="dd/mm/aaaa o solo el año" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
             </div>
             <div>
               <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">CUENTA CATASTRAL</div>
               <input id="eCuentaCatastral" type="text" placeholder="Núm. de cuenta" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
             </div>
           </div>
-          <div style="margin-bottom:10px;">
-            <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">UBICACIÓN DE LA PROPIEDAD</div>
-            <input id="eUbicacion" type="text" placeholder="Ubicación del predio" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
+          <div style="margin-bottom:10px;display:flex;gap:14px;align-items:flex-end;">
+            <div style="flex:1;">
+              <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">UBICACIÓN DE LA PROPIEDAD</div>
+              <input id="eUbicacion" type="text" placeholder="Ubicación del predio" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
+            </div>
+            <div style="display:flex;gap:14px;align-items:center;flex-shrink:0;padding-bottom:2px;">
+              <div onclick="escSetTramite('Escritura Total')" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <div id="eTramiteBoxTotal" style="width:20px;height:20px;border:1.5px solid #7a6840;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;background:#fff;color:#1a1008;flex-shrink:0;"></div>
+                <span style="font-size:0.72rem;color:#1a1008;">TOTAL</span>
+              </div>
+              <div onclick="escSetTramite('Escritura Parcial')" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <div id="eTramiteBoxParcial" style="width:20px;height:20px;border:1.5px solid #7a6840;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;background:#fff;color:#1a1008;flex-shrink:0;"></div>
+                <span style="font-size:0.72rem;color:#1a1008;">PARCIAL</span>
+              </div>
+            </div>
+            <input type="hidden" id="eTramite" value="">
           </div>
-          <!-- Campos del Excel de Escrituras (Predio, Vol./Instr., Trámite) -->
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;">
-            <div>
-              <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">PREDIO</div>
-              <input id="ePredio" type="text" placeholder="Terreno Rústico, Local de Negocio..." style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
+          <!-- Campos del Excel de Escrituras (Predio, Trámite). Vol./Instr. ya se captura arriba, sin duplicar. -->
+          <div style="margin-bottom:14px;">
+            <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">CARACTERÍSTICAS DEL TRÁMITE</div>
+            <div style="display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap;margin-top:6px;">
+              <div style="flex-shrink:0;width:150px;">
+                <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">TIPO DE TERRENO</div>
+                <select id="ePredio" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
+                  <option value="">— Selecciona —</option>
+                  <option>URBANO</option>
+                  <option>RUSTICO</option>
+                </select>
+              </div>
+              <div style="flex-shrink:0;width:150px;">
+                <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">USO DE SUELO</div>
+                <select id="eUsoSuelo" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
+                  <option value="">— Selecciona —</option>
+                  <option>HABITACIONAL</option>
+                  <option>COMERCIAL</option>
+                  <option>INDUSTRIAL</option>
+                  <option>MIXTO</option>
+                  <option>BALDÍO</option>
+                  <option>SERVICIOS</option>
+                  <option>AGRÍCOLA</option>
+                  <option>GANADERO</option>
+                  <option>FORESTAL</option>
+                </select>
+              </div>
+              <div onclick="escToggleCaracteristica('conCasa')" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding-bottom:2px;">
+                <div id="eCaractBoxConCasa" style="width:20px;height:20px;border:1.5px solid #7a6840;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;background:#fff;color:#1a1008;flex-shrink:0;"></div>
+                <span style="font-size:0.72rem;color:#1a1008;">CON CONSTRUCCIÓN</span>
+              </div>
+              <div onclick="escToggleCaracteristica('sinCasa')" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding-bottom:2px;">
+                <div id="eCaractBoxSinCasa" style="width:20px;height:20px;border:1.5px solid #7a6840;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;background:#fff;color:#1a1008;flex-shrink:0;"></div>
+                <span style="font-size:0.72rem;color:#1a1008;">SIN CONSTRUCCIÓN</span>
+              </div>
+              <div onclick="escToggleCaracteristica('rectifMedidas')" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding-bottom:2px;">
+                <div id="eCaractBoxRectifMedidas" style="width:20px;height:20px;border:1.5px solid #7a6840;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;background:#fff;color:#1a1008;flex-shrink:0;"></div>
+                <span style="font-size:0.72rem;color:#1a1008;">RECTIFICACIÓN DE MEDIDAS Y COLINDANCIAS</span>
+              </div>
+              <div onclick="escToggleCaracteristica('rectifDatos')" style="display:flex;align-items:center;gap:6px;cursor:pointer;padding-bottom:2px;">
+                <div id="eCaractBoxRectifDatos" style="width:20px;height:20px;border:1.5px solid #7a6840;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;background:#fff;color:#1a1008;flex-shrink:0;"></div>
+                <span style="font-size:0.72rem;color:#1a1008;">RECTIFICACIÓN DE DATOS</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;padding-bottom:2px;">
+                <span style="font-size:0.55rem;color:#7a6840;font-weight:700;white-space:nowrap;">CARÁCTER DE REGISTRO PÚBLICO (IFREO):</span>
+                <div onclick="escSetCaracterIfreo('definitivo')" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                  <div id="eIfreoBoxDefinitivo" style="width:20px;height:20px;border:1.5px solid #7a6840;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;background:#fff;color:#1a1008;flex-shrink:0;"></div>
+                  <span style="font-size:0.72rem;color:#1a1008;">DEFINITIVO</span>
+                </div>
+                <div onclick="escSetCaracterIfreo('preventivo')" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                  <div id="eIfreoBoxPreventivo" style="width:20px;height:20px;border:1.5px solid #7a6840;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;background:#fff;color:#1a1008;flex-shrink:0;"></div>
+                  <span style="font-size:0.72rem;color:#1a1008;">PREVENTIVO</span>
+                </div>
+                <div onclick="escSetCaracterIfreo('sinregistro')" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                  <div id="eIfreoBoxSinRegistro" style="width:20px;height:20px;border:1.5px solid #7a6840;border-radius:3px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;background:#fff;color:#1a1008;flex-shrink:0;"></div>
+                  <span style="font-size:0.72rem;color:#1a1008;">SIN REGISTRO</span>
+                </div>
+              </div>
             </div>
-            <div>
-              <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">VOL./INSTR. (SIST. NOTARIAL)</div>
-              <input id="eVolInstr" type="text" placeholder="Ej. 124/9,020" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
-            </div>
-            <div>
-              <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">TIPO DE TRÁMITE</div>
-              <select id="eTramite" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
-                <option value="">— Selecciona —</option>
-                <option>Escritura Total</option>
-                <option>Escritura Parcial</option>
-              </select>
-            </div>
+            <input type="hidden" id="eConCasa" value="">
+            <input type="hidden" id="eSinCasa" value="">
+            <input type="hidden" id="eRectifMedidas" value="">
+            <input type="hidden" id="eRectifDatos" value="">
+            <input type="hidden" id="eCaracterIfreo" value="">
           </div>
+          <input type="hidden" id="eVolInstr" value="">
           <!-- Semáforo -->
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">
-            <button type="button" onclick="escSetEstado(&#39;urgente&#39;,this)" data-estado="urgente" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">🔴 Urgente</button>
             <button type="button" onclick="escSetEstado(&#39;proceso&#39;,this)" data-estado="proceso" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">🟡 En Proceso</button>
             <button type="button" onclick="escSetEstado(&#39;listo&#39;,this)" data-estado="listo" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">🟢 Listo p/Entregar</button>
             <button type="button" onclick="escSetEstado(&#39;espera&#39;,this)" data-estado="espera" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">⬜ En Espera</button>
@@ -15143,18 +15216,18 @@ Recibo original im…</td>
             <div id="eCompradores-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
             <button type="button" onclick="escAgregarPersona(&#39;comprador&#39;)" style="width:100%;background:linear-gradient(135deg,#3b82f6,#1a4a8a);border:none;color:#fff;border-radius:8px;padding:8px;cursor:pointer;font-size:0.78rem;font-family:sans-serif;font-weight:700;box-shadow:0 2px 6px rgba(26,74,138,0.3);">＋ Agregar otro comprador/donatario</button>
           </div>
-          <!-- Descripción -->
-          <div class="field" style="margin-bottom:16px;">
-            <label>📝 Descripción del Trámite</label>
-            <textarea id="eDescripcion" rows="3" placeholder="Detalles generales del trámite, ubicación del predio, observaciones..."></textarea>
+          <!-- Observaciones (bitácora) también visible en modo edición -->
+          <div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+            <div style="font-family:monospace;font-size:0.65rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:10px;">🗒️ OBSERVACIONES</div>
+            <div id="esc-bitacora-lista-edit"></div>
           </div>
           <!-- ══ LÍNEA DEL TIEMPO ══ -->
           <div style="margin-bottom:16px;">
             <div style="font-family:monospace;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;">📍 Progreso del Trámite</div>
             <div style="position:relative;padding:0 4px;width:100%;box-sizing:border-box;">
               <!-- Barra de fondo -->
-              <div style="position:absolute;top:17px;left:10%;right:10%;height:3px;background:#e0ddd5;border-radius:2px;z-index:0;">
-                <div id="esc-progreso-barra" style="height:100%;background:#1a7a3a;border-radius:2px;transition:width 0.4s;width:0%;"></div>
+              <div id="esc-progreso-track" style="position:absolute;top:17px;left:10%;right:10%;height:3px;background:#e0ddd5;border-radius:2px;z-index:0;transition:background 0.4s;">
+                <div id="esc-progreso-barra" style="display:none;"></div>
               </div>
               <!-- Pasos -->
               <div style="display:flex;justify-content:space-between;position:relative;z-index:1;width:100%;">
@@ -15182,6 +15255,11 @@ Recibo original im…</td>
             </div>
             <div id="esc-paso-hint" style="text-align:center;font-size:0.68rem;color:var(--muted);margin-top:10px;font-family:monospace;">Guarda la escritura para activar el primer paso</div>
           </div>
+          <!-- Notas por etapa también visibles en modo edición -->
+          <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-l);">
+            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:12px;">🎯 Llamado a la Acción</div>
+            <div id="esc-notas-etapa-edit"></div>
+          </div>
         </div><!-- /modal-body-form -->
         <!-- ── VISTA DETALLE (solo lectura) — FUERA del form ── -->
         <div id="esc-vista-detalle" style="display:none;padding:20px;">
@@ -15191,8 +15269,8 @@ Recibo original im…</td>
           <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-l);">
             <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;">📍 Progreso del Trámite</div>
             <div style="position:relative;padding:0 4px;width:100%;box-sizing:border-box;">
-              <div style="position:absolute;top:17px;left:10%;right:10%;height:3px;background:#e0ddd5;border-radius:2px;z-index:0;">
-                <div id="esc-progreso-barra-d" style="height:100%;background:#1a7a3a;border-radius:2px;transition:width 0.4s;width:0%;"></div>
+              <div id="esc-progreso-track-d" style="position:absolute;top:17px;left:10%;right:10%;height:3px;background:#e0ddd5;border-radius:2px;z-index:0;transition:background 0.4s;">
+                <div id="esc-progreso-barra-d" style="display:none;"></div>
               </div>
               <div style="display:flex;justify-content:space-between;position:relative;z-index:1;width:100%;">
                 <div style="display:flex;flex-direction:column;align-items:center;gap:5px;width:19%;min-width:0;">
@@ -15221,7 +15299,7 @@ Recibo original im…</td>
           </div>
           <!-- Notas por etapa -->
           <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-l);">
-            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:12px;">📝 Notas por Etapa</div>
+            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:12px;">🎯 Llamado a la Acción</div>
             <div id="esc-notas-etapa"></div>
           </div>
         </div>
@@ -15234,10 +15312,24 @@ Recibo original im…</td>
         <div id="esc-ftr-detalle" class="modal-ftr" style="display:none;">
           <button class="btn btn-ghost" onclick="cerrar(&#39;mEscritura&#39;)">✕ Cerrar</button>
           <button class="btn" style="background:var(--rojo-l);color:var(--rojo);border:1px solid var(--rojo);" onclick="escEliminar()">🗑 Eliminar</button>
+          <button class="btn btn-ghost" onclick="escImprimirFicha()">🖨️ Imprimir</button>
           <button class="btn btn-primary" onclick="escModoEditar()">✏️ Editar</button>
         </div>
       </div>
     </div>
+    <!-- MODAL VINCULAR FOLIO DE RECIBO (serie A) A LA ESCRITURA -->
+    <div class="modal-ov" id="mEscVincularFolio"><div class="modal">
+      <div class="modal-hdr"><h3>🧾 Vincular Folio de Recibo</h3><button class="modal-x" onclick="cerrar('mEscVincularFolio')">✕</button></div>
+      <div class="modal-body">
+        <div style="font-size:0.76rem;color:var(--muted);margin-bottom:14px;">Selecciona el recibo (folio serie A) con el que se vincula esta escritura.</div>
+        <input class="search-inp" placeholder="🔍 Buscar por nombre o folio..." id="escFolioQ" oninput="escFiltrarFoliosVinculacion()" style="margin-bottom:12px;">
+        <div id="esc-folio-list" style="max-height:300px;overflow-y:auto;"></div>
+      </div>
+      <div class="modal-ftr">
+        <button class="btn btn-ghost" style="color:var(--rojo);" onclick="escVincularFolioSeleccionar(null)">Quitar vínculo</button>
+        <button class="btn btn-ghost" onclick="cerrar('mEscVincularFolio')">Cancelar</button>
+      </div>
+    </div></div>
     <!-- MODAL DETALLE DE PASO -->
     <div class="modal-ov" id="mEscPaso">
       <div class="modal" style="max-width:520px;width:100%;">
@@ -19265,7 +19357,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20260904f"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=20260904g"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

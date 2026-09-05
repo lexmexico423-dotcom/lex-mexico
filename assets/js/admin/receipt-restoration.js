@@ -4612,9 +4612,13 @@ function _escLimpiarForm(){
 }
 function escSetEstado(estado, btn){
   document.getElementById('eEstado').value=estado;
+  const colores={urgente:'#c0161a',proceso:'#c8952a',listo:'#1a7a3a',espera:'#7a6840',archivado:'#8c6518'};
   document.querySelectorAll('.esc-estado-btn').forEach(b=>{
-    b.style.opacity=b.dataset.estado===estado?'1':'0.45';
-    b.style.transform=b.dataset.estado===estado?'scale(1.04)':'scale(1)';
+    const activo=b.dataset.estado===estado;
+    const c=colores[b.dataset.estado]||'#7a6840';
+    b.style.background=activo?c:'#fff';
+    b.style.color=activo?'#fff':'#7a6840';
+    b.style.borderColor=activo?c:'#d4b870';
   });
 }
 function escAgregarPersona(tipo, datos={}){

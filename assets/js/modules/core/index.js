@@ -747,16 +747,20 @@ function pedirTexto(opts) {
       placeholder: '',
       btnSi: 'Aceptar',
       btnNo: 'Cancelar',
-      validar: null  // función opcional (valor) => string error o null
+      validar: null,   // función opcional (valor) => string error o null
+      multilinea: false // true = textarea grande, auto-expandible y justificada
     }, opts || {});
     const ov = document.createElement('div');
     ov.className = 'modal-ov show';
     ov.style.zIndex = '99999';
+    const campoHtml = o.multilinea
+      ? '<textarea class="cb-input cb-textarea" placeholder="' + escapeHtml(o.placeholder) + '">' + escapeHtml(o.valorInicial) + '</textarea>'
+      : '<input type="text" class="cb-input" placeholder="' + escapeHtml(o.placeholder) + '" value="' + escapeHtml(o.valorInicial) + '">';
     ov.innerHTML =
-      '<div class="modal cb-modal" role="dialog" aria-modal="true">' +
+      '<div class="modal cb-modal' + (o.multilinea ? ' cb-modal-ancho' : '') + '" role="dialog" aria-modal="true">' +
       '  <div class="cb-header"><h3>' + escapeHtml(o.titulo) + '</h3></div>' +
       '  <div class="cb-body">' + (o.mensaje ? '<p>' + escapeHtml(o.mensaje) + '</p>' : '') +
-      '    <input type="text" class="cb-input" placeholder="' + escapeHtml(o.placeholder) + '" value="' + escapeHtml(o.valorInicial) + '">' +
+           campoHtml +
       '    <div class="cb-error" style="display:none;"></div>' +
       '  </div>' +
       '  <div class="cb-footer">' +
@@ -767,6 +771,11 @@ function pedirTexto(opts) {
     document.body.appendChild(ov);
     const inp = ov.querySelector('.cb-input');
     const errEl = ov.querySelector('.cb-error');
+    if (o.multilinea) {
+      const autoCrecer = () => { inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 400) + 'px'; };
+      inp.addEventListener('input', autoCrecer);
+      setTimeout(autoCrecer, 0);
+    }
     const cerrarModal = (resultado) => {
       document.removeEventListener('keydown', escListener);
       ov.classList.remove('show');
@@ -791,10 +800,10 @@ function pedirTexto(opts) {
     ov.addEventListener('click', e => { if (e.target === ov) cerrarModal(null); });
     const escListener = e => {
       if (e.key === 'Escape') { e.preventDefault(); cerrarModal(null); }
-      else if (e.key === 'Enter' && e.target === inp) { e.preventDefault(); intentarAceptar(); }
+      else if (e.key === 'Enter' && e.target === inp && !o.multilinea) { e.preventDefault(); intentarAceptar(); }
     };
     document.addEventListener('keydown', escListener);
-    setTimeout(() => { inp.focus(); inp.select(); }, 50);
+    setTimeout(() => { inp.focus(); if (!o.multilinea && inp.select) inp.select(); }, 50);
   });
 }
 

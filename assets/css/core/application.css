@@ -570,6 +570,13 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
   outline:none;border-color:var(--gold);
   box-shadow:0 0 0 3px rgba(200,149,42,0.15);
 }
+/* Variante ancha + textarea auto-expandible y justificada (pedirTexto con
+   multilinea:true, p.ej. la nota del trámite). */
+.cb-modal-ancho{ max-width:620px; }
+textarea.cb-input.cb-textarea{
+  min-height:110px;resize:none;overflow-y:auto;max-height:400px;
+  text-align:justify;line-height:1.6;font-size:0.95rem;
+}
 .cb-error{
   margin-top:8px;padding:6px 10px;background:rgba(192,22,26,0.08);
   border-left:3px solid var(--rojo);border-radius:3px;

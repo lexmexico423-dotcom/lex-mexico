@@ -1262,6 +1262,21 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
 }
 /* ── PERFIL DE CONTACTO ── */
 #mPerfilContacto .modal{max-width:680px;}
+/* ── MODAL DE ESCRITURA MÁS GRANDE (texto/inputs a escala, solo aquí) ── */
+#mEscritura .modal-hdr{padding:20px 26px;}
+#mEscritura .modal-hdr h3{font-size:1.2rem;}
+#mEscritura .modal-body{padding:26px;}
+#mEscritura .field{margin-bottom:16px;}
+#mEscritura .field label{font-size:0.68rem;}
+#mEscritura .field input,#mEscritura .field select,#mEscritura .field textarea{font-size:0.95rem;padding:10px 14px;}
+#mEscritura .field textarea{min-height:80px;}
+/* ── HOJA TAMAÑO CARTA (mockup aprobado): mismos colores, fondo de respaldo gris ── */
+#mEscritura.modal-ov{background:#e9e4d8;}
+#mEscritura .modal{background:#fdfaf4;border:1px solid #d4b870;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.15);max-width:816px;}
+#mEscritura .modal-hdr{background:#fdfaf4;border-bottom:1px solid #d4b870;border-radius:4px 4px 0 0;}
+#mEscritura .modal-ftr{background:#fdfaf4;border-top:1px solid #d4b870;border-radius:0 0 4px 4px;}
+#mEscritura .modal-body{background:#fdfaf4;padding:32px 40px;box-sizing:border-box;}
+#esc-vista-detalle{background:#fdfaf4;}
 .perfil-hdr{display:flex;align-items:center;gap:14px;padding:20px 22px 16px;border-bottom:1px solid var(--border-l);}
 .perfil-avatar{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--gold-d),var(--gold));display:flex;align-items:center;justify-content:center;font-family:serif;font-size:1.3rem;color:#fff;font-weight:700;flex-shrink:0;}
 .perfil-nombre{font-family:serif;font-size:1.05rem;color:var(--text);font-weight:600;}

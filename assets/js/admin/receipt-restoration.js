@@ -4197,12 +4197,245 @@ function obtenerHistorialPagosAbono(folioRef){
 // Control de escrituras con línea del tiempo de 5 pasos y chat IA
 // ═══════════════════════════════════════════════════════════════════════
 const ESC_PASOS = ['FIRMA NOTARIAL','CATASTRO','TRASLADO MPL','ISR','IFREO'];
+// ── Catálogos oficiales de Catastro: Aviso de Traslado de Dominio ──────
+// Catálogo fijo (no viene de API/tabla externa). No modificar ortografía,
+// mayúsculas ni redacción de ninguna opción: son el catálogo oficial tal
+// cual lo captura el sistema de Catastro (incluye erratas originales,
+// p.ej. "CUENA" en la 405 — se conservan tal cual).
+const ESC_TIPOS_MOVIMIENTO = {
+  '1': '1. TRASLADOS DE DOMINIO',
+  '2': '2. RECTIFICACIONES',
+  '3': '3. INTEGRACIONES',
+  '4': '4. OTROS TRÁMITES',
+  '5': '5. TRÁMITES PARCIALES'
+};
+const ESC_TIPOS_TRAMITE_CATASTRO = {
+  '1': [
+    ['101','ADJUDICACION INTESTAMENTARIA'],
+    ['102','ADJUDICACION POR REMATE JUDICIAL O ADMINISTRATIVO'],
+    ['103','ADJUDICACION TESTAMENTARIA'],
+    ['104','CESION DE DERECHOS DE HEREDEROS, LEGATARIO O COPROPIETARIO'],
+    ['105','COMPRAVENTA'],
+    ['106','COMPRAVENTA (C.I.S.) ( CONSTRUCCIONES DE INTERES SOCIAL )'],
+    ['107','COMPRAVENTA AD CORPUS'],
+    ['108','CONSTITUCION DE USUFRUCTO O NUDA PROPIEDAD Y EXTINCION DE USUFRUCTO'],
+    ['109','CONSTITUCION, TRANSMISION O EXTINCION DE FIDEICOMISO'],
+    ['110','CONTRATO DE PROMESA DE COMPRAVENTA'],
+    ['111','CONTRATO PRIVADO DE COMPRAVENTA (JUEZ O REGISTRADOR)'],
+    ['112','DACION EN PAGO'],
+    ['113','DONACION'],
+    ['114','DONACION CON RESERVA DE USUFRUCTO VITALICIO Y DE DOMINIO'],
+    ['115','ENAJENACION A TRAVES DE FIDEICOMISO'],
+    ['116','ESCRITURA CORETT'],
+    ['117','ESCRITURA CORETTURO'],
+    ['118','ESCRITURA FONATUR'],
+    ['119','ESCRITURA FOVISSSTE'],
+    ['120','ESCRITURA INFONAVIT'],
+    ['121','ESCRITURA IVO'],
+    ['122','PERMUTA'],
+    ['123','PRESCRIPCION POSITIVA O ADQUISITIVA'],
+    ['124','COMPRAVENTA CON CREDITO HIPOTECARIO'],
+    ['125','RESCISION DE CONTRATO'],
+    ['126','CESION DE DERECHOS DE PROPIEDAD'],
+    ['127','ENAGENACION DE PARTE ALICUOTA DEL COPROPIETARIO'],
+    ['128','CESION DE DERECHOS DE COMPRADOR'],
+    ['129','FUSION Y ESCISION DE SOCIEDADES'],
+    ['130','APORTACIONES A SOCIEDADES Y ASOCIACIONES'],
+    ['131','OTRO, ESPECIFICAR EN EL RECUADRO DE OBSERVACIONES']
+  ],
+  '2': [
+    ['201','DE CONSTRUCCION'],
+    ['202','DE DATOS'],
+    ['203','DE MEDIDAS'],
+    ['204','DE VALOR'],
+    ['205','DE FRACCIONAMIENTO O CONDOMINIOS']
+  ],
+  '3': [
+    ['301','AD PERPETUAM'],
+    ['302','CERTIFICADO DE POSESION CORETTURO'],
+    ['303','CERTIFICADO PARCELARIO'],
+    ['304','CESION DE DERECHOS COMUNALES'],
+    ['305','CESION DE DERECHOS DE POSESION'],
+    ['306','CESION DE DERECHOS EJIDALES'],
+    ['307','COMUNAL'],
+    ['308','DONACION COMUNAL'],
+    ['309','DONACION EJIDAL'],
+    ['310','EJIDAL'],
+    ['311','INMATRICULACION DE BIENES INMUEBLES'],
+    ['312','INTEGRACION DE LOTES'],
+    ['313','PRIVADA'],
+    ['314','PROTOCOLIZACION'],
+    ['315','TITULO DE SOLAR URBANO'],
+    ['316','OTRO, ESPECIFICAR EN EL RECUADRO DE OBSERVACIONES']
+  ],
+  '4': [
+    ['401','CESION DE DERECHOS COMUNALES CUANDO YA EXISTE CUENTA EN EL ICEO'],
+    ['402','CESION DE DERECHOS DE POSESION EN PROPIEDAD PRIVADA CUANDO YA EXISTE CUENTA EN EL ICEO'],
+    ['403','CESION DE DERECHOS EJIDALES CUANDO YA EXISTE CUENTA EN EL ICEO'],
+    ['404','CONSTITUCION DE COPROPIEDAD O SOCIEDAD CONYUGAL'],
+    ['405','CESION DE DERECHOS DE POSESION NOTARIAL CUANDO YA EXISTE CUENA EN EL ICEO'],
+    ['406','OTRO, ESPECIFICAR EN EL RECUADRO DE OBSERVACIONES']
+  ],
+  '5': [
+    ['501','CONSTITUCION DE FRACCIONAMIENTO Y/O CONDOMINIO'],
+    ['502','FUSION DE PREDIOS'],
+    ['503','DIVISION COPROPIEDAD O DISOLUCION DE MANCOMUNIDAD'],
+    ['504','ASIGNACION'],
+    ['505','REASIGNACION'],
+    ['506','OTRO, ESPECIFICAR EN EL RECUADRO DE OBSERVACIONES']
+  ]
+};
+// ── Denominación de las partes (carácter) según el Tipo de Trámite (Catastro) ──
+// [adquirente/quien recibe, transmitente/quien entrega]. Catálogo fijo, mismas
+// claves que ESC_TIPOS_TRAMITE_CATASTRO. Definido junto con el usuario.
+const ESC_CARACTER_POR_TRAMITE = {
+  '101': ['Adjudicatario(a)','Autor de la Sucesión'],
+  '102': ['Adjudicatario(a)','Ejecutado(a)'],
+  '103': ['Heredero(a)/Legatario(a)','Autor de la Sucesión'],
+  '104': ['Cesionario(a)','Cedente'],
+  '105': ['Comprador(a)','Vendedor(a)'],
+  '106': ['Comprador(a)','Vendedor(a)'],
+  '107': ['Comprador(a)','Vendedor(a)'],
+  '108': ['Usufructuario(a)','Nudo(a) Propietario(a)'],
+  '109': ['Fideicomisario(a)','Fideicomitente'],
+  '110': ['Promitente Comprador(a)','Promitente Vendedor(a)'],
+  '111': ['Comprador(a)','Vendedor(a)'],
+  '112': ['Acreedor(a)','Deudor(a)'],
+  '113': ['Donatario(a)','Donador(a)'],
+  '114': ['Donatario(a)','Donador(a)'],
+  '115': ['Fideicomisario(a)','Fideicomitente'],
+  '116': ['Adquirente','CORETT'],
+  '117': ['Adquirente','CORETTURO'],
+  '118': ['Adquirente','FONATUR'],
+  '119': ['Acreditado(a)','FOVISSSTE'],
+  '120': ['Acreditado(a)','INFONAVIT'],
+  '121': ['Adquirente','IVO'],
+  '122': ['Permutante (A)','Permutante (B)'],
+  '123': ['Prescribiente','Titular Registral'],
+  '124': ['Comprador(a)','Vendedor(a)'],
+  '125': ['Comprador(a)','Vendedor(a)'],
+  '126': ['Cesionario(a)','Cedente'],
+  '127': ['Adquirente','Copropietario(a) Enajenante'],
+  '128': ['Cesionario(a)','Cedente'],
+  '129': ['Sociedad Fusionante/Escindente','Sociedad Fusionada/Escindida'],
+  '130': ['Sociedad','Aportante'],
+  '131': ['Adquirente','Transmitente'],
+  '201': ['Propietario(a)','Propietario(a)'],
+  '202': ['Propietario(a)','Propietario(a)'],
+  '203': ['Propietario(a)','Propietario(a)'],
+  '204': ['Propietario(a)','Propietario(a)'],
+  '205': ['Propietario(a)','Propietario(a)'],
+  '301': ['Propietario(a)','Propietario(a)'],
+  '302': ['Poseedor(a)','CORETTURO'],
+  '303': ['Propietario(a)','Propietario(a)'],
+  '304': ['Cesionario(a)','Cedente'],
+  '305': ['Cesionario(a)','Cedente'],
+  '306': ['Cesionario(a)','Cedente'],
+  '307': ['Propietario(a)','Propietario(a)'],
+  '308': ['Donatario(a)','Donador(a)'],
+  '309': ['Donatario(a)','Donador(a)'],
+  '310': ['Propietario(a)','Propietario(a)'],
+  '311': ['Propietario(a)','Propietario(a)'],
+  '312': ['Propietario(a)','Propietario(a)'],
+  '313': ['Propietario(a)','Propietario(a)'],
+  '314': ['Propietario(a)','Propietario(a)'],
+  '315': ['Propietario(a)','Propietario(a)'],
+  '316': ['Adquirente','Transmitente'],
+  '401': ['Cesionario(a)','Cedente'],
+  '402': ['Cesionario(a)','Cedente'],
+  '403': ['Cesionario(a)','Cedente'],
+  '404': ['Copropietario(a)','Copropietario(a)'],
+  '405': ['Cesionario(a)','Cedente'],
+  '406': ['Adquirente','Transmitente'],
+  '501': ['Propietario(a)','Propietario(a)'],
+  '502': ['Propietario(a)','Propietario(a)'],
+  '503': ['Copropietario(a)','Copropietario(a)'],
+  '504': ['Asignatario(a)','Asignante'],
+  '505': ['Asignatario(a)','Asignante'],
+  '506': ['Adquirente','Transmitente']
+};
+// Opciones de CARÁCTER para una persona (comprador=adquirente / vendedor=transmitente).
+// Si ya hay Tipo de Trámite seleccionado: una sola denominación fija (la que
+// corresponde a ese trámite). Si aún no se ha elegido trámite: comportamiento
+// anterior (elección manual entre las dos opciones genéricas).
+// Normaliza para MOSTRAR (nunca reescribe el dato guardado) los carácteres
+// legado capturados antes de que existiera el "(a)" — Comprador, Vendedor,
+// Donatario, Donador — para que la ficha y la impresión siempre se vean
+// consistentes: Comprador(a), Vendedor(a), etc.
+function _escCaracterDisplay(car){
+  if(!car) return car;
+  const legado = {'Comprador':'Comprador(a)','Vendedor':'Vendedor(a)','Donatario':'Donatario(a)','Donador':'Donador(a)'};
+  return legado[car] || car;
+}
+function escCaracterOpciones(tipo){
+  const clave = document.getElementById('eTipoTramiteCatastro')?.value || '';
+  const par = ESC_CARACTER_POR_TRAMITE[clave];
+  if(par) return [tipo==='comprador' ? par[0] : par[1]];
+  return tipo==='comprador' ? ['Comprador(a)','Donatario(a)'] : ['Vendedor(a)','Donador(a)'];
+}
+// Refresca el CARÁCTER de las personas ya agregadas cuando cambia el Tipo de
+// Trámite (Catastro), conservando la selección previa cuando sigue siendo
+// una opción válida (p.ej. mientras no se ha elegido trámite todavía).
+function escActualizarCaracterEnPersonas(){
+  document.querySelectorAll('#eCompradores-list .esc-caracter').forEach(sel=>{
+    const cur = sel.value;
+    const ops = escCaracterOpciones('comprador');
+    sel.innerHTML = ops.map(o=>`<option ${(cur===o||cur===o.replace('(a)',''))?'selected':''}>${esc(o)}</option>`).join('');
+  });
+  document.querySelectorAll('#eVendedores-list .esc-caracter').forEach(sel=>{
+    const cur = sel.value;
+    const ops = escCaracterOpciones('vendedor');
+    sel.innerHTML = ops.map(o=>`<option ${(cur===o||cur===o.replace('(a)',''))?'selected':''}>${esc(o)}</option>`).join('');
+  });
+}
+function escActualizarTipoTramiteCatastro(preseleccionar){
+  const movSel = document.getElementById('eTipoMovimiento');
+  const traSel = document.getElementById('eTipoTramiteCatastro');
+  if(!movSel || !traSel) return;
+  const lista = ESC_TIPOS_TRAMITE_CATASTRO[movSel.value] || [];
+  if(!movSel.value || !lista.length){
+    traSel.innerHTML = '<option value="">— Selecciona primero Tipos de Movimientos —</option>';
+    traSel.disabled = true;
+    traSel.value = '';
+    if(typeof escActualizarCaracterEnPersonas==='function') escActualizarCaracterEnPersonas();
+    return;
+  }
+  traSel.disabled = false;
+  traSel.innerHTML = '<option value="">— Selecciona —</option>' + lista.map(([clave,texto])=>`<option value="${clave}">${esc(clave+' - '+texto)}</option>`).join('');
+  traSel.value = (preseleccionar && lista.some(([c])=>c===preseleccionar)) ? preseleccionar : '';
+  if(typeof escActualizarCaracterEnPersonas==='function') escActualizarCaracterEnPersonas();
+}
 let _escFiltro = 'todos';
 let _escIdx    = -1;      // índice de escritura en edición
 let _escPasoIdx= -1;      // índice de paso abierto
 let _escIaHist = [];      // historial chat IA del paso
 // ── Inicializar D.escrituras si no existe ────────────────────────────
 if(typeof D!=='undefined' && !Array.isArray(D.escrituras)) D.escrituras = [];
+// ── Unificar observaciones legacy: ya no debe existir más de una nota por
+// escritura. Cualquier registro con 2 o más se fusiona en una sola (se
+// concatena el texto) la primera vez que se carga el sistema.
+(function _escUnificarObservacionesLegacy(){
+  if(typeof D==='undefined' || !Array.isArray(D.escrituras)) return;
+  let cambiado = false;
+  D.escrituras.forEach(function(e){
+    if(e && Array.isArray(e.bitacora) && e.bitacora.length>1){
+      const texto = e.bitacora.map(function(n){ return n && n.texto; }).filter(Boolean).join(' ');
+      e.bitacora = texto ? [{texto, fecha:(e.bitacora[0]&&e.bitacora[0].fecha)||''}] : [];
+      cambiado = true;
+    }
+    // "Llamado a la Acción": las notas de etapas ya superadas (completadas)
+    // no deben conservarse — limpieza retroactiva de datos existentes.
+    if(e && Array.isArray(e.pasos)){
+      e.pasos.forEach(function(p){
+        if(p && p.estado==='completado' && p.notas){
+          p.notas = '';
+          cambiado = true;
+        }
+      });
+    }
+  });
+  if(cambiado && typeof save==='function') save();
+})();
 // ── Sync y refresco automático ────────────────────────────────────────
 function escSyncYRefrescar(){
   save();
@@ -4293,21 +4526,24 @@ function escMostrarDetalle(e){
   if(el_ftr_d) el_ftr_d.style.display = 'flex';
   if(el_titulo) el_titulo.textContent  = e.num||'Escritura';
   const cfg={
-    urgente:{col:'#c0161a',bg:'rgba(192,22,26,0.08)',lbl:'🔴 Urgente'},
     proceso:{col:'#9a6010',bg:'rgba(200,149,42,0.08)',lbl:'🟡 En Proceso'},
     listo:  {col:'#1a7a3a',bg:'rgba(26,122,58,0.08)', lbl:'🟢 Listo p/Entregar'},
     espera: {col:'#7a6840',bg:'rgba(0,0,0,0.04)',      lbl:'⬜ En Espera'},
     archivado:{col:'#7a6840',bg:'rgba(122,104,64,0.08)',lbl:'🗄 Archivado'}
   };
   const st = cfg[e.estado||'proceso']||cfg.proceso;
-  const fila = (lbl,val) => val ? `<div style="margin-bottom:8px;">
-    <div style="font-family:monospace;font-size:0.58rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;">${lbl}</div>
-    <div style="font-size:0.83rem;color:var(--ink);line-height:1.5;">${val}</div>
+  const fila = (lbl,val) => val ? `<div style="text-align:left;">
+    <div style="font-family:monospace;font-size:0.58rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;">${lbl}</div>
+    <div style="font-size:0.85rem;color:var(--ink);line-height:1.4;font-weight:600;">${val}</div>
   </div>` : '';
+  const seccion = (icon,titulo,cuerpo) => `<div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+    ${titulo?`<div style="font-family:monospace;font-size:0.65rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:10px;">${icon} ${titulo}</div>`:''}
+    ${cuerpo}
+  </div>`;
   const renderPersonas = (lista) => (lista||[]).map(p=>{
     const obj = typeof p==='string' ? {nombre:p} : p;
     let html = `<div style="padding:6px 10px;background:rgba(0,0,0,0.03);border-radius:6px;margin-bottom:4px;">
-      ${obj.caracter?`<div style="font-size:0.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">${esc(obj.caracter)}</div>`:''}
+      ${obj.caracter?`<div style="font-size:0.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">${esc(_escCaracterDisplay(obj.caracter))}</div>`:''}
       <span style="font-weight:600;">${esc(obj.nombre||'—')}</span>`;
     if(obj.tipoPersona) html += ` <span style="font-size:0.68rem;color:var(--muted);">(Persona ${esc(obj.tipoPersona)})</span>`;
     if(obj.civil)    html += ` <span style="font-size:0.7rem;color:var(--muted);">(${esc(obj.civil)})</span>`;
@@ -4319,92 +4555,298 @@ function escMostrarDetalle(e){
   const fechaFmt = e.fechaFirma
     ? new Date(e.fechaFirma+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'})
     : (e.fechaFirmaTexto ? esc(e.fechaFirmaTexto) : '—');
+  const _recVinc = e.folioRecibo ? ((typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))||[]).find(r=>r.folio===e.folioRecibo) : null;
+  const _badgeHdr = document.getElementById('eFolioBadgeHdr');
+  const _badgeVal = document.getElementById('eFolioBadgeHdrVal');
+  if(_badgeHdr){
+    if(e.folioRecibo){
+      const _letraVinc = _recVinc?.letra || (typeof letraVersion==='function' ? letraVersion(_recVinc||{}) : '') || 'A';
+      if(_badgeVal) _badgeVal.textContent = (typeof folioConLetra==='function' ? folioConLetra(e.folioRecibo, _recVinc?.anio_folio, _letraVinc) : (e.folioRecibo+_letraVinc));
+      _badgeHdr.style.display = 'block';
+    } else {
+      _badgeHdr.style.display = 'none';
+    }
+  }
+  const _foliosHdr = document.getElementById('eFoliosHdr');
+  const _foliosHdrVal = document.getElementById('eFoliosHdrVal');
+  if(_foliosHdr){
+    if(e.folios){
+      if(_foliosHdrVal) _foliosHdrVal.textContent = e.folios;
+      _foliosHdr.style.display = 'block';
+    } else {
+      _foliosHdr.style.display = 'none';
+    }
+  }
+  const _chipsCaract = [
+    e.rectifMedidas?'<span style="font-size:0.65rem;font-weight:700;color:#8c6518;background:#fff;border:1px solid rgba(200,149,42,0.35);padding:4px 11px;border-radius:10px;">✓ Rectificación de Medidas y Colindancias</span>':'',
+    e.rectifDatos?'<span style="font-size:0.65rem;font-weight:700;color:#8c6518;background:#fff;border:1px solid rgba(200,149,42,0.35);padding:4px 11px;border-radius:10px;">✓ Rectificación de Datos</span>':''
+  ].filter(Boolean).join('');
+  const _txtConstruccion = e.conCasa ? 'Con Construcción' : (e.sinCasa ? 'Sin Construcción' : '—');
+  const _txtIfreo = e.caracterIfreo==='definitivo' ? 'Definitivo' : (e.caracterIfreo==='preventivo' ? 'Preventivo' : (e.caracterIfreo==='sinregistro' ? 'Sin Registro' : '—'));
   if(el_header) el_header.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:14px;">
-      <div style="flex:1;min-width:0;">
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-          ${fila('Tipo de Escritura', esc(e.tipo||'—'))}
-          ${fila('Notaría No.', esc(e.notaria||'—'))}
-          ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
-          ${fila('Fecha de Firma', fechaFmt)}
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-          ${fila('Predio', esc(e.predio||'—'))}
-          ${fila('Ubicación', esc(e.ubicacion||'—'))}
-          ${fila('Tipo de Trámite', esc(e.tramite||'—'))}
-        </div>
-        ${(e.folios||e.cuentaCatastral)?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-          ${e.folios?fila('Folios (sist. notarial)', esc(e.folios)):''}
-          ${e.cuentaCatastral?fila('Cuenta Catastral', esc(e.cuentaCatastral)):''}
-        </div>`:''}
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
-          <div>
-            <div style="font-family:monospace;font-size:0.58rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">🛒 Compradores / Donatarios</div>
-            ${renderPersonas(e.compradores)||'<span style="font-size:0.75rem;color:var(--muted);">—</span>'}
-          </div>
-          <div>
-            <div style="font-family:monospace;font-size:0.58rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">📤 Vendedores / Donantes</div>
-            ${renderPersonas(e.vendedores)||'<span style="font-size:0.75rem;color:var(--muted);">—</span>'}
-          </div>
-        </div>
-        ${e.descripcion?`<div style="font-size:0.78rem;color:#7a6840;background:rgba(200,149,42,0.06);border-left:3px solid var(--gold);padding:8px 10px;border-radius:0 6px 6px 0;line-height:1.5;">${esc(e.descripcion)}</div>`:''}
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px;">
+      <div style="font-size:0.95rem;font-weight:700;color:var(--ink);">📋 Resumen del Trámite</div>
+      <span style="font-size:0.68rem;font-weight:700;color:${st.col};background:${st.bg};padding:5px 14px;border-radius:14px;white-space:nowrap;flex-shrink:0;border:1px solid ${st.col}44;">${st.lbl}</span>
+    </div>
+    ${seccion('📁','', `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+        ${fila('Tipos de Movimientos', esc(ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento]||'—'))}
+        ${fila('Tipo de Trámite', (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? esc(t[0]+' - '+t[1]) : '—'; })())}
       </div>
-      <span style="font-size:0.65rem;font-weight:700;color:${st.col};background:${st.bg};padding:4px 12px;border-radius:12px;white-space:nowrap;flex-shrink:0;border:1px solid ${st.col}44;">${st.lbl}</span>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+        ${fila('Tipo de Terreno', esc(e.predio||'—'))}
+        ${fila('Uso de Suelo', esc(e.usoSuelo||'—'))}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        ${fila('Construcción', esc(_txtConstruccion))}
+        ${fila('Carácter de Registro Público (IFREO)', esc(_txtIfreo))}
+      </div>
+      ${_chipsCaract?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid rgba(200,149,42,0.2);">${_chipsCaract}</div>`:''}
+    `)}
+    ${seccion('🏛','DATOS NOTARIALES', `
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:14px;">
+        ${fila('Notaría No.', esc(e.notaria||'—'))}
+        ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
+        ${fila('Fecha de Firma', fechaFmt)}
+        ${fila('Cuenta Catastral', esc(e.cuentaCatastral||'—'))}
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+        ${fila('Ubicación', esc(e.ubicacion||'—'))}
+        ${fila('Alcance (Total/Parcial)', esc(e.tramite||'—'))}
+      </div>
+    `)}
+    ${e.descripcion?`<div style="font-size:0.78rem;color:#7a6840;background:rgba(200,149,42,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:0 8px 8px 0;line-height:1.5;margin-bottom:14px;">${esc(e.descripcion)}</div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:6px;">
+      <div style="background:#eef3ff;border:1.5px solid rgba(59,130,246,0.3);border-radius:12px;padding:14px 16px;">
+        ${renderPersonas(e.compradores)||'<span style="font-size:0.75rem;color:var(--muted);">—</span>'}
+      </div>
+      <div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;">
+        ${renderPersonas(e.vendedores)||'<span style="font-size:0.75rem;color:var(--muted);">—</span>'}
+      </div>
     </div>
     <div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-top:16px;">
       <div style="font-family:monospace;font-size:0.65rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:10px;">🗒️ OBSERVACIONES</div>
-      <div id="esc-bitacora-lista" style="margin-bottom:10px;">${escRenderBitacora(e.bitacora||[])}</div>
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="esc-nota-nueva" placeholder="Escribe una nueva observación..." style="flex:1;box-sizing:border-box;border:1.5px solid #d4b870;border-radius:8px;padding:8px 10px;font-size:0.78rem;font-family:sans-serif;">
-        <button type="button" onclick="escAgregarNota()" style="background:linear-gradient(135deg,#c8952a,#8c6518);border:none;color:#fff;border-radius:8px;padding:0 16px;cursor:pointer;font-weight:700;font-size:0.75rem;font-family:sans-serif;white-space:nowrap;">＋ Agregar más</button>
-      </div>
+      <div id="esc-bitacora-lista">${escRenderBitacora(e.bitacora||[])}</div>
     </div>`;
   escActualizarTimelineDetalle(e.pasos||[]);
   escRenderNotasEtapa(e);
 }
-function escRenderBitacora(lista){
-  if(!lista || !lista.length) return '<div style="font-size:0.75rem;color:var(--muted);font-style:italic;">Sin observaciones todavía.</div>';
-  return '<div style="background:rgba(200,149,42,0.06);border-radius:10px;padding:2px 10px;">' + lista.map((n,i)=>{
-    const etiqueta = n.fecha ? esc(n.fecha) : esc(n.origen||'—');
-    return `<div style="display:flex;gap:10px;align-items:center;padding:8px 2px;${i<lista.length-1?'border-bottom:1px solid rgba(200,149,42,0.2);':''}">
-      <div style="width:20px;height:20px;border-radius:50%;background:#c8952a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;flex-shrink:0;">${i+1}</div>
-      <div style="flex:1;font-size:0.78rem;color:var(--ink);line-height:1.4;">${esc(n.texto||'')}</div>
-      <div style="font-family:monospace;font-size:0.58rem;color:#8c6518;white-space:nowrap;">${etiqueta}</div>
-    </div>`;
-  }).join('') + '</div>';
-}
-function escRenderNotasEtapa(e){
-  const cont = document.getElementById('esc-notas-etapa');
-  if(!cont) return;
+// Imprimir la ficha en una ventana aislada (mismo patrón que recibos/clientes):
+// evita el bug de Ctrl+P nativo, que al imprimir toda la página (sidebar +
+// demás paneles ocultos) repetía la ficha —position:fixed del modal— en
+// cada una de las páginas resultantes.
+// Ficha de impresión: NO clona el DOM en pantalla (tarjetas de color, chips,
+// círculos, badges) — genera un documento aparte, sencillo y en blanco y
+// negro, pensado para imprimirse en una hoja tamaño carta.
+function escImprimirFicha(){
+  const e = (_escIdx>=0 && D.escrituras[_escIdx]) ? D.escrituras[_escIdx] : null;
+  if(!e){ if(typeof toast==='function') toast('Abre una escritura primero','err'); return; }
+  const fila = (lbl,val) => val ? `<div class="ip-campo"><div class="ip-lbl">${esc(lbl)}</div><div class="ip-val">${val}</div></div>` : '';
+  const fechaFmt = e.fechaFirma
+    ? new Date(e.fechaFirma+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'})
+    : (e.fechaFirmaTexto ? esc(e.fechaFirmaTexto) : '—');
+  const _recVinc = e.folioRecibo ? ((typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))||[]).find(r=>r.folio===e.folioRecibo) : null;
+  const _letraVinc = _recVinc?.letra || (typeof letraVersion==='function' ? letraVersion(_recVinc||{}) : '') || 'A';
+  const _folioTxt = e.folioRecibo ? (typeof folioConLetra==='function' ? folioConLetra(e.folioRecibo, _recVinc?.anio_folio, _letraVinc) : (e.folioRecibo+_letraVinc)) : '';
+  const tramiteTxt = (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? (t[0]+' - '+t[1]) : '—'; })();
+  const construccionTxt = e.conCasa ? 'Con Construcción' : (e.sinCasa ? 'Sin Construcción' : '—');
+  const ifreoTxt = e.caracterIfreo==='definitivo' ? 'Definitivo' : (e.caracterIfreo==='preventivo' ? 'Preventivo' : (e.caracterIfreo==='sinregistro' ? 'Sin Registro' : '—'));
+  const chipsCaract = [e.rectifMedidas?'Rectificación de Medidas y Colindancias':'', e.rectifDatos?'Rectificación de Datos':''].filter(Boolean).join(' · ');
+  const renderPersonasImp = (lista) => (lista||[]).map(p=>{
+    const obj = typeof p==='string' ? {nombre:p} : p;
+    const extra = [];
+    if(obj.caracter) extra.push(esc(_escCaracterDisplay(obj.caracter)));
+    if(obj.tipoPersona) extra.push('Persona '+esc(obj.tipoPersona));
+    if(obj.civil) extra.push(esc(obj.civil));
+    let html = `<div class="ip-persona"><strong>${esc(obj.nombre||'—')}</strong>${extra.length?' — '+extra.join(', '):''}</div>`;
+    if(obj.tipoSociedad) html += `<div class="ip-sub">Régimen: ${esc(obj.tipoSociedad)}</div>`;
+    if(obj.consentimientoConyuge) html += `<div class="ip-sub">Con consentimiento de su cónyuge${obj.nombreConyuge?': '+esc(obj.nombreConyuge):''}</div>`;
+    if(obj.conducto) html += `<div class="ip-sub">Por conducto de: ${esc(obj.conducto)}</div>`;
+    return html;
+  }).join('') || '<div class="ip-sub">—</div>';
   const pasos = Array(5).fill(null).map((_,i)=>(e.pasos||[])[i]||{estado:'pendiente',notas:'',fecha:''});
   const completados = pasos.filter(p=>p.estado==='completado').length;
   const pasoActivo = completados<5 ? completados : -1;
-  cont.innerHTML = pasos.map((p,i)=>{
-    const esComp = p.estado==='completado';
-    const esActivo = i===pasoActivo;
-    const col = esComp?'#1a7a3a':esActivo?'#c8952a':'#d8d2c2';
-    const bg  = esComp?'#fff':esActivo?'#fff8e8':'rgba(0,0,0,0.02)';
-    const shadow = esActivo?'box-shadow:0 2px 8px rgba(200,149,42,0.15);':esComp?'box-shadow:0 1px 4px rgba(0,0,0,0.06);':'';
-    const estadoTxt = esComp?'✓ Completado':esActivo?'🟡 En proceso':'Pendiente';
-    const colTxt = esComp?'#1a7a3a':esActivo?'#8c6518':'#a9a08a';
-    let cuerpo = '';
-    if(esActivo){
-      cuerpo = `<textarea id="esc-nota-etapa-${i}" rows="2" placeholder="Escribe el estatus de esta etapa..." style="width:100%;box-sizing:border-box;border:1.5px solid #c8952a;border-radius:6px;background:#fff;padding:6px 9px;font-size:0.75rem;font-family:sans-serif;resize:vertical;margin-top:6px;">${esc(p.notas||'')}</textarea>
-        <button type="button" onclick="escGuardarNotaEtapaInline(${i})" style="margin-top:6px;background:linear-gradient(135deg,#c8952a,#8c6518);border:none;color:#fff;border-radius:6px;padding:5px 12px;font-size:0.68rem;font-weight:700;cursor:pointer;">💾 Guardar nota</button>`;
-    } else if(p.notas){
-      cuerpo = `<div style="font-size:0.75rem;color:#5c5648;margin-top:4px;">${esc(p.notas)}</div>`;
+  const pasosTxt = pasos.map((p,i)=>{
+    const marca = p.estado==='completado' ? '✓' : (i===pasoActivo ? '●' : '○');
+    return `<span class="ip-paso">${marca} ${(i+1)}. ${esc(ESC_PASOS[i])}</span>`;
+  }).join('');
+  const llamado = pasoActivo===-1
+    ? esc(e.notaFinal || 'Trámite completado en todas las etapas.')
+    : esc(pasos[pasoActivo].notas || ('('+ESC_PASOS[pasoActivo]+' en proceso, sin nota registrada)'));
+  const obsTexto = (e.bitacora && e.bitacora[0] && e.bitacora[0].texto) ? esc(e.bitacora[0].texto) : '';
+  const titulo = 'Escritura ' + esc(e.num||'');
+  const fechaImp = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  const cuerpo = `<div class="ip-hoja">
+    <div class="ip-hdr">
+      <h1>${titulo}</h1>
+      <div style="text-align:right;">
+        ${_folioTxt?`<div class="ip-folio">Folio: <strong>${esc(_folioTxt)}</strong></div>`:''}
+        <div class="ip-fecha">Impreso el ${fechaImp}</div>
+      </div>
+    </div>
+    ${e.folios?`<div class="ip-sec">${fila('Folios (Sist. Notarial)', esc(e.folios))}</div>`:''}
+    <div class="ip-sec">
+      <div class="ip-sec-tit">Clasificación Catastral</div>
+      <div class="ip-grid">
+        ${fila('Tipos de Movimientos', esc(ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento]||'—'))}
+        ${fila('Tipo de Trámite', esc(tramiteTxt))}
+        ${fila('Tipo de Terreno', esc(e.predio||'—'))}
+        ${fila('Uso de Suelo', esc(e.usoSuelo||'—'))}
+        ${fila('Construcción', esc(construccionTxt))}
+        ${fila('Carácter de Registro Público (IFREO)', esc(ifreoTxt))}
+      </div>
+      ${chipsCaract?`<div class="ip-nota">${esc(chipsCaract)}</div>`:''}
+    </div>
+    <div class="ip-sec">
+      <div class="ip-sec-tit">Datos Notariales</div>
+      <div class="ip-grid4">
+        ${fila('Notaría No.', esc(e.notaria||'—'))}
+        ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
+        ${fila('Fecha de Firma', fechaFmt)}
+        ${fila('Cuenta Catastral', esc(e.cuentaCatastral||'—'))}
+      </div>
+      <div class="ip-grid" style="margin-top:4px;">
+        ${fila('Ubicación', esc(e.ubicacion||'—'))}
+        ${fila('Alcance (Total/Parcial)', esc(e.tramite||'—'))}
+      </div>
+    </div>
+    <div class="ip-sec">
+      <div class="ip-sec-tit">Partes</div>
+      <div class="ip-personas">
+        <div><div class="ip-lbl">Compradores / Donatarios</div>${renderPersonasImp(e.compradores)}</div>
+        <div><div class="ip-lbl">Vendedores / Donantes</div>${renderPersonasImp(e.vendedores)}</div>
+      </div>
+    </div>
+    ${obsTexto?`<div class="ip-sec"><div class="ip-sec-tit">Observaciones</div><div class="ip-obs">${obsTexto}</div></div>`:''}
+    <div class="ip-sec">
+      <div class="ip-sec-tit">Progreso del Trámite</div>
+      <div class="ip-pasos">${pasosTxt}</div>
+      <div class="ip-nota" style="font-style:italic;">${llamado}</div>
+    </div>
+    <div class="ip-foot">LEX-MÉXICO · Sistema Integral — Documento interno</div>
+  </div>`;
+  const win = window.open('','_blank','width=900,height=1000');
+  if(!win){ if(typeof toast==='function') toast('El navegador bloqueó la ventana de impresión — permite ventanas emergentes e intenta de nuevo','err'); return; }
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+'</title>'
+    +'<style>'
+    +'@page{size:letter;margin:16mm;}'
+    +'*{box-sizing:border-box;}'
+    +'body{font-family:Georgia,"Times New Roman",serif;color:#1a1008;background:#fff;margin:0;padding:0;font-size:11.5px;}'
+    +'.ip-hoja{max-width:760px;margin:0 auto;}'
+    +'.ip-hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1a1008;padding-bottom:8px;margin-bottom:18px;}'
+    +'.ip-hdr h1{font-size:19px;margin:0;font-weight:700;}'
+    +'.ip-folio{font-size:11px;color:#333;}'
+    +'.ip-fecha{font-size:10px;color:#666;}'
+    +'.ip-sec{margin-bottom:16px;}'
+    +'.ip-sec-tit{font-family:Arial,sans-serif;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;font-weight:700;border-bottom:1px solid #999;padding-bottom:4px;margin-bottom:8px;color:#333;}'
+    +'.ip-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;}'
+    +'.ip-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 16px;}'
+    +'.ip-campo{margin-bottom:3px;}'
+    +'.ip-lbl{font-family:Arial,sans-serif;font-size:8.5px;letter-spacing:0.05em;text-transform:uppercase;color:#777;margin-bottom:5px;}'
+    +'.ip-val{font-size:12px;font-weight:600;}'
+    +'.ip-personas{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;}'
+    +'.ip-persona{font-size:12px;margin-bottom:2px;}'
+    +'.ip-sub{font-size:10px;color:#555;margin:1px 0 4px 10px;}'
+    +'.ip-obs{font-size:11.5px;line-height:1.5;text-align:justify;}'
+    +'.ip-pasos{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:10.5px;margin-bottom:5px;}'
+    +'.ip-nota{font-size:10.5px;color:#444;margin-top:4px;}'
+    +'.ip-foot{margin-top:28px;border-top:1px solid #999;padding-top:8px;font-size:9px;color:#777;text-align:center;}'
+    +'</style>'
+    +'</head><body>'
+    + cuerpo
+    +'<scr'+'ipt>window.onload=function(){window.print();window.addEventListener(\'afterprint\',function(){window.close();});};<'+'/script></body></html>');
+  win.document.close();
+}
+// Observaciones unificadas: una sola nota por escritura (ya no una lista de
+// 2, 3 o más). Se sigue guardando internamente como arreglo de 1 elemento
+// (o vacío) por compatibilidad con el resto del código (Excel, escGuardar).
+function escRenderBitacora(lista, editable){
+  const texto = (lista && lista[0] && lista[0].texto) || '';
+  if(!editable){
+    if(!texto) return '<div style="font-size:0.75rem;color:var(--muted);font-style:italic;">Sin observaciones todavía.</div>';
+    return `<div style="font-size:0.78rem;color:var(--ink);line-height:1.5;text-align:justify;">${esc(texto)}</div>`;
+  }
+  return `<div contenteditable="true" oninput="this.dataset.dirty='1'" onblur="if(this.dataset.dirty){escEditarObservacion(0,this.innerText);this.dataset.dirty='';}" style="box-sizing:border-box;border:1px solid #d4b870;border-radius:8px;padding:8px 10px;font-size:0.78rem;font-family:sans-serif;background:#fff;color:var(--ink);text-align:justify;line-height:1.4;outline:none;min-height:40px;">${esc(texto)}</div>`;
+}
+function escEditarObservacion(idx, valor){
+  if(_escIdx<0 || !D.escrituras[_escIdx]) return;
+  const e = D.escrituras[_escIdx];
+  const texto = (valor||'').trim();
+  if(texto){
+    if(!Array.isArray(e.bitacora)) e.bitacora = [];
+    e.bitacora[0] = { texto, fecha: (e.bitacora[0]&&e.bitacora[0].fecha) || (typeof _fechaHoyCorta==='function'?_fechaHoyCorta():new Date().toLocaleDateString('es-MX')) };
+  } else {
+    e.bitacora = [];
+  }
+  e.fechaMod = new Date().toISOString();
+  escSyncYRefrescar();
+  const _bitView = document.getElementById('esc-bitacora-lista'); if(_bitView) _bitView.innerHTML = escRenderBitacora(e.bitacora);
+  const _bitEdit = document.getElementById('esc-bitacora-lista-edit'); if(_bitEdit) _bitEdit.innerHTML = escRenderBitacora(e.bitacora, true);
+  toast('📝 Observación actualizada');
+}
+// "Llamado a la Acción": muestra ÚNICAMENTE la etapa en la que va el trámite
+// ahora mismo (no las 5). En cuanto una etapa se supera (se completa), sus
+// notas se descartan — esta sección siempre refleja solo el presente, nunca
+// el histórico de etapas ya superadas.
+function escRenderNotasEtapa(e){
+  // La vista de solo-lectura (ficha) nunca debe mostrar controles editables
+  // (textarea/botones) — eso queda exclusivamente en el formulario de edición.
+  const destinos = [{id:'esc-notas-etapa', suf:'', editable:false}, {id:'esc-notas-etapa-edit', suf:'edit', editable:true}];
+  destinos.forEach(({id,suf,editable})=>{
+    const cont = document.getElementById(id);
+    if(!cont) return;
+    const pasos = Array(5).fill(null).map((_,i)=>(e.pasos||[])[i]||{estado:'pendiente',notas:'',fecha:''});
+    const completados = pasos.filter(p=>p.estado==='completado').length;
+    const pasoActivo = completados<5 ? completados : -1;
+    if(pasoActivo===-1){
+      const notaFinal = e.notaFinal||'';
+      const boton = editable ? `<button type="button" onclick="escAgregarNotaFinal('${suf}')" style="margin-top:8px;background:linear-gradient(135deg,#1a7a3a,#155c2c);border:none;color:#fff;border-radius:6px;padding:5px 12px;font-size:0.68rem;font-weight:700;cursor:pointer;">${notaFinal?'✏️ Editar nota':'＋ Agregar nota'}</button>` : '';
+      cont.innerHTML = `<div style="background:#fff;border-left:4px solid #1a7a3a;border-radius:0 10px 10px 0;box-shadow:0 1px 4px rgba(0,0,0,0.06);padding:10px 12px;">
+        <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#1a7a3a;">✓ Trámite completado en todas las etapas</div>
+        ${notaFinal?`<div style="font-size:0.75rem;color:#5c5648;margin-top:6px;">${esc(notaFinal)}</div>`:''}
+        ${boton}
+      </div>`;
+      return;
     }
-    return `<div style="background:${bg};border-left:4px solid ${col};border-radius:0 10px 10px 0;${shadow}padding:10px 12px;margin-bottom:8px;">
-      <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:${colTxt};">${i+1}. ${ESC_PASOS[i]} · ${estadoTxt}</div>
+    const i = pasoActivo;
+    const p = pasos[i];
+    const cuerpo = editable
+      ? `<textarea id="esc-nota-etapa-${suf?suf+'-':''}${i}" rows="2" placeholder="Escribe el estatus de esta etapa..." style="width:100%;box-sizing:border-box;border:1.5px solid #c8952a;border-radius:6px;background:#fff;padding:6px 9px;font-size:0.75rem;font-family:sans-serif;resize:vertical;margin-top:6px;">${esc(p.notas||'')}</textarea>
+        <button type="button" onclick="escGuardarNotaEtapaInline(${i},'${suf}')" style="margin-top:6px;background:linear-gradient(135deg,#c8952a,#8c6518);border:none;color:#fff;border-radius:6px;padding:5px 12px;font-size:0.68rem;font-weight:700;cursor:pointer;">💾 Guardar nota</button>`
+      : (p.notas ? `<div style="font-size:0.75rem;color:#5c5648;margin-top:6px;">${esc(p.notas)}</div>` : '');
+    cont.innerHTML = `<div style="background:#fff8e8;border-left:4px solid #c8952a;border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(200,149,42,0.15);padding:10px 12px;">
+      <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;">${i+1}. ${ESC_PASOS[i]} · 🟡 En proceso</div>
       ${cuerpo}
     </div>`;
-  }).join('');
+  });
 }
-function escGuardarNotaEtapaInline(idx){
+// Nota libre una vez que el trámite ya está completado en las 5 etapas (ya
+// no hay "etapa activa" a la cual atar una nota de estatus).
+async function escAgregarNotaFinal(suf){
+  if(_escIdx<0 || !D.escrituras[_escIdx]){ toast('Abre la escritura primero','err'); return; }
+  const e = D.escrituras[_escIdx];
+  const valor = await pedirTexto({
+    titulo: 'Nota del trámite',
+    mensaje: 'El trámite ya está completado en todas las etapas.',
+    valorInicial: e.notaFinal||'',
+    placeholder: 'Escribe una nota...',
+    btnSi: 'Guardar',
+    multilinea: true
+  });
+  if(valor===null) return;
+  e.notaFinal = valor.trim();
+  e.fechaMod = new Date().toISOString();
+  escSyncYRefrescar();
+  escRenderNotasEtapa(e);
+  toast('📝 Nota guardada');
+}
+function escGuardarNotaEtapaInline(idx, suf){
   if(_escIdx<0 || !D.escrituras[_escIdx]) return;
   const e = D.escrituras[_escIdx];
   if(!e.pasos) e.pasos = Array(5).fill(null).map(()=>({estado:'pendiente',notas:'',fecha:''}));
-  const ta = document.getElementById('esc-nota-etapa-'+idx);
+  const taId = 'esc-nota-etapa-'+(suf?suf+'-':'')+idx;
+  const ta = document.getElementById(taId);
   const notas = (ta?.value||'').trim();
   const fecha = new Date().toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   e.pasos[idx] = { estado:(e.pasos[idx]&&e.pasos[idx].estado)||'pendiente', notas, fecha };
@@ -4413,20 +4855,6 @@ function escGuardarNotaEtapaInline(idx){
   escRenderNotasEtapa(e);
   toast('📝 Nota de etapa guardada');
 }
-function escAgregarNota(){
-  if(_escIdx<0 || !D.escrituras[_escIdx]){ toast('Abre la escritura primero','err'); return; }
-  const ta = document.getElementById('esc-nota-nueva');
-  const texto = (ta?.value||'').trim();
-  if(!texto){ toast('Escribe algo para agregar a la bitácora','err'); return; }
-  const e = D.escrituras[_escIdx];
-  if(!Array.isArray(e.bitacora)) e.bitacora=[];
-  e.bitacora.push({texto, fecha:(typeof _fechaHoyCorta==='function'?_fechaHoyCorta():new Date().toLocaleDateString('es-MX'))});
-  if(ta) ta.value='';
-  escSyncYRefrescar();
-  const cont = document.getElementById('esc-bitacora-lista');
-  if(cont) cont.innerHTML = escRenderBitacora(e.bitacora);
-  toast('📝 Nota agregada a la bitácora');
-}
 function escActualizarTimelineDetalle(pasos){
   const arr = Array(5).fill(null).map((_,i)=>pasos[i]||{estado:'pendiente',notas:'',fecha:''});
   const completados = arr.filter(p=>p.estado==='completado').length;
@@ -4434,23 +4862,25 @@ function escActualizarTimelineDetalle(pasos){
   for(let i=0;i<5;i++){
     const circ = document.getElementById('esc-d-circ-'+i);
     if(!circ) continue;
-    const esComp  = arr[i].estado==='completado';
-    const esActiv = i===pasoActivo;
-    if(esComp){
-      circ.textContent='✓'; circ.style.cssText+='background:#d0cdc8;border-color:#b0ada8;color:#fff;cursor:default;box-shadow:none;transform:scale(1);';
-    } else if(esActiv){
-      circ.textContent=i+1; circ.style.cssText+='background:#1a7a3a;border-color:#1a7a3a;color:#fff;cursor:pointer;box-shadow:0 0 0 4px rgba(26,122,58,0.2);transform:scale(1.08);';
+    const p = arr[i];
+    const esClickeable = i===pasoActivo;
+    if(p.estado==='completado'){
+      circ.textContent='✓'; circ.style.cssText+='background:#1a7a3a;border-color:#1a7a3a;color:#fff;cursor:default;box-shadow:none;transform:scale(1);';
+    } else if(p.estado==='activo'){
+      circ.textContent=i+1; circ.style.cssText+='background:#2563eb;border-color:#2563eb;color:#fff;cursor:'+(esClickeable?'pointer':'default')+';box-shadow:0 0 0 4px rgba(37,99,235,0.2);transform:scale(1.08);';
+    } else if(esClickeable){
+      circ.textContent=i+1; circ.style.cssText+='background:#fff8e8;border-color:#c8952a;color:#8c6518;cursor:pointer;box-shadow:0 0 0 4px rgba(200,149,42,0.15);transform:scale(1.05);';
     } else {
       circ.textContent=i+1; circ.style.cssText+='background:#f5f0e8;border-color:#d0c8b8;color:#ccc;cursor:default;box-shadow:none;transform:scale(1);';
     }
   }
-  const barra = document.getElementById('esc-progreso-barra-d');
-  if(barra) barra.style.width=Math.round(completados/5*100)+'%';
+  const track = document.getElementById('esc-progreso-track-d');
+  if(track) track.style.background = _escBarraGradiente(pasoActivo, pasoActivo>=0 ? arr[pasoActivo].estado : '');
   const hint = document.getElementById('esc-detalle-hint');
   if(hint){
     hint.textContent = pasoActivo===-1
       ? '✅ Escritura completada en todos los pasos'
-      : 'Paso activo: '+ESC_PASOS[pasoActivo]+' — toca el círculo verde para registrar el estatus';
+      : 'Paso activo: '+ESC_PASOS[pasoActivo]+' — toca el círculo resaltado para registrar el estatus';
     hint.style.color = pasoActivo===-1?'#1a7a3a':'var(--muted)';
   }
 }
@@ -4459,6 +4889,19 @@ function escMostrarFormulario(){
   document.getElementById('esc-ftr-form').style.display='flex';
   document.getElementById('esc-vista-detalle').style.display='none';
   document.getElementById('esc-ftr-detalle').style.display='none';
+  const _bh = document.getElementById('eFolioBadgeHdr'); if(_bh) _bh.style.display='none';
+  const _fh = document.getElementById('eFoliosHdr'); if(_fh) _fh.style.display='none';
+}
+// Desde el badge "FOLIO" del encabezado de la ficha: cierra la Escritura y
+// abre la ficha del recibo vinculado, reutilizando el mismo camino que ya usa
+// "abrirFolioDesdeCliente" (ir a Nuevo Recibo en modo consulta).
+function escVerFolioVinculado(){
+  const e = (_escIdx>=0 && D.escrituras[_escIdx]) ? D.escrituras[_escIdx] : null;
+  if(!e || !e.folioRecibo){ if(typeof toast==='function') toast('Sin folio vinculado','err'); return; }
+  if(typeof cerrar==='function') cerrar('mEscritura');
+  if(typeof ir==='function') ir('nuevo-recibo');
+  document.body.classList.add('modo-consulta');
+  if(typeof abrirFolioPBC==='function') abrirFolioPBC(e.folioRecibo, false);
 }
 function escModoEditar(){
   escMostrarFormulario();
@@ -4475,7 +4918,7 @@ function escRender(){
     if(_escFiltro!=='todos' && e.estado!==_escFiltro) return false;
     if(q){
       const _gn=p=>typeof p==='string'?p:(p?.nombre||'');
-      const txt=[e.num||'',(e.compradores||[]).map(_gn).join(' '),(e.vendedores||[]).map(_gn).join(' '),e.tipo||'',e.notaria||'',e.descripcion||''].join(' ').toLowerCase();
+      const txt=[e.num||'',(e.compradores||[]).map(_gn).join(' '),(e.vendedores||[]).map(_gn).join(' '),e.tipo||'',ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento]||'',e.notaria||'',e.descripcion||''].join(' ').toLowerCase();
       return txt.includes(q);
     }
     return true;
@@ -4486,7 +4929,6 @@ function escRender(){
     return;
   }
   const estadoConfig={
-    urgente:  {col:'#c0161a',bg:'rgba(192,22,26,0.08)',dot:'#c0161a',lbl:'🔴 Urgente'},
     proceso:  {col:'#9a6010',bg:'rgba(200,149,42,0.08)',dot:'#c8952a',lbl:'🟡 En Proceso'},
     listo:    {col:'#1a7a3a',bg:'rgba(26,122,58,0.08)',dot:'#1a7a3a',lbl:'🟢 Listo p/Entregar'},
     espera:   {col:'#7a6840',bg:'rgba(0,0,0,0.04)',dot:'#aaa',lbl:'⬜ En Espera'},
@@ -4511,16 +4953,22 @@ function escRender(){
     const miniTimeline = pasos.map((p,i)=>{
       const esComp  = p&&p.estado==='completado';
       const esActiv = i===pasoActivo;
-      const col = esComp?'#b0ada8':esActiv?'#1a7a3a':'#d0c8b8';
-      const bg  = esComp?'#d0cdc8':esActiv?'#1a7a3a':'#fff';
+      // Mismos colores que el resto del sistema: verde = completado,
+      // azul = en proceso (activo), gris = pendiente.
+      const col = esComp?'#1a7a3a':esActiv?'#2563eb':'#d0c8b8';
+      const bg  = esComp?'#1a7a3a':esActiv?'#2563eb':'#f5f0e8';
       const txt = esComp?'✓':(i+1);
       const fc  = esComp||esActiv?'#fff':'#bbb';
-      return `<div style="width:26px;height:26px;border-radius:50%;border:2.5px solid ${col};background:${bg};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;color:${fc};flex-shrink:0;" title="${ESC_PASOS[i]}">${txt}</div>`;
-    }).join('<div style="flex:1;height:2px;background:#e0ddd5;margin-top:12px;"></div>');
+      const lbl = esc(ESC_PASOS[i]).split(' ').join('<br>');
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">
+        <div style="width:26px;height:26px;border-radius:50%;border:2.5px solid ${col};background:${bg};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;color:${fc};flex-shrink:0;" title="${esc(ESC_PASOS[i])}">${txt}</div>
+        <div style="font-family:monospace;font-size:0.48rem;font-weight:700;text-align:center;color:var(--muted);line-height:1.25;white-space:nowrap;">${lbl}</div>
+      </div>`;
+    }).join('<div style="flex:1;height:2px;background:#e0ddd5;margin-top:13px;"></div>');
     return `<div onclick="escAbrirDetalle(${idx})" style="background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;">
         <div style="min-width:0;">
-          <div style="font-family:monospace;font-size:0.65rem;color:var(--muted);margin-bottom:2px;">${esc(e.num||'—')} · ${esc(e.tipo||'Escritura')} · Not. ${esc(e.notaria||'—')}</div>
+          <div style="font-family:monospace;font-size:0.65rem;color:var(--muted);margin-bottom:2px;">${esc(e.num||'—')} · ${esc(e.tipo || ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento] || 'Escritura')} · Not. ${esc(e.notaria||'—')}</div>
           <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">${esc(comp)}</div>
           ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ ${esc(vend)}</div>`:''}
         </div>
@@ -4529,7 +4977,7 @@ function escRender(){
           <span style="font-family:monospace;font-size:0.62rem;color:var(--muted);">${pct}% completado</span>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:4px;">${miniTimeline}</div>
+      <div style="display:flex;align-items:flex-start;gap:4px;">${miniTimeline}</div>
       ${e.descripcion?`<div style="font-size:0.72rem;color:var(--muted);margin-top:8px;line-height:1.4;">${esc(e.descripcion.substring(0,120))}${e.descripcion.length>120?'…':''}</div>`:''}
       ${(()=>{
         const chips=[];
@@ -4575,18 +5023,37 @@ function escAbrirDetalle(idx){
     _escLimpiarForm();
     document.getElementById('eNum').value         = e.num||'';
     document.getElementById('eNotaria').value     = e.notaria||'';
-    document.getElementById('eInstrumento').value = e.instrumento||'';
-    document.getElementById('eVolumen').value     = e.volumen||'';
-    document.getElementById('eFechaFirma').value  = e.fechaFirma||'';
-    document.getElementById('eTipo').value        = e.tipo||'';
-    document.getElementById('eDescripcion').value = e.descripcion||'';
-    const _eFFT = document.getElementById('eFechaFirmaTexto'); if(_eFFT) _eFFT.value = e.fechaFirmaTexto||'';
-    const _ePre = document.getElementById('ePredio');    if(_ePre) _ePre.value = e.predio||'';
+    const _vi = _escSplitVolInstr(e.volInstr);
+    document.getElementById('eInstrumento').value = e.instrumento || _vi.instrumento;
+    document.getElementById('eVolumen').value     = e.volumen     || _vi.volumen;
+    document.getElementById('eFechaFirma').value  = _escFormatFechaFirma(e);
+    const _eMov = document.getElementById('eTipoMovimiento'); if(_eMov) _eMov.value = e.tipoMovimiento||'';
+    escActualizarTipoTramiteCatastro(e.tipoTramiteCatastro||'');
+    const _eDesc = document.getElementById('eDescripcion'); if(_eDesc) _eDesc.value = e.descripcion||'';
+    // Si el valor guardado no coincide con ninguna opción del desplegable
+    // (p.ej. texto libre heredado de antes de que Predio fuera un select),
+    // se deja en "— Selecciona —" en vez de mostrarse en blanco. El dato
+    // original se conserva de todos modos (escGuardar lo preserva si no
+    // se elige una opción nueva).
+    const _ePre = document.getElementById('ePredio');
+    if(_ePre) _ePre.value = (e.predio==='URBANO'||e.predio==='RUSTICO') ? e.predio : '';
+    const _eUso = document.getElementById('eUsoSuelo');  if(_eUso) _eUso.value = e.usoSuelo||'';
     const _eUbi = document.getElementById('eUbicacion'); if(_eUbi) _eUbi.value = e.ubicacion||'';
     const _eVoI = document.getElementById('eVolInstr');  if(_eVoI) _eVoI.value = e.volInstr||'';
     const _eFol = document.getElementById('eFolios');    if(_eFol) _eFol.value = e.folios||'';
     const _eTra = document.getElementById('eTramite');   if(_eTra) _eTra.value = e.tramite||'';
+    _escRefrescarTramiteBoxes();
+    const _eIfr = document.getElementById('eCaracterIfreo'); if(_eIfr) _eIfr.value = e.caracterIfreo||'';
+    _escRefrescarCaracterIfreoBoxes();
+    const _eCC1 = document.getElementById('eConCasa');       if(_eCC1) _eCC1.value = e.conCasa ? '1' : '';
+    const _eCC0 = document.getElementById('eSinCasa');       if(_eCC0) _eCC0.value = e.sinCasa ? '1' : '';
+    const _eCC2 = document.getElementById('eRectifMedidas'); if(_eCC2) _eCC2.value = e.rectifMedidas ? '1' : '';
+    const _eCC3 = document.getElementById('eRectifDatos');   if(_eCC3) _eCC3.value = e.rectifDatos ? '1' : '';
+    _escRefrescarCaracteristicasBoxes();
     const _eCC  = document.getElementById('eCuentaCatastral'); if(_eCC) _eCC.value = e.cuentaCatastral||'';
+    const _eFV  = document.getElementById('eFolioVinculo'); if(_eFV) _eFV.value = e.folioRecibo||'';
+    escActualizarBotonVincular();
+    const _bitEdit = document.getElementById('esc-bitacora-lista-edit'); if(_bitEdit) _bitEdit.innerHTML = escRenderBitacora(e.bitacora||[], true);
     (e.compradores||[]).forEach(p=>escAgregarPersona('comprador', typeof p==='string'?{nombre:p}:p));
     (e.vendedores||[]).forEach(p=>escAgregarPersona('vendedor',   typeof p==='string'?{nombre:p}:p));
     escSetEstado(e.estado||'proceso');
@@ -4603,16 +5070,200 @@ function escAbrirDetalle(idx){
   }
 }
 function _escLimpiarForm(){
-  ['eNum','eNotaria','eInstrumento','eVolumen','eFechaFirma','eDescripcion','ePredio','eUbicacion','eVolInstr','eFolios','eFechaFirmaTexto','eCuentaCatastral'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  document.getElementById('eTipo').value='';
+  ['eNum','eNotaria','eInstrumento','eVolumen','eFechaFirma','eDescripcion','ePredio','eUsoSuelo','eUbicacion','eVolInstr','eFolios','eFechaFirmaTexto','eCuentaCatastral','eFolioVinculo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const _eMovL = document.getElementById('eTipoMovimiento'); if(_eMovL) _eMovL.value='';
+  escActualizarTipoTramiteCatastro();
   const eTramite = document.getElementById('eTramite'); if(eTramite) eTramite.value='';
+  _escRefrescarTramiteBoxes();
+  const eIfreo = document.getElementById('eCaracterIfreo'); if(eIfreo) eIfreo.value='';
+  _escRefrescarCaracterIfreoBoxes();
+  ['eConCasa','eSinCasa','eRectifMedidas','eRectifDatos'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  _escRefrescarCaracteristicasBoxes();
   document.getElementById('eCompradores-list').innerHTML='';
   document.getElementById('eVendedores-list').innerHTML='';
   escActualizarTimeline([]);
+  escActualizarBotonVincular();
+  const _bitEdit = document.getElementById('esc-bitacora-lista-edit'); if(_bitEdit) _bitEdit.innerHTML = escRenderBitacora([], true);
+  const _notasEdit = document.getElementById('esc-notas-etapa-edit'); if(_notasEdit) _notasEdit.innerHTML='';
+}
+function escActualizarBotonVincular(){
+  const inp = document.getElementById('eFolioVinculo');
+  const btn = document.getElementById('eFolioVincularBtn');
+  if(!btn) return;
+  const folio = inp && inp.value ? parseInt(inp.value,10) : 0;
+  if(folio){
+    const rec = (typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))?.find(r=>r.folio===folio);
+    const fStr = typeof folioFormato==='function' ? folioFormato(folio, rec?.anio_folio) : folio;
+    btn.textContent = '🔗 Folio #'+fStr+' vinculado';
+  } else {
+    btn.textContent = 'FOLIO / 🔗 vincular';
+  }
+}
+// Solo recibos originales de serie A (no complementos B/C…) — son los que
+// representan el pago real por el que se contrató el trámite.
+function _escRecibosSerieA(q){
+  const todos = (typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[])) || [];
+  const serieA = todos.filter(r => (r.letra||'A').toUpperCase()==='A' && !r.esComplemento);
+  if(!q) return serieA;
+  const ql = q.toLowerCase();
+  return serieA.filter(r => (r.nombre||'').toLowerCase().includes(ql) || String(r.folio).includes(q));
+}
+function escAbrirVincularFolio(){
+  escRenderFoliosVinculacion('');
+  const q = document.getElementById('escFolioQ'); if(q) q.value='';
+  $('mEscVincularFolio').classList.add('show');
+}
+function escFiltrarFoliosVinculacion(){
+  escRenderFoliosVinculacion(document.getElementById('escFolioQ')?.value||'');
+}
+function escRenderFoliosVinculacion(q){
+  const filtrados = _escRecibosSerieA(q);
+  const el = document.getElementById('esc-folio-list');
+  if(!el) return;
+  if(!filtrados.length){ el.innerHTML='<div style="padding:16px;color:var(--muted);font-size:0.76rem;text-align:center;">Sin recibos de serie A encontrados.</div>'; return; }
+  el.innerHTML = filtrados.slice(0,30).map(r=>{
+    const saldo = r.saldoPendiente!=null ? r.saldoPendiente : Math.max(0,(r.total||0)-(r.anticipo||0));
+    return `<div class="drive-folder-item" onclick="escVincularFolioSeleccionar(${r.folio})">
+      <span style="font-family:monospace;font-size:0.75rem;font-weight:700;color:var(--gold-d);">#${folioFormato(r.folio, r.anio_folio)}</span>
+      <div style="flex:1;">
+        <div style="font-size:0.82rem;font-weight:600;">${esc(r.nombre||'—')}</div>
+        <div style="font-family:monospace;font-size:0.6rem;color:var(--muted);">${r.fecha||''}${r.total?' · $'+fmt(r.total):''} ${saldo>0?'· <span style="color:var(--amarillo);">$'+fmt(saldo)+' pendiente</span>':'· <span style="color:var(--verde);">Liquidado</span>'}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function escVincularFolioSeleccionar(folio){
+  const inp = document.getElementById('eFolioVinculo');
+  if(inp) inp.value = folio ? String(folio) : '';
+  escActualizarBotonVincular();
+  cerrar('mEscVincularFolio');
+  toast(folio ? 'Folio vinculado ✓' : 'Vínculo eliminado', 'ok');
+}
+// Un solo campo de Fecha de Firma: acepta dd/mm/aaaa (o aaaa-mm-dd) para
+// una fecha completa, o cualquier texto libre (p. ej. solo el año "2019")
+// cuando no se conocen día y mes. Sustituye a los dos campos anteriores.
+function _escParseFechaFirma(raw){
+  const t = (raw||'').trim();
+  if(!t) return {fechaFirma:'', fechaFirmaTexto:''};
+  const dmy = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if(dmy){
+    const d=dmy[1].padStart(2,'0'), mo=dmy[2].padStart(2,'0'), y=dmy[3];
+    return {fechaFirma:`${y}-${mo}-${d}`, fechaFirmaTexto:''};
+  }
+  const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(iso) return {fechaFirma:t, fechaFirmaTexto:''};
+  return {fechaFirma:'', fechaFirmaTexto:t};
+}
+function _escFormatFechaFirma(e){
+  if(e.fechaFirma){
+    const m = String(e.fechaFirma).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(m) return `${m[3]}/${m[2]}/${m[1]}`;
+    return e.fechaFirma;
+  }
+  return e.fechaFirmaTexto||'';
+}
+// Divide el texto "Vol./Instr." tal como viene del Excel (formato "Vol/Instr",
+// p. ej. "124/9,020") para poder mostrarlo en los campos separados de Vol.
+// e Instr. cuando la escritura los trae vacíos (registros importados viejos).
+function _escSplitVolInstr(raw){
+  const t = String(raw||'').trim();
+  if(!t) return {volumen:'', instrumento:''};
+  const sep = t.indexOf('/');
+  if(sep<0) return {volumen:t, instrumento:''};
+  return {volumen:t.slice(0,sep).trim(), instrumento:t.slice(sep+1).trim()};
+}
+// Construye el degradado de la línea que conecta las 5 bolitas: los tramos
+// entre pasos ya completados se pintan verdes de punta a punta, el tramo que
+// sale del paso "en proceso" avanza solo un tercio en azul (para dar la
+// sensación de que ya arrancó pero le falta camino), y el resto queda gris.
+function _escBarraGradiente(pasoActivo, estadoActivo){
+  const totalSeg = ESC_PASOS.length - 1; // 4 tramos entre 5 bolitas
+  const segPct = 100/totalSeg;
+  const stops = [];
+  let pos = 0;
+  for(let s=0;s<totalSeg;s++){
+    const ini = pos, fin = pos+segPct;
+    if(pasoActivo===-1 || s < pasoActivo){
+      stops.push(`#1a7a3a ${ini}%`, `#1a7a3a ${fin}%`);
+    } else if(s===pasoActivo && estadoActivo==='activo'){
+      const parcial = ini + segPct*(1/3);
+      stops.push(`#2563eb ${ini}%`, `#2563eb ${parcial}%`, `#e0ddd5 ${parcial}%`, `#e0ddd5 ${fin}%`);
+    } else {
+      stops.push(`#e0ddd5 ${ini}%`, `#e0ddd5 ${fin}%`);
+    }
+    pos = fin;
+  }
+  return `linear-gradient(to right, ${stops.join(', ')})`;
+}
+// Casillas cuadradas TOTAL/PARCIAL (se marcan con una X) en vez del
+// desplegable anterior; el valor real sigue viviendo en el input oculto
+// #eTramite para no tocar el resto de la lógica (escGuardar, importación, etc.)
+function _escRefrescarTramiteBoxes(){
+  const val = document.getElementById('eTramite')?.value||'';
+  const boxT = document.getElementById('eTramiteBoxTotal');
+  const boxP = document.getElementById('eTramiteBoxParcial');
+  if(boxT) boxT.textContent = val==='Escritura Total' ? '✕' : '';
+  if(boxP) boxP.textContent = val==='Escritura Parcial' ? '✕' : '';
+}
+function escSetTramite(val){
+  const hidden = document.getElementById('eTramite');
+  if(!hidden) return;
+  hidden.value = (hidden.value===val) ? '' : val; // click de nuevo para desmarcar
+  _escRefrescarTramiteBoxes();
+}
+// Carácter de Registro Público (IFREO): PREVENTIVO / PARCIAL — mutuamente
+// excluyentes entre sí (igual patrón que Escritura Total/Parcial).
+function _escRefrescarCaracterIfreoBoxes(){
+  const val = document.getElementById('eCaracterIfreo')?.value||'';
+  const boxD = document.getElementById('eIfreoBoxDefinitivo');
+  const boxP = document.getElementById('eIfreoBoxPreventivo');
+  const boxS = document.getElementById('eIfreoBoxSinRegistro');
+  if(boxD) boxD.textContent = val==='definitivo' ? '✕' : '';
+  if(boxP) boxP.textContent = val==='preventivo' ? '✕' : '';
+  if(boxS) boxS.textContent = val==='sinregistro' ? '✕' : '';
+}
+function escSetCaracterIfreo(val){
+  const hidden = document.getElementById('eCaracterIfreo');
+  if(!hidden) return;
+  hidden.value = (hidden.value===val) ? '' : val; // click de nuevo para desmarcar
+  _escRefrescarCaracterIfreoBoxes();
+}
+// Características del trámite: casillas independientes entre sí (no
+// excluyentes con Total/Parcial) — Con Casa, Rectificación de medidas y
+// colindancias, Rectificación de datos. Con Casa / Sin Casa sí son
+// mutuamente excluyentes entre ellas (un predio no puede tener ambas).
+const _ESC_CARACT_MAP = {
+  conCasa:       {input:'eConCasa',       box:'eCaractBoxConCasa'},
+  sinCasa:       {input:'eSinCasa',       box:'eCaractBoxSinCasa'},
+  rectifMedidas: {input:'eRectifMedidas', box:'eCaractBoxRectifMedidas'},
+  rectifDatos:   {input:'eRectifDatos',   box:'eCaractBoxRectifDatos'}
+};
+const _ESC_CARACT_EXCLUSIVAS = { conCasa:'sinCasa', sinCasa:'conCasa' };
+function _escRefrescarCaracteristicasBoxes(){
+  Object.values(_ESC_CARACT_MAP).forEach(({input,box})=>{
+    const inp = document.getElementById(input);
+    const b = document.getElementById(box);
+    if(b) b.textContent = (inp && inp.value==='1') ? '✕' : '';
+  });
+}
+function escToggleCaracteristica(clave){
+  const cfg = _ESC_CARACT_MAP[clave];
+  if(!cfg) return;
+  const inp = document.getElementById(cfg.input);
+  if(!inp) return;
+  const activar = inp.value!=='1';
+  inp.value = activar ? '1' : '';
+  const opuesta = _ESC_CARACT_EXCLUSIVAS[clave];
+  if(activar && opuesta){
+    const cfgOp = _ESC_CARACT_MAP[opuesta];
+    const inpOp = cfgOp && document.getElementById(cfgOp.input);
+    if(inpOp) inpOp.value='';
+  }
+  _escRefrescarCaracteristicasBoxes();
 }
 function escSetEstado(estado, btn){
   document.getElementById('eEstado').value=estado;
-  const colores={urgente:'#c0161a',proceso:'#c8952a',listo:'#1a7a3a',espera:'#7a6840',archivado:'#8c6518'};
+  const colores={proceso:'#c8952a',listo:'#1a7a3a',espera:'#7a6840',archivado:'#8c6518'};
   document.querySelectorAll('.esc-estado-btn').forEach(b=>{
     const activo=b.dataset.estado===estado;
     const c=colores[b.dataset.estado]||'#7a6840';
@@ -4627,21 +5278,22 @@ function escAgregarPersona(tipo, datos={}){
   const color   = tipo==='comprador' ? '#3b82f6' : '#c8952a';
   const colorBg = tipo==='comprador' ? '#eef3ff' : '#fff8e8';
   const colorTxt= tipo==='comprador' ? '#1a4a8a' : '#8c6518';
-  const opcionesCaracter = tipo==='comprador' ? ['Comprador','Donatario'] : ['Vendedor','Donador'];
+  const opcionesCaracter = escCaracterOpciones(tipo);
   const etiqCond = tipo==='comprador' ? 'Adquirió o recibió por conducto de:' : 'Vendió/donó por conducto de:';
   const plhCond  = tipo==='comprador' ? 'Nombre del representante' : 'Nombre del apoderado legal';
   const hayConducTo    = !!(datos.conducto);
   const esCasado       = datos.civil === 'Casado/a';
   const esSocConyugal  = datos.tipoSociedad === 'Sociedad Conyugal';
+  const esAdicional = cont.children.length > 0; // la primera persona es obligatoria y no se puede quitar
   const div = document.createElement('div');
   div.className = 'esc-persona-row';
-  div.style.cssText = `background:${colorBg};border:1.5px solid ${color}44;border-radius:10px;padding:10px 12px;margin-bottom:8px;box-shadow:0 2px 6px ${color}22;`;
+  div.style.cssText = `position:relative;background:${colorBg};border:1.5px solid ${color}44;border-radius:10px;padding:10px 12px;margin-bottom:8px;box-shadow:0 2px 6px ${color}22;`;
   div.innerHTML = `
     <div style="display:grid;grid-template-columns:0.8fr 1.8fr 0.8fr;gap:8px;margin-bottom:8px;">
       <div>
         <div style="font-family:monospace;font-size:0.5rem;color:${colorTxt};text-align:center;margin-bottom:2px;">CARÁCTER</div>
         <select class="esc-caracter" style="width:100%;box-sizing:border-box;font-size:0.72rem;padding:6px 4px;border:1px solid ${color}66;border-radius:6px;text-align:center;background:#fff;">
-          ${opcionesCaracter.map(o=>`<option ${datos.caracter===o?'selected':''}>${o}</option>`).join('')}
+          ${opcionesCaracter.map(o=>`<option ${(datos.caracter===o||datos.caracter===o.replace('(a)','')) ?'selected':''}>${o}</option>`).join('')}
         </select>
       </div>
       <div>
@@ -4660,7 +5312,7 @@ function escAgregarPersona(tipo, datos={}){
       <div style="flex:1;">
         <div style="font-family:monospace;font-size:0.5rem;color:${colorTxt};margin-bottom:2px;">ESTADO CIVIL</div>
         <select class="esc-civil" style="width:100%;box-sizing:border-box;font-size:0.72rem;padding:6px;border:1px solid ${color}66;border-radius:6px;background:#fff;color:var(--ink);" onchange="_escToggleSociedad(this)">
-          <option value="">Estado Civil</option>
+          <option value="">-SELECCIONAR-</option>
           <option ${datos.civil==='Soltero/a'   ?'selected':''}>Soltero/a</option>
           <option ${datos.civil==='Casado/a'     ?'selected':''}>Casado/a</option>
           <option ${datos.civil==='Divorciado/a' ?'selected':''}>Divorciado/a</option>
@@ -4686,23 +5338,28 @@ function escAgregarPersona(tipo, datos={}){
         <input type="text" class="esc-consent-nombre" value="${escHTML(datos.nombreConyuge||'')}" placeholder="Nombre del(la) cónyuge" style="width:100%;box-sizing:border-box;font-family:sans-serif;font-size:0.72rem;padding:5px 8px;border:1px solid #b8cff0;border-radius:6px;">
       </div>
     </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,0.5);border:1px dashed ${color};border-radius:8px;padding:6px 10px;margin-bottom:6px;">
+    <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,0.5);border:1px dashed ${color};border-radius:8px;padding:6px 10px;margin-bottom:6px;">
       <label style="font-size:0.58rem;color:${colorTxt};font-family:monospace;letter-spacing:0.02em;display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;flex:1;">
         <input type="checkbox" class="esc-conducto-chk" style="accent-color:${color};"
           ${hayConducTo?'checked':''}
           onchange="this.closest('.esc-persona-row').querySelector('.esc-conducto-row').style.display=this.checked?'flex':'none';">
         ${etiqCond}
       </label>
-      <button type="button" onclick="this.closest('.esc-persona-row').remove()"
-        style="background:none;border:1px solid rgba(192,22,26,0.3);color:#c0161a;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:0.65rem;font-family:sans-serif;flex-shrink:0;">
-        ✕ Quitar
-      </button>
     </div>
     <div class="esc-conducto-row" style="display:${hayConducTo?'flex':'none'};gap:5px;align-items:center;">
       <input type="text" class="esc-conducto-nom" value="${escHTML(datos.conducto||'')}"
         placeholder="${plhCond}"
         style="flex:1;min-width:0;font-family:sans-serif;font-size:0.75rem;padding:5px 8px;border:1px solid ${color}66;border-radius:6px;">
     </div>`;
+  if(esAdicional){
+    const xBtn = document.createElement('button');
+    xBtn.type = 'button';
+    xBtn.setAttribute('aria-label','Quitar');
+    xBtn.textContent = '✕';
+    xBtn.style.cssText = `position:absolute;top:6px;right:8px;background:none;border:none;color:${color};font-size:0.85rem;font-weight:700;cursor:pointer;line-height:1;padding:2px 4px;`;
+    xBtn.onclick = () => div.remove();
+    div.appendChild(xBtn);
+  }
   cont.appendChild(div);
 }
 function _escToggleSociedad(sel){
@@ -4768,20 +5425,47 @@ function escGuardar(){
       notaria:     (document.getElementById('eNotaria')?.value||'').trim(),
       instrumento: (document.getElementById('eInstrumento')?.value||'').trim(),
       volumen:     (document.getElementById('eVolumen')?.value||'').trim(),
-      fechaFirma:  document.getElementById('eFechaFirma')?.value||'',
-      fechaFirmaTexto: (document.getElementById('eFechaFirmaTexto')?.value||'').trim(),
-      tipo:        document.getElementById('eTipo')?.value||'',
-      predio:      (document.getElementById('ePredio')?.value||'').trim(),
+      ...(() => { const _ff=_escParseFechaFirma(document.getElementById('eFechaFirma')?.value); return {fechaFirma:_ff.fechaFirma, fechaFirmaTexto:_ff.fechaFirmaTexto}; })(),
+      // El Acto Jurídico (Tipo de Escritura) ya no se captura por separado:
+      // esa casilla fue sustituida por Tipos de Movimientos / Tipo de Trámite
+      // (Catastro). Se conserva el valor legado si la escritura ya lo tenía.
+      tipo:        (_escIdx>=0 ? (D.escrituras[_escIdx]?.tipo||'') : ''),
+      tipoMovimiento:      document.getElementById('eTipoMovimiento')?.value||'',
+      tipoTramiteCatastro: document.getElementById('eTipoTramiteCatastro')?.value||'',
+      // Ahora es un desplegable (Urbano/Rústico). Si no se elige nada y ya
+      // había un valor de texto libre anterior (p. ej. importado de Excel),
+      // se conserva en vez de borrarlo.
+      predio: (() => { const v=(document.getElementById('ePredio')?.value||'').trim(); return v || (_escIdx>=0 ? (D.escrituras[_escIdx]?.predio||'') : ''); })(),
+      usoSuelo: (() => { const v=(document.getElementById('eUsoSuelo')?.value||'').trim(); return v || (_escIdx>=0 ? (D.escrituras[_escIdx]?.usoSuelo||'') : ''); })(),
       ubicacion:   (document.getElementById('eUbicacion')?.value||'').trim(),
-      volInstr:    (document.getElementById('eVolInstr')?.value||'').trim(),
+      // Vol./Instr. ya no se captura por separado (duplicaba Instr./Vol. de arriba):
+      // se deriva de esos mismos campos, y si están vacíos se conserva el valor
+      // que ya traía la escritura (p. ej. importado de Excel), sin perder datos.
+      volInstr: (() => {
+        const _instr = (document.getElementById('eInstrumento')?.value||'').trim();
+        const _vol   = (document.getElementById('eVolumen')?.value||'').trim();
+        if(_instr || _vol) return [_vol,_instr].filter(Boolean).join('/');
+        return _escIdx>=0 ? (D.escrituras[_escIdx]?.volInstr||'') : '';
+      })(),
       folios:      (document.getElementById('eFolios')?.value||'').trim(),
+      folioRecibo: (() => { const v=(document.getElementById('eFolioVinculo')?.value||'').trim(); const n=parseInt(v,10); return isNaN(n)?0:n; })(),
       cuentaCatastral: (document.getElementById('eCuentaCatastral')?.value||'').trim(),
       tramite:     document.getElementById('eTramite')?.value||'',
+      caracterIfreo: document.getElementById('eCaracterIfreo')?.value||'',
+      conCasa:       document.getElementById('eConCasa')?.value==='1',
+      sinCasa:       document.getElementById('eSinCasa')?.value==='1',
+      rectifMedidas: document.getElementById('eRectifMedidas')?.value==='1',
+      rectifDatos:   document.getElementById('eRectifDatos')?.value==='1',
       estado:      document.getElementById('eEstado')?.value||'proceso',
       compradores,
       vendedores:  leerPersonas('eVendedores-list'),
-      descripcion: (document.getElementById('eDescripcion')?.value||'').trim(),
+      // El campo visible se quitó del formulario; se conserva lo que ya
+      // tuviera la escritura (si venía de antes) en vez de borrarlo.
+      descripcion: document.getElementById('eDescripcion')
+        ? (document.getElementById('eDescripcion').value||'').trim()
+        : (_escIdx>=0 ? (D.escrituras[_escIdx]?.descripcion||'') : ''),
       bitacora:    _escIdx>=0 ? (D.escrituras[_escIdx].bitacora||[]) : [],
+      notaFinal:   _escIdx>=0 ? (D.escrituras[_escIdx].notaFinal||'') : '',
       origenExcelNo: _escIdx>=0 ? (D.escrituras[_escIdx].origenExcelNo||'') : '',
       pasos,
       fechaMod:    new Date().toISOString()
@@ -4818,29 +5502,39 @@ function escActualizarTimeline(pasos){
     const circ = document.getElementById('esc-circulo-'+i);
     if(!circ) return;
     const p = arr[i];
-    const esCompletado = p.estado==='completado';
-    const esActivo     = i === pasoActivo;
-    const esBloqueado  = !esCompletado && !esActivo;
-    if(esCompletado){
-      // Gris con paloma — bloqueado
+    const esClickeable = i === pasoActivo;
+    // El color de cada bolita refleja su estatus real (Pendiente/En Proceso/
+    // Completado), igual que los botones del paso — antes siempre se pintaba
+    // verde el paso "activo" sin importar qué estatus se le hubiera puesto.
+    if(p.estado==='completado'){
+      // Verde — completado
       circ.textContent='✓';
-      circ.style.background='#d0cdc8';
-      circ.style.borderColor='#b0ada8';
+      circ.style.background='#1a7a3a';
+      circ.style.borderColor='#1a7a3a';
       circ.style.color='#fff';
       circ.style.cursor='default';
       circ.style.boxShadow='none';
       circ.style.transform='scale(1)';
-    } else if(esActivo){
-      // Verde brillante — clickeable
+    } else if(p.estado==='activo'){
+      // Azul — en proceso
       circ.textContent=i+1;
-      circ.style.background='#1a7a3a';
-      circ.style.borderColor='#1a7a3a';
+      circ.style.background='#2563eb';
+      circ.style.borderColor='#2563eb';
       circ.style.color='#fff';
-      circ.style.cursor='pointer';
-      circ.style.boxShadow='0 0 0 4px rgba(26,122,58,0.2)';
+      circ.style.cursor=esClickeable?'pointer':'default';
+      circ.style.boxShadow='0 0 0 4px rgba(37,99,235,0.2)';
       circ.style.transform='scale(1.08)';
+    } else if(esClickeable){
+      // Pendiente, pero es el siguiente paso a trabajar — resaltado en dorado
+      circ.textContent=i+1;
+      circ.style.background='#fff8e8';
+      circ.style.borderColor='#c8952a';
+      circ.style.color='#8c6518';
+      circ.style.cursor='pointer';
+      circ.style.boxShadow='0 0 0 4px rgba(200,149,42,0.15)';
+      circ.style.transform='scale(1.05)';
     } else {
-      // Gris claro — bloqueado
+      // Gris claro — pendiente y bloqueado
       circ.textContent=i+1;
       circ.style.background='#f5f0e8';
       circ.style.borderColor='#d0c8b8';
@@ -4850,9 +5544,9 @@ function escActualizarTimeline(pasos){
       circ.style.transform='scale(1)';
     }
   });
-  // Barra de progreso
-  const barra = document.getElementById('esc-progreso-barra');
-  if(barra) barra.style.width = Math.round(completados/5*100)+'%';
+  // Barra de progreso (tramos verdes/azul parcial según estatus real)
+  const track = document.getElementById('esc-progreso-track');
+  if(track) track.style.background = _escBarraGradiente(pasoActivo, pasoActivo>=0 ? arr[pasoActivo].estado : '');
   // Hint
   const hint = document.getElementById('esc-paso-hint');
   if(hint){
@@ -4860,7 +5554,7 @@ function escActualizarTimeline(pasos){
       hint.textContent='✅ Todos los pasos completados — escritura concluida';
       hint.style.color='#1a7a3a';
     } else if(_escIdx >= 0){
-      hint.textContent='Paso activo: '+ESC_PASOS[pasoActivo]+' — haz clic en el círculo verde para registrar el estatus';
+      hint.textContent='Paso activo: '+ESC_PASOS[pasoActivo]+' — haz clic en el círculo resaltado para registrar el estatus';
       hint.style.color='var(--muted)';
     } else {
       hint.textContent='Guarda la escritura para activar el primer paso';
@@ -4924,7 +5618,9 @@ function escGuardarPaso(){
     const notasEl  = document.getElementById('paso-notas');
     if(!hiddenEl){ toast('Error: elemento no encontrado','err'); return; }
     const estadoNuevo = hiddenEl.value || 'pendiente';
-    const notas       = notasEl ? notasEl.value.trim() : '';
+    // Al completar (superar) una etapa, su nota deja de mostrarse en cualquier
+    // parte — "Llamado a la Acción" solo refleja la etapa activa actual.
+    const notas       = (estadoNuevo==='completado') ? '' : (notasEl ? notasEl.value.trim() : '');
     const fecha       = new Date().toLocaleString('es-MX',{
       timeZone:'America/Mexico_City',
       day:'2-digit',month:'2-digit',year:'numeric',
@@ -5000,7 +5696,7 @@ async function escProcesarArchivoExcel(input){
       input.value=''; return;
     }
     const mensaje = 'Se detectaron '+filasValidas.length+' fila(s) con datos.\n\n'
-      +'Se creará una carpeta y una escritura nueva por cada fila, con la información EXACTA del Excel — nada se reescribe ni se interpreta.\n\n'
+      +'Se creará una escritura nueva por cada fila, con la información EXACTA del Excel — nada se reescribe ni se interpreta. Ninguna llevará número de carpeta asignado: eso se hace después, manualmente, desde Carpetas.\n\n'
       +'Como el Excel no indica en qué estado va cada trámite, todas se importan como "🗄 Archivado" y con los 5 pasos en pendiente; puedes reclasificarlas después una por una.\n\n'
       +'¿Continuar?';
     const ok = typeof confirmarBonito==='function'
@@ -5009,11 +5705,6 @@ async function escProcesarArchivoExcel(input){
     if(!ok){ input.value=''; return; }
     if(!Array.isArray(D.carpetas))   D.carpetas=[];
     if(!Array.isArray(D.escrituras)) D.escrituras=[];
-    let maxCarp = 0;
-    D.carpetas.forEach(c=>{
-      const m = /^CARP\.- (\d+)$/.exec(c.num||'');
-      if(m) maxCarp = Math.max(maxCarp, parseInt(m[1],10));
-    });
     let creadas = 0;
     filasValidas.forEach(f=>{
       const no        = String(_escBuscarCol(f,['No.','No','Núm.','Num.'])).trim();
@@ -5037,32 +5728,19 @@ async function escProcesarArchivoExcel(input){
       } else if(fechaRaw!==''&&fechaRaw!==undefined&&fechaRaw!==null){
         fechaFirmaTexto = String(fechaRaw).trim();
       }
-      const bitacora=[];
-      if(obs1) bitacora.push({texto:obs1, fecha:'', origen:'Observación 1 (Excel)'});
-      if(obs2) bitacora.push({texto:obs2, fecha:'', origen:'Observación 2 (Excel)'});
-      if(obs3) bitacora.push({texto:obs3, fecha:'', origen:'Observación 3 (Excel)'});
+      // Observaciones unificadas: si el Excel trae varias columnas de
+      // observaciones, se concatenan en una sola nota (ya no 2 o 3 separadas).
+      const _obsExcel = [obs1,obs2,obs3].filter(Boolean).join(' ');
+      const bitacora = _obsExcel ? [{texto:_obsExcel, fecha:''}] : [];
 
-      maxCarp++;
-      const numCarpeta = 'CARP.- '+maxCarp;
+      // Ya NO se crea una carpeta automática por cada fila: la escritura
+      // importada queda sin número de carpeta (num:'') hasta que se vincule
+      // manualmente a una carpeta real desde el módulo de Carpetas.
       const nombreComprador = comprador || cliente;
-      D.carpetas.push({
-        num: numCarpeta,
-        cliente: cliente || comprador || ('Escritura importada #'+(no||maxCarp)),
-        descripcion:'',
-        estatus:'Importado de Excel (Escrituras)', ingreso:'',
-        celebEscritura:'',
-        obsLista:[], obs:'',
-        reciboOficial:'',
-        estadoArchivo:'', prioridad:'', totalPactado:0,
-        tipoTramite:'escritura',
-        fechaCreacion: new Date().toISOString(),
-        fechaModificacion: new Date().toISOString(),
-        juicioDesc:'', escNotario:notaria, escVolumen:'', escInstrumento:'', escTipo:'',
-        regCivilTipo:'', docDesc:''
-      });
+      const _vi = _escSplitVolInstr(volInstr);
       D.escrituras.push({
-        num: numCarpeta,
-        notaria, instrumento:'', volumen:'',
+        num: '',
+        notaria, instrumento:_vi.instrumento, volumen:_vi.volumen,
         fechaFirma, fechaFirmaTexto,
         tipo:'',
         predio, ubicacion, volInstr, folios, tramite,
@@ -5079,7 +5757,7 @@ async function escProcesarArchivoExcel(input){
     });
     escSyncYRefrescar();
     if(typeof renderCarp==='function') renderCarp();
-    toast('✅ '+creadas+' escritura(s) importada(s) desde Excel — se crearon '+creadas+' carpeta(s) vinculadas');
+    toast('✅ '+creadas+' escritura(s) importada(s) desde Excel — sin carpeta asignada, vincúlalas después desde Carpetas');
   }catch(err){
     console.error('[escProcesarArchivoExcel]', err);
     toast('Error al importar el Excel: '+err.message,'err');

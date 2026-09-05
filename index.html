@@ -16,8 +16,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <!-- SDK de Supabase (carga clásica, no módulo dinámico — evita problemas con Brave/adblockers) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="assets/js/integrations/oauth-popup-relay.js?v=20260904b"></script>
-<link rel="stylesheet" href="assets/css/core/application.css?v=20260904b">
+<script src="assets/js/integrations/oauth-popup-relay.js?v=20260904d"></script>
+<link rel="stylesheet" href="assets/css/core/application.css?v=20260904d">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!-- PDF.js: extracción de texto de PDFs con capa de texto (gratuito, sin API) -->
@@ -26,11 +26,11 @@
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
 <!-- SheetJS: lectura de Excel/.xlsm en el navegador para importar Escrituras -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
-<script src="assets/js/diagnostics/network-console.js?v=20260904b"></script>
+<script src="assets/js/diagnostics/network-console.js?v=20260904d"></script>
   <!-- ═══ CSS SISTEMA DE RECIBOS (index.html) ═══ -->
   <link rel="stylesheet" href="assets/css/modules/receipts.css">
 <link rel="stylesheet" href="assets/css/components/modal-states.css">
-<script src="assets/js/core/error-guard.js?v=20260904b"></script>
+<script src="assets/js/core/error-guard.js?v=20260904d"></script>
 <link rel="stylesheet" href="assets/css/components/ai-dropdown.css"></head>
 <body>
 <!-- ══ SPLASH DE CARGA — oculta la app hasta confirmar sesión ══ -->
@@ -51,7 +51,7 @@
   <div id="lex-splash-texto" style="font-family:sans-serif;font-size:0.7rem;letter-spacing:0.12em;color:rgba(200,149,42,0.65);text-transform:uppercase;">LEX-MÉXICO · Verificando sesión</div>
   <button id="lex-splash-reintentar" onclick="location.reload()" style="display:none;margin-top:18px;padding:8px 20px;border-radius:8px;border:1.5px solid rgba(200,149,42,0.5);background:transparent;color:#c8952a;font-family:monospace;font-size:0.7rem;font-weight:700;letter-spacing:0.08em;cursor:pointer;">↻ REINTENTAR</button>
 </div>
-<script src="assets/js/ui/legal-background.js?v=20260904b"></script>
+<script src="assets/js/ui/legal-background.js?v=20260904d"></script>
 <div style="display:flex;min-height:100vh;">
 <!-- SIDEBAR -->
 <nav class="sidebar">
@@ -15041,43 +15041,36 @@ Recibo original im…</td>
     </div><!-- fin panel-gestiones -->
     <!-- MODAL DETALLE ESCRITURA -->
     <div class="modal-ov" id="mEscritura">
-      <div class="modal wide" style="max-width:680px;width:94vw;max-height:88vh;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;margin:auto;">
+      <div class="modal wide" style="max-width:960px;width:95vw;max-height:92vh;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;margin:auto;">
         <div class="modal-hdr">
           <h3 id="mEscTitulo">Nueva Escritura</h3>
           <button class="modal-x" onclick="cerrar(&#39;mEscritura&#39;)">✕</button>
         </div>
         <div class="modal-body" id="modal-body-form" style="padding:16px;">
-          <!-- Fila 1: Archivo + Notaría + Instrumento + Volumen + Fecha -->
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:12px;">
-            <div class="field">
-              <label>📂 Expediente / Carpeta</label>
+          <!-- ══ ENCABEZADO: Carpeta + Folios + Folio vincular ══ -->
+          <div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:14px;">
+            <div style="background:linear-gradient(135deg,var(--gold),var(--gold-d));border-radius:10px;padding:8px 14px;box-shadow:0 3px 10px rgba(140,101,24,0.35);flex-shrink:0;">
+              <div style="font-family:monospace;font-size:0.5rem;color:#fdfaf4;opacity:0.85;">EXPEDIENTE</div>
               <div style="position:relative;">
-                <input id="eNum" type="text" placeholder="Busca el cliente o el número de carpeta..." autocomplete="off" style="font-family:monospace;font-weight:700;width:100%;box-sizing:border-box;background:#eef3ff;border-color:#3b82f6;" oninput="escBuscarCarpeta(this.value)" onfocus="escBuscarCarpeta(this.value)" onblur="setTimeout(()=&gt;{if(window._escNumSugKeepOpen)return;const d=document.getElementById(&#39;eNumSug&#39;);if(d)d.style.display=&#39;none&#39;;},250)">
-                <div id="eNumSug" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid #3b82f6;border-top:none;border-radius:0 0 8px 8px;z-index:200;max-height:260px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
-                <div style="font-size:0.62rem;color:#7a6840;margin-top:3px;">Debe corresponder a una carpeta real de Carpetas.</div>
+                <input id="eNum" type="text" placeholder="Busca..." autocomplete="off" style="font-family:monospace;font-weight:700;font-size:1rem;width:140px;box-sizing:border-box;background:transparent;border:none;color:#fff;padding:0;" oninput="escBuscarCarpeta(this.value)" onfocus="escBuscarCarpeta(this.value)" onblur="setTimeout(()=&gt;{if(window._escNumSugKeepOpen)return;const d=document.getElementById(&#39;eNumSug&#39;);if(d)d.style.display=&#39;none&#39;;},250)">
+                <div id="eNumSug" style="display:none;position:absolute;top:100%;left:-14px;right:-14px;background:#fff;border:1.5px solid var(--gold);border-top:none;border-radius:0 0 8px 8px;z-index:200;max-height:260px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
               </div>
             </div>
-            <div class="field">
-              <label>🔏 Notaría No.</label>
-              <input id="eNotaria" type="text" placeholder="75 / 81">
+            <div style="flex:1;">
+              <div style="font-family:monospace;font-size:0.5rem;color:#7a6840;margin-bottom:3px;letter-spacing:0.06em;">FOLIOS SISTEMA NOTARIAL</div>
+              <input id="eFolios" type="text" placeholder="Ej. 15,157 y 15,343" style="width:100%;box-sizing:border-box;border:1.5px solid #d4b870;border-radius:8px;padding:7px 10px;font-size:0.78rem;">
             </div>
-            <div class="field">
-              <label>📑 Instrumento</label>
-              <input id="eInstrumento" type="text" placeholder="Núm.">
-            </div>
-            <div class="field">
-              <label>📚 Volumen</label>
-              <input id="eVolumen" type="text" placeholder="Vol.">
+            <div style="text-align:right;flex-shrink:0;">
+              <div style="font-family:monospace;font-size:0.48rem;color:#7a6840;margin-bottom:2px;">FOLIO</div>
+              <div style="font-family:monospace;font-size:0.68rem;color:#1a4a8a;">🔗 vincular</div>
             </div>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div style="font-size:0.62rem;color:#7a6840;margin:-8px 0 12px;">Debe corresponder a una carpeta real de Carpetas.</div>
+
+          <!-- ══ Acto jurídico y datos notariales ══ -->
+          <div style="display:grid;grid-template-columns:1.2fr 0.8fr 0.7fr 0.7fr 1fr 1fr;gap:8px;margin-bottom:12px;">
             <div class="field">
-              <label>📅 Fecha de Firma</label>
-              <input id="eFechaFirma" type="date">
-              <input id="eFechaFirmaTexto" type="text" placeholder="O fecha aproximada (ej. &#34;2019&#34;) si no hay día exacto" style="margin-top:5px;font-size:0.72rem;">
-            </div>
-            <div class="field">
-              <label>📋 Tipo de Escritura</label>
+              <label>📋 Acto Jurídico</label>
               <select id="eTipo">
                 <option value="">— Selecciona —</option>
                 <option>Compraventa</option>
@@ -15091,26 +15084,43 @@ Recibo original im…</td>
                 <option>Otro</option>
               </select>
             </div>
+            <div class="field">
+              <label>🔏 Notaría No.</label>
+              <input id="eNotaria" type="text" placeholder="75 / 81">
+            </div>
+            <div class="field">
+              <label>📑 Instr.</label>
+              <input id="eInstrumento" type="text" placeholder="Núm.">
+            </div>
+            <div class="field">
+              <label>📚 Vol.</label>
+              <input id="eVolumen" type="text" placeholder="Vol.">
+            </div>
+            <div class="field">
+              <label>📅 Fecha de Firma</label>
+              <input id="eFechaFirma" type="date">
+              <input id="eFechaFirmaTexto" type="text" placeholder="O aprox. (ej. &#34;2019&#34;)" style="margin-top:5px;font-size:0.68rem;">
+            </div>
+            <div class="field">
+              <label>🏛️ Cuenta Catastral</label>
+              <input id="eCuentaCatastral" type="text" placeholder="Núm. de cuenta">
+            </div>
           </div>
-          <!-- Campos del Excel de Escrituras (Predio, Ubicación, Vol./Instr., Folios, Trámite) -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          <div class="field" style="margin-bottom:12px;">
+            <label>📍 Ubicación de la Propiedad</label>
+            <input id="eUbicacion" type="text" placeholder="Ubicación del predio">
+          </div>
+          <!-- Campos del Excel de Escrituras (Predio, Vol./Instr., Trámite) -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px;">
             <div class="field">
               <label>🏞️ Predio</label>
               <input id="ePredio" type="text" placeholder="Terreno Rústico, Local de Negocio...">
-            </div>
-            <div class="field">
-              <label>📍 Ubicación</label>
-              <input id="eUbicacion" type="text" placeholder="Ubicación del predio">
             </div>
             <div class="field">
               <label>📚 Vol./Instr. (sist. notarial)</label>
               <input id="eVolInstr" type="text" placeholder="Ej. 124/9,020">
             </div>
             <div class="field">
-              <label>🗂️ Folios (sist. notarial)</label>
-              <input id="eFolios" type="text" placeholder="Ej. 15,157 y 15,343">
-            </div>
-            <div class="field" style="grid-column:1/-1;">
               <label>📄 Tipo de Trámite</label>
               <select id="eTramite">
                 <option value="">— Selecciona —</option>
@@ -15131,17 +15141,17 @@ Recibo original im…</td>
             </div>
             <input type="hidden" id="eEstado" value="proceso">
           </div>
-          <!-- Compradores -->
-          <div class="field" style="margin-bottom:12px;">
-            <label>🛒 Compradores / Donatarios *</label>
-            <div id="eCompradores-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px;"></div>
-            <button type="button" onclick="escAgregarPersona(&#39;comprador&#39;)" style="background:#eef3ff;border:1.5px dashed #3b82f6;color:#1a4a8a;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:0.78rem;font-family:sans-serif;width:100%;">＋ Agregar comprador</button>
+          <!-- Propietario que trasmite (vendedores/donadores) -->
+          <div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;box-shadow:0 3px 12px rgba(200,149,42,0.12);padding:14px 16px;margin-bottom:14px;">
+            <div style="text-align:center;font-family:monospace;font-size:0.68rem;font-weight:700;letter-spacing:0.06em;color:#8c6518;margin-bottom:10px;">📤 PROPIETARIO QUE TRASMITE</div>
+            <div id="eVendedores-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
+            <button type="button" onclick="escAgregarPersona(&#39;vendedor&#39;)" style="width:100%;background:linear-gradient(135deg,#c8952a,#8c6518);border:none;color:#fff;border-radius:8px;padding:8px;cursor:pointer;font-size:0.78rem;font-family:sans-serif;font-weight:700;box-shadow:0 2px 6px rgba(140,101,24,0.3);">＋ Agregar otro donador/vendedor</button>
           </div>
-          <!-- Vendedores -->
-          <div class="field" style="margin-bottom:12px;">
-            <label>📤 Vendedores / Donantes</label>
-            <div id="eVendedores-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:6px;"></div>
-            <button type="button" onclick="escAgregarPersona(&#39;vendedor&#39;)" style="background:#fff8e8;border:1.5px dashed #c8952a;color:#8c6518;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:0.78rem;font-family:sans-serif;width:100%;">＋ Agregar vendedor</button>
+          <!-- Adquirente (compradores/donatarios) -->
+          <div style="background:#eef3ff;border:1.5px solid rgba(59,130,246,0.3);border-radius:12px;box-shadow:0 3px 12px rgba(59,130,246,0.12);padding:14px 16px;margin-bottom:14px;">
+            <div style="text-align:center;font-family:monospace;font-size:0.68rem;font-weight:700;letter-spacing:0.06em;color:#1a4a8a;margin-bottom:10px;">📥 ADQUIRENTE *</div>
+            <div id="eCompradores-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;"></div>
+            <button type="button" onclick="escAgregarPersona(&#39;comprador&#39;)" style="width:100%;background:linear-gradient(135deg,#3b82f6,#1a4a8a);border:none;color:#fff;border-radius:8px;padding:8px;cursor:pointer;font-size:0.78rem;font-family:sans-serif;font-weight:700;box-shadow:0 2px 6px rgba(26,74,138,0.3);">＋ Agregar otro comprador/donatario</button>
           </div>
           <!-- Descripción -->
           <div class="field" style="margin-bottom:16px;">
@@ -15218,6 +15228,11 @@ Recibo original im…</td>
               </div>
             </div>
             <div id="esc-detalle-hint" style="text-align:center;font-size:0.65rem;color:var(--muted);margin-top:10px;font-family:monospace;"></div>
+          </div>
+          <!-- Notas por etapa -->
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-l);">
+            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:12px;">📝 Notas por Etapa</div>
+            <div id="esc-notas-etapa"></div>
           </div>
         </div>
         <!-- ── FOOTER FORMULARIO ── -->
@@ -17324,19 +17339,19 @@ Recibo original im…</td>
 </div>
 <!-- ═══ FIN EXPEDIENTE DIGITAL VEHICULAR ═══ -->
 
-<script src="assets/js/config/public-config.js?v=20260904b"></script>
-<script src="assets/js/modules/recibos/index.js?v=20260904b"></script>
-<script src="assets/js/modules/caja/index.js?v=20260904b"></script>
-<script src="assets/js/modules/contabilidad/index.js?v=20260904b"></script>
-<script src="assets/js/modules/clientes/index.js?v=20260904b"></script>
-<script src="assets/js/modules/directorio/index.js?v=20260904b"></script>
-<script src="assets/js/modules/expedientes/index.js?v=20260904b"></script>
-<script src="assets/js/modules/documentos/index.js?v=20260904b"></script>
-<script src="assets/js/modules/integraciones/index.js?v=20260904b"></script>
-<script src="assets/js/modules/administracion/index.js?v=20260904b"></script>
-<script src="assets/js/modules/core/index.js?v=20260904b"></script>
-<script src="assets/js/compat/receipts-and-supabase.compat.js?v=20260904b"></script>
-<script src="assets/js/compat/operations-and-accounting.compat.js?v=20260904b"></script>
+<script src="assets/js/config/public-config.js?v=20260904d"></script>
+<script src="assets/js/modules/recibos/index.js?v=20260904d"></script>
+<script src="assets/js/modules/caja/index.js?v=20260904d"></script>
+<script src="assets/js/modules/contabilidad/index.js?v=20260904d"></script>
+<script src="assets/js/modules/clientes/index.js?v=20260904d"></script>
+<script src="assets/js/modules/directorio/index.js?v=20260904d"></script>
+<script src="assets/js/modules/expedientes/index.js?v=20260904d"></script>
+<script src="assets/js/modules/documentos/index.js?v=20260904d"></script>
+<script src="assets/js/modules/integraciones/index.js?v=20260904d"></script>
+<script src="assets/js/modules/administracion/index.js?v=20260904d"></script>
+<script src="assets/js/modules/core/index.js?v=20260904d"></script>
+<script src="assets/js/compat/receipts-and-supabase.compat.js?v=20260904d"></script>
+<script src="assets/js/compat/operations-and-accounting.compat.js?v=20260904d"></script>
 <!-- PANEL FLOTANTE: Botones de actualización en esquina inferior derecha (fuera de la hoja del recibo) -->
     </div>
     <div id="panel-configuracion" class="panel">
@@ -19149,7 +19164,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/integrations/session-cleanup.js?v=20260904b"></script>
+<script src="assets/js/integrations/session-cleanup.js?v=20260904d"></script>
 <!-- Modal: Historial de versiones de recibo -->
 <div class="modal-overlay" id="modal-versiones" style="z-index:200;">
   <div class="modal" style="max-width:540px;width:94%;max-height:80vh;display:flex;flex-direction:column;">
@@ -19260,20 +19275,20 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20260904b"></script>
-<script src="assets/js/ui/form-navigation.js?v=20260904b"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=20260904d"></script>
+<script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->
 <!-- Ficha del Folio movida a la vista de consulta, ver #pdf-consulta-wrap -->
 <!-- ═══ FIN MODAL FICHA DEL FOLIO ═══ -->
-<script src="assets/js/compat/folio-query-and-statements.compat.js?v=20260904b"></script>
+<script src="assets/js/compat/folio-query-and-statements.compat.js?v=20260904d"></script>
 <!-- ═══ SCANSYS PRO (panel forense de folios) ═══ -->
-<script src="assets/js/admin/scansys-engine.js?v=20260904b"></script>
+<script src="assets/js/admin/scansys-engine.js?v=20260904d"></script>
 
-<script src="assets/js/admin/accounting-restoration.js?v=20260904b"></script>
+<script src="assets/js/admin/accounting-restoration.js?v=20260904d"></script>
 
 
-<script src="assets/js/admin/cash-cut-management.js?v=20260904b"></script>
+<script src="assets/js/admin/cash-cut-management.js?v=20260904d"></script>
 
 <!-- ── Flechas fijas de navegación rápida en Contabilidad (subir/bajar) ── -->
 <div id="cs-scroll-arrows" style="position:fixed;right:6px;top:50%;transform:translateY(-50%);z-index:400;display:none;flex-direction:column;gap:14px;">
@@ -19286,6 +19301,6 @@ Recibo original im…</td>
     onmouseover="this.style.color='#e8c875';this.style.borderColor='#e8c875';this.style.background='rgba(232,200,117,0.14)';"
     onmouseout="this.style.color='rgba(200,149,42,0.45)';this.style.borderColor='rgba(200,149,42,0.25)';this.style.background='rgba(22,9,5,0.45)';">▼</button>
 </div>
-<script src="assets/js/ui/accounting-scroll.js?v=20260904b"></script>
+<script src="assets/js/ui/accounting-scroll.js?v=20260904d"></script>
 
 </body></html>

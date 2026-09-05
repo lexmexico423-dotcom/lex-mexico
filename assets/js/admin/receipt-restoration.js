@@ -4307,8 +4307,12 @@ function escMostrarDetalle(e){
   const renderPersonas = (lista) => (lista||[]).map(p=>{
     const obj = typeof p==='string' ? {nombre:p} : p;
     let html = `<div style="padding:6px 10px;background:rgba(0,0,0,0.03);border-radius:6px;margin-bottom:4px;">
+      ${obj.caracter?`<div style="font-size:0.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">${esc(obj.caracter)}</div>`:''}
       <span style="font-weight:600;">${esc(obj.nombre||'—')}</span>`;
+    if(obj.tipoPersona) html += ` <span style="font-size:0.68rem;color:var(--muted);">(Persona ${esc(obj.tipoPersona)})</span>`;
     if(obj.civil)    html += ` <span style="font-size:0.7rem;color:var(--muted);">(${esc(obj.civil)})</span>`;
+    if(obj.tipoSociedad) html += `<div style="font-size:0.7rem;color:#1a4a8a;margin-top:2px;">Régimen: ${esc(obj.tipoSociedad)}</div>`;
+    if(obj.consentimientoConyuge) html += `<div style="font-size:0.72rem;color:#1a4a8a;margin-top:2px;">✓ Con consentimiento de su cónyuge${obj.nombreConyuge?': <strong>'+esc(obj.nombreConyuge)+'</strong>':''}</div>`;
     if(obj.conducto) html += `<div style="font-size:0.72rem;color:#7a6840;margin-top:2px;">↳ Por conducto de: <strong>${esc(obj.conducto)}</strong></div>`;
     return html + '</div>';
   }).join('');
@@ -4329,7 +4333,10 @@ function escMostrarDetalle(e){
           ${fila('Ubicación', esc(e.ubicacion||'—'))}
           ${fila('Tipo de Trámite', esc(e.tramite||'—'))}
         </div>
-        ${e.folios?fila('Folios (sist. notarial)', esc(e.folios)):''}
+        ${(e.folios||e.cuentaCatastral)?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+          ${e.folios?fila('Folios (sist. notarial)', esc(e.folios)):''}
+          ${e.cuentaCatastral?fila('Cuenta Catastral', esc(e.cuentaCatastral)):''}
+        </div>`:''}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:10px;">
           <div>
             <div style="font-family:monospace;font-size:0.58rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px;">🛒 Compradores / Donatarios</div>
@@ -4344,25 +4351,67 @@ function escMostrarDetalle(e){
       </div>
       <span style="font-size:0.65rem;font-weight:700;color:${st.col};background:${st.bg};padding:4px 12px;border-radius:12px;white-space:nowrap;flex-shrink:0;border:1px solid ${st.col}44;">${st.lbl}</span>
     </div>
-    <div style="border-top:1px solid var(--border-l);padding-top:12px;margin-top:4px;">
-      <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">🕒 Bitácora</div>
+    <div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-top:16px;">
+      <div style="font-family:monospace;font-size:0.65rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:10px;">🗒️ OBSERVACIONES</div>
       <div id="esc-bitacora-lista" style="margin-bottom:10px;">${escRenderBitacora(e.bitacora||[])}</div>
-      <div style="display:flex;gap:6px;">
-        <textarea id="esc-nota-nueva" rows="2" placeholder="Agregar nota a la bitácora..." style="flex:1;resize:vertical;font-family:sans-serif;font-size:0.8rem;"></textarea>
-        <button type="button" onclick="escAgregarNota()" style="background:var(--gold);border:none;color:#1a1008;border-radius:8px;padding:0 14px;cursor:pointer;font-weight:700;font-size:0.8rem;font-family:sans-serif;">＋ Nota</button>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="esc-nota-nueva" placeholder="Escribe una nueva observación..." style="flex:1;box-sizing:border-box;border:1.5px solid #d4b870;border-radius:8px;padding:8px 10px;font-size:0.78rem;font-family:sans-serif;">
+        <button type="button" onclick="escAgregarNota()" style="background:linear-gradient(135deg,#c8952a,#8c6518);border:none;color:#fff;border-radius:8px;padding:0 16px;cursor:pointer;font-weight:700;font-size:0.75rem;font-family:sans-serif;white-space:nowrap;">＋ Agregar más</button>
       </div>
     </div>`;
   escActualizarTimelineDetalle(e.pasos||[]);
+  escRenderNotasEtapa(e);
 }
 function escRenderBitacora(lista){
-  if(!lista || !lista.length) return '<div style="font-size:0.75rem;color:var(--muted);font-style:italic;">Sin notas todavía.</div>';
-  return lista.map(n=>{
-    const etiqueta = n.fecha ? esc(n.fecha) : esc(n.origen||'Sin fecha');
-    return `<div style="display:flex;gap:8px;margin-bottom:6px;">
-      <div style="font-size:0.65rem;color:var(--muted);white-space:nowrap;padding-top:1px;flex-shrink:0;">${etiqueta}</div>
-      <div style="font-size:0.8rem;color:var(--ink);line-height:1.4;">${esc(n.texto||'')}</div>
+  if(!lista || !lista.length) return '<div style="font-size:0.75rem;color:var(--muted);font-style:italic;">Sin observaciones todavía.</div>';
+  return '<div style="background:rgba(200,149,42,0.06);border-radius:10px;padding:2px 10px;">' + lista.map((n,i)=>{
+    const etiqueta = n.fecha ? esc(n.fecha) : esc(n.origen||'—');
+    return `<div style="display:flex;gap:10px;align-items:center;padding:8px 2px;${i<lista.length-1?'border-bottom:1px solid rgba(200,149,42,0.2);':''}">
+      <div style="width:20px;height:20px;border-radius:50%;background:#c8952a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;flex-shrink:0;">${i+1}</div>
+      <div style="flex:1;font-size:0.78rem;color:var(--ink);line-height:1.4;">${esc(n.texto||'')}</div>
+      <div style="font-family:monospace;font-size:0.58rem;color:#8c6518;white-space:nowrap;">${etiqueta}</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+function escRenderNotasEtapa(e){
+  const cont = document.getElementById('esc-notas-etapa');
+  if(!cont) return;
+  const pasos = Array(5).fill(null).map((_,i)=>(e.pasos||[])[i]||{estado:'pendiente',notas:'',fecha:''});
+  const completados = pasos.filter(p=>p.estado==='completado').length;
+  const pasoActivo = completados<5 ? completados : -1;
+  cont.innerHTML = pasos.map((p,i)=>{
+    const esComp = p.estado==='completado';
+    const esActivo = i===pasoActivo;
+    const col = esComp?'#1a7a3a':esActivo?'#c8952a':'#d8d2c2';
+    const bg  = esComp?'#fff':esActivo?'#fff8e8':'rgba(0,0,0,0.02)';
+    const shadow = esActivo?'box-shadow:0 2px 8px rgba(200,149,42,0.15);':esComp?'box-shadow:0 1px 4px rgba(0,0,0,0.06);':'';
+    const estadoTxt = esComp?'✓ Completado':esActivo?'🟡 En proceso':'Pendiente';
+    const colTxt = esComp?'#1a7a3a':esActivo?'#8c6518':'#a9a08a';
+    let cuerpo = '';
+    if(esActivo){
+      cuerpo = `<textarea id="esc-nota-etapa-${i}" rows="2" placeholder="Escribe el estatus de esta etapa..." style="width:100%;box-sizing:border-box;border:1.5px solid #c8952a;border-radius:6px;background:#fff;padding:6px 9px;font-size:0.75rem;font-family:sans-serif;resize:vertical;margin-top:6px;">${esc(p.notas||'')}</textarea>
+        <button type="button" onclick="escGuardarNotaEtapaInline(${i})" style="margin-top:6px;background:linear-gradient(135deg,#c8952a,#8c6518);border:none;color:#fff;border-radius:6px;padding:5px 12px;font-size:0.68rem;font-weight:700;cursor:pointer;">💾 Guardar nota</button>`;
+    } else if(p.notas){
+      cuerpo = `<div style="font-size:0.75rem;color:#5c5648;margin-top:4px;">${esc(p.notas)}</div>`;
+    }
+    return `<div style="background:${bg};border-left:4px solid ${col};border-radius:0 10px 10px 0;${shadow}padding:10px 12px;margin-bottom:8px;">
+      <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:${colTxt};">${i+1}. ${ESC_PASOS[i]} · ${estadoTxt}</div>
+      ${cuerpo}
     </div>`;
   }).join('');
+}
+function escGuardarNotaEtapaInline(idx){
+  if(_escIdx<0 || !D.escrituras[_escIdx]) return;
+  const e = D.escrituras[_escIdx];
+  if(!e.pasos) e.pasos = Array(5).fill(null).map(()=>({estado:'pendiente',notas:'',fecha:''}));
+  const ta = document.getElementById('esc-nota-etapa-'+idx);
+  const notas = (ta?.value||'').trim();
+  const fecha = new Date().toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  e.pasos[idx] = { estado:(e.pasos[idx]&&e.pasos[idx].estado)||'pendiente', notas, fecha };
+  e.fechaMod = new Date().toISOString();
+  escSyncYRefrescar();
+  escRenderNotasEtapa(e);
+  toast('📝 Nota de etapa guardada');
 }
 function escAgregarNota(){
   if(_escIdx<0 || !D.escrituras[_escIdx]){ toast('Abre la escritura primero','err'); return; }
@@ -4537,6 +4586,7 @@ function escAbrirDetalle(idx){
     const _eVoI = document.getElementById('eVolInstr');  if(_eVoI) _eVoI.value = e.volInstr||'';
     const _eFol = document.getElementById('eFolios');    if(_eFol) _eFol.value = e.folios||'';
     const _eTra = document.getElementById('eTramite');   if(_eTra) _eTra.value = e.tramite||'';
+    const _eCC  = document.getElementById('eCuentaCatastral'); if(_eCC) _eCC.value = e.cuentaCatastral||'';
     (e.compradores||[]).forEach(p=>escAgregarPersona('comprador', typeof p==='string'?{nombre:p}:p));
     (e.vendedores||[]).forEach(p=>escAgregarPersona('vendedor',   typeof p==='string'?{nombre:p}:p));
     escSetEstado(e.estado||'proceso');
@@ -4553,7 +4603,7 @@ function escAbrirDetalle(idx){
   }
 }
 function _escLimpiarForm(){
-  ['eNum','eNotaria','eInstrumento','eVolumen','eFechaFirma','eDescripcion','ePredio','eUbicacion','eVolInstr','eFolios','eFechaFirmaTexto'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['eNum','eNotaria','eInstrumento','eVolumen','eFechaFirma','eDescripcion','ePredio','eUbicacion','eVolInstr','eFolios','eFechaFirmaTexto','eCuentaCatastral'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('eTipo').value='';
   const eTramite = document.getElementById('eTramite'); if(eTramite) eTramite.value='';
   document.getElementById('eCompradores-list').innerHTML='';
@@ -4572,52 +4622,117 @@ function escAgregarPersona(tipo, datos={}){
   const cont    = document.getElementById(listId);
   const color   = tipo==='comprador' ? '#3b82f6' : '#c8952a';
   const colorBg = tipo==='comprador' ? '#eef3ff' : '#fff8e8';
-  const etiq    = tipo==='comprador' ? 'Compró por conducto de:' : 'Vendió por apoderado legal:';
-  const plh     = tipo==='comprador' ? 'Nombre del representante' : 'Nombre del apoderado legal';
-  const hayConducTo = !!(datos.conducto);
+  const colorTxt= tipo==='comprador' ? '#1a4a8a' : '#8c6518';
+  const opcionesCaracter = tipo==='comprador' ? ['Comprador','Donatario'] : ['Vendedor','Donador'];
+  const etiqCond = tipo==='comprador' ? 'Adquirió o recibió por conducto de:' : 'Vendió/donó por conducto de:';
+  const plhCond  = tipo==='comprador' ? 'Nombre del representante' : 'Nombre del apoderado legal';
+  const hayConducTo    = !!(datos.conducto);
+  const esCasado       = datos.civil === 'Casado/a';
+  const esSocConyugal  = datos.tipoSociedad === 'Sociedad Conyugal';
   const div = document.createElement('div');
   div.className = 'esc-persona-row';
-  div.style.cssText = `background:${colorBg};border:1.5px solid ${color}44;border-radius:8px;padding:8px 10px;margin-bottom:6px;`;
+  div.style.cssText = `background:${colorBg};border:1.5px solid ${color}44;border-radius:10px;padding:10px 12px;margin-bottom:8px;box-shadow:0 2px 6px ${color}22;`;
   div.innerHTML = `
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-      <input type="text" class="esc-nombre" value="${escHTML(datos.nombre||'')}"
-        placeholder="Nombre completo"
-        style="flex:1;min-width:0;font-family:sans-serif;font-size:0.83rem;font-weight:600;">
-      <select class="esc-civil"
-        style="font-size:0.72rem;background:#fff;border:1px solid #d4b870;border-radius:5px;padding:4px 6px;font-family:sans-serif;color:var(--ink);width:130px;flex-shrink:0;">
-        <option value="">Estado Civil</option>
-        <option ${datos.civil==='Soltero/a'   ?'selected':''}>Soltero/a</option>
-        <option ${datos.civil==='Casado/a'     ?'selected':''}>Casado/a</option>
-        <option ${datos.civil==='Divorciado/a' ?'selected':''}>Divorciado/a</option>
-        <option ${datos.civil==='Viudo/a'      ?'selected':''}>Viudo/a</option>
-        <option ${datos.civil==='Unión Libre'  ?'selected':''}>Unión Libre</option>
-      </select>
+    <div style="display:grid;grid-template-columns:0.8fr 1.8fr 0.8fr;gap:8px;margin-bottom:8px;">
+      <div>
+        <div style="font-family:monospace;font-size:0.5rem;color:${colorTxt};text-align:center;margin-bottom:2px;">CARÁCTER</div>
+        <select class="esc-caracter" style="width:100%;box-sizing:border-box;font-size:0.72rem;padding:6px 4px;border:1px solid ${color}66;border-radius:6px;text-align:center;background:#fff;">
+          ${opcionesCaracter.map(o=>`<option ${datos.caracter===o?'selected':''}>${o}</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <div style="font-family:monospace;font-size:0.5rem;color:${colorTxt};text-align:center;margin-bottom:2px;">NOMBRE</div>
+        <input type="text" class="esc-nombre" value="${escHTML(datos.nombre||'')}" placeholder="Nombre completo" style="width:100%;box-sizing:border-box;font-family:sans-serif;font-size:0.8rem;font-weight:600;padding:6px 8px;border:1px solid ${color}66;border-radius:6px;">
+      </div>
+      <div>
+        <div style="font-family:monospace;font-size:0.5rem;color:${colorTxt};text-align:center;margin-bottom:2px;">PERSONA</div>
+        <select class="esc-tipopersona" style="width:100%;box-sizing:border-box;font-size:0.72rem;padding:6px 4px;border:1px solid ${color}66;border-radius:6px;text-align:center;background:#fff;">
+          <option ${(!datos.tipoPersona||datos.tipoPersona==='Física')?'selected':''}>Física</option>
+          <option ${datos.tipoPersona==='Moral'?'selected':''}>Moral</option>
+        </select>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <div style="flex:1;">
+        <div style="font-family:monospace;font-size:0.5rem;color:${colorTxt};margin-bottom:2px;">ESTADO CIVIL</div>
+        <select class="esc-civil" style="width:100%;box-sizing:border-box;font-size:0.72rem;padding:6px;border:1px solid ${color}66;border-radius:6px;background:#fff;color:var(--ink);" onchange="_escToggleSociedad(this)">
+          <option value="">Estado Civil</option>
+          <option ${datos.civil==='Soltero/a'   ?'selected':''}>Soltero/a</option>
+          <option ${datos.civil==='Casado/a'     ?'selected':''}>Casado/a</option>
+          <option ${datos.civil==='Divorciado/a' ?'selected':''}>Divorciado/a</option>
+          <option ${datos.civil==='Viudo/a'      ?'selected':''}>Viudo/a</option>
+          <option ${datos.civil==='Unión Libre'  ?'selected':''}>Unión Libre</option>
+        </select>
+      </div>
+      <div class="esc-tiposociedad-row" style="flex:1;display:${esCasado?'block':'none'};">
+        <div style="font-family:monospace;font-size:0.5rem;color:#1a4a8a;margin-bottom:2px;">TIPO DE SOCIEDAD</div>
+        <select class="esc-tiposociedad" style="width:100%;box-sizing:border-box;font-size:0.72rem;padding:6px;border:1.5px solid #1a4a8a;border-radius:6px;background:#eef3ff;color:#1a4a8a;" onchange="_escToggleConsentimiento(this)">
+          <option value="">— Selecciona —</option>
+          <option ${datos.tipoSociedad==='Sociedad Conyugal'?'selected':''}>Sociedad Conyugal</option>
+          <option ${datos.tipoSociedad==='Separación de Bienes'?'selected':''}>Separación de Bienes</option>
+        </select>
+      </div>
+    </div>
+    <div class="esc-consent-row" style="display:${(esCasado&&esSocConyugal)?'block':'none'};background:#eef3ff;border:1.5px solid #b8cff0;border-radius:8px;padding:8px 10px;margin-bottom:8px;">
+      <label style="display:flex;align-items:center;gap:6px;font-family:monospace;font-size:0.58rem;color:#1a4a8a;font-weight:700;cursor:pointer;user-select:none;margin-bottom:5px;">
+        <input type="checkbox" class="esc-consent-chk" ${datos.consentimientoConyuge?'checked':''} style="accent-color:#1a4a8a;" onchange="this.closest('.esc-persona-row').querySelector('.esc-consent-nom-row').style.display=this.checked?'block':'none';">
+        CON CONSENTIMIENTO DE SU ESPOSA(O)
+      </label>
+      <div class="esc-consent-nom-row" style="display:${datos.consentimientoConyuge?'block':'none'};">
+        <input type="text" class="esc-consent-nombre" value="${escHTML(datos.nombreConyuge||'')}" placeholder="Nombre del(la) cónyuge" style="width:100%;box-sizing:border-box;font-family:sans-serif;font-size:0.72rem;padding:5px 8px;border:1px solid #b8cff0;border-radius:6px;">
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,0.5);border:1px dashed ${color};border-radius:8px;padding:6px 10px;margin-bottom:6px;">
+      <label style="font-size:0.58rem;color:${colorTxt};font-family:monospace;letter-spacing:0.02em;display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;flex:1;">
+        <input type="checkbox" class="esc-conducto-chk" style="accent-color:${color};"
+          ${hayConducTo?'checked':''}
+          onchange="this.closest('.esc-persona-row').querySelector('.esc-conducto-row').style.display=this.checked?'flex':'none';">
+        ${etiqCond}
+      </label>
       <button type="button" onclick="this.closest('.esc-persona-row').remove()"
-        style="background:none;border:1px solid rgba(192,22,26,0.3);color:#c0161a;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:0.7rem;font-family:sans-serif;flex-shrink:0;">
+        style="background:none;border:1px solid rgba(192,22,26,0.3);color:#c0161a;border-radius:5px;padding:3px 8px;cursor:pointer;font-size:0.65rem;font-family:sans-serif;flex-shrink:0;">
         ✕ Quitar
       </button>
     </div>
-    <label style="font-size:0.65rem;color:#7a6840;font-family:monospace;letter-spacing:0.04em;text-transform:uppercase;display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;">
-      <input type="checkbox" class="esc-conducto-chk" style="accent-color:${color};"
-        ${hayConducTo?'checked':''}
-        onchange="this.closest('.esc-persona-row').querySelector('.esc-conducto-row').style.display=this.checked?'flex':'none';">
-      ${etiq}
-    </label>
-    <div class="esc-conducto-row" style="display:${hayConducTo?'flex':'none'};gap:5px;align-items:center;margin-top:4px;">
+    <div class="esc-conducto-row" style="display:${hayConducTo?'flex':'none'};gap:5px;align-items:center;">
       <input type="text" class="esc-conducto-nom" value="${escHTML(datos.conducto||'')}"
-        placeholder="${plh}"
-        style="flex:1;min-width:0;font-family:sans-serif;font-size:0.78rem;">
-      <button type="button"
-        onclick="const r=this.closest('.esc-persona-row');r.querySelector('.esc-conducto-chk').checked=false;r.querySelector('.esc-conducto-nom').value='';r.querySelector('.esc-conducto-row').style.display='none';"
-        style="background:none;border:none;cursor:pointer;color:#c0161a;font-size:0.8rem;flex-shrink:0;">✕</button>
+        placeholder="${plhCond}"
+        style="flex:1;min-width:0;font-family:sans-serif;font-size:0.75rem;padding:5px 8px;border:1px solid ${color}66;border-radius:6px;">
     </div>`;
   cont.appendChild(div);
+}
+function _escToggleSociedad(sel){
+  const row = sel.closest('.esc-persona-row');
+  const socRow = row.querySelector('.esc-tiposociedad-row');
+  const esCasado = sel.value==='Casado/a';
+  socRow.style.display = esCasado ? 'block' : 'none';
+  if(!esCasado){
+    const soc = row.querySelector('.esc-tiposociedad');
+    soc.value='';
+    _escToggleConsentimiento(soc);
+  }
+}
+function _escToggleConsentimiento(sel){
+  const row = sel.closest('.esc-persona-row');
+  const consentRow = row.querySelector('.esc-consent-row');
+  const esSocConyugal = sel.value==='Sociedad Conyugal';
+  consentRow.style.display = esSocConyugal ? 'block' : 'none';
+  if(!esSocConyugal){
+    row.querySelector('.esc-consent-chk').checked=false;
+    row.querySelector('.esc-consent-nombre').value='';
+    row.querySelector('.esc-consent-nom-row').style.display='none';
+  }
 }
 function escGuardar(){
   try {
     const leerPersonas = (listId) => Array.from(document.querySelectorAll('#'+listId+' .esc-persona-row')).map(div=>({
       nombre:   div.querySelector('.esc-nombre')?.value.trim()||'',
+      caracter: div.querySelector('.esc-caracter')?.value||'',
+      tipoPersona: div.querySelector('.esc-tipopersona')?.value||'',
       civil:    div.querySelector('.esc-civil')?.value||'',
+      tipoSociedad: div.querySelector('.esc-tiposociedad')?.value||'',
+      consentimientoConyuge: !!div.querySelector('.esc-consent-chk')?.checked,
+      nombreConyuge: div.querySelector('.esc-consent-chk')?.checked ? (div.querySelector('.esc-consent-nombre')?.value.trim()||'') : '',
       conducto: div.querySelector('.esc-conducto-chk')?.checked ? (div.querySelector('.esc-conducto-nom')?.value.trim()||'') : ''
     })).filter(p=>p.nombre);
     const compradores = leerPersonas('eCompradores-list');
@@ -4656,6 +4771,7 @@ function escGuardar(){
       ubicacion:   (document.getElementById('eUbicacion')?.value||'').trim(),
       volInstr:    (document.getElementById('eVolInstr')?.value||'').trim(),
       folios:      (document.getElementById('eFolios')?.value||'').trim(),
+      cuentaCatastral: (document.getElementById('eCuentaCatastral')?.value||'').trim(),
       tramite:     document.getElementById('eTramite')?.value||'',
       estado:      document.getElementById('eEstado')?.value||'proceso',
       compradores,
@@ -4817,6 +4933,7 @@ function escGuardarPaso(){
     e.fechaMod = new Date().toISOString();
     escActualizarTimeline(e.pasos);
     escActualizarTimelineDetalle(e.pasos);
+    escRenderNotasEtapa(e);
     escSyncYRefrescar();
     cerrar('mEscPaso');
     if(estadoNuevo==='completado' && _escPasoIdx < 4){

@@ -4536,10 +4536,6 @@ function escMostrarDetalle(e){
     <div style="font-family:monospace;font-size:0.58rem;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;">${lbl}</div>
     <div style="font-size:0.85rem;color:var(--ink);line-height:1.4;font-weight:600;">${val}</div>
   </div>` : '';
-  const seccion = (icon,titulo,cuerpo) => `<div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
-    ${titulo?`<div style="font-family:monospace;font-size:0.65rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:10px;">${icon} ${titulo}</div>`:''}
-    ${cuerpo}
-  </div>`;
   const renderPersonas = (lista) => (lista||[]).map(p=>{
     const obj = typeof p==='string' ? {nombre:p} : p;
     let html = `<div style="padding:6px 10px;background:rgba(0,0,0,0.03);border-radius:6px;margin-bottom:4px;">
@@ -4584,50 +4580,48 @@ function escMostrarDetalle(e){
   const _txtConstruccion = e.conCasa ? 'Con Construcción' : (e.sinCasa ? 'Sin Construcción' : '—');
   const _txtIfreo = e.caracterIfreo==='definitivo' ? 'Definitivo' : (e.caracterIfreo==='preventivo' ? 'Preventivo' : (e.caracterIfreo==='sinregistro' ? 'Sin Registro' : '—'));
   if(el_header) el_header.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:16px;">
-      <div style="font-size:0.95rem;font-weight:700;color:var(--ink);">📋 Resumen del Trámite</div>
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
       <span style="font-size:0.68rem;font-weight:700;color:${st.col};background:${st.bg};padding:5px 14px;border-radius:14px;white-space:nowrap;flex-shrink:0;border:1px solid ${st.col}44;">${st.lbl}</span>
     </div>
-    ${seccion('📁','', `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
-        ${fila('Tipos de Movimientos', esc(ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento]||'—'))}
-        ${fila('Tipo de Trámite', (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? esc(t[0]+' - '+t[1]) : '—'; })())}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+      <div style="border:1.5px solid rgba(59,130,246,0.35);border-radius:16px;padding:12px 14px;background:#eef3ff;text-align:center;">
+        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#1a4a8a;font-weight:700;margin-bottom:8px;">COMPRADOR(A) / DONATARIO(A)</div>
+        ${renderPersonas(e.compradores)||'<div style="font-size:0.75rem;color:var(--muted);">—</div>'}
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
-        ${fila('Tipo de Terreno', esc(e.predio||'—'))}
-        ${fila('Uso de Suelo', esc(e.usoSuelo||'—'))}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-        ${fila('Construcción', esc(_txtConstruccion))}
-        ${fila('Carácter de Registro Público (IFREO)', esc(_txtIfreo))}
-      </div>
-      ${_chipsCaract?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid rgba(200,149,42,0.2);">${_chipsCaract}</div>`:''}
-    `)}
-    ${seccion('🏛','DATOS NOTARIALES', `
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:14px;">
-        ${fila('Notaría No.', esc(e.notaria||'—'))}
-        ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
-        ${fila('Fecha de Firma', fechaFmt)}
-        ${fila('Cuenta Catastral', esc(e.cuentaCatastral||'—'))}
-      </div>
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
-        ${fila('Ubicación', esc(e.ubicacion||'—'))}
-        ${fila('Alcance (Total/Parcial)', esc(e.tramite||'—'))}
-      </div>
-    `)}
-    ${e.descripcion?`<div style="font-size:0.78rem;color:#7a6840;background:rgba(200,149,42,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:0 8px 8px 0;line-height:1.5;margin-bottom:14px;">${esc(e.descripcion)}</div>`:''}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:6px;">
-      <div style="background:#eef3ff;border:1.5px solid rgba(59,130,246,0.3);border-radius:12px;padding:14px 16px;">
-        ${renderPersonas(e.compradores)||'<span style="font-size:0.75rem;color:var(--muted);">—</span>'}
-      </div>
-      <div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;">
-        ${renderPersonas(e.vendedores)||'<span style="font-size:0.75rem;color:var(--muted);">—</span>'}
+      <div style="border:1.5px solid rgba(200,149,42,0.35);border-radius:16px;padding:12px 14px;background:#fff8e8;text-align:center;">
+        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:8px;">VENDEDOR(A) / DONANTE</div>
+        ${renderPersonas(e.vendedores)||'<div style="font-size:0.75rem;color:var(--muted);">—</div>'}
       </div>
     </div>
-    <div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-top:16px;">
-      <div style="font-family:monospace;font-size:0.65rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:10px;">🗒️ OBSERVACIONES</div>
-      <div id="esc-bitacora-lista">${escRenderBitacora(e.bitacora||[])}</div>
-    </div>`;
+    <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:700;color:#8c6518;margin-bottom:14px;">📋 Resumen del Trámite</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+      ${fila('Tipos de Movimientos', esc(ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento]||'—'))}
+      ${fila('Tipo de Trámite', (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? esc(t[0]+' - '+t[1]) : '—'; })())}
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+      ${fila('Tipo de Terreno', esc(e.predio||'—'))}
+      ${fila('Uso de Suelo', esc(e.usoSuelo||'—'))}
+    </div>
+    <div style="border-top:1px solid rgba(200,149,42,0.25);margin:0 0 14px;"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+      ${fila('Construcción', esc(_txtConstruccion))}
+      ${fila('Carácter de Registro Público (IFREO)', esc(_txtIfreo))}
+    </div>
+    ${_chipsCaract?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;">${_chipsCaract}</div>`:''}
+    <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.8rem;font-weight:700;color:#8c6518;margin-bottom:14px;">🏛 Datos Notariales</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:14px;">
+      ${fila('Notaría No.', esc(e.notaria||'—'))}
+      ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
+      ${fila('Fecha de Firma', fechaFmt)}
+      ${fila('Cuenta Catastral', esc(e.cuentaCatastral||'—'))}
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:18px;">
+      ${fila('Ubicación', esc(e.ubicacion||'—'))}
+      ${fila('Alcance (Total/Parcial)', esc(e.tramite||'—'))}
+    </div>
+    ${e.descripcion?`<div style="font-size:0.78rem;color:#7a6840;background:rgba(200,149,42,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:0 8px 8px 0;line-height:1.5;margin-bottom:18px;">${esc(e.descripcion)}</div>`:''}
+    <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.8rem;font-weight:700;color:#8c6518;margin-bottom:12px;">🗒️ Observaciones</div>
+    <div id="esc-bitacora-lista" style="margin-bottom:6px;">${escRenderBitacora(e.bitacora||[])}</div>`;
   escActualizarTimelineDetalle(e.pasos||[]);
   escRenderNotasEtapa(e);
 }

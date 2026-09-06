@@ -4677,81 +4677,110 @@ function escImprimirFicha(){
   const obsTexto = (e.bitacora && e.bitacora[0] && e.bitacora[0].texto) ? esc(e.bitacora[0].texto) : '';
   const titulo = 'Escritura ' + esc(e.num||'');
   const fechaImp = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'long',year:'numeric'});
+  // Círculos del progreso: misma lógica de 4 estados que el resto del
+  // sistema (escActualizarTimeline) — verde=completado, azul=en proceso,
+  // dorado=siguiente paso pendiente, gris=pendiente bloqueado — y la misma
+  // barra de progreso (_escBarraGradiente) que ya se usa en el formulario,
+  // solo que aquí es una foto fija para imprimir.
+  const circulosHtml = pasos.map((p,i)=>{
+    const esComp = p.estado==='completado';
+    const esActivo = p.estado==='activo';
+    const esSiguiente = i===pasoActivo && !esActivo;
+    let bg,bd,fc;
+    if(esComp){ bg='#1a7a3a'; bd='#1a7a3a'; fc='#fff'; }
+    else if(esActivo){ bg='#2563eb'; bd='#2563eb'; fc='#fff'; }
+    else if(esSiguiente){ bg='#fdf6e3'; bd='#c8952a'; fc='#8c6518'; }
+    else { bg='#eee6d3'; bd='#cbbb95'; fc='#a89b7a'; }
+    const txt = esComp?'✓':(i+1);
+    return `<div style="width:19%;"><div class="ip-circ" style="background:${bg};border:2px solid ${bd};color:${fc};">${txt}</div><div class="ip-plbl">${esc(ESC_PASOS[i]).split(' ').join('<br>')}</div></div>`;
+  }).join('');
+  const trackGradient = (typeof _escBarraGradiente==='function') ? _escBarraGradiente(pasoActivo, pasoActivo>=0?pasos[pasoActivo].estado:'') : '#1a7a3a';
   const cuerpo = `<div class="ip-hoja">
     <div class="ip-hdr">
-      <h1>${titulo}</h1>
-      <div style="text-align:right;">
-        ${_folioTxt?`<div class="ip-folio">Folio: <strong>${esc(_folioTxt)}</strong></div>`:''}
-        <div class="ip-fecha">Impreso el ${fechaImp}</div>
-      </div>
+      <div class="ip-carp">${titulo}</div>
+      ${_folioTxt?`<div class="ip-folio-badge"><div class="lbl">FOLIO</div><div class="val">${esc(_folioTxt)}</div></div>`:''}
     </div>
-    ${e.folios?`<div class="ip-sec">${fila('Folios (Sist. Notarial)', esc(e.folios))}</div>`:''}
-    <div class="ip-sec">
-      <div class="ip-sec-tit">Clasificación Catastral</div>
-      <div class="ip-grid">
-        ${fila('Tipos de Movimientos', esc(ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento]||'—'))}
-        ${fila('Tipo de Trámite', esc(tramiteTxt))}
-        ${fila('Tipo de Terreno', esc(e.predio||'—'))}
-        ${fila('Uso de Suelo', esc(e.usoSuelo||'—'))}
-        ${fila('Construcción', esc(construccionTxt))}
-        ${fila('Carácter de Registro Público (IFREO)', esc(ifreoTxt))}
-      </div>
-      ${chipsCaract?`<div class="ip-nota">${esc(chipsCaract)}</div>`:''}
+    <div class="ip-sub-hdr">
+      ${e.folios?`<span>Folios (Sist. Notarial): ${esc(e.folios)}</span>`:'<span></span>'}
+      <span>Impreso el ${fechaImp}</span>
     </div>
-    <div class="ip-sec">
-      <div class="ip-sec-tit">Datos Notariales</div>
-      <div class="ip-grid4">
-        ${fila('Notaría No.', esc(e.notaria||'—'))}
-        ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
-        ${fila('Fecha de Firma', fechaFmt)}
-        ${fila('Cuenta Catastral', esc(e.cuentaCatastral||'—'))}
-      </div>
-      <div class="ip-grid" style="margin-top:4px;">
-        ${fila('Ubicación', esc(e.ubicacion||'—'))}
-        ${fila('Alcance (Total/Parcial)', esc(e.tramite||'—'))}
-      </div>
+    <div class="ip-personas">
+      <div class="ip-pcard"><div class="ip-plabel">COMPRADOR(A) / DONATARIO(A)</div>${renderPersonasImp(e.compradores)}</div>
+      <div class="ip-pcard"><div class="ip-plabel">VENDEDOR(A) / DONANTE</div>${renderPersonasImp(e.vendedores)}</div>
     </div>
-    <div class="ip-sec">
-      <div class="ip-sec-tit">Partes</div>
-      <div class="ip-personas">
-        <div><div class="ip-lbl">Compradores / Donatarios</div>${renderPersonasImp(e.compradores)}</div>
-        <div><div class="ip-lbl">Vendedores / Donantes</div>${renderPersonasImp(e.vendedores)}</div>
-      </div>
+    <div class="ip-sec-tit">📋 Resumen del Trámite</div>
+    <div class="ip-grid">
+      ${fila('Tipos de Movimientos', esc(ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento]||'—'))}
+      ${fila('Tipo de Trámite', esc(tramiteTxt))}
+      ${fila('Tipo de Terreno', esc(e.predio||'—'))}
+      ${fila('Uso de Suelo', esc(e.usoSuelo||'—'))}
     </div>
-    ${obsTexto?`<div class="ip-sec"><div class="ip-sec-tit">Observaciones</div><div class="ip-obs">${obsTexto}</div></div>`:''}
-    <div class="ip-sec">
-      <div class="ip-sec-tit">Progreso del Trámite</div>
-      <div class="ip-pasos">${pasosTxt}</div>
-      <div class="ip-nota" style="font-style:italic;">${llamado}</div>
+    <hr class="ip-hr">
+    <div class="ip-grid" style="margin-bottom:14px;">
+      ${fila('Construcción', esc(construccionTxt))}
+      ${fila('Carácter de Registro Público (IFREO)', esc(ifreoTxt))}
     </div>
+    ${chipsCaract?`<div class="ip-nota">${esc(chipsCaract)}</div>`:''}
+    <div class="ip-sec-tit-c">🏛 Datos Notariales</div>
+    <div class="ip-grid4">
+      ${fila('Notaría No.', esc(e.notaria||'—'))}
+      ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
+      ${fila('Fecha de Firma', fechaFmt)}
+      ${fila('Cuenta Catastral', esc(e.cuentaCatastral||'—'))}
+    </div>
+    <div class="ip-grid" style="margin-top:8px;margin-bottom:16px;">
+      ${fila('Ubicación', esc(e.ubicacion||'—'))}
+      ${fila('Alcance (Total/Parcial)', esc(e.tramite||'—'))}
+    </div>
+    ${obsTexto?`<div class="ip-sec-tit-c">🗒 Observaciones</div><div class="ip-obs"><span>•</span><span>${obsTexto}</span></div>`:''}
+    <div class="ip-sec-tit-c">📍 Progreso del Trámite</div>
+    <div class="ip-progreso-wrap">
+      <div class="ip-progreso-track" style="background:${trackGradient};"></div>
+      <div class="ip-progreso-row">${circulosHtml}</div>
+    </div>
+    ${pasoActivo===-1?'<div class="ip-completo">✓ Escritura completada en todos los pasos</div>':''}
+    <div class="ip-llamado-tit">🎯 Llamado a la Acción</div>
+    <div class="ip-llamado-txt">${llamado}</div>
     <div class="ip-foot">LEX-MÉXICO · Sistema Integral — Documento interno</div>
   </div>`;
   const win = window.open('','_blank','width=900,height=1000');
   if(!win){ if(typeof toast==='function') toast('El navegador bloqueó la ventana de impresión — permite ventanas emergentes e intenta de nuevo','err'); return; }
   win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+titulo+'</title>'
     +'<style>'
-    +'@page{size:letter;margin:16mm;}'
+    +'@page{size:letter;margin:14mm;}'
     +'*{box-sizing:border-box;}'
-    +'body{font-family:Georgia,"Times New Roman",serif;color:#1a1008;background:#fff;margin:0;padding:0;font-size:11.5px;}'
-    +'.ip-hoja{max-width:760px;margin:0 auto;}'
-    +'.ip-hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1a1008;padding-bottom:8px;margin-bottom:18px;}'
-    +'.ip-hdr h1{font-size:19px;margin:0;font-weight:700;}'
-    +'.ip-folio{font-size:11px;color:#333;}'
-    +'.ip-fecha{font-size:10px;color:#666;}'
-    +'.ip-sec{margin-bottom:16px;}'
-    +'.ip-sec-tit{font-family:Arial,sans-serif;font-size:10px;letter-spacing:0.08em;text-transform:uppercase;font-weight:700;border-bottom:1px solid #999;padding-bottom:4px;margin-bottom:8px;color:#333;}'
-    +'.ip-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;}'
-    +'.ip-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 16px;}'
-    +'.ip-campo{margin-bottom:3px;}'
-    +'.ip-lbl{font-family:Arial,sans-serif;font-size:8.5px;letter-spacing:0.05em;text-transform:uppercase;color:#777;margin-bottom:5px;}'
-    +'.ip-val{font-size:12px;font-weight:600;}'
-    +'.ip-personas{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;}'
-    +'.ip-persona{font-size:12px;margin-bottom:2px;}'
-    +'.ip-sub{font-size:10px;color:#555;margin:1px 0 4px 10px;}'
-    +'.ip-obs{font-size:11.5px;line-height:1.5;text-align:justify;}'
-    +'.ip-pasos{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:10.5px;margin-bottom:5px;}'
-    +'.ip-nota{font-size:10.5px;color:#444;margin-top:4px;}'
-    +'.ip-foot{margin-top:28px;border-top:1px solid #999;padding-top:8px;font-size:9px;color:#777;text-align:center;}'
+    +'body{font-family:Georgia,"Times New Roman",serif;color:#2a1f10;background:#fff;margin:0;padding:0;font-size:11.5px;}'
+    +'.ip-hoja{max-width:760px;margin:0 auto;background:#f2e8d5;border-radius:8px;padding:26px 32px;}'
+    +'.ip-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}'
+    +'.ip-carp{font-size:20px;font-weight:700;color:#5c4420;}'
+    +'.ip-folio-badge{border:1px solid #c8a860;border-radius:10px;padding:3px 14px;text-align:center;}'
+    +'.ip-folio-badge .lbl{font-family:Arial,sans-serif;font-size:8px;letter-spacing:0.12em;color:#8c6518;}'
+    +'.ip-folio-badge .val{font-family:Arial,sans-serif;font-size:13px;font-weight:700;color:#5c4420;}'
+    +'.ip-sub-hdr{display:flex;justify-content:space-between;font-family:Arial,sans-serif;font-size:9px;color:#8c6518;margin-bottom:16px;}'
+    +'.ip-personas{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px;}'
+    +'.ip-pcard{border:1px solid #c8a860;border-radius:16px;padding:10px 12px;text-align:center;}'
+    +'.ip-plabel{font-family:Arial,sans-serif;font-size:8px;letter-spacing:0.1em;color:#8c6518;margin-bottom:4px;}'
+    +'.ip-persona{font-size:12.5px;font-weight:700;}'
+    +'.ip-sub{font-size:9.5px;color:#8a7a5a;font-style:italic;margin:1px 0 3px;}'
+    +'.ip-sec-tit{display:flex;align-items:center;gap:6px;color:#8c6518;font-size:11.5px;margin-bottom:10px;font-family:Arial,sans-serif;}'
+    +'.ip-sec-tit-c{display:flex;align-items:center;justify-content:center;gap:6px;color:#8c6518;font-size:11.5px;margin:14px 0 10px;font-family:Arial,sans-serif;}'
+    +'.ip-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;}'
+    +'.ip-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}'
+    +'.ip-campo{margin-bottom:2px;}'
+    +'.ip-lbl{font-family:Arial,sans-serif;font-size:8px;letter-spacing:0.05em;color:#9a8a6a;margin-bottom:2px;}'
+    +'.ip-val{font-size:12px;}'
+    +'.ip-hr{border:none;border-top:1px solid #d9c89a;margin:10px 0;}'
+    +'.ip-nota{font-size:10px;color:#7a6840;margin:4px 0;}'
+    +'.ip-obs{display:flex;gap:8px;font-size:11px;line-height:1.5;text-align:justify;margin-bottom:6px;}'
+    +'.ip-progreso-wrap{position:relative;padding:0 4px;margin-bottom:6px;}'
+    +'.ip-progreso-track{position:absolute;top:16px;left:9%;right:9%;height:3px;border-radius:2px;z-index:0;}'
+    +'.ip-progreso-row{display:flex;justify-content:space-between;position:relative;z-index:1;}'
+    +'.ip-circ{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;margin:0 auto 5px;}'
+    +'.ip-plbl{font-family:Arial,sans-serif;font-size:7px;text-align:center;color:#7a6840;font-weight:700;}'
+    +'.ip-completo{text-align:center;font-family:Arial,sans-serif;font-size:10px;color:#1a7a3a;font-weight:700;border-top:1px solid #d9c89a;padding-top:8px;margin-bottom:4px;}'
+    +'.ip-llamado-tit{display:flex;align-items:center;gap:6px;color:#8c6518;font-size:11.5px;margin-top:14px;font-family:Arial,sans-serif;}'
+    +'.ip-llamado-txt{font-size:11px;color:#444;margin-top:4px;font-style:italic;}'
+    +'.ip-foot{margin-top:22px;border-top:1px solid #d9c89a;padding-top:8px;font-size:9px;color:#8a7a5a;text-align:center;font-family:Arial,sans-serif;}'
     +'</style>'
     +'</head><body>'
     + cuerpo
@@ -4811,9 +4840,12 @@ function escRenderNotasEtapa(e){
     }
     const i = pasoActivo;
     const p = pasos[i];
+    // Sin botón propio de guardado: el texto de esta caja se captura al
+    // vuelo en escGuardar() (botón GUARDAR general del formulario), igual
+    // que el resto de los campos — evita una segunda fuente de verdad que
+    // se pisaba con el modal de paso y hacía parecer que "no guardaba".
     const cuerpo = editable
-      ? `<textarea id="esc-nota-etapa-${suf?suf+'-':''}${i}" rows="2" placeholder="Escribe el estatus de esta etapa..." style="width:100%;box-sizing:border-box;border:1.5px solid #c8952a;border-radius:6px;background:#fff;padding:6px 9px;font-size:0.75rem;font-family:sans-serif;resize:vertical;margin-top:6px;">${esc(p.notas||'')}</textarea>
-        <button type="button" onclick="escGuardarNotaEtapaInline(${i},'${suf}')" style="margin-top:6px;background:linear-gradient(135deg,#c8952a,#8c6518);border:none;color:#fff;border-radius:6px;padding:5px 12px;font-size:0.68rem;font-weight:700;cursor:pointer;">💾 Guardar nota</button>`
+      ? `<textarea id="esc-nota-etapa-${suf?suf+'-':''}${i}" rows="2" placeholder="Escribe el estatus de esta etapa..." style="width:100%;box-sizing:border-box;border:1.5px solid #c8952a;border-radius:6px;background:#fff;padding:6px 9px;font-size:0.75rem;font-family:sans-serif;resize:vertical;margin-top:6px;">${esc(p.notas||'')}</textarea>`
       : (p.notas ? `<div style="font-size:0.75rem;color:#5c5648;margin-top:6px;">${esc(p.notas)}</div>` : '');
     cont.innerHTML = `<div style="background:#fff8e8;border-left:4px solid #c8952a;border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(200,149,42,0.15);padding:10px 12px;">
       <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;">${i+1}. ${ESC_PASOS[i]} · 🟡 En proceso</div>
@@ -4840,20 +4872,6 @@ async function escAgregarNotaFinal(suf){
   escSyncYRefrescar();
   escRenderNotasEtapa(e);
   toast('📝 Nota guardada');
-}
-function escGuardarNotaEtapaInline(idx, suf){
-  if(_escIdx<0 || !D.escrituras[_escIdx]) return;
-  const e = D.escrituras[_escIdx];
-  if(!e.pasos) e.pasos = Array(5).fill(null).map(()=>({estado:'pendiente',notas:'',fecha:''}));
-  const taId = 'esc-nota-etapa-'+(suf?suf+'-':'')+idx;
-  const ta = document.getElementById(taId);
-  const notas = (ta?.value||'').trim();
-  const fecha = new Date().toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  e.pasos[idx] = { estado:(e.pasos[idx]&&e.pasos[idx].estado)||'pendiente', notas, fecha };
-  e.fechaMod = new Date().toISOString();
-  escSyncYRefrescar();
-  escRenderNotasEtapa(e);
-  toast('📝 Nota de etapa guardada');
 }
 function escActualizarTimelineDetalle(pasos){
   const arr = Array(5).fill(null).map((_,i)=>pasos[i]||{estado:'pendiente',notas:'',fecha:''});
@@ -4951,14 +4969,19 @@ function escRender(){
     // Mini línea del tiempo con estado correcto
     const pasoActivo = completados < 5 ? completados : -1;
     const miniTimeline = pasos.map((p,i)=>{
-      const esComp  = p&&p.estado==='completado';
-      const esActiv = i===pasoActivo;
-      // Mismos colores que el resto del sistema: verde = completado,
-      // azul = en proceso (activo), gris = pendiente.
-      const col = esComp?'#1a7a3a':esActiv?'#2563eb':'#d0c8b8';
-      const bg  = esComp?'#1a7a3a':esActiv?'#2563eb':'#f5f0e8';
+      const esComp    = p&&p.estado==='completado';
+      const esActivo  = p&&p.estado==='activo';
+      const esSiguiente = i===pasoActivo && !esActivo;
+      // Misma lógica de 4 estados que las bolitas del formulario de edición
+      // (escActualizarTimeline): verde = completado, azul = en proceso
+      // (estado 'activo' explícito), dorado = pendiente pero es el siguiente
+      // paso a trabajar, gris = pendiente y bloqueado.
+      let col, bg, fc;
+      if(esComp){ col='#1a7a3a'; bg='#1a7a3a'; fc='#fff'; }
+      else if(esActivo){ col='#2563eb'; bg='#2563eb'; fc='#fff'; }
+      else if(esSiguiente){ col='#c8952a'; bg='#fff8e8'; fc='#8c6518'; }
+      else { col='#d0c8b8'; bg='#f5f0e8'; fc='#bbb'; }
       const txt = esComp?'✓':(i+1);
-      const fc  = esComp||esActiv?'#fff':'#bbb';
       const lbl = esc(ESC_PASOS[i]).split(' ').join('<br>');
       return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">
         <div style="width:26px;height:26px;border-radius:50%;border:2.5px solid ${col};background:${bg};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;color:${fc};flex-shrink:0;" title="${esc(ESC_PASOS[i])}">${txt}</div>
@@ -5420,6 +5443,24 @@ function escGuardar(){
     const pasos = _escIdx>=0
       ? (D.escrituras[_escIdx].pasos || Array(5).fill(null).map(()=>({estado:'pendiente',notas:'',fecha:''})))
       : Array(5).fill(null).map(()=>({estado:'pendiente',notas:'',fecha:''}));
+    // La caja de texto de "Llamado a la Acción" (etapa activa) ya no tiene
+    // botón propio de guardado: su valor se captura aquí, junto con el resto
+    // del formulario, al presionar el botón GUARDAR general.
+    (() => {
+      const completadosAntes = pasos.filter(p=>p.estado==='completado').length;
+      const pasoActivoAntes  = completadosAntes<5 ? completadosAntes : -1;
+      if(pasoActivoAntes<0) return;
+      const ta = document.getElementById('esc-nota-etapa-edit-'+pasoActivoAntes);
+      if(!ta) return;
+      const notasNuevas = ta.value.trim();
+      if(notasNuevas !== (pasos[pasoActivoAntes].notas||'')){
+        pasos[pasoActivoAntes] = {
+          ...pasos[pasoActivoAntes],
+          notas: notasNuevas,
+          fecha: new Date().toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+        };
+      }
+    })();
     const e = {
       num,
       notaria:     (document.getElementById('eNotaria')?.value||'').trim(),
@@ -5563,40 +5604,50 @@ function escActualizarTimeline(pasos){
   }
 }
 function escClickPaso(pasoIdx){
-  // Verificar que hay una escritura activa
-  if(_escIdx < 0 || !D.escrituras || !D.escrituras[_escIdx]){
-    toast('Abre la escritura primero','err'); return;
+  try{
+    // Verificar que hay una escritura activa
+    if(_escIdx < 0 || !D.escrituras || !D.escrituras[_escIdx]){
+      toast('Abre la escritura primero','err'); return;
+    }
+    const e   = D.escrituras[_escIdx];
+    const arr = Array(5).fill(null).map((_,i)=>(e.pasos||[])[i]||{estado:'pendiente',notas:'',fecha:''});
+    const completados = arr.filter(p=>p.estado==='completado').length;
+    const pasoActivo  = completados < 5 ? completados : -1;
+    // Solo el paso activo es clickeable
+    if(pasoIdx !== pasoActivo){
+      if(pasoIdx < pasoActivo) toast('Este paso ya está completado','err');
+      return;
+    }
+    escAbrirPaso(pasoIdx);
+  }catch(err){
+    console.error('[escClickPaso]', err);
+    toast('Error al abrir el paso: '+err.message,'err');
   }
-  const e   = D.escrituras[_escIdx];
-  const arr = Array(5).fill(null).map((_,i)=>(e.pasos||[])[i]||{estado:'pendiente',notas:'',fecha:''});
-  const completados = arr.filter(p=>p.estado==='completado').length;
-  const pasoActivo  = completados < 5 ? completados : -1;
-  // Solo el paso activo es clickeable
-  if(pasoIdx !== pasoActivo){
-    if(pasoIdx < pasoActivo) toast('Este paso ya está completado','err');
-    return;
-  }
-  escAbrirPaso(pasoIdx);
 }
 function escAbrirPaso(pasoIdx){
-  if(_escIdx<0){toast('Guarda la escritura primero','err');return;}
-  _escPasoIdx=pasoIdx;
-  _escIaHist=[];
-  const e=D.escrituras[_escIdx];
-  const p=(e.pasos||[])[pasoIdx]||{estado:'pendiente',notas:'',fecha:''};
-  document.getElementById('mEscPasoTitulo').textContent='Paso '+(pasoIdx+1)+' — '+ESC_PASOS[pasoIdx];
-  document.getElementById('paso-notas').value=p.notas||'';
-  document.getElementById('paso-estado-hidden').value=p.estado||'pendiente';
-  document.getElementById('paso-fecha-upd').textContent=p.fecha?'Última actualización: '+fmtFecha(p.fecha):'Sin actualizaciones aún';
-  // Resaltar botón de estado activo
-  ['pendiente','activo','completado'].forEach(s=>{
-    const btn=document.getElementById('paso-btn-'+s);
-    if(btn) btn.style.opacity=p.estado===s?'1':'0.4';
-  });
-  // Limpiar chat IA
-  document.getElementById('esc-ia-msgs').innerHTML=`<div style="color:var(--muted);font-size:0.72rem;font-style:italic;">Hola. Tengo acceso al estado completo de esta escritura. Pregúntame sobre este paso o el trámite en general.</div>`;
-  document.getElementById('esc-ia-inp').value='';
-  $('mEscPaso').classList.add('show');
+  try{
+    if(_escIdx<0){toast('Guarda la escritura primero','err');return;}
+    _escPasoIdx=pasoIdx;
+    _escIaHist=[];
+    const e=D.escrituras[_escIdx];
+    const p=(e.pasos||[])[pasoIdx]||{estado:'pendiente',notas:'',fecha:''};
+    document.getElementById('mEscPasoTitulo').textContent='Paso '+(pasoIdx+1)+' — '+ESC_PASOS[pasoIdx];
+    document.getElementById('paso-notas').value=p.notas||'';
+    document.getElementById('paso-estado-hidden').value=p.estado||'pendiente';
+    document.getElementById('paso-fecha-upd').textContent=p.fecha?'Última actualización: '+fmtFecha(p.fecha):'Sin actualizaciones aún';
+    // Resaltar botón de estado activo
+    ['pendiente','activo','completado'].forEach(s=>{
+      const btn=document.getElementById('paso-btn-'+s);
+      if(btn) btn.style.opacity=p.estado===s?'1':'0.4';
+    });
+    // Limpiar chat IA
+    document.getElementById('esc-ia-msgs').innerHTML=`<div style="color:var(--muted);font-size:0.72rem;font-style:italic;">Hola. Tengo acceso al estado completo de esta escritura. Pregúntame sobre este paso o el trámite en general.</div>`;
+    document.getElementById('esc-ia-inp').value='';
+    $('mEscPaso').classList.add('show');
+  }catch(err){
+    console.error('[escAbrirPaso]', err);
+    toast('Error al abrir el paso: '+err.message,'err');
+  }
 }
 function escPasoSetEstado(estado){
   document.getElementById('paso-estado-hidden').value=estado;

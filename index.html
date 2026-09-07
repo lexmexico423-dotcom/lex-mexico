@@ -15252,7 +15252,10 @@ Recibo original im…</td>
           </div>
           <!-- ══ LÍNEA DEL TIEMPO ══ -->
           <div style="margin-bottom:16px;">
-            <div style="font-family:monospace;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:16px;">📍 Progreso del Trámite</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+              <div style="font-family:monospace;font-size:0.62rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">📍 Progreso del Trámite</div>
+              <button type="button" id="esc-btn-editar-pasos" onclick="escToggleModoEditarPasos()" title="Permite corregir cualquier paso, incluidos los completados" style="font-family:monospace;font-size:0.6rem;font-weight:700;color:#8c6518;background:#fff8e8;border:1px solid #d4b870;border-radius:14px;padding:3px 10px;cursor:pointer;">✎ Editar</button>
+            </div>
             <div style="position:relative;padding:0 4px;width:100%;box-sizing:border-box;">
               <!-- Barra de fondo -->
               <div id="esc-progreso-track" style="position:absolute;top:17px;left:10%;right:10%;height:3px;background:#e0ddd5;border-radius:2px;z-index:0;transition:background 0.4s;">
@@ -15301,7 +15304,10 @@ Recibo original im…</td>
           <div id="esc-notas-etapa"></div>
           <!-- Línea del tiempo interactiva -->
           <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-l);">
-            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;">📍 Progreso del Trámite</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">📍 Progreso del Trámite</div>
+              <button type="button" id="esc-btn-editar-pasos-d" onclick="escToggleModoEditarPasos()" title="Permite corregir cualquier paso, incluidos los completados" style="font-family:monospace;font-size:0.6rem;font-weight:700;color:#8c6518;background:#fff8e8;border:1px solid #d4b870;border-radius:14px;padding:3px 10px;cursor:pointer;">✎ Editar</button>
+            </div>
             <div style="position:relative;padding:0 4px;width:100%;box-sizing:border-box;">
               <div id="esc-progreso-track-d" style="position:absolute;top:17px;left:10%;right:10%;height:3px;background:#e0ddd5;border-radius:2px;z-index:0;transition:background 0.4s;">
                 <div id="esc-progreso-barra-d" style="display:none;"></div>
@@ -19385,7 +19391,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=202609065"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=202609067"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

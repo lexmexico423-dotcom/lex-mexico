@@ -17,7 +17,7 @@
 <!-- SDK de Supabase (carga clásica, no módulo dinámico — evita problemas con Brave/adblockers) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="assets/js/integrations/oauth-popup-relay.js?v=20260904d"></script>
-<link rel="stylesheet" href="assets/css/core/application.css?v=20260904g">
+<link rel="stylesheet" href="assets/css/core/application.css?v=20260904h">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <!-- PDF.js: extracción de texto de PDFs con capa de texto (gratuito, sin API) -->
@@ -14773,17 +14773,34 @@ Recibo original im…</td>
       <div class="search-row">
         <input class="search-inp" placeholder="🔍 Buscar por nombre, archivo, notaría..." id="escQ" oninput="escRender()">
         <input type="file" id="escImportInput" accept=".xlsx,.xls,.xlsm,.csv" style="display:none" onchange="escProcesarArchivoExcel(this)">
-        <button class="btn" onclick="escImportarExcel()" style="background:rgba(200,149,42,0.12);border:1.5px solid var(--gold);color:var(--gold-d);font-weight:700;">📥 Importar Excel</button>
-        <button class="btn" onclick="escLimpiarImportacionesVacias()" style="background:rgba(192,22,26,0.08);border:1.5px solid rgba(192,22,26,0.3);color:#c0161a;font-weight:700;" title="Borra las filas de una importación que quedaron sin ningún dato real">🧹 Limpiar vacías</button>
+        <div id="escCountBox" style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);border:1.5px solid var(--border-l);border-radius:var(--radius-sm);padding:6px 20px;flex-shrink:0;line-height:1.15;">
+          <span id="escCountNum" style="font-size:1.3rem;font-weight:800;color:var(--gold-d);font-family:monospace;">0</span>
+          <span style="font-size:0.62rem;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Escrituras</span>
+        </div>
         <button class="btn btn-primary" onclick="escAbrirNueva()">＋ Nueva Escritura</button>
       </div>
       <!-- Semáforo / Filtros -->
       <div style="display:flex;gap:8px;padding:10px 16px;flex-wrap:wrap;">
-        <button class="fbtn activo" id="escF-todos" onclick="escSetFiltro(&#39;todos&#39;,this)" style="background:rgba(200,149,42,0.12);border:1.5px solid rgba(200,149,42,0.3);color:var(--gold-d);border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">Todos</button>
-        <button class="fbtn" id="escF-proceso" onclick="escSetFiltro(&#39;proceso&#39;,this)" style="background:rgba(200,149,42,0.08);border:1.5px solid rgba(200,149,42,0.25);color:#9a6010;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">🟡 En Proceso</button>
-        <button class="fbtn" id="escF-listo" onclick="escSetFiltro(&#39;listo&#39;,this)" style="background:rgba(26,122,58,0.08);border:1.5px solid rgba(26,122,58,0.25);color:#1a7a3a;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">🟢 Listo p/Entregar</button>
-        <button class="fbtn" id="escF-espera" onclick="escSetFiltro(&#39;espera&#39;,this)" style="background:rgba(0,0,0,0.05);border:1.5px solid rgba(0,0,0,0.12);color:#7a6840;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">⚫ En Espera</button>
-        <button class="fbtn" id="escF-archivado" onclick="escSetFiltro(&#39;archivado&#39;,this)" style="background:rgba(122,104,64,0.1);border:1.5px dashed rgba(122,104,64,0.4);color:#7a6840;border-radius:20px;padding:5px 16px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;">🗄 Archivado</button>
+        <button class="fbtn activo" id="escF-todos" onclick="escSetFiltro(&#39;todos&#39;,this)"
+          data-bg="rgba(200,149,42,0.12)" data-bd="1.5px solid rgba(200,149,42,0.3)" data-fg="var(--gold-d)" data-shadow="none"
+          data-bg-on="linear-gradient(135deg,#d4a53a,#8c6518)" data-bd-on="1.5px solid #8c6518" data-fg-on="#fff" data-shadow-on="0 3px 10px rgba(140,101,24,0.35)"
+          style="background:linear-gradient(135deg,#d4a53a,#8c6518);border:1.5px solid #8c6518;color:#fff;box-shadow:0 3px 10px rgba(140,101,24,0.35);border-radius:20px;padding:6px 18px;font-family:monospace;font-size:0.68rem;font-weight:900;cursor:pointer;transition:all 0.15s;">Todos</button>
+        <button class="fbtn" id="escF-proceso" onclick="escSetFiltro(&#39;proceso&#39;,this)"
+          data-bg="rgba(200,149,42,0.08)" data-bd="1.5px solid rgba(200,149,42,0.25)" data-fg="#9a6010" data-shadow="none"
+          data-bg-on="linear-gradient(135deg,#e0a83a,#c8952a)" data-bd-on="1.5px solid #9a6010" data-fg-on="#fff" data-shadow-on="0 3px 10px rgba(200,149,42,0.35)"
+          style="background:rgba(200,149,42,0.08);border:1.5px solid rgba(200,149,42,0.25);color:#9a6010;border-radius:20px;padding:6px 18px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;transition:all 0.15s;">🟡 En Proceso</button>
+        <button class="fbtn" id="escF-listo" onclick="escSetFiltro(&#39;listo&#39;,this)"
+          data-bg="rgba(26,122,58,0.08)" data-bd="1.5px solid rgba(26,122,58,0.25)" data-fg="#1a7a3a" data-shadow="none"
+          data-bg-on="linear-gradient(135deg,#1a7a3a,#155c2c)" data-bd-on="1.5px solid #155c2c" data-fg-on="#fff" data-shadow-on="0 3px 10px rgba(26,122,58,0.35)"
+          style="background:rgba(26,122,58,0.08);border:1.5px solid rgba(26,122,58,0.25);color:#1a7a3a;border-radius:20px;padding:6px 18px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;transition:all 0.15s;">🟢 Listo p/Entregar</button>
+        <button class="fbtn" id="escF-espera" onclick="escSetFiltro(&#39;espera&#39;,this)"
+          data-bg="rgba(0,0,0,0.05)" data-bd="1.5px solid rgba(0,0,0,0.12)" data-fg="#7a6840" data-shadow="none"
+          data-bg-on="linear-gradient(135deg,#7a6840,#5c4d30)" data-bd-on="1.5px solid #5c4d30" data-fg-on="#fff" data-shadow-on="0 3px 10px rgba(0,0,0,0.25)"
+          style="background:rgba(0,0,0,0.05);border:1.5px solid rgba(0,0,0,0.12);color:#7a6840;border-radius:20px;padding:6px 18px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;transition:all 0.15s;">⚫ En Espera</button>
+        <button class="fbtn" id="escF-archivado" onclick="escSetFiltro(&#39;archivado&#39;,this)"
+          data-bg="rgba(122,104,64,0.1)" data-bd="1.5px dashed rgba(122,104,64,0.4)" data-fg="#7a6840" data-shadow="none"
+          data-bg-on="linear-gradient(135deg,#8a7550,#5c4d30)" data-bd-on="1.5px solid #5c4d30" data-fg-on="#fff" data-shadow-on="0 3px 10px rgba(122,104,64,0.3)"
+          style="background:rgba(122,104,64,0.1);border:1.5px dashed rgba(122,104,64,0.4);color:#7a6840;border-radius:20px;padding:6px 18px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;transition:all 0.15s;">🗄 Archivado</button>
       </div>
       <div id="esc-lista" style="padding:0 12px 24px;"></div>
     </div><!-- fin panel-escrituras -->
@@ -15040,7 +15057,7 @@ Recibo original im…</td>
     </div><!-- fin panel-gestiones -->
     <!-- MODAL DETALLE ESCRITURA -->
     <div class="modal-ov" id="mEscritura">
-      <div class="modal wide" style="max-width:960px;width:95vw;max-height:92vh;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;margin:auto;">
+      <div class="modal wide" style="max-width:960px;width:95vw;max-height:92vh;overflow-x:hidden;box-sizing:border-box;margin:auto;">
         <div class="modal-hdr">
           <div style="display:flex;align-items:center;gap:16px;min-width:0;flex:1;">
             <h3 id="mEscTitulo" style="font-family:serif;font-size:1.5rem;color:#8c6518;font-weight:700;">Nueva Escritura</h3>
@@ -15051,8 +15068,8 @@ Recibo original im…</td>
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
             <div id="eFolioBadgeHdr" onclick="escVerFolioVinculado()" title="Ver ficha del recibo vinculado" style="display:none;cursor:pointer;background:rgba(59,130,246,0.08);border:1.5px solid rgba(59,130,246,0.3);border-radius:8px;padding:3px 12px;text-align:center;line-height:1.25;flex-shrink:0;">
-              <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.1em;color:#7a8ba0;font-weight:700;">FOLIO</div>
-              <div id="eFolioBadgeHdrVal" style="font-family:monospace;font-size:0.9rem;color:#1a4a8a;font-weight:800;">—</div>
+              <div style="font-family:serif;font-size:0.6rem;letter-spacing:0.1em;color:#8c6518;font-weight:700;">FOLIO</div>
+              <div id="eFolioBadgeHdrVal" style="font-family:serif;font-size:1.3rem;color:#1a4a8a;font-weight:800;">—</div>
             </div>
             <span id="eEstadoBadgeHdr" style="display:none;font-size:0.68rem;font-weight:700;padding:5px 14px;border-radius:14px;white-space:nowrap;flex-shrink:0;"></span>
             <button class="modal-x" onclick="cerrar(&#39;mEscritura&#39;)">✕</button>
@@ -15267,7 +15284,7 @@ Recibo original im…</td>
           </div>
         </div><!-- /modal-body-form -->
         <!-- ── VISTA DETALLE (solo lectura) — FUERA del form ── -->
-        <div id="esc-vista-detalle" style="display:none;padding:20px;">
+        <div id="esc-vista-detalle" style="display:none;padding:20px;flex:1;overflow-y:auto;box-sizing:border-box;">
           <!-- Info principal (estatus + comprador/vendedor) -->
           <div id="esc-detalle-header-top"></div>
           <!-- Notas por etapa / Llamado a la Acción / Requiere atención -->
@@ -15303,19 +15320,23 @@ Recibo original im…</td>
               </div>
             </div>
             <div id="esc-detalle-hint" style="text-align:center;font-size:0.65rem;color:var(--muted);margin-top:10px;font-family:monospace;"></div>
+            <div id="esc-btn-confirmar-entrega" style="display:none;justify-content:center;margin-top:14px;">
+              <button type="button" onclick="escConfirmarEntrega()" style="background:linear-gradient(135deg,#1a7a3a,#155c2c);border:none;color:#fff;border-radius:10px;padding:10px 22px;font-family:sans-serif;font-size:0.8rem;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(26,122,58,0.25);">✅ Se confirma entrega de escrituras</button>
+            </div>
           </div>
           <!-- Resto del detalle (resumen, notariales, observaciones) -->
           <div id="esc-detalle-header-bottom" style="margin-top:20px;"></div>
         </div>
         <!-- ── FOOTER FORMULARIO ── -->
         <div id="esc-ftr-form" class="modal-ftr">
+          <button class="btn" style="background:var(--rojo-l);color:var(--rojo);border:1px solid var(--rojo);margin-right:8px;" onclick="escEliminar()">🗑 Eliminar</button>
+          <button class="btn" style="background:rgba(122,104,64,0.12);color:#7a6840;border:1px solid rgba(122,104,64,0.4);margin-right:auto;" onclick="escCancelar()">🚫 Cancelar Escritura</button>
           <button class="btn btn-ghost" onclick="cerrar(&#39;mEscritura&#39;)">Cancelar</button>
           <button class="btn btn-primary" onclick="escGuardar()">💾 Guardar</button>
         </div>
         <!-- ── FOOTER DETALLE ── -->
         <div id="esc-ftr-detalle" class="modal-ftr" style="display:none;">
           <button class="btn btn-ghost" onclick="cerrar(&#39;mEscritura&#39;)">✕ Cerrar</button>
-          <button class="btn" style="background:var(--rojo-l);color:var(--rojo);border:1px solid var(--rojo);" onclick="escEliminar()">🗑 Eliminar</button>
           <button class="btn btn-ghost" onclick="escImprimirFicha()">🖨️ Imprimir</button>
           <button class="btn btn-primary" onclick="escModoEditar()">✏️ Editar</button>
         </div>
@@ -15355,15 +15376,6 @@ Recibo original im…</td>
             <textarea id="paso-notas" rows="4" placeholder="Ej: Ingresado el 15/01/26. Esperando cédula catastral. Ref: 2026-1234. Hablar con Ing. Ramírez el viernes."></textarea>
           </div>
           <div id="paso-fecha-upd" style="font-family:monospace;font-size:0.6rem;color:var(--muted);margin-bottom:12px;"></div>
-          <!-- Chat IA -->
-          <div style="border-top:1px solid var(--border-l);padding-top:12px;">
-            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;">🤖 Consultar con IA</div>
-            <div id="esc-ia-msgs" style="max-height:200px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;margin-bottom:8px;padding:8px;background:#f5f0e8;border-radius:8px;min-height:60px;font-size:0.78rem;"></div>
-            <div style="display:flex;gap:6px;">
-              <textarea id="esc-ia-inp" rows="2" placeholder="Pregunta sobre este paso o el trámite en general..." style="flex:1;resize:none;font-family:sans-serif;font-size:0.8rem;" onkeydown="if(event.key===&#39;Enter&#39;&amp;&amp;!event.shiftKey){event.preventDefault();escIaEnviar();}"></textarea>
-              <button onclick="escIaEnviar()" style="background:var(--gold);border:none;color:#1a1008;border-radius:8px;padding:0 14px;cursor:pointer;font-weight:700;font-size:0.8rem;font-family:sans-serif;">Enviar</button>
-            </div>
-          </div>
         </div>
         <div class="modal-ftr">
           <button class="btn btn-ghost" onclick="cerrar(&#39;mEscPaso&#39;)">Cancelar</button>
@@ -19361,7 +19373,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20260904r"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=202609046"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

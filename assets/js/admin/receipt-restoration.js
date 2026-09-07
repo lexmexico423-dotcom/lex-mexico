@@ -4566,7 +4566,8 @@ function escMostrarDetalle(e){
     listo:  {col:'#1a7a3a',bg:'rgba(26,122,58,0.08)', lbl:'🟢 Listo p/Entregar'},
     espera: {col:'#7a6840',bg:'rgba(0,0,0,0.04)',      lbl:'⬜ En Espera'},
     archivado:{col:'#7a6840',bg:'rgba(122,104,64,0.08)',lbl:'🗄 Archivado'},
-    cancelado:{col:'#a32d2d',bg:'rgba(163,45,45,0.08)',lbl:'❌ Cancelado'}
+    cancelado:{col:'#a32d2d',bg:'rgba(163,45,45,0.08)',lbl:'❌ Cancelado'},
+    noprocedio:{col:'#7a2020',bg:'rgba(122,32,32,0.08)',lbl:'⛔ No Procedió'}
   };
   const st = cfg[e.estado||'proceso']||cfg.proceso;
   const fila = (lbl,val) => val ? `<div style="text-align:left;">
@@ -5202,8 +5203,8 @@ function escRender(){
   let lista = D.escrituras.filter(e=>{
     if(_escFiltro==='todos'){
       // "Todos" = En Proceso + Listo p/Entregar + recién creadas sin estatus
-      // asignado todavía — excluye En Espera, Archivado y Cancelado.
-      if(e.estado==='espera' || e.estado==='archivado' || e.estado==='cancelado') return false;
+      // asignado todavía — excluye En Espera, Archivado, Cancelado y No Procedió.
+      if(e.estado==='espera' || e.estado==='archivado' || e.estado==='cancelado' || e.estado==='noprocedio') return false;
     } else if(_escFiltro==='archivado'){
       // El filtro Archivado incluye también las Canceladas.
       if(e.estado!=='archivado' && e.estado!=='cancelado') return false;
@@ -5226,14 +5227,20 @@ function escRender(){
   // para En Espera, Archivado ni Cancelado. Se calcula siempre sobre TODO
   // D.escrituras (no solo lo que pasó el filtro/búsqueda actuales), para que
   // el número de cada una sea estable sin importar qué pestaña tengas
-  // abierta. La firmada más antigua es el folio 1; la más reciente tiene el
-  // folio más alto (misma lógica de fechaFirma que el orden de la lista).
+  // abierta.
+  // Se ordena EXACTAMENTE igual que la lista visible (más reciente primero)
+  // y luego se numera al revés, para que el número de cada una sea siempre
+  // el inverso exacto de su posición en pantalla — sin importar cómo se
+  // resuelvan los empates (p.ej. varias sin fecha exacta, solo con año).
+  // Así el de más arriba siempre tiene el número más alto y el de hasta
+  // abajo siempre es el folio 1, nunca al revés.
   const _pendientesOrdenadas = D.escrituras
     .filter(x=>!x.estado || x.estado==='proceso' || x.estado==='listo')
     .slice()
-    .sort((a,b)=>(a.fechaFirma||'9999-99-99').localeCompare(b.fechaFirma||'9999-99-99'));
+    .sort((a,b)=>(b.fechaFirma||'9999-99-99').localeCompare(a.fechaFirma||'9999-99-99'));
   const _folioPendienteMap = new Map();
-  _pendientesOrdenadas.forEach((x,i)=>_folioPendienteMap.set(x,i+1));
+  const _totalPendientes = _pendientesOrdenadas.length;
+  _pendientesOrdenadas.forEach((x,i)=>_folioPendienteMap.set(x, _totalPendientes-i));
   // Contador de escrituras (respeta el filtro de semáforo y la búsqueda
   // activos) — reemplaza a los botones de Importar Excel / Limpiar vacías,
   // que se quitaron de esta barra (las funciones siguen existiendo en el
@@ -5251,6 +5258,7 @@ function escRender(){
     espera:   {col:'#7a6840',bg:'rgba(0,0,0,0.04)',dot:'#aaa',lbl:'⬜ En Espera'},
     archivado:{col:'#7a6840',bg:'rgba(122,104,64,0.08)',dot:'#7a6840',lbl:'🗄 Archivado'},
     cancelado:{col:'#a32d2d',bg:'rgba(163,45,45,0.08)',dot:'#a32d2d',lbl:'❌ Cancelado'},
+    noprocedio:{col:'#7a2020',bg:'rgba(122,32,32,0.08)',dot:'#7a2020',lbl:'⛔ No Procedió'},
   };
   cont.innerHTML = lista.map(e=>{
     const idx = D.escrituras.indexOf(e);
@@ -5259,13 +5267,8 @@ function escRender(){
     const completados = pasos.filter(p=>p.estado==='completado').length;
     const pct = Math.round(completados/5*100);
     const getNombre = p => typeof p==='string' ? p : (p.nombre||'');
-    const getLabel  = p => {
-      const n = getNombre(p);
-      const c = typeof p==='object' && p.civil ? ` (${p.civil})` : '';
-      return n+c;
-    };
-    const comp = (e.compradores||[]).map(getLabel).join(', ')||'Sin comprador';
-    const vend = (e.vendedores||[]).length ? (e.vendedores||[]).map(getLabel).join(', ') : '';
+    const comp = (e.compradores||[]).map(getNombre).join(', ')||'Sin comprador';
+    const vend = (e.vendedores||[]).length ? (e.vendedores||[]).map(getNombre).join(', ') : '';
     // Rol dinámico de cada parte según el Tipo de Trámite (mismo catálogo
     // que ya usa la ficha de detalle) y nombre del acto (ej. "COMPRAVENTA").
     const _parCaracterCard = ESC_CARACTER_POR_TRAMITE[e.tipoTramiteCatastro] || null;
@@ -5285,6 +5288,35 @@ function escRender(){
     const folioPendiente = _folioPendienteMap.get(e);
     // Mini línea del tiempo con estado correcto
     const pasoActivo = completados < 5 ? completados : -1;
+    // Frase del "Llamado a la Acción" (misma lógica que escRenderNotasEtapa,
+    // condensada a una línea) — solo aplica a escrituras En Proceso, igual
+    // que en la ficha de detalle.
+    let _llamadoTxt = '', _llamadoAtencion = false;
+    if(e.estado==='proceso'){
+      if(pasoActivo===-1){
+        _llamadoTxt = '✓ ' + (e.notaFinal ? esc(e.notaFinal) : 'Trámite completado en todas las etapas');
+      } else {
+        const _pAct = pasos[pasoActivo] || {notas:''};
+        const _dias = e.pasoActivoFecha ? (Date.now()-new Date(e.pasoActivoFecha).getTime())/86400000 : Infinity;
+        const _umbralCard = e.pasoActivoRequerimientos ? ESC_DIAS_REQUIERE_ATENCION_REQUERIMIENTOS : (e.pasoActivoEnEspera ? ESC_DIAS_REQUIERE_ATENCION_ESPERA : ESC_DIAS_REQUIERE_ATENCION);
+        if(_dias >= _umbralCard){
+          _llamadoAtencion = true;
+          _llamadoTxt = '⏸ Requiere atención: ' + (_pAct.notas ? esc(_pAct.notas) : 'Sin nota registrada');
+        } else {
+          _llamadoTxt = _pAct.notas ? esc(_pAct.notas) : (esc(ESC_PASOS[pasoActivo]) + ' · En proceso');
+        }
+      }
+    }
+    // El tramo entre un círculo y el siguiente refleja el mismo avance que
+    // la barra grande de la ficha/formulario (_escBarraGradiente): verde
+    // completo si ya se pasó ese paso, mitad azul si es el paso activo y su
+    // estatus es "activo" (llega justo a la mitad del siguiente círculo),
+    // gris el resto.
+    const _conectorTramo = (i) => {
+      if(pasoActivo===-1 || i<pasoActivo) return `<div style="flex:1;height:2px;background:#1a7a3a;margin-top:13px;"></div>`;
+      if(i===pasoActivo && pasos[i] && pasos[i].estado==='activo') return `<div style="flex:1;height:2px;margin-top:13px;background:linear-gradient(to right,#2563eb 0%,#2563eb 50%,#e0ddd5 50%,#e0ddd5 100%);"></div>`;
+      return `<div style="flex:1;height:2px;background:#e0ddd5;margin-top:13px;"></div>`;
+    };
     const miniTimeline = pasos.map((p,i)=>{
       const esComp    = p&&p.estado==='completado';
       const esActivo  = p&&p.estado==='activo';
@@ -5300,11 +5332,12 @@ function escRender(){
       else { col='#d0c8b8'; bg='#f5f0e8'; fc='#bbb'; }
       const txt = esComp?'✓':(i+1);
       const lbl = esc(ESC_PASOS[i]).split(' ').join('<br>');
-      return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">
+      const circulo = `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;">
         <div style="width:26px;height:26px;border-radius:50%;border:2.5px solid ${col};background:${bg};display:flex;align-items:center;justify-content:center;font-size:0.6rem;font-weight:700;color:${fc};flex-shrink:0;" title="${esc(ESC_PASOS[i])}">${txt}</div>
         <div style="font-family:monospace;font-size:0.48rem;font-weight:700;text-align:center;color:var(--muted);line-height:1.25;white-space:nowrap;">${lbl}</div>
       </div>`;
-    }).join('<div style="flex:1;height:2px;background:#e0ddd5;margin-top:13px;"></div>');
+      return i<4 ? circulo+_conectorTramo(i) : circulo;
+    }).join('');
     return `<div onclick="escAbrirDetalle(${idx})" style="background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;">
         <div style="display:flex;gap:14px;min-width:0;flex:1;">
@@ -5315,16 +5348,16 @@ function escRender(){
           <div style="min-width:0;">
             <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:4px;">
               ${actoTxt?`<div style="font-family:monospace;font-size:0.78rem;font-weight:800;color:#8c6518;letter-spacing:0.03em;">${actoTxt}</div>`:''}
-              ${_instrTxt?`<div style="font-family:monospace;font-size:0.62rem;color:var(--muted);white-space:nowrap;"><span style="font-weight:700;">INSTR.</span> ${_instrTxt}</div>`:''}
-              ${_volTxt?`<div style="font-family:monospace;font-size:0.62rem;color:var(--muted);white-space:nowrap;"><span style="font-weight:700;">VOL.</span> ${_volTxt}</div>`:''}
-              ${_fechaFirmaCard?`<div style="font-family:monospace;font-size:0.62rem;color:var(--muted);white-space:nowrap;"><span style="font-weight:700;">FECHA DE FIRMA</span> ${_fechaFirmaCard}</div>`:''}
+              ${_instrTxt?`<div style="font-family:monospace;font-size:0.62rem;white-space:nowrap;"><span style="font-weight:700;color:var(--muted);">INSTR.</span> <span style="color:var(--ink);font-weight:700;">${_instrTxt}</span></div>`:''}
+              ${_volTxt?`<div style="font-family:monospace;font-size:0.62rem;white-space:nowrap;"><span style="font-weight:700;color:var(--muted);">VOL.</span> <span style="color:var(--ink);font-weight:700;">${_volTxt}</span></div>`:''}
+              ${_fechaFirmaCard?`<div style="font-family:monospace;font-size:0.62rem;white-space:nowrap;"><span style="font-weight:700;color:var(--muted);">FECHA DE FIRMA</span> <span style="color:var(--ink);font-weight:700;">${_fechaFirmaCard}</span></div>`:''}
             </div>
             <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">👤 ${esc(comp)} <span style="font-size:0.6rem;color:#1a4a8a;text-transform:uppercase;font-weight:700;">${rolAdq}</span></div>
             ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ ${esc(vend)} <span style="font-size:0.58rem;color:#8c6518;text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
           </div>
         </div>
         <div style="display:flex;align-items:baseline;gap:10px;flex-shrink:0;">
-          <div style="font-family:serif;font-size:1.05rem;color:#8c6518;font-weight:700;white-space:nowrap;">${e.num?('CARP.- '+esc(e.num)):'—'}</div>
+          <div style="font-family:serif;font-size:1.05rem;color:#8c6518;font-weight:700;white-space:nowrap;">${e.num?(/^carp/i.test(e.num.trim())?esc(e.num):'CARP.- '+esc(e.num)):'—'}</div>
           ${folioRecHtml?`<div style="border-left:1.5px solid #8c6518;padding-left:10px;line-height:1.3;text-align:left;">
             <div style="font-family:serif;font-size:0.55rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;">FOLIO</div>
             <div style="font-family:serif;font-size:0.95rem;color:#1a4a8a;font-weight:800;">${folioRecHtml}</div>
@@ -5335,6 +5368,7 @@ function escRender(){
           </div>
         </div>
       </div>
+      ${_llamadoTxt?`<div style="font-size:0.72rem;color:${_llamadoAtencion?'#a32d2d':'#7a6840'};font-weight:${_llamadoAtencion?'700':'400'};margin-bottom:8px;">🎯 ${_llamadoTxt}</div>`:''}
       <div style="display:flex;align-items:flex-start;gap:4px;">${miniTimeline}</div>
     </div>`;
   }).join('');
@@ -5567,7 +5601,7 @@ function _escBarraGradiente(pasoActivo, estadoActivo){
     if(pasoActivo===-1 || s < pasoActivo){
       stops.push(`#1a7a3a ${ini}%`, `#1a7a3a ${fin}%`);
     } else if(s===pasoActivo && estadoActivo==='activo'){
-      const parcial = ini + segPct*(1/3);
+      const parcial = ini + segPct*0.5;
       stops.push(`#2563eb ${ini}%`, `#2563eb ${parcial}%`, `#e0ddd5 ${parcial}%`, `#e0ddd5 ${fin}%`);
     } else {
       stops.push(`#e0ddd5 ${ini}%`, `#e0ddd5 ${fin}%`);
@@ -5644,7 +5678,7 @@ function escToggleCaracteristica(clave){
 }
 function escSetEstado(estado, btn){
   document.getElementById('eEstado').value=estado;
-  const colores={proceso:'#c8952a',listo:'#1a7a3a',espera:'#7a6840',archivado:'#8c6518'};
+  const colores={proceso:'#c8952a',listo:'#1a7a3a',espera:'#7a6840',archivado:'#8c6518',noprocedio:'#7a2020'};
   document.querySelectorAll('.esc-estado-btn').forEach(b=>{
     const activo=b.dataset.estado===estado;
     const c=colores[b.dataset.estado]||'#7a6840';
@@ -5941,6 +5975,25 @@ async function escCancelar(){
   cerrar('mEscritura');
   if(typeof escRender==='function') escRender();
   toast('🚫 Escritura marcada como Cancelada');
+}
+// Utilidad de UNA SOLA VEZ (pedida explícitamente para revisar y reclasificar
+// manualmente las archivadas existentes) — quita el estatus "Archivado" de
+// todas las escrituras que lo tengan, para que vuelvan a aparecer en "Todos"
+// sin estatus asignado. No crea ningún estatus nuevo.
+async function escMigrarArchivadosSinEstatus(){
+  const afectadas = D.escrituras.filter(e=>e.estado==='archivado');
+  if(!afectadas.length){ if(typeof toast==='function') toast('No hay escrituras archivadas','warn'); return; }
+  const ok = await confirmarBonito({
+    titulo: '¿Quitar el estatus a las archivadas?',
+    mensaje: 'Se les quitará el estatus a '+afectadas.length+' escritura(s) marcadas como Archivado, para que aparezcan en "Todos" sin estatus y las revises una por una. Es solo por esta ocasión.',
+    btnSi: 'Sí, quitar estatus',
+    peligro: true
+  });
+  if(!ok) return;
+  afectadas.forEach(e=>{ e.estado=''; e.fechaMod=new Date().toISOString(); });
+  escSyncYRefrescar();
+  if(typeof escRender==='function') escRender();
+  if(typeof toast==='function') toast('✅ '+afectadas.length+' escritura(s) movidas a "Todos" sin estatus');
 }
 // ── Línea del tiempo ──────────────────────────────────────────────────
 function escActualizarTimeline(pasos){

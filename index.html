@@ -15042,18 +15042,21 @@ Recibo original im…</td>
     <div class="modal-ov" id="mEscritura">
       <div class="modal wide" style="max-width:960px;width:95vw;max-height:92vh;overflow-y:auto;overflow-x:hidden;box-sizing:border-box;margin:auto;">
         <div class="modal-hdr">
-          <div style="display:flex;align-items:center;gap:10px;min-width:0;">
-            <h3 id="mEscTitulo">Nueva Escritura</h3>
+          <div style="display:flex;align-items:center;gap:16px;min-width:0;flex:1;">
+            <h3 id="mEscTitulo" style="font-family:serif;font-size:1.5rem;color:#8c6518;font-weight:700;">Nueva Escritura</h3>
+            <div id="eFoliosHdr" style="display:none;text-align:left;flex-shrink:0;">
+              <div style="font-family:monospace;font-size:0.55rem;letter-spacing:0.08em;color:var(--muted);font-weight:700;text-transform:uppercase;">Folios (Sist. Notarial)</div>
+              <div id="eFoliosHdrVal" style="font-size:0.85rem;color:var(--ink);font-weight:700;">—</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
             <div id="eFolioBadgeHdr" onclick="escVerFolioVinculado()" title="Ver ficha del recibo vinculado" style="display:none;cursor:pointer;background:rgba(59,130,246,0.08);border:1.5px solid rgba(59,130,246,0.3);border-radius:8px;padding:3px 12px;text-align:center;line-height:1.25;flex-shrink:0;">
               <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.1em;color:#7a8ba0;font-weight:700;">FOLIO</div>
               <div id="eFolioBadgeHdrVal" style="font-family:monospace;font-size:0.9rem;color:#1a4a8a;font-weight:800;">—</div>
             </div>
-            <div id="eFoliosHdr" style="display:none;text-align:left;flex-shrink:0;">
-              <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.08em;color:var(--muted);font-weight:700;text-transform:uppercase;">Folios (sist. notarial)</div>
-              <div id="eFoliosHdrVal" style="font-size:0.8rem;color:var(--ink);font-weight:700;">—</div>
-            </div>
+            <span id="eEstadoBadgeHdr" style="display:none;font-size:0.68rem;font-weight:700;padding:5px 14px;border-radius:14px;white-space:nowrap;flex-shrink:0;"></span>
+            <button class="modal-x" onclick="cerrar(&#39;mEscritura&#39;)">✕</button>
           </div>
-          <button class="modal-x" onclick="cerrar(&#39;mEscritura&#39;)">✕</button>
         </div>
         <div class="modal-body" id="modal-body-form" style="padding:16px;">
           <!-- ══ ENCABEZADO: Carpeta + Folios + Folio vincular (calca del mockup aprobado) ══ -->
@@ -15218,7 +15221,8 @@ Recibo original im…</td>
           </div>
           <!-- Observaciones (bitácora) también visible en modo edición -->
           <div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-bottom:16px;">
-            <div style="font-family:monospace;font-size:0.65rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:10px;">🗒️ OBSERVACIONES</div>
+            <div style="font-family:monospace;font-size:0.65rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:4px;">🗒️ OBSERVACIONES INICIALES DEL TRÁMITE</div>
+            <div style="font-size:0.68rem;color:var(--muted);margin-bottom:10px;">Nota general del trámite — no cambia por paso. Distinta de "Llamado a la Acción" (más abajo).</div>
             <div id="esc-bitacora-lista-edit"></div>
           </div>
           <!-- ══ LÍNEA DEL TIEMPO ══ -->
@@ -15257,7 +15261,8 @@ Recibo original im…</td>
           </div>
           <!-- Notas por etapa también visibles en modo edición -->
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-l);">
-            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:12px;">🎯 Llamado a la Acción</div>
+            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:4px;">🎯 Llamado a la Acción</div>
+            <div style="font-size:0.68rem;color:var(--muted);margin-bottom:12px;">Nota del paso activo — distinta de Observaciones. De aquí depende el aviso de "Requiere atención" tras 30 días sin novedades.</div>
             <div id="esc-notas-etapa-edit"></div>
           </div>
         </div><!-- /modal-body-form -->
@@ -19356,7 +19361,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20260904m"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=20260904r"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

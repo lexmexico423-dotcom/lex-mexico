@@ -15086,7 +15086,10 @@ Recibo original im…</td>
               <div style="font-size:0.6rem;letter-spacing:0.08em;color:rgba(255,255,255,0.85);font-weight:700;">FOLIOS SISTEMA NOTARIAL</div>
               <input id="eFolios" type="text" placeholder="Ej. 15,157 y 15,343" style="width:100%;box-sizing:border-box;background:#fff;border:none;border-radius:6px;padding:6px 10px;font-size:0.85rem;color:#1a1008;margin-top:2px;">
             </div>
-            <button type="button" id="eFolioVincularBtn" onclick="escAbrirVincularFolio()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:6px;color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;flex-shrink:0;padding:6px 10px;">FOLIO / 🔗 vincular</button>
+            <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+              <button type="button" id="eFolioVincularBtn" onclick="escAbrirVincularFolio()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.4);border-radius:6px;color:#fff;font-size:0.75rem;font-weight:700;cursor:pointer;padding:6px 10px;">FOLIO / 🔗 vincular</button>
+              <a id="eFolioVincularOtroLink" href="javascript:void(0)" onclick="escAbrirVincularFolio(true)" style="display:none;font-size:0.62rem;color:rgba(255,255,255,0.78);text-decoration:underline;">Vincular otro folio »</a>
+            </div>
             <input type="hidden" id="eFolioVinculo" value="">
           </div>
 
@@ -15351,7 +15354,7 @@ Recibo original im…</td>
         <div id="esc-folio-list" style="max-height:300px;overflow-y:auto;"></div>
       </div>
       <div class="modal-ftr">
-        <button class="btn btn-ghost" style="color:var(--rojo);" onclick="escVincularFolioSeleccionar(null)">Quitar vínculo</button>
+        <button class="btn btn-ghost" id="eFolioQuitarVinculoBtn" style="color:var(--rojo);" onclick="escVincularFolioSeleccionar(null)">Quitar vínculo</button>
         <button class="btn btn-ghost" onclick="cerrar('mEscVincularFolio')">Cancelar</button>
       </div>
     </div></div>
@@ -19373,7 +19376,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=202609046"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=202609052"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

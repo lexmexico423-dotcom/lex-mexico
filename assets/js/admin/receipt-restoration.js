@@ -4197,6 +4197,16 @@ function obtenerHistorialPagosAbono(folioRef){
 // Control de escrituras con línea del tiempo de 5 pasos y chat IA
 // ═══════════════════════════════════════════════════════════════════════
 const ESC_PASOS = ['FIRMA NOTARIAL','CATASTRO','TRASLADO MPL','ISR','IFREO'];
+// Frase de respaldo por tramo (entre un paso y el siguiente) cuando ese paso
+// activo todavía no tiene una nota real capturada — para que el punto medio
+// de "Progreso del Trámite" siempre tenga algo que explicar, y para que la
+// primera vez que se marca "En proceso" ya haya una razón por defecto.
+const ESC_TRAMO_PENDIENTE = [
+  'Pendiente: no se ha ingresado a Catastro.',
+  'Pendiente: no se ha hecho el pago de Traslado Municipal.',
+  'Pendiente: no se ha solicitado el pago de I.S.R.',
+  'Pendiente: no se ha ingresado a IFREO.'
+];
 // ── Catálogos oficiales de Catastro: Aviso de Traslado de Dominio ──────
 // Catálogo fijo (no viene de API/tabla externa). No modificar ortografía,
 // mayúsculas ni redacción de ninguna opción: son el catálogo oficial tal
@@ -5098,6 +5108,7 @@ function escActualizarTimelineDetalle(pasos){
   }
   const track = document.getElementById('esc-progreso-track-d');
   if(track) track.style.background = _escBarraGradiente(pasoActivo, pasoActivo>=0 ? arr[pasoActivo].estado : '');
+  _escActualizarMarcadorTramo(arr, pasoActivo, '-d');
   const hint = document.getElementById('esc-detalle-hint');
   if(hint){
     hint.textContent = pasoActivo===-1
@@ -5303,10 +5314,22 @@ function escRender(){
           _llamadoAtencion = true;
           _llamadoTxt = '⏸ Requiere atención: ' + (_pAct.notas ? esc(_pAct.notas) : 'Sin nota registrada');
         } else {
-          _llamadoTxt = _pAct.notas ? esc(_pAct.notas) : (esc(ESC_PASOS[pasoActivo]) + ' · En proceso');
+          _llamadoTxt = _pAct.notas ? esc(_pAct.notas) : (esc(ESC_PASOS[pasoActivo]) + ' · <span style="color:#c8952a;font-weight:700;">En proceso</span>');
         }
       }
     }
+    // Aviso visual (triángulo + píldora "ATENCIÓN") que se suma al llamado a
+    // la acción SOLO cuando requiere atención (no en los demás casos de
+    // "En proceso" o completado) — va entre el bloque izquierdo y el de
+    // CARP/FOLIO en la fila superior de la tarjeta.
+    const _atencionBadgeHtml = _llamadoAtencion ? `<div style="display:flex;align-items:center;flex-shrink:0;">
+      <svg width="30" height="26" viewBox="0 0 30 26" style="filter:drop-shadow(0 2px 3px rgba(163,32,32,0.35));position:relative;z-index:2;flex-shrink:0;">
+        <polygon points="15,1 29,24 1,24" fill="#c81e1e" stroke="#fff" stroke-width="1.3"/>
+        <rect x="13.3" y="8" width="3.4" height="8" rx="1.7" fill="#fff"/>
+        <circle cx="15" cy="19.3" r="1.9" fill="#fff"/>
+      </svg>
+      <div style="background:#c81e1e;color:#fff;font-weight:800;font-size:0.72rem;letter-spacing:0.04em;padding:5px 14px 5px 18px;border-radius:0 14px 14px 0;margin-left:-10px;box-shadow:0 2px 5px rgba(163,32,32,0.3);font-family:sans-serif;white-space:nowrap;">ATENCIÓN</div>
+    </div>` : '';
     // El tramo entre un círculo y el siguiente refleja el mismo avance que
     // la barra grande de la ficha/formulario (_escBarraGradiente): verde
     // completo si ya se pasó ese paso, mitad azul si es el paso activo y su
@@ -5314,7 +5337,17 @@ function escRender(){
     // gris el resto.
     const _conectorTramo = (i) => {
       if(pasoActivo===-1 || i<pasoActivo) return `<div style="flex:1;height:2px;background:#1a7a3a;margin-top:13px;"></div>`;
-      if(i===pasoActivo && pasos[i] && pasos[i].estado==='activo') return `<div style="flex:1;height:2px;margin-top:13px;background:linear-gradient(to right,#2563eb 0%,#2563eb 50%,#e0ddd5 50%,#e0ddd5 100%);"></div>`;
+      if(i===pasoActivo && pasos[i] && pasos[i].estado==='activo'){
+        // Mismo marcador "ⓘ" del punto medio que la ficha/formulario: al
+        // tocarlo se ve la nota real del paso (o la frase de respaldo).
+        const _razonTramo = pasos[i].notas ? esc(pasos[i].notas) : esc(ESC_TRAMO_PENDIENTE[i]||'');
+        return `<div style="flex:1;height:2px;margin-top:13px;position:relative;background:linear-gradient(to right,#2563eb 0%,#2563eb 50%,#e0ddd5 50%,#e0ddd5 100%);">
+          <button type="button" onclick="event.stopPropagation();const t=document.getElementById('esc-tramo-tip-${idx}');if(t)t.style.display=t.style.display==='block'?'none':'block';" title="Por qué no ha avanzado" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#fff;border:1.5px solid #2563eb;color:#2563eb;font-size:0.55rem;font-weight:700;cursor:pointer;padding:0;line-height:1;z-index:2;">i</button>
+          <div id="esc-tramo-tip-${idx}" style="display:none;position:absolute;left:50%;top:20px;transform:translateX(-50%);background:#fff;border:1px solid #2563eb;border-radius:8px;padding:6px 10px;font-size:0.62rem;color:var(--ink);width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:6;">
+            <div style="font-weight:700;color:#2563eb;margin-bottom:2px;">Por qué no ha avanzado</div>${_razonTramo}
+          </div>
+        </div>`;
+      }
       return `<div style="flex:1;height:2px;background:#e0ddd5;margin-top:13px;"></div>`;
     };
     const miniTimeline = pasos.map((p,i)=>{
@@ -5341,9 +5374,9 @@ function escRender(){
     return `<div onclick="escAbrirDetalle(${idx})" style="background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;">
         <div style="display:flex;gap:14px;min-width:0;flex:1;">
-          ${folioPendiente?`<div style="flex-shrink:0;line-height:1.15;">
+          ${folioPendiente?`<div style="flex-shrink:0;line-height:1.15;text-align:center;">
             <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.05em;color:#8c6518;font-weight:700;">ESCRITURA</div>
-            <div style="font-size:1.25rem;font-weight:800;color:#8c6518;">${folioPendiente}</div>
+            <div style="font-size:0.9rem;font-weight:800;color:#8c6518;">${folioPendiente}</div>
           </div>`:''}
           <div style="min-width:0;">
             <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:4px;">
@@ -5356,6 +5389,7 @@ function escRender(){
             ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ ${esc(vend)} <span style="font-size:0.58rem;color:#8c6518;text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
           </div>
         </div>
+        ${_atencionBadgeHtml}
         <div style="display:flex;align-items:baseline;gap:10px;flex-shrink:0;">
           <div style="font-family:serif;font-size:1.05rem;color:#8c6518;font-weight:700;white-space:nowrap;">${e.num?(/^carp/i.test(e.num.trim())?esc(e.num):'CARP.- '+esc(e.num)):'—'}</div>
           ${folioRecHtml?`<div style="border-left:1.5px solid #8c6518;padding-left:10px;line-height:1.3;text-align:left;">
@@ -5609,6 +5643,33 @@ function _escBarraGradiente(pasoActivo, estadoActivo){
     pos = fin;
   }
   return `linear-gradient(to right, ${stops.join(', ')})`;
+}
+// Marcador "ⓘ" en el punto medio del tramo activo (misma posición exacta que
+// el corte del degradado de _escBarraGradiente) — al tocarlo despliega la
+// razón real por la que ese paso no ha avanzado: la nota capturada en
+// "Llamado a la Acción" si existe, o si no, la frase de respaldo de
+// ESC_TRAMO_PENDIENTE. Se usa en la ficha (sufijo '-d') y en el formulario
+// de edición (sufijo '').
+function _escActualizarMarcadorTramo(pasos, pasoActivo, sufijo){
+  const btn = document.getElementById('esc-tramo-info'+sufijo);
+  const tip = document.getElementById('esc-tramo-tooltip'+sufijo);
+  if(!btn || !tip) return;
+  const totalSeg = ESC_PASOS.length-1;
+  const segPct = 100/totalSeg;
+  const activo = pasoActivo>=0 && pasoActivo<totalSeg && pasos[pasoActivo] && pasos[pasoActivo].estado==='activo';
+  tip.style.display='none';
+  if(!activo){ btn.style.display='none'; return; }
+  const parcial = pasoActivo*segPct + segPct*0.5;
+  btn.style.left = parcial+'%';
+  tip.style.left = parcial+'%';
+  btn.style.display='flex';
+  const razon = pasos[pasoActivo].notas ? esc(pasos[pasoActivo].notas) : esc(ESC_TRAMO_PENDIENTE[pasoActivo]||'');
+  tip.innerHTML = '<div style="font-weight:700;color:#2563eb;margin-bottom:2px;">Por qué no ha avanzado</div>'+razon;
+}
+function escToggleRazonTramo(sufijo){
+  const tip = document.getElementById('esc-tramo-tooltip'+sufijo);
+  if(!tip) return;
+  tip.style.display = tip.style.display==='block' ? 'none' : 'block';
 }
 // Casillas cuadradas TOTAL/PARCIAL (se marcan con una X) en vez del
 // desplegable anterior; el valor real sigue viviendo en el input oculto
@@ -5976,25 +6037,6 @@ async function escCancelar(){
   if(typeof escRender==='function') escRender();
   toast('🚫 Escritura marcada como Cancelada');
 }
-// Utilidad de UNA SOLA VEZ (pedida explícitamente para revisar y reclasificar
-// manualmente las archivadas existentes) — quita el estatus "Archivado" de
-// todas las escrituras que lo tengan, para que vuelvan a aparecer en "Todos"
-// sin estatus asignado. No crea ningún estatus nuevo.
-async function escMigrarArchivadosSinEstatus(){
-  const afectadas = D.escrituras.filter(e=>e.estado==='archivado');
-  if(!afectadas.length){ if(typeof toast==='function') toast('No hay escrituras archivadas','warn'); return; }
-  const ok = await confirmarBonito({
-    titulo: '¿Quitar el estatus a las archivadas?',
-    mensaje: 'Se les quitará el estatus a '+afectadas.length+' escritura(s) marcadas como Archivado, para que aparezcan en "Todos" sin estatus y las revises una por una. Es solo por esta ocasión.',
-    btnSi: 'Sí, quitar estatus',
-    peligro: true
-  });
-  if(!ok) return;
-  afectadas.forEach(e=>{ e.estado=''; e.fechaMod=new Date().toISOString(); });
-  escSyncYRefrescar();
-  if(typeof escRender==='function') escRender();
-  if(typeof toast==='function') toast('✅ '+afectadas.length+' escritura(s) movidas a "Todos" sin estatus');
-}
 // ── Línea del tiempo ──────────────────────────────────────────────────
 function escActualizarTimeline(pasos){
   // Determinar el índice del paso activo (primer pendiente después de los completados)
@@ -6050,6 +6092,7 @@ function escActualizarTimeline(pasos){
   // Barra de progreso (tramos verdes/azul parcial según estatus real)
   const track = document.getElementById('esc-progreso-track');
   if(track) track.style.background = _escBarraGradiente(pasoActivo, pasoActivo>=0 ? arr[pasoActivo].estado : '');
+  _escActualizarMarcadorTramo(arr, pasoActivo, '');
   // Hint
   const hint = document.getElementById('esc-paso-hint');
   if(hint){

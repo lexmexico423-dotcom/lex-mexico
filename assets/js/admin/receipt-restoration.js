@@ -4207,6 +4207,66 @@ const ESC_TRAMO_PENDIENTE = [
   'Pendiente: no se ha solicitado el pago de I.S.R.',
   'Pendiente: no se ha ingresado a IFREO.'
 ];
+// ── Puntos intermedios con plazo de 10 días ────────────────────────────
+// Al marcar un paso como Completado, el SIGUIENTE paso arranca solo en
+// "En Proceso" con esta nota por defecto (índice = índice del paso que la
+// recibe, 0 sin usar porque nada precede a Firma Notarial) y un reloj de
+// ESC_DIAS_INTERMEDIO días. Mientras no venza, es solo informativo. Al
+// vencer, la nota deja de ser opcional (hay que explicar el retraso) y la
+// ficha muestra un badge de días de retraso con la misma escala que
+// Pendientes de Placas (_PEND_ESTADOS / _pendEstadoPorEdad).
+const ESC_DIAS_INTERMEDIO = 10;
+const ESC_NOTAS_AUTO_INTERMEDIO = [
+  '',
+  'Se concluyó la firma ante Notario, tienes 10 días para presentar la documentación a Catastro',
+  'Acabas de concluir el proceso en catastro, tienes 10 días para solicitar el traslado municipal',
+  'Acabas de concluir el proceso en Traslado municipal, tienes 10 días para solicitar y pagar el I.S.R.',
+  'Acabas de concluir el pago de I.S.R., tienes 10 días para ingresar a IFREO'
+];
+// Días de retraso sobre el plazo de 10 días (0 si aún no vence, ya se
+// "superó" manualmente, o el paso no fue auto-iniciado). Reutiliza la misma
+// función de escalamiento que Pendientes de Placas para que el badge se vea
+// y se clasifique exactamente igual (Pendiente/Urgente/Crítico/Abandonado).
+function _escDiasRetrasoIntermedio(p){
+  if(!p || !p.fechaAutoInicio || p.intermedioSuperado) return 0;
+  const limite = new Date(p.fechaAutoInicio).getTime() + ESC_DIAS_INTERMEDIO*86400000;
+  const dias = (Date.now()-limite)/86400000;
+  return dias>0 ? Math.floor(dias) : 0;
+}
+// Marca la etapa intermedia del paso activo como resuelta manualmente: la
+// barra pasa a verde completo y el ⓘ deja de mostrarse, sin necesidad de
+// marcar el paso entero como Completado.
+function escSuperarTramo(){
+  if(_escIdx<0 || !D.escrituras[_escIdx]) return;
+  const e = D.escrituras[_escIdx];
+  if(!e.pasos) return;
+  const completados = e.pasos.filter(p=>p&&p.estado==='completado').length;
+  const pasoActivo = completados<5 ? completados : -1;
+  if(pasoActivo<0 || !e.pasos[pasoActivo]) return;
+  e.pasos[pasoActivo].intermedioSuperado = true;
+  e.fechaMod = new Date().toISOString();
+  escSyncYRefrescar();
+  escActualizarTimeline(e.pasos);
+  escActualizarTimelineDetalle(e.pasos);
+  escRenderNotasEtapa(e);
+  if(typeof escRender==='function') escRender();
+  toast('✅ Etapa intermedia superada');
+}
+// Misma acción que escSuperarTramo() pero desde la tarjeta de la lista, que
+// no tiene abierta la escritura en el modal (_escIdx) — opera directo sobre
+// D.escrituras[idx].
+function escSuperarTramoCard(idx){
+  const e = D.escrituras[idx];
+  if(!e || !e.pasos) return;
+  const completados = e.pasos.filter(p=>p&&p.estado==='completado').length;
+  const pasoActivo = completados<5 ? completados : -1;
+  if(pasoActivo<0 || !e.pasos[pasoActivo]) return;
+  e.pasos[pasoActivo].intermedioSuperado = true;
+  e.fechaMod = new Date().toISOString();
+  escSyncYRefrescar();
+  if(typeof escRender==='function') escRender();
+  toast('✅ Etapa intermedia superada');
+}
 // ── Catálogos oficiales de Catastro: Aviso de Traslado de Dominio ──────
 // Catálogo fijo (no viene de API/tabla externa). No modificar ortografía,
 // mayúsculas ni redacción de ninguna opción: son el catálogo oficial tal
@@ -4765,7 +4825,7 @@ function escImprimirFicha(){
     const txt = esComp?'✓':(i+1);
     return `<div style="width:19%;"><div class="ip-circ" style="background:${bg};border:2px solid ${bd};color:${fc};">${txt}</div><div class="ip-plbl">${esc(ESC_PASOS[i]).split(' ').join('<br>')}</div></div>`;
   }).join('');
-  const trackGradient = (typeof _escBarraGradiente==='function') ? _escBarraGradiente(pasoActivo, pasoActivo>=0?pasos[pasoActivo].estado:'') : '#1a7a3a';
+  const trackGradient = (typeof _escBarraGradiente==='function') ? _escBarraGradiente(pasoActivo, pasoActivo>=0?pasos[pasoActivo].estado:'', pasoActivo>=0 && pasos[pasoActivo] ? !!pasos[pasoActivo].intermedioSuperado : false) : '#1a7a3a';
   const cuerpo = `<div class="ip-hoja">
     <div class="ip-hdr">
       <div class="ip-carp">${titulo}</div>
@@ -4931,6 +4991,28 @@ function escRenderNotasEtapa(e){
     const i = pasoActivo;
     const p = pasos[i];
     if(!editable){
+      // Punto intermedio con plazo de 10 días vencido (p.fechaAutoInicio):
+      // toma prioridad sobre el aviso genérico de 30 días de abajo, porque
+      // es más específico. El badge de retraso reutiliza la misma escala de
+      // Pendientes de Placas, y el llamado a la acción NO desaparece aunque
+      // ya se haya escrito una razón — solo cambia su presentación aquí.
+      const _diasIntermedio = _escDiasRetrasoIntermedio(p);
+      if(_diasIntermedio>0 && typeof _pendEstadoPorEdad==='function'){
+        const _est = _pendEstadoPorEdad(_diasIntermedio);
+        cont.innerHTML = `<div style="background:${_est.bg};border:1.5px solid ${_est.border};border-radius:10px;padding:12px 16px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+            <div style="font-size:1.3rem;">🎯</div>
+            <div style="flex:1;min-width:160px;">
+              <div style="font-size:0.85rem;font-weight:700;color:${_est.fg};">Llamado a la Acción</div>
+              <div style="font-family:monospace;font-size:0.6rem;color:${_est.fg};opacity:0.8;">${i+1}. ${ESC_PASOS[i]} — plazo de ${ESC_DIAS_INTERMEDIO} días vencido</div>
+            </div>
+            <span style="font-family:monospace;font-size:0.62rem;font-weight:700;color:${_est.fg};background:${_est.border};padding:5px 12px;border-radius:14px;">${_est.icon} ${_est.label} · ${_diasIntermedio} día(s) de retraso</span>
+          </div>
+          <div style="font-family:sans-serif;font-size:0.72rem;color:${_est.fg};margin-top:10px;"><b>Razón:</b> ${p.notas?esc(p.notas):'Sin razón registrada — ábrelo y escribe una para poder guardar cualquier cambio.'}</div>
+          <button type="button" onclick="escAbrirPaso(${i})" style="margin-top:10px;background:none;border:1px solid ${_est.border};color:${_est.fg};font-family:sans-serif;font-size:0.68rem;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;">ABRIR PASO</button>
+        </div>`;
+        return;
+      }
       // Vista de solo lectura: si el paso activo lleva ESC_DIAS_REQUIERE_ATENCION
       // días o más sin ningún cambio registrado EN ESE PASO (pasoActivoFecha —
       // no fechaMod, que cambia con cualquier edición del formulario y no
@@ -5095,19 +5177,19 @@ function escActualizarTimelineDetalle(pasos){
     const circ = document.getElementById('esc-d-circ-'+i);
     if(!circ) continue;
     const p = arr[i];
-    const esClickeable = i===pasoActivo;
+    const esClickeable = i===pasoActivo || _escModoEditarPasos;
     if(p.estado==='completado'){
-      circ.textContent='✓'; circ.style.cssText+='background:#1a7a3a;border-color:#1a7a3a;color:#fff;cursor:default;box-shadow:none;transform:scale(1);';
+      circ.textContent='✓'; circ.style.cssText+='background:#1a7a3a;border-color:#1a7a3a;color:#fff;cursor:'+(esClickeable?'pointer':'default')+';box-shadow:none;transform:scale(1);';
     } else if(p.estado==='activo'){
       circ.textContent=i+1; circ.style.cssText+='background:#2563eb;border-color:#2563eb;color:#fff;cursor:'+(esClickeable?'pointer':'default')+';box-shadow:0 0 0 4px rgba(37,99,235,0.2);transform:scale(1.08);';
     } else if(esClickeable){
       circ.textContent=i+1; circ.style.cssText+='background:#fff8e8;border-color:#c8952a;color:#8c6518;cursor:pointer;box-shadow:0 0 0 4px rgba(200,149,42,0.15);transform:scale(1.05);';
     } else {
-      circ.textContent=i+1; circ.style.cssText+='background:#f5f0e8;border-color:#d0c8b8;color:#ccc;cursor:default;box-shadow:none;transform:scale(1);';
+      circ.textContent=i+1; circ.style.cssText+='background:#f5f0e8;border-color:#d0c8b8;color:#ccc;cursor:'+(esClickeable?'pointer':'default')+';box-shadow:none;transform:scale(1);';
     }
   }
   const track = document.getElementById('esc-progreso-track-d');
-  if(track) track.style.background = _escBarraGradiente(pasoActivo, pasoActivo>=0 ? arr[pasoActivo].estado : '');
+  if(track) track.style.background = _escBarraGradiente(pasoActivo, pasoActivo>=0 ? arr[pasoActivo].estado : '', pasoActivo>=0 && arr[pasoActivo] ? !!arr[pasoActivo].intermedioSuperado : false);
   _escActualizarMarcadorTramo(arr, pasoActivo, '-d');
   const hint = document.getElementById('esc-detalle-hint');
   if(hint){
@@ -5336,15 +5418,26 @@ function escRender(){
     // estatus es "activo" (llega justo a la mitad del siguiente círculo),
     // gris el resto.
     const _conectorTramo = (i) => {
-      if(pasoActivo===-1 || i<pasoActivo) return `<div style="flex:1;height:2px;background:#1a7a3a;margin-top:13px;"></div>`;
+      if(pasoActivo===-1 || i<pasoActivo || (i===pasoActivo && pasos[i] && pasos[i].intermedioSuperado)) return `<div style="flex:1;height:2px;background:#1a7a3a;margin-top:13px;"></div>`;
       if(i===pasoActivo && pasos[i] && pasos[i].estado==='activo'){
         // Mismo marcador "ⓘ" del punto medio que la ficha/formulario: al
-        // tocarlo se ve la nota real del paso (o la frase de respaldo).
+        // tocarlo se ve la nota real del paso (o la frase de respaldo), el
+        // retraso sobre el plazo de 10 días (si ya venció) y el botón para
+        // superar manualmente esta etapa intermedia.
         const _razonTramo = pasos[i].notas ? esc(pasos[i].notas) : esc(ESC_TRAMO_PENDIENTE[i]||'');
+        const _diasTramo = _escDiasRetrasoIntermedio(pasos[i]);
+        let _badgeTramo = '';
+        if(_diasTramo>0 && typeof _pendEstadoPorEdad==='function'){
+          const _est = _pendEstadoPorEdad(_diasTramo);
+          _badgeTramo = '<div style="margin-top:6px;display:inline-block;background:'+_est.bg+';border:1px solid '+_est.border+';color:'+_est.fg+';font-weight:700;font-size:0.58rem;padding:3px 8px;border-radius:10px;">'+_est.icon+' '+_est.label+' · '+_diasTramo+' día(s)</div>';
+        }
+        const _bordeTip = _diasTramo>0 ? '#c99' : '#2563eb';
+        const _colorTit = _diasTramo>0 ? '#a32d2d' : '#2563eb';
         return `<div style="flex:1;height:2px;margin-top:13px;position:relative;background:linear-gradient(to right,#2563eb 0%,#2563eb 50%,#e0ddd5 50%,#e0ddd5 100%);">
-          <button type="button" onclick="event.stopPropagation();const t=document.getElementById('esc-tramo-tip-${idx}');if(t)t.style.display=t.style.display==='block'?'none':'block';" title="Por qué no ha avanzado" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#fff;border:1.5px solid #2563eb;color:#2563eb;font-size:0.55rem;font-weight:700;cursor:pointer;padding:0;line-height:1;z-index:2;">i</button>
-          <div id="esc-tramo-tip-${idx}" style="display:none;position:absolute;left:50%;top:20px;transform:translateX(-50%);background:#fff;border:1px solid #2563eb;border-radius:8px;padding:6px 10px;font-size:0.62rem;color:var(--ink);width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:6;">
-            <div style="font-weight:700;color:#2563eb;margin-bottom:2px;">Por qué no ha avanzado</div>${_razonTramo}
+          <button type="button" onclick="event.stopPropagation();const t=document.getElementById('esc-tramo-tip-${idx}');if(t)t.style.display=t.style.display==='block'?'none':'block';" title="Por qué no ha avanzado" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#fff;border:1.5px solid ${_bordeTip};color:${_colorTit};font-size:0.55rem;font-weight:700;cursor:pointer;padding:0;line-height:1;z-index:2;">i</button>
+          <div id="esc-tramo-tip-${idx}" style="display:none;position:absolute;left:50%;top:20px;transform:translateX(-50%);background:#fff;border:1px solid ${_bordeTip};border-radius:8px;padding:6px 10px;font-size:0.62rem;color:var(--ink);width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:6;">
+            <div style="font-weight:700;color:${_colorTit};margin-bottom:2px;">Por qué no ha avanzado</div>${_razonTramo}${_badgeTramo}
+            <button type="button" onclick="event.stopPropagation();escSuperarTramoCard(${idx});" style="margin-top:6px;display:block;background:#eef8f0;border:1px solid #7fae7f;color:#1a7a3a;font-weight:700;font-size:0.56rem;padding:3px 8px;border-radius:8px;cursor:pointer;">✓ Ya se presume superado</button>
           </div>
         </div>`;
       }
@@ -5625,14 +5718,14 @@ function _escSplitVolInstr(raw){
 // entre pasos ya completados se pintan verdes de punta a punta, el tramo que
 // sale del paso "en proceso" avanza solo un tercio en azul (para dar la
 // sensación de que ya arrancó pero le falta camino), y el resto queda gris.
-function _escBarraGradiente(pasoActivo, estadoActivo){
+function _escBarraGradiente(pasoActivo, estadoActivo, superado){
   const totalSeg = ESC_PASOS.length - 1; // 4 tramos entre 5 bolitas
   const segPct = 100/totalSeg;
   const stops = [];
   let pos = 0;
   for(let s=0;s<totalSeg;s++){
     const ini = pos, fin = pos+segPct;
-    if(pasoActivo===-1 || s < pasoActivo){
+    if(pasoActivo===-1 || s < pasoActivo || (s===pasoActivo && superado)){
       stops.push(`#1a7a3a ${ini}%`, `#1a7a3a ${fin}%`);
     } else if(s===pasoActivo && estadoActivo==='activo'){
       const parcial = ini + segPct*0.5;
@@ -5656,15 +5749,29 @@ function _escActualizarMarcadorTramo(pasos, pasoActivo, sufijo){
   if(!btn || !tip) return;
   const totalSeg = ESC_PASOS.length-1;
   const segPct = 100/totalSeg;
-  const activo = pasoActivo>=0 && pasoActivo<totalSeg && pasos[pasoActivo] && pasos[pasoActivo].estado==='activo';
+  const p = pasoActivo>=0 && pasoActivo<totalSeg ? pasos[pasoActivo] : null;
+  const activo = !!p && p.estado==='activo' && !p.intermedioSuperado;
   tip.style.display='none';
   if(!activo){ btn.style.display='none'; return; }
   const parcial = pasoActivo*segPct + segPct*0.5;
   btn.style.left = parcial+'%';
   tip.style.left = parcial+'%';
   btn.style.display='flex';
-  const razon = pasos[pasoActivo].notas ? esc(pasos[pasoActivo].notas) : esc(ESC_TRAMO_PENDIENTE[pasoActivo]||'');
-  tip.innerHTML = '<div style="font-weight:700;color:#2563eb;margin-bottom:2px;">Por qué no ha avanzado</div>'+razon;
+  const razon = p.notas ? esc(p.notas) : esc(ESC_TRAMO_PENDIENTE[pasoActivo]||'');
+  const dias = _escDiasRetrasoIntermedio(p);
+  let badgeHtml = '';
+  if(dias>0 && typeof _pendEstadoPorEdad==='function'){
+    const est = _pendEstadoPorEdad(dias);
+    badgeHtml = '<div style="margin-top:6px;display:inline-block;background:'+est.bg+';border:1px solid '+est.border+';color:'+est.fg+';font-weight:700;font-size:0.6rem;padding:3px 8px;border-radius:10px;">'+est.icon+' '+est.label+' · '+dias+' día(s) de retraso</div>';
+  }
+  // Con retraso vencido, la razón ya no es opcional para guardar el paso —
+  // se avisa aquí mismo para que quede claro antes de abrir el modal.
+  const avisoObligatorio = dias>0 ? '<div style="margin-top:6px;font-size:0.6rem;color:#a32d2d;">Abre este paso y escribe la razón — ya no puedes guardarlo vacío.</div>' : '';
+  btn.style.background = dias>0 ? '#fdeaea' : '#fff';
+  btn.style.borderColor = dias>0 ? '#c99' : '#2563eb';
+  btn.style.color = dias>0 ? '#a32d2d' : '#2563eb';
+  tip.innerHTML = '<div style="font-weight:700;color:'+(dias>0?'#a32d2d':'#2563eb')+';margin-bottom:2px;">Por qué no ha avanzado</div>'+razon+badgeHtml+avisoObligatorio
+    +'<button type="button" onclick="event.stopPropagation();escSuperarTramo();" style="margin-top:8px;display:block;background:#eef8f0;border:1px solid #7fae7f;color:#1a7a3a;font-weight:700;font-size:0.6rem;padding:4px 10px;border-radius:8px;cursor:pointer;">✓ Ya se presume superado</button>';
 }
 function escToggleRazonTramo(sufijo){
   const tip = document.getElementById('esc-tramo-tooltip'+sufijo);
@@ -6047,7 +6154,10 @@ function escActualizarTimeline(pasos){
     const circ = document.getElementById('esc-circulo-'+i);
     if(!circ) return;
     const p = arr[i];
-    const esClickeable = i === pasoActivo;
+    // Con "Editar" activo (_escModoEditarPasos) los 5 círculos se vuelven
+    // clickeables, incluidos los completados y los futuros — para poder
+    // corregir un paso ya hecho o adelantarse a uno que aún no toca.
+    const esClickeable = i === pasoActivo || _escModoEditarPasos;
     // El color de cada bolita refleja su estatus real (Pendiente/En Proceso/
     // Completado), igual que los botones del paso — antes siempre se pintaba
     // verde el paso "activo" sin importar qué estatus se le hubiera puesto.
@@ -6057,7 +6167,7 @@ function escActualizarTimeline(pasos){
       circ.style.background='#1a7a3a';
       circ.style.borderColor='#1a7a3a';
       circ.style.color='#fff';
-      circ.style.cursor='default';
+      circ.style.cursor=esClickeable?'pointer':'default';
       circ.style.boxShadow='none';
       circ.style.transform='scale(1)';
     } else if(p.estado==='activo'){
@@ -6079,19 +6189,19 @@ function escActualizarTimeline(pasos){
       circ.style.boxShadow='0 0 0 4px rgba(200,149,42,0.15)';
       circ.style.transform='scale(1.05)';
     } else {
-      // Gris claro — pendiente y bloqueado
+      // Gris claro — pendiente y bloqueado (o clickeable si "Editar" está activo)
       circ.textContent=i+1;
       circ.style.background='#f5f0e8';
       circ.style.borderColor='#d0c8b8';
       circ.style.color='#ccc';
-      circ.style.cursor='default';
+      circ.style.cursor=esClickeable?'pointer':'default';
       circ.style.boxShadow='none';
       circ.style.transform='scale(1)';
     }
   });
   // Barra de progreso (tramos verdes/azul parcial según estatus real)
   const track = document.getElementById('esc-progreso-track');
-  if(track) track.style.background = _escBarraGradiente(pasoActivo, pasoActivo>=0 ? arr[pasoActivo].estado : '');
+  if(track) track.style.background = _escBarraGradiente(pasoActivo, pasoActivo>=0 ? arr[pasoActivo].estado : '', pasoActivo>=0 && arr[pasoActivo] ? !!arr[pasoActivo].intermedioSuperado : false);
   _escActualizarMarcadorTramo(arr, pasoActivo, '');
   // Hint
   const hint = document.getElementById('esc-paso-hint');
@@ -6108,6 +6218,34 @@ function escActualizarTimeline(pasos){
     }
   }
 }
+// Con "Editar" activo se puede abrir cualquiera de los 5 pasos (completados
+// o futuros), no solo el paso activo — para corregir errores o adelantar
+// registros. Se apaga sola al cerrar la escritura (ver escCancelar/cerrar).
+let _escModoEditarPasos = false;
+function escToggleModoEditarPasos(){
+  _escModoEditarPasos = !_escModoEditarPasos;
+  ['esc-btn-editar-pasos','esc-btn-editar-pasos-d'].forEach(id=>{
+    const btn = document.getElementById(id);
+    if(!btn) return;
+    if(_escModoEditarPasos){
+      btn.textContent = '✕ Cerrar edición';
+      btn.style.background = '#fdeaea';
+      btn.style.borderColor = '#c99';
+      btn.style.color = '#a32d2d';
+    } else {
+      btn.textContent = '✎ Editar';
+      btn.style.background = '#fff8e8';
+      btn.style.borderColor = '#d4b870';
+      btn.style.color = '#8c6518';
+    }
+  });
+  // Repintar los círculos para reflejar el nuevo modo (cursor/colores)
+  if(_escIdx>=0 && D.escrituras[_escIdx]){
+    const pasos = D.escrituras[_escIdx].pasos||[];
+    if(typeof escActualizarTimeline==='function') escActualizarTimeline(pasos);
+    if(typeof escActualizarTimelineDetalle==='function') escActualizarTimelineDetalle(pasos);
+  }
+}
 function escClickPaso(pasoIdx){
   try{
     // Verificar que hay una escritura activa
@@ -6118,6 +6256,8 @@ function escClickPaso(pasoIdx){
     const arr = Array(5).fill(null).map((_,i)=>(e.pasos||[])[i]||{estado:'pendiente',notas:'',fecha:''});
     const completados = arr.filter(p=>p.estado==='completado').length;
     const pasoActivo  = completados < 5 ? completados : -1;
+    // Con "Editar" activo, cualquier paso se puede abrir
+    if(_escModoEditarPasos){ escAbrirPaso(pasoIdx); return; }
     // Solo el paso activo es clickeable
     if(pasoIdx !== pasoActivo){
       if(pasoIdx < pasoActivo) toast('Este paso ya está completado','err');
@@ -6178,12 +6318,45 @@ function escGuardarPaso(){
     // Al completar (superar) una etapa, su nota deja de mostrarse en cualquier
     // parte — "Llamado a la Acción" solo refleja la etapa activa actual.
     const notas       = (estadoNuevo==='completado') ? '' : (notasEl ? notasEl.value.trim() : '');
+    // Si este paso arrancó automáticamente al completar el anterior (tiene
+    // fechaAutoInicio) y ya vencieron los ESC_DIAS_INTERMEDIO días sin
+    // "superarlo" manualmente, la nota deja de ser opcional: hay que explicar
+    // el retraso antes de poder guardar cualquier cambio que no sea Completado.
+    const _pasoAntes = e.pasos[_escPasoIdx] || {};
+    if(estadoNuevo!=='completado' && _escDiasRetrasoIntermedio(_pasoAntes)>0 && !notas){
+      toast('⏸ Este paso lleva retraso — escribe la razón antes de guardar','err');
+      return;
+    }
     const fecha       = new Date().toLocaleString('es-MX',{
       timeZone:'America/Mexico_City',
       day:'2-digit',month:'2-digit',year:'numeric',
       hour:'2-digit',minute:'2-digit'
     });
-    e.pasos[_escPasoIdx] = { estado:estadoNuevo, notas, fecha };
+    // Al guardar (sin completar) se conserva fechaAutoInicio/intermedioSuperado
+    // del paso: escribir la razón NO apaga el reloj de 10 días ni borra el
+    // llamado a la acción — solo permite guardar; el badge de retraso sigue
+    // corriendo hasta que se "supere" manualmente o se complete el paso.
+    e.pasos[_escPasoIdx] = estadoNuevo==='completado'
+      ? { estado:estadoNuevo, notas, fecha }
+      : { estado:estadoNuevo, notas, fecha, fechaAutoInicio:_pasoAntes.fechaAutoInicio, intermedioSuperado:!!_pasoAntes.intermedioSuperado };
+    // Al completar un paso, el SIGUIENTE arranca solo en "En Proceso" con la
+    // nota por defecto y su propio reloj de ESC_DIAS_INTERMEDIO días — solo
+    // si ese siguiente paso sigue en su estado inicial (no se pisa trabajo
+    // real ya capturado ahí, por ejemplo al usar "Editar" para corregir un
+    // paso viejo cuyo siguiente ya avanzó de verdad).
+    if(estadoNuevo==='completado' && _escPasoIdx<4){
+      const _sig = _escPasoIdx+1;
+      const _sigActual = e.pasos[_sig] || {estado:'pendiente',notas:'',fecha:''};
+      if(_sigActual.estado==='pendiente' && !_sigActual.notas){
+        e.pasos[_sig] = {
+          estado:'activo',
+          notas: ESC_NOTAS_AUTO_INTERMEDIO[_sig]||'',
+          fecha,
+          fechaAutoInicio: new Date().toISOString(),
+          intermedioSuperado: false
+        };
+      }
+    }
     // Actualizar fechaMod también aquí: si no se marca el avance de paso como
     // cambio reciente, el merge anti-condición-de-carrera de sincronizarFolio()
     // no sabría que esta versión local es más nueva que la del servidor.

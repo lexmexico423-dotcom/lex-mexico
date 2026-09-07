@@ -15263,8 +15263,10 @@ Recibo original im…</td>
         </div><!-- /modal-body-form -->
         <!-- ── VISTA DETALLE (solo lectura) — FUERA del form ── -->
         <div id="esc-vista-detalle" style="display:none;padding:20px;">
-          <!-- Info principal -->
-          <div id="esc-detalle-header"></div>
+          <!-- Info principal (estatus + comprador/vendedor) -->
+          <div id="esc-detalle-header-top"></div>
+          <!-- Notas por etapa / Llamado a la Acción / Requiere atención -->
+          <div id="esc-notas-etapa"></div>
           <!-- Línea del tiempo interactiva -->
           <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-l);">
             <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;">📍 Progreso del Trámite</div>
@@ -15297,11 +15299,8 @@ Recibo original im…</td>
             </div>
             <div id="esc-detalle-hint" style="text-align:center;font-size:0.65rem;color:var(--muted);margin-top:10px;font-family:monospace;"></div>
           </div>
-          <!-- Notas por etapa -->
-          <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border-l);">
-            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:12px;">🎯 Llamado a la Acción</div>
-            <div id="esc-notas-etapa"></div>
-          </div>
+          <!-- Resto del detalle (resumen, notariales, observaciones) -->
+          <div id="esc-detalle-header-bottom" style="margin-top:20px;"></div>
         </div>
         <!-- ── FOOTER FORMULARIO ── -->
         <div id="esc-ftr-form" class="modal-ftr">
@@ -19357,7 +19356,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20260904k"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=20260904l"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

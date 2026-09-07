@@ -571,10 +571,11 @@ body{background:var(--bg);font-family:sans-serif;color:var(--ink);min-height:100
   box-shadow:0 0 0 3px rgba(200,149,42,0.15);
 }
 /* Variante ancha + textarea auto-expandible y justificada (pedirTexto con
-   multilinea:true, p.ej. la nota del trámite). */
-.cb-modal-ancho{ max-width:620px; }
+   multilinea:true, p.ej. requerimientos pendientes / nota del trámite).
+   Más ancha y con más alto inicial para permitir una explicación amplia. */
+.cb-modal-ancho{ max-width:760px; }
 textarea.cb-input.cb-textarea{
-  min-height:110px;resize:none;overflow-y:auto;max-height:400px;
+  min-height:180px;resize:none;overflow-y:auto;max-height:480px;
   text-align:justify;line-height:1.6;font-size:0.95rem;
 }
 .cb-error{

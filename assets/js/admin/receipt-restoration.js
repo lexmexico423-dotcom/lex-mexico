@@ -4518,7 +4518,8 @@ function escMostrarDetalle(e){
   const el_det    = document.getElementById('esc-vista-detalle');
   const el_ftr_d  = document.getElementById('esc-ftr-detalle');
   const el_titulo = document.getElementById('mEscTitulo');
-  const el_header = document.getElementById('esc-detalle-header');
+  const el_header = document.getElementById('esc-detalle-header-top');
+  const el_footer = document.getElementById('esc-detalle-header-bottom');
   if(!el_det){ console.error('No se encontró esc-vista-detalle'); return; }
   if(el_form)  el_form.style.display  = 'none';
   if(el_ftr_f) el_ftr_f.style.display = 'none';
@@ -4583,7 +4584,7 @@ function escMostrarDetalle(e){
     <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
       <span style="font-size:0.68rem;font-weight:700;color:${st.col};background:${st.bg};padding:5px 14px;border-radius:14px;white-space:nowrap;flex-shrink:0;border:1px solid ${st.col}44;">${st.lbl}</span>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
       <div style="border:1.5px solid rgba(59,130,246,0.35);border-radius:16px;padding:12px 14px;background:#eef3ff;text-align:center;">
         <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#1a4a8a;font-weight:700;margin-bottom:8px;">COMPRADOR(A) / DONATARIO(A)</div>
         ${renderPersonas(e.compradores)||'<div style="font-size:0.75rem;color:var(--muted);">—</div>'}
@@ -4592,36 +4593,43 @@ function escMostrarDetalle(e){
         <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:8px;">VENDEDOR(A) / DONANTE</div>
         ${renderPersonas(e.vendedores)||'<div style="font-size:0.75rem;color:var(--muted);">—</div>'}
       </div>
+    </div>`;
+  if(el_footer) el_footer.innerHTML = `
+    <div style="border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:700;color:#8c6518;margin-bottom:14px;">📋 Resumen del Trámite</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+        ${fila('Tipos de Movimientos', esc(ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento]||'—'))}
+        ${fila('Tipo de Trámite', (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? esc(t[0]+' - '+t[1]) : '—'; })())}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
+        ${fila('Tipo de Terreno', esc(e.predio||'—'))}
+        ${fila('Uso de Suelo', esc(e.usoSuelo||'—'))}
+      </div>
+      <div style="border-top:1px solid rgba(200,149,42,0.25);margin:0 0 14px;"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        ${fila('Construcción', esc(_txtConstruccion))}
+        ${fila('Carácter de Registro Público (IFREO)', esc(_txtIfreo))}
+      </div>
+      ${_chipsCaract?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:14px;">${_chipsCaract}</div>`:''}
     </div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:700;color:#8c6518;margin-bottom:14px;">📋 Resumen del Trámite</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
-      ${fila('Tipos de Movimientos', esc(ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento]||'—'))}
-      ${fila('Tipo de Trámite', (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? esc(t[0]+' - '+t[1]) : '—'; })())}
+    <div style="border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:700;color:#8c6518;margin-bottom:14px;">🏛 Datos Notariales</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:14px;">
+        ${fila('Notaría No.', esc(e.notaria||'—'))}
+        ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
+        ${fila('Fecha de Firma', fechaFmt)}
+        ${fila('Cuenta Catastral', esc(e.cuentaCatastral||'—'))}
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+        ${fila('Ubicación', esc(e.ubicacion||'—'))}
+        ${fila('Alcance (Total/Parcial)', esc(e.tramite||'—'))}
+      </div>
     </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
-      ${fila('Tipo de Terreno', esc(e.predio||'—'))}
-      ${fila('Uso de Suelo', esc(e.usoSuelo||'—'))}
-    </div>
-    <div style="border-top:1px solid rgba(200,149,42,0.25);margin:0 0 14px;"></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px;">
-      ${fila('Construcción', esc(_txtConstruccion))}
-      ${fila('Carácter de Registro Público (IFREO)', esc(_txtIfreo))}
-    </div>
-    ${_chipsCaract?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px;">${_chipsCaract}</div>`:''}
-    <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.8rem;font-weight:700;color:#8c6518;margin-bottom:14px;">🏛 Datos Notariales</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:14px;">
-      ${fila('Notaría No.', esc(e.notaria||'—'))}
-      ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
-      ${fila('Fecha de Firma', fechaFmt)}
-      ${fila('Cuenta Catastral', esc(e.cuentaCatastral||'—'))}
-    </div>
-    <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:18px;">
-      ${fila('Ubicación', esc(e.ubicacion||'—'))}
-      ${fila('Alcance (Total/Parcial)', esc(e.tramite||'—'))}
-    </div>
-    ${e.descripcion?`<div style="font-size:0.78rem;color:#7a6840;background:rgba(200,149,42,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:0 8px 8px 0;line-height:1.5;margin-bottom:18px;">${esc(e.descripcion)}</div>`:''}
-    <div style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:0.8rem;font-weight:700;color:#8c6518;margin-bottom:12px;">🗒️ Observaciones</div>
-    <div id="esc-bitacora-lista" style="margin-bottom:6px;">${escRenderBitacora(e.bitacora||[])}</div>`;
+    ${e.descripcion?`<div style="font-size:0.78rem;color:#7a6840;background:rgba(200,149,42,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:0 8px 8px 0;line-height:1.5;margin-bottom:14px;">${esc(e.descripcion)}</div>`:''}
+    <div style="border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;">
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:700;color:#8c6518;margin-bottom:12px;">📄 Observaciones iniciales del trámite</div>
+      <div id="esc-bitacora-lista">${escRenderBitacora(e.bitacora||[])}</div>
+    </div>`;
   escActualizarTimelineDetalle(e.pasos||[]);
   escRenderNotasEtapa(e);
 }
@@ -4812,6 +4820,9 @@ function escEditarObservacion(idx, valor){
 // ahora mismo (no las 5). En cuanto una etapa se supera (se completa), sus
 // notas se descartan — esta sección siempre refleja solo el presente, nunca
 // el histórico de etapas ya superadas.
+// Días de inactividad (desde fechaMod) a partir de los cuales una escritura
+// EN PROCESO se marca como "Requiere atención" en la ficha de solo lectura.
+const ESC_DIAS_REQUIERE_ATENCION = 30;
 function escRenderNotasEtapa(e){
   // La vista de solo-lectura (ficha) nunca debe mostrar controles editables
   // (textarea/botones) — eso queda exclusivamente en el formulario de edición.
@@ -4819,33 +4830,137 @@ function escRenderNotasEtapa(e){
   destinos.forEach(({id,suf,editable})=>{
     const cont = document.getElementById(id);
     if(!cont) return;
+    // El aviso "Requiere atención" / Llamado a la Acción solo aplica a
+    // escrituras EN PROCESO. En Listo p/Entregar, En Espera y Archivado este
+    // espacio (en la ficha de solo lectura) queda vacío — sus notas viven en
+    // la caja de Observaciones, que ya se muestra aparte.
+    if(!editable && e.estado!=='proceso'){ cont.innerHTML=''; return; }
     const pasos = Array(5).fill(null).map((_,i)=>(e.pasos||[])[i]||{estado:'pendiente',notas:'',fecha:''});
     const completados = pasos.filter(p=>p.estado==='completado').length;
     const pasoActivo = completados<5 ? completados : -1;
     if(pasoActivo===-1){
       const notaFinal = e.notaFinal||'';
       const boton = editable ? `<button type="button" onclick="escAgregarNotaFinal('${suf}')" style="margin-top:8px;background:linear-gradient(135deg,#1a7a3a,#155c2c);border:none;color:#fff;border-radius:6px;padding:5px 12px;font-size:0.68rem;font-weight:700;cursor:pointer;">${notaFinal?'✏️ Editar nota':'＋ Agregar nota'}</button>` : '';
-      cont.innerHTML = `<div style="background:#fff;border-left:4px solid #1a7a3a;border-radius:0 10px 10px 0;box-shadow:0 1px 4px rgba(0,0,0,0.06);padding:10px 12px;">
-        <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#1a7a3a;">✓ Trámite completado en todas las etapas</div>
-        ${notaFinal?`<div style="font-size:0.75rem;color:#5c5648;margin-top:6px;">${esc(notaFinal)}</div>`:''}
-        ${boton}
+      const tituloWrap = editable ? '' : `<div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:12px;">🎯 Llamado a la Acción</div>`;
+      cont.innerHTML = `<div style="margin-bottom:16px;">
+        ${tituloWrap}
+        <div style="background:#fff;border-left:4px solid #1a7a3a;border-radius:0 10px 10px 0;box-shadow:0 1px 4px rgba(0,0,0,0.06);padding:10px 12px;">
+          <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#1a7a3a;">✓ Trámite completado en todas las etapas</div>
+          ${notaFinal?`<div style="font-size:0.75rem;color:#5c5648;margin-top:6px;">${esc(notaFinal)}</div>`:''}
+          ${boton}
+        </div>
       </div>`;
       return;
     }
     const i = pasoActivo;
     const p = pasos[i];
+    if(!editable){
+      // Vista de solo lectura: si llevan ESC_DIAS_REQUIERE_ATENCION días o más
+      // sin ningún cambio registrado (fechaMod), se resalta como "Detenido" /
+      // Requiere atención, con el botón TOMAR ACCIÓN. Antes de ese umbral se
+      // ve igual que siempre (caja dorada normal).
+      const dias = e.fechaMod ? (Date.now() - new Date(e.fechaMod).getTime())/86400000 : 0;
+      if(dias >= ESC_DIAS_REQUIERE_ATENCION){
+        cont.innerHTML = `<div style="background:#fdeaea;border:1.5px solid rgba(163,45,45,0.35);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+          <div style="font-size:1.3rem;">🎯</div>
+          <div style="flex:1;min-width:160px;">
+            <div style="font-size:0.85rem;font-weight:700;color:#a32d2d;">Llamado a la Acción</div>
+            <div style="font-family:monospace;font-size:0.6rem;color:#8a5a5a;">Siguiente paso del trámite</div>
+          </div>
+          <span style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#fff;background:#c0362f;padding:5px 12px;border-radius:14px;">⏸ Detenido</span>
+          <div style="font-family:sans-serif;font-size:0.72rem;color:#7a2f2f;flex-basis:100%;"><b>Requiere atención:</b> ${p.notas?esc(p.notas):'Sin nota registrada — usa "Tomar acción" para agregar una.'}</div>
+          <div style="position:relative;">
+            <button type="button" onclick="escToggleMenuAtencion(event)" style="background:none;border:1px solid #e0a0a0;color:#a32d2d;font-family:sans-serif;font-size:0.68rem;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;">TOMAR ACCIÓN</button>
+            <div id="esc-menu-atencion" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1px solid rgba(0,0,0,0.15);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:10;min-width:230px;overflow:hidden;">
+              <button type="button" onclick="escAccionAtencion('espera')" style="display:block;width:100%;text-align:left;padding:9px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.72rem;cursor:pointer;">Sigue en espera sin respuesta</button>
+              <button type="button" onclick="escAccionAtencion('requerimientos')" style="display:block;width:100%;text-align:left;padding:9px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.72rem;cursor:pointer;border-top:1px solid #eee;">Tenemos requerimientos</button>
+              <button type="button" onclick="escAccionAtencion('resuelto')" style="display:block;width:100%;text-align:left;padding:9px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.72rem;cursor:pointer;border-top:1px solid #eee;">Marcar como resuelto y avanzar</button>
+            </div>
+          </div>
+        </div>`;
+        return;
+      }
+      cont.innerHTML = `<div style="margin-bottom:16px;">
+        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:12px;">🎯 Llamado a la Acción</div>
+        <div style="background:#fff8e8;border-left:4px solid #c8952a;border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(200,149,42,0.15);padding:10px 12px;">
+          <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;">${i+1}. ${ESC_PASOS[i]} · 🟡 En proceso</div>
+          ${p.notas ? `<div style="font-size:0.75rem;color:#5c5648;margin-top:6px;">${esc(p.notas)}</div>` : ''}
+        </div>
+      </div>`;
+      return;
+    }
     // Sin botón propio de guardado: el texto de esta caja se captura al
     // vuelo en escGuardar() (botón GUARDAR general del formulario), igual
     // que el resto de los campos — evita una segunda fuente de verdad que
     // se pisaba con el modal de paso y hacía parecer que "no guardaba".
-    const cuerpo = editable
-      ? `<textarea id="esc-nota-etapa-${suf?suf+'-':''}${i}" rows="2" placeholder="Escribe el estatus de esta etapa..." style="width:100%;box-sizing:border-box;border:1.5px solid #c8952a;border-radius:6px;background:#fff;padding:6px 9px;font-size:0.75rem;font-family:sans-serif;resize:vertical;margin-top:6px;">${esc(p.notas||'')}</textarea>`
-      : (p.notas ? `<div style="font-size:0.75rem;color:#5c5648;margin-top:6px;">${esc(p.notas)}</div>` : '');
     cont.innerHTML = `<div style="background:#fff8e8;border-left:4px solid #c8952a;border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(200,149,42,0.15);padding:10px 12px;">
       <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;">${i+1}. ${ESC_PASOS[i]} · 🟡 En proceso</div>
-      ${cuerpo}
+      <textarea id="esc-nota-etapa-${suf?suf+'-':''}${i}" rows="2" placeholder="Escribe el estatus de esta etapa..." style="width:100%;box-sizing:border-box;border:1.5px solid #c8952a;border-radius:6px;background:#fff;padding:6px 9px;font-size:0.75rem;font-family:sans-serif;resize:vertical;margin-top:6px;">${esc(p.notas||'')}</textarea>
     </div>`;
   });
+}
+// Menú desplegable del botón "TOMAR ACCIÓN" del aviso de Requiere Atención.
+function escToggleMenuAtencion(ev){
+  if(ev) ev.stopPropagation();
+  const menu = document.getElementById('esc-menu-atencion');
+  if(!menu) return;
+  const abrir = menu.style.display !== 'block';
+  menu.style.display = abrir ? 'block' : 'none';
+  if(abrir){
+    setTimeout(() => {
+      const cerrar = () => { menu.style.display='none'; document.removeEventListener('click', cerrar); };
+      document.addEventListener('click', cerrar);
+    }, 0);
+  }
+}
+// Acciones del aviso "Requiere atención" (paso EN PROCESO detenido 30+ días
+// sin ningún cambio registrado):
+// - espera:         reinicia el conteo de 30 días sin pedir nada más.
+// - requerimientos: actualiza la nota/razón del paso activo (qué falta).
+// - resuelto:       guarda una nota final y avanza el paso a Completado.
+async function escAccionAtencion(accion){
+  if(_escIdx<0 || !D.escrituras[_escIdx]) return;
+  const e = D.escrituras[_escIdx];
+  if(!e.pasos) e.pasos = Array(5).fill(null).map(()=>({estado:'pendiente',notas:'',fecha:''}));
+  const completados = e.pasos.filter(p=>p&&p.estado==='completado').length;
+  const pasoActivo = completados<5 ? completados : -1;
+  if(pasoActivo<0){ toast('No hay un paso activo pendiente','err'); return; }
+  const fecha = new Date().toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  if(accion==='espera'){
+    e.fechaMod = new Date().toISOString();
+    escSyncYRefrescar();
+    escMostrarDetalle(e);
+    toast('Se reinició el seguimiento por otros 30 días');
+    return;
+  }
+  if(accion==='requerimientos'){
+    const valor = await pedirTexto({
+      titulo: 'Requerimientos pendientes',
+      mensaje: 'Describe qué falta para poder avanzar este paso.',
+      valorInicial: (e.pasos[pasoActivo] && e.pasos[pasoActivo].notas) || '',
+      placeholder: 'Ej: Falta ingresar a Catastro; razón: pago vencido.',
+      btnSi: 'Guardar',
+      multilinea: true
+    });
+    if(valor===null) return;
+    e.pasos[pasoActivo] = { ...(e.pasos[pasoActivo]||{}), estado:(e.pasos[pasoActivo]&&e.pasos[pasoActivo].estado)||'pendiente', notas: valor.trim(), fecha };
+    e.fechaMod = new Date().toISOString();
+    escSyncYRefrescar();
+    escMostrarDetalle(e);
+    toast('📝 Requerimientos actualizados');
+    return;
+  }
+  if(accion==='resuelto'){
+    // Misma regla que escGuardarPaso(): al completar una etapa su nota se
+    // limpia — "Llamado a la Acción" solo refleja la etapa activa actual,
+    // nunca el histórico de etapas ya superadas.
+    e.pasos[pasoActivo] = { estado:'completado', notas:'', fecha };
+    e.fechaMod = new Date().toISOString();
+    escSyncYRefrescar();
+    escMostrarDetalle(e);
+    if(pasoActivo<4) toast('✅ '+ESC_PASOS[pasoActivo]+' completado → Siguiente: '+ESC_PASOS[pasoActivo+1]);
+    else toast('🎉 ¡Escritura completada en todos los pasos!');
+  }
 }
 // Nota libre una vez que el trámite ya está completado en las 5 etapas (ya
 // no hay "etapa activa" a la cual atar una nota de estatus).

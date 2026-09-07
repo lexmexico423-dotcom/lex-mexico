@@ -4855,11 +4855,16 @@ function escRenderNotasEtapa(e){
     const i = pasoActivo;
     const p = pasos[i];
     if(!editable){
-      // Vista de solo lectura: si llevan ESC_DIAS_REQUIERE_ATENCION días o más
-      // sin ningún cambio registrado (fechaMod), se resalta como "Detenido" /
-      // Requiere atención, con el botón TOMAR ACCIÓN. Antes de ese umbral se
-      // ve igual que siempre (caja dorada normal).
-      const dias = e.fechaMod ? (Date.now() - new Date(e.fechaMod).getTime())/86400000 : 0;
+      // Vista de solo lectura: si el paso activo lleva ESC_DIAS_REQUIERE_ATENCION
+      // días o más sin ningún cambio registrado EN ESE PASO (pasoActivoFecha —
+      // no fechaMod, que cambia con cualquier edición del formulario y no
+      // sirve para esto), se resalta como "Detenido" / Requiere atención, con
+      // el botón TOMAR ACCIÓN. Antes de ese umbral se ve igual que siempre
+      // (caja dorada normal). Si nunca se registró pasoActivoFecha (escritura
+      // capturada antes de que existiera este campo), se trata como vencida
+      // desde siempre — es la única forma honesta de no ocultar trámites
+      // realmente detenidos solo porque son de antes de este feature.
+      const dias = e.pasoActivoFecha ? (Date.now() - new Date(e.pasoActivoFecha).getTime())/86400000 : Infinity;
       if(dias >= ESC_DIAS_REQUIERE_ATENCION){
         cont.innerHTML = `<div style="background:#fdeaea;border:1.5px solid rgba(163,45,45,0.35);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
           <div style="font-size:1.3rem;">🎯</div>
@@ -4928,6 +4933,7 @@ async function escAccionAtencion(accion){
   const fecha = new Date().toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
   if(accion==='espera'){
     e.fechaMod = new Date().toISOString();
+    e.pasoActivoFecha = new Date().toISOString();
     escSyncYRefrescar();
     escMostrarDetalle(e);
     toast('Se reinició el seguimiento por otros 30 días');
@@ -4945,6 +4951,7 @@ async function escAccionAtencion(accion){
     if(valor===null) return;
     e.pasos[pasoActivo] = { ...(e.pasos[pasoActivo]||{}), estado:(e.pasos[pasoActivo]&&e.pasos[pasoActivo].estado)||'pendiente', notas: valor.trim(), fecha };
     e.fechaMod = new Date().toISOString();
+    e.pasoActivoFecha = new Date().toISOString();
     escSyncYRefrescar();
     escMostrarDetalle(e);
     toast('📝 Requerimientos actualizados');
@@ -4956,6 +4963,8 @@ async function escAccionAtencion(accion){
     // nunca el histórico de etapas ya superadas.
     e.pasos[pasoActivo] = { estado:'completado', notas:'', fecha };
     e.fechaMod = new Date().toISOString();
+    // El paso SIGUIENTE (recién activo) arranca su propio conteo desde cero.
+    e.pasoActivoFecha = new Date().toISOString();
     escSyncYRefrescar();
     escMostrarDetalle(e);
     if(pasoActivo<4) toast('✅ '+ESC_PASOS[pasoActivo]+' completado → Siguiente: '+ESC_PASOS[pasoActivo+1]);
@@ -5555,6 +5564,13 @@ function escGuardar(){
     // La caja de texto de "Llamado a la Acción" (etapa activa) ya no tiene
     // botón propio de guardado: su valor se captura aquí, junto con el resto
     // del formulario, al presionar el botón GUARDAR general.
+    // _pasoActivoTocado: true si esta pasada realmente cambió algo del paso
+    // activo (su nota) — solo en ese caso se reinicia el reloj de 30 días de
+    // "Requiere atención" (pasoActivoFecha). Guardar la escritura por editar
+    // un campo cualquiera (notaría, comprador, etc.) NO debe resetear ese
+    // reloj — por eso no se reutiliza fechaMod (ese sí cambia en cada save,
+    // porque lo necesita la sincronización anti-condición-de-carrera).
+    let _pasoActivoTocado = false;
     (() => {
       const completadosAntes = pasos.filter(p=>p.estado==='completado').length;
       const pasoActivoAntes  = completadosAntes<5 ? completadosAntes : -1;
@@ -5568,6 +5584,7 @@ function escGuardar(){
           notas: notasNuevas,
           fecha: new Date().toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
         };
+        _pasoActivoTocado = true;
       }
     })();
     const e = {
@@ -5618,7 +5635,15 @@ function escGuardar(){
       notaFinal:   _escIdx>=0 ? (D.escrituras[_escIdx].notaFinal||'') : '',
       origenExcelNo: _escIdx>=0 ? (D.escrituras[_escIdx].origenExcelNo||'') : '',
       pasos,
-      fechaMod:    new Date().toISOString()
+      fechaMod:    new Date().toISOString(),
+      // Desde cuándo está "activo" el paso actual, para el aviso de
+      // Requiere Atención (30 días de silencio). Se reinicia SOLO cuando de
+      // verdad se registró algo nuevo en el paso activo (_pasoActivoTocado);
+      // si es una escritura nueva se marca desde ahora; si es una edición
+      // normal de otro campo, se conserva el valor que ya tenía.
+      pasoActivoFecha: _pasoActivoTocado
+        ? new Date().toISOString()
+        : (_escIdx>=0 ? (D.escrituras[_escIdx].pasoActivoFecha||'') : new Date().toISOString())
     };
     if(!Array.isArray(D.escrituras)) D.escrituras = [];
     if(_escIdx>=0) D.escrituras[_escIdx] = e;
@@ -5791,6 +5816,10 @@ function escGuardarPaso(){
     // cambio reciente, el merge anti-condición-de-carrera de sincronizarFolio()
     // no sabría que esta versión local es más nueva que la del servidor.
     e.fechaMod = new Date().toISOString();
+    // Cualquier cambio manual del paso (estado o nota) reinicia el reloj de
+    // 30 días de "Requiere atención" — igual si se completó y avanzó al
+    // siguiente paso (ese arranca su propio conteo desde cero).
+    e.pasoActivoFecha = new Date().toISOString();
     escActualizarTimeline(e.pasos);
     escActualizarTimelineDetalle(e.pasos);
     escRenderNotasEtapa(e);
@@ -5911,7 +5940,8 @@ async function escProcesarArchivoExcel(input){
         bitacora,
         origenExcelNo: no,
         pasos: Array(5).fill(null).map(()=>({estado:'pendiente',notas:'',fecha:''})),
-        fechaMod: new Date().toISOString()
+        fechaMod: new Date().toISOString(),
+        pasoActivoFecha: new Date().toISOString()
       });
       creadas++;
     });

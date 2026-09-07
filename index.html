@@ -14801,6 +14801,11 @@ Recibo original im…</td>
           data-bg="rgba(122,104,64,0.1)" data-bd="1.5px dashed rgba(122,104,64,0.4)" data-fg="#7a6840" data-shadow="none"
           data-bg-on="linear-gradient(135deg,#8a7550,#5c4d30)" data-bd-on="1.5px solid #5c4d30" data-fg-on="#fff" data-shadow-on="0 3px 10px rgba(122,104,64,0.3)"
           style="background:rgba(122,104,64,0.1);border:1.5px dashed rgba(122,104,64,0.4);color:#7a6840;border-radius:20px;padding:6px 18px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;transition:all 0.15s;">🗄 Archivado</button>
+        <button class="fbtn" id="escF-noprocedio" onclick="escSetFiltro(&#39;noprocedio&#39;,this)"
+          data-bg="rgba(122,32,32,0.08)" data-bd="1.5px solid rgba(122,32,32,0.25)" data-fg="#7a2020" data-shadow="none"
+          data-bg-on="linear-gradient(135deg,#a33a3a,#7a2020)" data-bd-on="1.5px solid #5c1818" data-fg-on="#fff" data-shadow-on="0 3px 10px rgba(122,32,32,0.35)"
+          style="background:rgba(122,32,32,0.08);border:1.5px solid rgba(122,32,32,0.25);color:#7a2020;border-radius:20px;padding:6px 18px;font-family:monospace;font-size:0.68rem;font-weight:700;cursor:pointer;transition:all 0.15s;">⛔ No Procedió</button>
+        <button onclick="escMigrarArchivadosSinEstatus()" title="Herramienta temporal: quita el estatus Archivado a todas para revisarlas una por una" style="margin-left:auto;background:none;border:1.5px dashed rgba(163,45,45,0.4);color:#a32d2d;border-radius:20px;padding:6px 14px;font-family:monospace;font-size:0.62rem;font-weight:700;cursor:pointer;transition:all 0.15s;">🔄 Migrar archivadas a "Todos" (una vez)</button>
       </div>
       <div id="esc-lista" style="padding:0 12px 24px;"></div>
     </div><!-- fin panel-escrituras -->
@@ -15225,6 +15230,7 @@ Recibo original im…</td>
             <button type="button" onclick="escSetEstado(&#39;listo&#39;,this)" data-estado="listo" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">🟢 Listo p/Entregar</button>
             <button type="button" onclick="escSetEstado(&#39;espera&#39;,this)" data-estado="espera" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">⬜ En Espera</button>
             <button type="button" onclick="escSetEstado(&#39;archivado&#39;,this)" data-estado="archivado" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">🗄 Archivado</button>
+            <button type="button" onclick="escSetEstado(&#39;noprocedio&#39;,this)" data-estado="noprocedio" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">⛔ No Procedió</button>
             <input type="hidden" id="eEstado" value="proceso">
           </div>
           <!-- Propietario que trasmite (vendedores/donadores) -->
@@ -15334,8 +15340,8 @@ Recibo original im…</td>
         <div id="esc-ftr-form" class="modal-ftr">
           <button class="btn" style="background:var(--rojo-l);color:var(--rojo);border:1px solid var(--rojo);margin-right:8px;" onclick="escEliminar()">🗑 Eliminar</button>
           <button class="btn" style="background:rgba(122,104,64,0.12);color:#7a6840;border:1px solid rgba(122,104,64,0.4);margin-right:auto;" onclick="escCancelar()">🚫 Cancelar Escritura</button>
-          <button class="btn btn-ghost" onclick="cerrar(&#39;mEscritura&#39;)">Cancelar</button>
           <button class="btn btn-primary" onclick="escGuardar()">💾 Guardar</button>
+          <button class="btn btn-ghost" onclick="cerrar(&#39;mEscritura&#39;)">Cerrar</button>
         </div>
         <!-- ── FOOTER DETALLE ── -->
         <div id="esc-ftr-detalle" class="modal-ftr" style="display:none;">
@@ -19376,7 +19382,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=202609052"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=202609059"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

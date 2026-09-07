@@ -4408,7 +4408,6 @@ function escActualizarTipoTramiteCatastro(preseleccionar){
 let _escFiltro = 'todos';
 let _escIdx    = -1;      // índice de escritura en edición
 let _escPasoIdx= -1;      // índice de paso abierto
-let _escIaHist = [];      // historial chat IA del paso
 // ── Inicializar D.escrituras si no existe ────────────────────────────
 if(typeof D!=='undefined' && !Array.isArray(D.escrituras)) D.escrituras = [];
 // ── Unificar observaciones legacy: ya no debe existir más de una nota por
@@ -4530,7 +4529,8 @@ function escMostrarDetalle(e){
     proceso:{col:'#9a6010',bg:'rgba(200,149,42,0.08)',lbl:'🟡 En Proceso'},
     listo:  {col:'#1a7a3a',bg:'rgba(26,122,58,0.08)', lbl:'🟢 Listo p/Entregar'},
     espera: {col:'#7a6840',bg:'rgba(0,0,0,0.04)',      lbl:'⬜ En Espera'},
-    archivado:{col:'#7a6840',bg:'rgba(122,104,64,0.08)',lbl:'🗄 Archivado'}
+    archivado:{col:'#7a6840',bg:'rgba(122,104,64,0.08)',lbl:'🗄 Archivado'},
+    cancelado:{col:'#a32d2d',bg:'rgba(163,45,45,0.08)',lbl:'❌ Cancelado'}
   };
   const st = cfg[e.estado||'proceso']||cfg.proceso;
   const fila = (lbl,val) => val ? `<div style="text-align:left;">
@@ -4542,8 +4542,8 @@ function escMostrarDetalle(e){
     const _discreto = [];
     if(obj.tipoPersona) _discreto.push('Persona '+esc(obj.tipoPersona));
     if(obj.civil)       _discreto.push(esc(obj.civil));
-    let html = `<div style="padding:8px 10px;background:rgba(0,0,0,0.03);border-radius:6px;margin-bottom:4px;box-shadow:none;">
-      <div style="font-weight:700;font-size:0.88rem;color:var(--ink);">${esc(obj.nombre||'—')}</div>
+    let html = `<div style="padding:6px 4px;margin-bottom:4px;">
+      <div style="font-weight:700;font-size:0.95rem;color:var(--ink);">${esc(obj.nombre||'—')}</div>
       ${_discreto.length?`<div style="font-size:0.64rem;color:var(--muted);margin-top:2px;">${_discreto.join(' · ')}</div>`:''}`;
     if(obj.tipoSociedad) html += `<div style="font-size:0.66rem;color:#1a4a8a;margin-top:2px;">Régimen: ${esc(obj.tipoSociedad)}</div>`;
     if(obj.consentimientoConyuge) html += `<div style="font-size:0.66rem;color:#1a4a8a;margin-top:2px;">✓ Con consentimiento de su cónyuge${obj.nombreConyuge?': <strong>'+esc(obj.nombreConyuge)+'</strong>':''}</div>`;
@@ -4601,7 +4601,7 @@ function escMostrarDetalle(e){
   }
   const _tramiteLabelHdr = (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? esc(t[1].toUpperCase()) : ''; })();
   if(el_header) el_header.innerHTML = `
-    ${_tramiteLabelHdr?`<div style="text-align:center;font-family:monospace;font-size:0.85rem;letter-spacing:0.1em;font-weight:800;color:#8c6518;margin-bottom:14px;text-transform:uppercase;">${_tramiteLabelHdr}</div>`:''}
+    ${_tramiteLabelHdr?`<div style="text-align:center;font-family:monospace;font-size:1.15rem;letter-spacing:0.1em;font-weight:800;color:#8c6518;margin-bottom:14px;text-transform:uppercase;">${_tramiteLabelHdr}</div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
       <div style="border:1.5px solid rgba(59,130,246,0.35);border-radius:16px;padding:12px 14px;background:#eef3ff;text-align:center;box-shadow:none;">
         <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#1a4a8a;font-weight:700;margin-bottom:8px;">👤 ${_tituloAdquirente}</div>
@@ -4645,8 +4645,7 @@ function escMostrarDetalle(e){
     </div>
     ${e.descripcion?`<div style="font-size:0.78rem;color:#7a6840;background:rgba(200,149,42,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:0 8px 8px 0;line-height:1.5;margin-bottom:14px;">${esc(e.descripcion)}</div>`:''}
     <div style="border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;">
-      <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:700;color:#8c6518;margin-bottom:4px;">📄 Observaciones iniciales del trámite</div>
-      <div style="font-size:0.68rem;color:var(--muted);margin-bottom:10px;">Nota general del trámite — distinta de "Llamado a la Acción" (más arriba, ligada al paso activo).</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:700;color:#8c6518;margin-bottom:12px;">📄 Observaciones iniciales del trámite</div>
       <div id="esc-bitacora-lista">${escRenderBitacora(e.bitacora||[])}</div>
     </div>`;
   escActualizarTimelineDetalle(e.pasos||[]);
@@ -4843,9 +4842,16 @@ function escEditarObservacion(idx, valor){
 // ahora mismo (no las 5). En cuanto una etapa se supera (se completa), sus
 // notas se descartan — esta sección siempre refleja solo el presente, nunca
 // el histórico de etapas ya superadas.
-// Días de inactividad (desde fechaMod) a partir de los cuales una escritura
-// EN PROCESO se marca como "Requiere atención" en la ficha de solo lectura.
+// Días de inactividad (desde pasoActivoFecha) a partir de los cuales una
+// escritura EN PROCESO se marca como "Requiere atención" en la ficha de solo
+// lectura. Cuando el paso activo quedó marcado con "Tenemos requerimientos"
+// (e.pasoActivoRequerimientos), el umbral es más corto: 8 días en vez de 30,
+// porque ya sabemos que hay algo pendiente esperando actualización. Cuando
+// quedó marcado con "Sigue en espera sin respuesta" (e.pasoActivoEnEspera),
+// el umbral es de 15 días.
 const ESC_DIAS_REQUIERE_ATENCION = 30;
+const ESC_DIAS_REQUIERE_ATENCION_REQUERIMIENTOS = 8;
+const ESC_DIAS_REQUIERE_ATENCION_ESPERA = 15;
 function escRenderNotasEtapa(e){
   // La vista de solo-lectura (ficha) nunca debe mostrar controles editables
   // (textarea/botones) — eso queda exclusivamente en el formulario de edición.
@@ -4888,7 +4894,12 @@ function escRenderNotasEtapa(e){
       // desde siempre — es la única forma honesta de no ocultar trámites
       // realmente detenidos solo porque son de antes de este feature.
       const dias = e.pasoActivoFecha ? (Date.now() - new Date(e.pasoActivoFecha).getTime())/86400000 : Infinity;
-      if(dias >= ESC_DIAS_REQUIERE_ATENCION){
+      const _umbralAtencion = e.pasoActivoRequerimientos ? ESC_DIAS_REQUIERE_ATENCION_REQUERIMIENTOS : (e.pasoActivoEnEspera ? ESC_DIAS_REQUIERE_ATENCION_ESPERA : ESC_DIAS_REQUIERE_ATENCION);
+      // Fecha de la última actualización registrada en el paso activo, para
+      // que se entienda desde cuándo corre el conteo (y por qué, en su caso,
+      // ya se disparó "Requiere atención").
+      const _fechaActFmt = e.pasoActivoFecha ? new Date(e.pasoActivoFecha).toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+      if(dias >= _umbralAtencion){
         cont.innerHTML = `<div style="background:#fdeaea;border:1.5px solid rgba(163,45,45,0.35);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
           <div style="font-size:1.3rem;">🎯</div>
           <div style="flex:1;min-width:160px;">
@@ -4897,6 +4908,7 @@ function escRenderNotasEtapa(e){
           </div>
           <span style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#fff;background:#c0362f;padding:5px 12px;border-radius:14px;">⏸ Detenido</span>
           <div style="font-family:sans-serif;font-size:0.72rem;color:#7a2f2f;flex-basis:100%;"><b>Requiere atención:</b> ${p.notas?esc(p.notas):'Sin nota registrada — usa "Tomar acción" para agregar una.'}</div>
+          ${_fechaActFmt?`<div style="font-family:sans-serif;font-size:0.66rem;color:#8a5a5a;flex-basis:100%;">Última actualización: ${esc(_fechaActFmt)}</div>`:''}
           <div style="position:relative;">
             <button type="button" onclick="escToggleMenuAtencion(event)" style="background:none;border:1px solid #e0a0a0;color:#a32d2d;font-family:sans-serif;font-size:0.68rem;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background 0.15s;" onmouseover="this.style.background='rgba(163,45,45,0.06)'" onmouseout="this.style.background='none'">TOMAR ACCIÓN <span style="font-size:0.55rem;">▾</span></button>
             <div id="esc-menu-atencion" style="display:none;position:absolute;left:0;top:calc(100% + 6px);background:#fff;border:1px solid rgba(0,0,0,0.1);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,0.16);z-index:50;min-width:260px;overflow:hidden;">
@@ -4914,6 +4926,7 @@ function escRenderNotasEtapa(e){
         <div style="background:#fff8e8;border-left:4px solid #c8952a;border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(200,149,42,0.15);padding:10px 12px;">
           <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;">${i+1}. ${ESC_PASOS[i]} · 🟡 En proceso</div>
           ${p.notas ? `<div style="font-size:0.75rem;color:#5c5648;margin-top:6px;">${esc(p.notas)}</div>` : ''}
+          ${_fechaActFmt?`<div style="font-size:0.62rem;color:#a08050;margin-top:6px;">Última actualización: ${esc(_fechaActFmt)}</div>`:''}
         </div>
       </div>`;
       return;
@@ -4958,9 +4971,14 @@ async function escAccionAtencion(accion){
   if(accion==='espera'){
     e.fechaMod = new Date().toISOString();
     e.pasoActivoFecha = new Date().toISOString();
+    e.pasoActivoRequerimientos = false;
+    // Mientras siga en espera de respuesta sin más novedades, el umbral de
+    // "Requiere atención" baja de 30 a 15 días de silencio (ver
+    // ESC_DIAS_REQUIERE_ATENCION_ESPERA).
+    e.pasoActivoEnEspera = true;
     escSyncYRefrescar();
     escMostrarDetalle(e);
-    toast('Se reinició el seguimiento por otros 30 días');
+    toast('Se reinició el seguimiento por otros 15 días');
     return;
   }
   if(accion==='requerimientos'){
@@ -4976,6 +4994,11 @@ async function escAccionAtencion(accion){
     e.pasos[pasoActivo] = { ...(e.pasos[pasoActivo]||{}), estado:(e.pasos[pasoActivo]&&e.pasos[pasoActivo].estado)||'pendiente', notas: valor.trim(), fecha };
     e.fechaMod = new Date().toISOString();
     e.pasoActivoFecha = new Date().toISOString();
+    // Mientras haya requerimientos pendientes sin resolver, el umbral de
+    // "Requiere atención" baja de 30 a 8 días de silencio (ver
+    // ESC_DIAS_REQUIERE_ATENCION_REQUERIMIENTOS).
+    e.pasoActivoRequerimientos = true;
+    e.pasoActivoEnEspera = false;
     escSyncYRefrescar();
     escMostrarDetalle(e);
     toast('📝 Requerimientos actualizados');
@@ -4989,6 +5012,8 @@ async function escAccionAtencion(accion){
     e.fechaMod = new Date().toISOString();
     // El paso SIGUIENTE (recién activo) arranca su propio conteo desde cero.
     e.pasoActivoFecha = new Date().toISOString();
+    e.pasoActivoRequerimientos = false;
+    e.pasoActivoEnEspera = false;
     escSyncYRefrescar();
     escMostrarDetalle(e);
     if(pasoActivo<4) toast('✅ '+ESC_PASOS[pasoActivo]+' completado → Siguiente: '+ESC_PASOS[pasoActivo+1]);
@@ -5042,7 +5067,60 @@ function escActualizarTimelineDetalle(pasos){
       ? '✅ Escritura completada en todos los pasos'
       : 'Paso activo: '+ESC_PASOS[pasoActivo]+' — toca el círculo resaltado para registrar el estatus';
     hint.style.color = pasoActivo===-1?'#1a7a3a':'var(--muted)';
+    // Más grande y visible cuando ya se completaron los 5 pasos — el hint
+    // normal ("Paso activo: ...") se queda en su tamaño chico de siempre.
+    hint.style.fontSize = pasoActivo===-1?'0.95rem':'0.65rem';
+    hint.style.fontWeight = pasoActivo===-1?'800':'400';
   }
+  // Botón "Se confirma entrega de escrituras": solo cuando ya se completaron
+  // los 5 pasos y todavía no está archivada (una vez archivada, ya no tiene
+  // caso volver a mostrarlo).
+  const btnEntrega = document.getElementById('esc-btn-confirmar-entrega');
+  if(btnEntrega){
+    const _eAct = (_escIdx>=0 && D.escrituras[_escIdx]) ? D.escrituras[_escIdx] : null;
+    const mostrarBtn = pasoActivo===-1 && _eAct && _eAct.estado!=='archivado';
+    btnEntrega.style.display = mostrarBtn ? 'flex' : 'none';
+  }
+}
+// Botón "Se confirma entrega de escrituras" (solo visible con los 5 pasos
+// completados): pide confirmación y luego quién autoriza —
+// elegirResponsable() ya resuelve esto igual que en el resto de la app: si
+// quien tiene la sesión abierta es la administradora, le muestra el selector
+// para elegir empleado o administrador; si es una empleada normal, usa
+// directamente su nombre sin mostrarle ningún selector. Al confirmar, la
+// escritura pasa a Archivado.
+async function escConfirmarEntrega(){
+  if(_escIdx<0 || !D.escrituras[_escIdx]) return;
+  const e = D.escrituras[_escIdx];
+  const ok = await confirmarBonito({
+    titulo: '¿Confirmar entrega de escrituras?',
+    mensaje: 'La escritura '+(e.num||'')+' se marcará como Archivado. Esta acción no se puede deshacer desde aquí.',
+    btnSi: 'Sí, confirmar entrega'
+  });
+  if(!ok) return;
+  // Dato adicional obligatorio antes de poder autorizar: quién recibió
+  // físicamente la escritura (puede ser el cliente o quien haya acudido por
+  // ella) — distinto de quién autoriza internamente la entrega, que se pide
+  // después con elegirResponsable().
+  const quienRecibio = await pedirTexto({
+    titulo: '¿Quién recibió la escritura?',
+    mensaje: 'Escribe el nombre de la persona que recibió la escritura.',
+    placeholder: 'Nombre de quien recibió',
+    btnSi: 'Continuar',
+    validar: (v) => (v||'').trim() ? null : 'Este dato es obligatorio.'
+  });
+  if(quienRecibio===null) return;
+  elegirResponsable(function(nombreResponsable){
+    e.entregaRecibioPor = quienRecibio.trim();
+    e.entregaConfirmadaPor = nombreResponsable;
+    e.entregaConfirmadaFecha = new Date().toISOString();
+    e.estado = 'archivado';
+    e.fechaMod = new Date().toISOString();
+    escSyncYRefrescar();
+    escMostrarDetalle(e);
+    if(typeof escRender==='function') escRender();
+    toast('📦 Entrega confirmada por '+nombreResponsable+' — escritura archivada');
+  });
 }
 function escMostrarFormulario(){
   document.getElementById('modal-body-form').style.display='block';
@@ -5075,7 +5153,16 @@ function escRender(){
   }
   const q=(document.getElementById('escQ')?.value||'').toLowerCase();
   let lista = D.escrituras.filter(e=>{
-    if(_escFiltro!=='todos' && e.estado!==_escFiltro) return false;
+    if(_escFiltro==='todos'){
+      // "Todos" = En Proceso + Listo p/Entregar + recién creadas sin estatus
+      // asignado todavía — excluye En Espera, Archivado y Cancelado.
+      if(e.estado==='espera' || e.estado==='archivado' || e.estado==='cancelado') return false;
+    } else if(_escFiltro==='archivado'){
+      // El filtro Archivado incluye también las Canceladas.
+      if(e.estado!=='archivado' && e.estado!=='cancelado') return false;
+    } else if(e.estado!==_escFiltro){
+      return false;
+    }
     if(q){
       const _gn=p=>typeof p==='string'?p:(p?.nombre||'');
       const txt=[e.num||'',(e.compradores||[]).map(_gn).join(' '),(e.vendedores||[]).map(_gn).join(' '),e.tipo||'',ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento]||'',e.notaria||'',e.descripcion||''].join(' ').toLowerCase();
@@ -5083,6 +5170,29 @@ function escRender(){
     }
     return true;
   });
+  // Orden de la lista: más recientes arriba, más antiguas abajo, según
+  // fechaFirma. Sin fechaFirma se trata como la más reciente (sube arriba)
+  // para que no se pierda de vista mientras no tenga fecha capturada.
+  lista = lista.slice().sort((a,b)=>(b.fechaFirma||'9999-99-99').localeCompare(a.fechaFirma||'9999-99-99'));
+  // Folio cronológico "PENDIENTE ESCRITURA": solo para escrituras activas
+  // (En Proceso / Listo p/Entregar / recién creadas sin estatus aún) — NO
+  // para En Espera, Archivado ni Cancelado. Se calcula siempre sobre TODO
+  // D.escrituras (no solo lo que pasó el filtro/búsqueda actuales), para que
+  // el número de cada una sea estable sin importar qué pestaña tengas
+  // abierta. La firmada más antigua es el folio 1; la más reciente tiene el
+  // folio más alto (misma lógica de fechaFirma que el orden de la lista).
+  const _pendientesOrdenadas = D.escrituras
+    .filter(x=>!x.estado || x.estado==='proceso' || x.estado==='listo')
+    .slice()
+    .sort((a,b)=>(a.fechaFirma||'9999-99-99').localeCompare(b.fechaFirma||'9999-99-99'));
+  const _folioPendienteMap = new Map();
+  _pendientesOrdenadas.forEach((x,i)=>_folioPendienteMap.set(x,i+1));
+  // Contador de escrituras (respeta el filtro de semáforo y la búsqueda
+  // activos) — reemplaza a los botones de Importar Excel / Limpiar vacías,
+  // que se quitaron de esta barra (las funciones siguen existiendo en el
+  // código por si se necesita exponerlas en otro lugar más adelante).
+  const _escCountEl = document.getElementById('escCountNum');
+  if(_escCountEl) _escCountEl.textContent = lista.length;
   const cont = document.getElementById('esc-lista');
   if(!lista.length){
     cont.innerHTML='<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.8rem;">Sin escrituras en este filtro.</div>';
@@ -5093,6 +5203,7 @@ function escRender(){
     listo:    {col:'#1a7a3a',bg:'rgba(26,122,58,0.08)',dot:'#1a7a3a',lbl:'🟢 Listo p/Entregar'},
     espera:   {col:'#7a6840',bg:'rgba(0,0,0,0.04)',dot:'#aaa',lbl:'⬜ En Espera'},
     archivado:{col:'#7a6840',bg:'rgba(122,104,64,0.08)',dot:'#7a6840',lbl:'🗄 Archivado'},
+    cancelado:{col:'#a32d2d',bg:'rgba(163,45,45,0.08)',dot:'#a32d2d',lbl:'❌ Cancelado'},
   };
   cont.innerHTML = lista.map(e=>{
     const idx = D.escrituras.indexOf(e);
@@ -5108,6 +5219,24 @@ function escRender(){
     };
     const comp = (e.compradores||[]).map(getLabel).join(', ')||'Sin comprador';
     const vend = (e.vendedores||[]).length ? (e.vendedores||[]).map(getLabel).join(', ') : '';
+    // Rol dinámico de cada parte según el Tipo de Trámite (mismo catálogo
+    // que ya usa la ficha de detalle) y nombre del acto (ej. "COMPRAVENTA").
+    const _parCaracterCard = ESC_CARACTER_POR_TRAMITE[e.tipoTramiteCatastro] || null;
+    const rolAdq   = _parCaracterCard ? esc(_parCaracterCard[0]) : 'Comprador(a)/Donatario(a)';
+    const rolTrans = _parCaracterCard ? esc(_parCaracterCard[1]) : 'Vendedor(a)/Donante';
+    const actoTxt = (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? esc(t[1].toUpperCase()) : ''; })();
+    // Instrumento, Volumen y fecha de celebración/firma — se muestran justo
+    // antes del tipo de trámite (ej. "Instr. 9,100 · Vol. 125 · 15 ene 2019").
+    const _fechaFirmaCard = e.fechaFirma
+      ? new Date(e.fechaFirma+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'})
+      : (e.fechaFirmaTexto ? esc(e.fechaFirmaTexto) : '');
+    const _instrVolTxt = [e.instrumento?('Instr. '+esc(e.instrumento)):'', e.volumen?('Vol. '+esc(e.volumen)):''].filter(Boolean).join(' · ');
+    const datosActoTxt = [_instrVolTxt, _fechaFirmaCard].filter(Boolean).join(' · ');
+    // Folio del recibo vinculado (mismo cálculo que en la ficha de detalle).
+    const _recVincCard = e.folioRecibo ? ((typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))||[]).find(r=>r.folio===e.folioRecibo) : null;
+    const _letraVincCard = _recVincCard?.letra || (typeof letraVersion==='function' ? letraVersion(_recVincCard||{}) : '') || 'A';
+    const folioRecTxt = e.folioRecibo ? (typeof folioConLetra==='function' ? folioConLetra(e.folioRecibo, _recVincCard?.anio_folio, _letraVincCard) : (e.folioRecibo+_letraVincCard)) : '';
+    const folioPendiente = _folioPendienteMap.get(e);
     // Mini línea del tiempo con estado correcto
     const pasoActivo = completados < 5 ? completados : -1;
     const miniTimeline = pasos.map((p,i)=>{
@@ -5133,35 +5262,47 @@ function escRender(){
     return `<div onclick="escAbrirDetalle(${idx})" style="background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;">
         <div style="min-width:0;">
-          <div style="font-family:monospace;font-size:0.65rem;color:var(--muted);margin-bottom:2px;">${esc(e.num||'—')} · ${esc(e.tipo || ESC_TIPOS_MOVIMIENTO[e.tipoMovimiento] || 'Escritura')} · Not. ${esc(e.notaria||'—')}</div>
-          <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">${esc(comp)}</div>
-          ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ ${esc(vend)}</div>`:''}
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
+            ${folioPendiente?`<div style="text-align:left;line-height:1.1;flex-shrink:0;">
+              <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.05em;color:#8c6518;font-weight:700;">ESCRITURA</div>
+              <div style="font-size:1.25rem;font-weight:800;color:#8c6518;">${folioPendiente}</div>
+            </div>`:''}
+            ${actoTxt?`<div style="font-family:monospace;font-size:0.78rem;font-weight:800;color:#8c6518;letter-spacing:0.03em;">${actoTxt}</div>`:''}
+            ${datosActoTxt?`<div style="font-family:monospace;font-size:0.62rem;color:var(--muted);white-space:nowrap;">${datosActoTxt}</div>`:''}
+          </div>
+          <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">👤 ${esc(comp)} <span style="font-size:0.6rem;color:#1a4a8a;text-transform:uppercase;font-weight:700;">${rolAdq}</span></div>
+          ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ ${esc(vend)} <span style="font-size:0.58rem;color:#8c6518;text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="font-family:serif;font-size:1.15rem;color:#8c6518;font-weight:700;white-space:nowrap;">${e.num?('CARP.- '+esc(e.num)):'—'}</div>
+            ${folioRecTxt?`<div style="text-align:center;line-height:1.15;">
+              <div style="font-family:serif;font-size:0.55rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;">FOLIO</div>
+              <div style="font-family:serif;font-size:0.95rem;color:#1a4a8a;font-weight:800;">${esc(folioRecTxt)}</div>
+            </div>`:''}
+          </div>
           <span style="font-size:0.65rem;font-weight:700;color:${cfg.col};background:${cfg.bg};padding:3px 10px;border-radius:12px;">${cfg.lbl}</span>
           <span style="font-family:monospace;font-size:0.62rem;color:var(--muted);">${pct}% completado</span>
         </div>
       </div>
       <div style="display:flex;align-items:flex-start;gap:4px;">${miniTimeline}</div>
-      ${e.descripcion?`<div style="font-size:0.72rem;color:var(--muted);margin-top:8px;line-height:1.4;">${esc(e.descripcion.substring(0,120))}${e.descripcion.length>120?'…':''}</div>`:''}
-      ${(()=>{
-        const chips=[];
-        if(e.predio)   chips.push('Predio: '+esc(e.predio));
-        if(e.ubicacion)chips.push('Ubicación: '+esc(e.ubicacion));
-        if(e.volInstr) chips.push('Vol./Instr.: '+esc(e.volInstr));
-        if(e.folios)   chips.push('Folios: '+esc(e.folios));
-        if(e.tramite)  chips.push(esc(e.tramite));
-        if(!chips.length) return '';
-        return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">'+chips.map(c=>`<span style="background:rgba(200,149,42,0.08);color:#7a6840;font-size:0.62rem;padding:2px 8px;border-radius:6px;">${c}</span>`).join('')+'</div>';
-      })()}
-      ${(e.bitacora&&e.bitacora.length)?`<div style="font-size:0.62rem;color:var(--muted);margin-top:6px;">🕒 ${e.bitacora.length} nota${e.bitacora.length===1?'':'s'} en bitácora</div>`:''}
     </div>`;
   }).join('');
 }
 function escSetFiltro(f,el){
   _escFiltro=f;
-  document.querySelectorAll('#panel-escrituras .fbtn').forEach(b=>b.style.fontWeight='500');
-  if(el) el.style.fontWeight='900';
+  // Antes el botón "activo" solo cambiaba el grosor de la letra (casi
+  // imperceptible) — ahora se rellena con su propio color (guardado en los
+  // data-attributes de cada botón) para que se note claramente cuál está
+  // seleccionado.
+  document.querySelectorAll('#panel-escrituras .fbtn[data-bg]').forEach(b=>{
+    const on = b.id === 'escF-'+f;
+    b.style.background = on ? b.dataset.bgOn : b.dataset.bg;
+    b.style.border      = on ? b.dataset.bdOn : b.dataset.bd;
+    b.style.color       = on ? b.dataset.fgOn : b.dataset.fg;
+    b.style.boxShadow   = on ? b.dataset.shadowOn : b.dataset.shadow;
+    b.style.fontWeight  = on ? '900' : '700';
+  });
   escRender();
 }
 // ── Abrir nueva escritura ─────────────────────────────────────────────
@@ -5667,7 +5808,18 @@ function escGuardar(){
       // normal de otro campo, se conserva el valor que ya tenía.
       pasoActivoFecha: _pasoActivoTocado
         ? new Date().toISOString()
-        : (_escIdx>=0 ? (D.escrituras[_escIdx].pasoActivoFecha||'') : new Date().toISOString())
+        : (_escIdx>=0 ? (D.escrituras[_escIdx].pasoActivoFecha||'') : new Date().toISOString()),
+      // Igual que pasoActivoFecha: una edición real de la nota del paso activo
+      // desde este formulario ya no cuenta como "esperando actualización de
+      // requerimientos" (umbral de 8 días) — vuelve al umbral normal de 30.
+      pasoActivoRequerimientos: _pasoActivoTocado
+        ? false
+        : (_escIdx>=0 ? !!D.escrituras[_escIdx].pasoActivoRequerimientos : false),
+      // Igual que pasoActivoRequerimientos, pero para "Sigue en espera sin
+      // respuesta" (umbral de 15 días).
+      pasoActivoEnEspera: _pasoActivoTocado
+        ? false
+        : (_escIdx>=0 ? !!D.escrituras[_escIdx].pasoActivoEnEspera : false)
     };
     if(!Array.isArray(D.escrituras)) D.escrituras = [];
     if(_escIdx>=0) D.escrituras[_escIdx] = e;
@@ -5690,6 +5842,26 @@ async function escEliminar(){
   escSyncYRefrescar();
   cerrar('mEscritura');
   toast('Escritura eliminada');
+}
+// Distinto de escEliminar(): esto NO borra el registro, solo lo marca como
+// Cancelado (nuevo estatus). Queda visible bajo el filtro "Archivado" (que
+// incluye Archivado + Cancelado), por si se necesita consultar después.
+async function escCancelar(){
+  if(_escIdx<0 || !D.escrituras[_escIdx]) return;
+  const e = D.escrituras[_escIdx];
+  const ok = await confirmarBonito({
+    titulo: '¿Cancelar esta escritura?',
+    mensaje: 'La escritura '+(e.num||'')+' se marcará como Cancelada y aparecerá junto con las archivadas. El registro no se borra.',
+    btnSi: 'Sí, cancelar escritura',
+    peligro: true
+  });
+  if(!ok) return;
+  e.estado = 'cancelado';
+  e.fechaMod = new Date().toISOString();
+  escSyncYRefrescar();
+  cerrar('mEscritura');
+  if(typeof escRender==='function') escRender();
+  toast('🚫 Escritura marcada como Cancelada');
 }
 // ── Línea del tiempo ──────────────────────────────────────────────────
 function escActualizarTimeline(pasos){
@@ -5786,21 +5958,22 @@ function escAbrirPaso(pasoIdx){
   try{
     if(_escIdx<0){toast('Guarda la escritura primero','err');return;}
     _escPasoIdx=pasoIdx;
-    _escIaHist=[];
     const e=D.escrituras[_escIdx];
     const p=(e.pasos||[])[pasoIdx]||{estado:'pendiente',notas:'',fecha:''};
     document.getElementById('mEscPasoTitulo').textContent='Paso '+(pasoIdx+1)+' — '+ESC_PASOS[pasoIdx];
     document.getElementById('paso-notas').value=p.notas||'';
     document.getElementById('paso-estado-hidden').value=p.estado||'pendiente';
-    document.getElementById('paso-fecha-upd').textContent=p.fecha?'Última actualización: '+fmtFecha(p.fecha):'Sin actualizaciones aún';
+    // Misma fecha/fuente que "Llamado a la Acción" (e.pasoActivoFecha) para
+    // que ambos avisos siempre coincidan — antes usaba p.fecha, que podía
+    // quedar desfasado (ej. tras "Sigue en espera sin respuesta").
+    document.getElementById('paso-fecha-upd').textContent = e.pasoActivoFecha
+      ? 'Última actualización: '+new Date(e.pasoActivoFecha).toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+      : 'Sin actualizaciones aún';
     // Resaltar botón de estado activo
     ['pendiente','activo','completado'].forEach(s=>{
       const btn=document.getElementById('paso-btn-'+s);
       if(btn) btn.style.opacity=p.estado===s?'1':'0.4';
     });
-    // Limpiar chat IA
-    document.getElementById('esc-ia-msgs').innerHTML=`<div style="color:var(--muted);font-size:0.72rem;font-style:italic;">Hola. Tengo acceso al estado completo de esta escritura. Pregúntame sobre este paso o el trámite en general.</div>`;
-    document.getElementById('esc-ia-inp').value='';
     $('mEscPaso').classList.add('show');
   }catch(err){
     console.error('[escAbrirPaso]', err);
@@ -5844,6 +6017,11 @@ function escGuardarPaso(){
     // 30 días de "Requiere atención" — igual si se completó y avanzó al
     // siguiente paso (ese arranca su propio conteo desde cero).
     e.pasoActivoFecha = new Date().toISOString();
+    // Una edición manual del paso desde este modal ya no es "esperando
+    // actualización de requerimientos" ni "en espera sin respuesta" — vuelve
+    // al umbral normal de 30 días.
+    e.pasoActivoRequerimientos = false;
+    e.pasoActivoEnEspera = false;
     escActualizarTimeline(e.pasos);
     escActualizarTimelineDetalle(e.pasos);
     escRenderNotasEtapa(e);
@@ -5965,7 +6143,9 @@ async function escProcesarArchivoExcel(input){
         origenExcelNo: no,
         pasos: Array(5).fill(null).map(()=>({estado:'pendiente',notas:'',fecha:''})),
         fechaMod: new Date().toISOString(),
-        pasoActivoFecha: new Date().toISOString()
+        pasoActivoFecha: new Date().toISOString(),
+        pasoActivoRequerimientos: false,
+        pasoActivoEnEspera: false
       });
       creadas++;
     });
@@ -6013,51 +6193,6 @@ async function escLimpiarImportacionesVacias(){
   escSyncYRefrescar();
   if(typeof renderCarp==='function') renderCarp();
   toast('🗑 '+vacias.length+' escritura(s) vacía(s) y su(s) carpeta(s) borradas');
-}
-// ── Chat IA del paso ──────────────────────────────────────────────────
-async function escIaEnviar(){
-  const inp=document.getElementById('esc-ia-inp');
-  const msgs=document.getElementById('esc-ia-msgs');
-  const texto=(inp.value||'').trim();
-  if(!texto)return;
-  inp.value='';
-  // Burbuja usuario
-  msgs.innerHTML+=`<div style="text-align:right;"><span style="background:var(--gold);color:#1a1008;padding:6px 10px;border-radius:10px 10px 2px 10px;display:inline-block;font-size:0.78rem;max-width:85%;">${esc(texto)}</span></div>`;
-  msgs.scrollTop=msgs.scrollHeight;
-  _escIaHist.push({role:'user',content:texto});
-  // Burbuja pensando
-  const thinkId='think-'+Date.now();
-  msgs.innerHTML+=`<div id="${thinkId}" style="text-align:left;"><span style="background:#e8e0f0;color:#5a1a6a;padding:6px 10px;border-radius:10px 10px 10px 2px;display:inline-block;font-size:0.78rem;">✦ Pensando...</span></div>`;
-  msgs.scrollTop=msgs.scrollHeight;
-  // Construir contexto del trámite
-  const e=_escIdx>=0?D.escrituras[_escIdx]:{};
-  const pasoActual=(_escPasoIdx>=0&&e.pasos)?e.pasos[_escPasoIdx]:{};
-  const contexto=`Eres un asistente legal mexicano experto en trámites de escrituración en Oaxaca, México.
-Tienes acceso al siguiente expediente de escritura:
-EXPEDIENTE: ${e.num||'—'}
-TIPO: ${e.tipo||'—'}
-NOTARÍA: ${e.notaria||'—'} | INSTRUMENTO: ${e.instrumento||'—'} | VOLUMEN: ${e.volumen||'—'}
-COMPRADORES: ${(e.compradores||[]).join(', ')||'—'}
-VENDEDORES: ${(e.vendedores||[]).join(', ')||'—'}
-DESCRIPCIÓN GENERAL: ${e.descripcion||'—'}
-PASO ACTUAL: ${ESC_PASOS[_escPasoIdx]||'—'}
-ESTADO DEL PASO: ${pasoActual.estado||'pendiente'}
-NOTAS DEL PASO: ${pasoActual.notas||'Sin notas'}
-ÚLTIMA ACTUALIZACIÓN: ${pasoActual.fecha||'—'}
-PROGRESO GENERAL:
-${ESC_PASOS.map((n,i)=>{const p=(e.pasos||[])[i]||{};return `${i+1}. ${n}: ${p.estado||'pendiente'}${p.notas?' — '+p.notas.substring(0,80):''}`}).join('\n')}
-Responde en español, de forma concisa y práctica. Orienta sobre el proceso notarial y registral en Oaxaca.`;
-  try{
-    // Usar _iaLlamar: Groq primero, fallback Cloudflare Workers AI
-    const respuesta = (await _iaLlamar(contexto, 600, 0.3, 'consulta')).trim();
-    const el=document.getElementById(thinkId);if(el)el.remove();
-    msgs.innerHTML+=`<div style="text-align:left;"><span style="background:#e8e0f0;color:#3a0a5a;padding:6px 10px;border-radius:10px 10px 10px 2px;display:inline-block;font-size:0.78rem;max-width:90%;line-height:1.5;">${esc(respuesta)}</span></div>`;
-    _escIaHist.push({role:'assistant',content:respuesta});
-  }catch(err){
-    const el=document.getElementById(thinkId);if(el)el.remove();
-    msgs.innerHTML+=`<div style="color:#c0161a;font-size:0.72rem;padding:4px;">Error al conectar con IA: ${err.message}</div>`;
-  }
-  msgs.scrollTop=msgs.scrollHeight;
 }
 // ── Sincronizar D.escrituras con Supabase ─────────────────────────────
 const _origSyncEsc=window.syncEstadoSupabase;

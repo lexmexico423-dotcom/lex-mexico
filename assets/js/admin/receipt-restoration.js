@@ -4539,14 +4539,15 @@ function escMostrarDetalle(e){
   </div>` : '';
   const renderPersonas = (lista) => (lista||[]).map(p=>{
     const obj = typeof p==='string' ? {nombre:p} : p;
-    let html = `<div style="padding:6px 10px;background:rgba(0,0,0,0.03);border-radius:6px;margin-bottom:4px;">
-      ${obj.caracter?`<div style="font-size:0.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">${esc(_escCaracterDisplay(obj.caracter))}</div>`:''}
-      <span style="font-weight:600;">${esc(obj.nombre||'—')}</span>`;
-    if(obj.tipoPersona) html += ` <span style="font-size:0.68rem;color:var(--muted);">(Persona ${esc(obj.tipoPersona)})</span>`;
-    if(obj.civil)    html += ` <span style="font-size:0.7rem;color:var(--muted);">(${esc(obj.civil)})</span>`;
-    if(obj.tipoSociedad) html += `<div style="font-size:0.7rem;color:#1a4a8a;margin-top:2px;">Régimen: ${esc(obj.tipoSociedad)}</div>`;
-    if(obj.consentimientoConyuge) html += `<div style="font-size:0.72rem;color:#1a4a8a;margin-top:2px;">✓ Con consentimiento de su cónyuge${obj.nombreConyuge?': <strong>'+esc(obj.nombreConyuge)+'</strong>':''}</div>`;
-    if(obj.conducto) html += `<div style="font-size:0.72rem;color:#7a6840;margin-top:2px;">↳ Por conducto de: <strong>${esc(obj.conducto)}</strong></div>`;
+    const _discreto = [];
+    if(obj.tipoPersona) _discreto.push('Persona '+esc(obj.tipoPersona));
+    if(obj.civil)       _discreto.push(esc(obj.civil));
+    let html = `<div style="padding:8px 10px;background:rgba(0,0,0,0.03);border-radius:6px;margin-bottom:4px;box-shadow:none;">
+      <div style="font-weight:700;font-size:0.88rem;color:var(--ink);">${esc(obj.nombre||'—')}</div>
+      ${_discreto.length?`<div style="font-size:0.64rem;color:var(--muted);margin-top:2px;">${_discreto.join(' · ')}</div>`:''}`;
+    if(obj.tipoSociedad) html += `<div style="font-size:0.66rem;color:#1a4a8a;margin-top:2px;">Régimen: ${esc(obj.tipoSociedad)}</div>`;
+    if(obj.consentimientoConyuge) html += `<div style="font-size:0.66rem;color:#1a4a8a;margin-top:2px;">✓ Con consentimiento de su cónyuge${obj.nombreConyuge?': <strong>'+esc(obj.nombreConyuge)+'</strong>':''}</div>`;
+    if(obj.conducto) html += `<div style="font-size:0.66rem;color:#7a6840;margin-top:2px;">↳ Por conducto de: <strong>${esc(obj.conducto)}</strong></div>`;
     return html + '</div>';
   }).join('');
   const fechaFmt = e.fechaFirma
@@ -4580,17 +4581,34 @@ function escMostrarDetalle(e){
   ].filter(Boolean).join('');
   const _txtConstruccion = e.conCasa ? 'Con Construcción' : (e.sinCasa ? 'Sin Construcción' : '—');
   const _txtIfreo = e.caracterIfreo==='definitivo' ? 'Definitivo' : (e.caracterIfreo==='preventivo' ? 'Preventivo' : (e.caracterIfreo==='sinregistro' ? 'Sin Registro' : '—'));
+  // Título de cada tarjeta según el Tipo de Trámite elegido (mismo catálogo
+  // ESC_CARACTER_POR_TRAMITE que ya define el carácter de cada persona) — así
+  // en Compraventa dice "COMPRADOR(A)", en Donación "DONATARIO(A)", etc., en
+  // vez del rótulo genérico combinado. Si aún no hay trámite seleccionado (o
+  // es uno sin par definido), se conserva el rótulo combinado de siempre.
+  const _parCaracter = ESC_CARACTER_POR_TRAMITE[e.tipoTramiteCatastro] || null;
+  const _tituloAdquirente = _parCaracter ? esc(_parCaracter[0].toUpperCase()) : 'COMPRADOR(A) / DONATARIO(A)';
+  const _tituloTransmitente = _parCaracter ? esc(_parCaracter[1].toUpperCase()) : 'VENDEDOR(A) / DONANTE';
+  // Insignia de estado (antes vivía dentro de el_header) ahora se muestra
+  // arriba, junto al badge de FOLIO, en la cabecera fija del modal.
+  const _elEstadoBadgeHdr = document.getElementById('eEstadoBadgeHdr');
+  if(_elEstadoBadgeHdr){
+    _elEstadoBadgeHdr.textContent = st.lbl;
+    _elEstadoBadgeHdr.style.color = st.col;
+    _elEstadoBadgeHdr.style.background = st.bg;
+    _elEstadoBadgeHdr.style.border = '1px solid '+st.col+'44';
+    _elEstadoBadgeHdr.style.display = 'inline-block';
+  }
+  const _tramiteLabelHdr = (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? esc(t[1].toUpperCase()) : ''; })();
   if(el_header) el_header.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:14px;">
-      <span style="font-size:0.68rem;font-weight:700;color:${st.col};background:${st.bg};padding:5px 14px;border-radius:14px;white-space:nowrap;flex-shrink:0;border:1px solid ${st.col}44;">${st.lbl}</span>
-    </div>
+    ${_tramiteLabelHdr?`<div style="text-align:center;font-family:monospace;font-size:0.85rem;letter-spacing:0.1em;font-weight:800;color:#8c6518;margin-bottom:14px;text-transform:uppercase;">${_tramiteLabelHdr}</div>`:''}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
-      <div style="border:1.5px solid rgba(59,130,246,0.35);border-radius:16px;padding:12px 14px;background:#eef3ff;text-align:center;">
-        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#1a4a8a;font-weight:700;margin-bottom:8px;">COMPRADOR(A) / DONATARIO(A)</div>
+      <div style="border:1.5px solid rgba(59,130,246,0.35);border-radius:16px;padding:12px 14px;background:#eef3ff;text-align:center;box-shadow:none;">
+        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#1a4a8a;font-weight:700;margin-bottom:8px;">👤 ${_tituloAdquirente}</div>
         ${renderPersonas(e.compradores)||'<div style="font-size:0.75rem;color:var(--muted);">—</div>'}
       </div>
-      <div style="border:1.5px solid rgba(200,149,42,0.35);border-radius:16px;padding:12px 14px;background:#fff8e8;text-align:center;">
-        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:8px;">VENDEDOR(A) / DONANTE</div>
+      <div style="border:1.5px solid rgba(200,149,42,0.35);border-radius:16px;padding:12px 14px;background:#fff8e8;text-align:center;box-shadow:none;">
+        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:8px;">👤 ${_tituloTransmitente}</div>
         ${renderPersonas(e.vendedores)||'<div style="font-size:0.75rem;color:var(--muted);">—</div>'}
       </div>
     </div>`;
@@ -4627,7 +4645,8 @@ function escMostrarDetalle(e){
     </div>
     ${e.descripcion?`<div style="font-size:0.78rem;color:#7a6840;background:rgba(200,149,42,0.06);border-left:3px solid var(--gold);padding:10px 12px;border-radius:0 8px 8px 0;line-height:1.5;margin-bottom:14px;">${esc(e.descripcion)}</div>`:''}
     <div style="border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;">
-      <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:700;color:#8c6518;margin-bottom:12px;">📄 Observaciones iniciales del trámite</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:700;color:#8c6518;margin-bottom:4px;">📄 Observaciones iniciales del trámite</div>
+      <div style="font-size:0.68rem;color:var(--muted);margin-bottom:10px;">Nota general del trámite — distinta de "Llamado a la Acción" (más arriba, ligada al paso activo).</div>
       <div id="esc-bitacora-lista">${escRenderBitacora(e.bitacora||[])}</div>
     </div>`;
   escActualizarTimelineDetalle(e.pasos||[]);
@@ -4654,6 +4673,10 @@ function escImprimirFicha(){
   const construccionTxt = e.conCasa ? 'Con Construcción' : (e.sinCasa ? 'Sin Construcción' : '—');
   const ifreoTxt = e.caracterIfreo==='definitivo' ? 'Definitivo' : (e.caracterIfreo==='preventivo' ? 'Preventivo' : (e.caracterIfreo==='sinregistro' ? 'Sin Registro' : '—'));
   const chipsCaract = [e.rectifMedidas?'Rectificación de Medidas y Colindancias':'', e.rectifDatos?'Rectificación de Datos':''].filter(Boolean).join(' · ');
+  // Mismo título dinámico por Tipo de Trámite que en la ficha en pantalla.
+  const _parCaracterImp = ESC_CARACTER_POR_TRAMITE[e.tipoTramiteCatastro] || null;
+  const tituloAdquirenteImp   = _parCaracterImp ? esc(_parCaracterImp[0].toUpperCase()) : 'COMPRADOR(A) / DONATARIO(A)';
+  const tituloTransmitenteImp = _parCaracterImp ? esc(_parCaracterImp[1].toUpperCase()) : 'VENDEDOR(A) / DONANTE';
   const renderPersonasImp = (lista) => (lista||[]).map(p=>{
     const obj = typeof p==='string' ? {nombre:p} : p;
     const extra = [];
@@ -4707,8 +4730,8 @@ function escImprimirFicha(){
       <span>Impreso el ${fechaImp}</span>
     </div>
     <div class="ip-personas">
-      <div class="ip-pcard"><div class="ip-plabel">COMPRADOR(A) / DONATARIO(A)</div>${renderPersonasImp(e.compradores)}</div>
-      <div class="ip-pcard"><div class="ip-plabel">VENDEDOR(A) / DONANTE</div>${renderPersonasImp(e.vendedores)}</div>
+      <div class="ip-pcard"><div class="ip-plabel">${tituloAdquirenteImp}</div>${renderPersonasImp(e.compradores)}</div>
+      <div class="ip-pcard"><div class="ip-plabel">${tituloTransmitenteImp}</div>${renderPersonasImp(e.vendedores)}</div>
     </div>
     <div class="ip-sec-tit">📋 Resumen del Trámite</div>
     <div class="ip-grid">
@@ -4875,18 +4898,19 @@ function escRenderNotasEtapa(e){
           <span style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#fff;background:#c0362f;padding:5px 12px;border-radius:14px;">⏸ Detenido</span>
           <div style="font-family:sans-serif;font-size:0.72rem;color:#7a2f2f;flex-basis:100%;"><b>Requiere atención:</b> ${p.notas?esc(p.notas):'Sin nota registrada — usa "Tomar acción" para agregar una.'}</div>
           <div style="position:relative;">
-            <button type="button" onclick="escToggleMenuAtencion(event)" style="background:none;border:1px solid #e0a0a0;color:#a32d2d;font-family:sans-serif;font-size:0.68rem;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;">TOMAR ACCIÓN</button>
-            <div id="esc-menu-atencion" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:#fff;border:1px solid rgba(0,0,0,0.15);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.15);z-index:10;min-width:230px;overflow:hidden;">
-              <button type="button" onclick="escAccionAtencion('espera')" style="display:block;width:100%;text-align:left;padding:9px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.72rem;cursor:pointer;">Sigue en espera sin respuesta</button>
-              <button type="button" onclick="escAccionAtencion('requerimientos')" style="display:block;width:100%;text-align:left;padding:9px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.72rem;cursor:pointer;border-top:1px solid #eee;">Tenemos requerimientos</button>
-              <button type="button" onclick="escAccionAtencion('resuelto')" style="display:block;width:100%;text-align:left;padding:9px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.72rem;cursor:pointer;border-top:1px solid #eee;">Marcar como resuelto y avanzar</button>
+            <button type="button" onclick="escToggleMenuAtencion(event)" style="background:none;border:1px solid #e0a0a0;color:#a32d2d;font-family:sans-serif;font-size:0.68rem;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background 0.15s;" onmouseover="this.style.background='rgba(163,45,45,0.06)'" onmouseout="this.style.background='none'">TOMAR ACCIÓN <span style="font-size:0.55rem;">▾</span></button>
+            <div id="esc-menu-atencion" style="display:none;position:absolute;left:0;top:calc(100% + 6px);background:#fff;border:1px solid rgba(0,0,0,0.1);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,0.16);z-index:50;min-width:260px;overflow:hidden;">
+              <button type="button" onclick="escAccionAtencion('espera')" onmouseover="this.style.background='#fdf3ee'" onmouseout="this.style.background='#fff'" style="display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;text-align:left;padding:10px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.74rem;color:#3a3327;cursor:pointer;transition:background 0.15s;"><span style="font-size:0.85rem;flex-shrink:0;">⏳</span> Sigue en espera sin respuesta</button>
+              <button type="button" onclick="escAccionAtencion('requerimientos')" onmouseover="this.style.background='#fdf3ee'" onmouseout="this.style.background='#fff'" style="display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;text-align:left;padding:10px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.74rem;color:#3a3327;cursor:pointer;transition:background 0.15s;border-top:1px solid #f0ece2;"><span style="font-size:0.85rem;flex-shrink:0;">📝</span> Tenemos requerimientos</button>
+              <button type="button" onclick="escAccionAtencion('resuelto')" onmouseover="this.style.background='#eef8f0'" onmouseout="this.style.background='#fff'" style="display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;text-align:left;padding:10px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.74rem;color:#1a7a3a;font-weight:600;cursor:pointer;transition:background 0.15s;border-top:1px solid #f0ece2;"><span style="font-size:0.85rem;flex-shrink:0;">✅</span> Marcar como resuelto y avanzar</button>
             </div>
           </div>
         </div>`;
         return;
       }
       cont.innerHTML = `<div style="margin-bottom:16px;">
-        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:12px;">🎯 Llamado a la Acción</div>
+        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:4px;">🎯 Llamado a la Acción</div>
+        <div style="font-size:0.68rem;color:var(--muted);margin-bottom:10px;">Nota del paso activo — distinta de Observaciones.</div>
         <div style="background:#fff8e8;border-left:4px solid #c8952a;border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(200,149,42,0.15);padding:10px 12px;">
           <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;">${i+1}. ${ESC_PASOS[i]} · 🟡 En proceso</div>
           ${p.notas ? `<div style="font-size:0.75rem;color:#5c5648;margin-top:6px;">${esc(p.notas)}</div>` : ''}

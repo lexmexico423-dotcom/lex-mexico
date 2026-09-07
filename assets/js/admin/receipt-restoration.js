@@ -4510,6 +4510,42 @@ function escAbrirCrearCarpetaDesdeEscritura(clienteSugerido){
   const tipo = document.getElementById('kTipoTramite');
   if(tipo){ tipo.value = 'escritura'; if(typeof kActualizarSubtipo==='function') kActualizarSubtipo(); }
 }
+// ── Folios de recibo vinculados (uno o varios) ─────────────────────────
+// e.foliosRecibo es la lista actual (array de números). Los registros
+// creados antes de esta función solo tienen e.folioRecibo (un número
+// suelto); _escFoliosArr los normaliza a un solo formato sin necesidad
+// de migrar los datos existentes.
+function _escFoliosArr(e){
+  if(Array.isArray(e.foliosRecibo) && e.foliosRecibo.length) return e.foliosRecibo.filter(n=>n && !isNaN(n));
+  return e.folioRecibo ? [e.folioRecibo] : [];
+}
+function _escFoliosTxt(e){
+  const arr = _escFoliosArr(e);
+  if(!arr.length) return '';
+  const recibos = (typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))||[];
+  return arr.map(folio=>{
+    const rec = recibos.find(r=>r.folio===folio);
+    const letra = rec?.letra || (typeof letraVersion==='function' ? letraVersion(rec||{}) : '') || 'A';
+    return typeof folioConLetra==='function' ? folioConLetra(folio, rec?.anio_folio, letra) : (folio+letra);
+  }).join(', ');
+}
+// Igual que _escFoliosTxt, pero cada folio es un <span> clickeable
+// independiente (con stopPropagation para no disparar el clic del
+// contenedor, p.ej. la tarjeta de la lista que abre el detalle).
+// sep por defecto es ", " (badge de la ficha, botón del formulario). La
+// tarjeta de la lista pasa "<br>" para que cada folio baje en su propio
+// renglón, alineado bajo el de arriba, en vez de amontonarse en una línea.
+function _escFoliosHtml(e, fn, sep){
+  const arr = _escFoliosArr(e);
+  if(!arr.length) return '';
+  const recibos = (typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))||[];
+  return arr.map(folio=>{
+    const rec = recibos.find(r=>r.folio===folio);
+    const letra = rec?.letra || (typeof letraVersion==='function' ? letraVersion(rec||{}) : '') || 'A';
+    const txt = typeof folioConLetra==='function' ? folioConLetra(folio, rec?.anio_folio, letra) : (folio+letra);
+    return `<span onclick="event.stopPropagation();${fn}(${folio})" style="cursor:pointer;">${esc(txt)}</span>`;
+  }).join(sep===undefined ? ', ' : sep);
+}
 // ── Alternar entre formulario y vista detalle ─────────────────────────
 function escMostrarDetalle(e){
   const el_form   = document.getElementById('modal-body-form');
@@ -4553,13 +4589,15 @@ function escMostrarDetalle(e){
   const fechaFmt = e.fechaFirma
     ? new Date(e.fechaFirma+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'})
     : (e.fechaFirmaTexto ? esc(e.fechaFirmaTexto) : '—');
-  const _recVinc = e.folioRecibo ? ((typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))||[]).find(r=>r.folio===e.folioRecibo) : null;
   const _badgeHdr = document.getElementById('eFolioBadgeHdr');
   const _badgeVal = document.getElementById('eFolioBadgeHdrVal');
   if(_badgeHdr){
-    if(e.folioRecibo){
-      const _letraVinc = _recVinc?.letra || (typeof letraVersion==='function' ? letraVersion(_recVinc||{}) : '') || 'A';
-      if(_badgeVal) _badgeVal.textContent = (typeof folioConLetra==='function' ? folioConLetra(e.folioRecibo, _recVinc?.anio_folio, _letraVinc) : (e.folioRecibo+_letraVinc));
+    const _foliosArrHdr = _escFoliosArr(e);
+    if(_foliosArrHdr.length){
+      // Cada folio es clickeable de forma independiente (abre su recibo);
+      // el contenedor conserva su propio onclick como respaldo (abre el
+      // primero) para cuando se hace clic fuera de un número puntual.
+      if(_badgeVal) _badgeVal.innerHTML = _escFoliosHtml(e, 'escVerFolioVinculado');
       _badgeHdr.style.display = 'block';
     } else {
       _badgeHdr.style.display = 'none';
@@ -4665,9 +4703,7 @@ function escImprimirFicha(){
   const fechaFmt = e.fechaFirma
     ? new Date(e.fechaFirma+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'})
     : (e.fechaFirmaTexto ? esc(e.fechaFirmaTexto) : '—');
-  const _recVinc = e.folioRecibo ? ((typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))||[]).find(r=>r.folio===e.folioRecibo) : null;
-  const _letraVinc = _recVinc?.letra || (typeof letraVersion==='function' ? letraVersion(_recVinc||{}) : '') || 'A';
-  const _folioTxt = e.folioRecibo ? (typeof folioConLetra==='function' ? folioConLetra(e.folioRecibo, _recVinc?.anio_folio, _letraVinc) : (e.folioRecibo+_letraVinc)) : '';
+  const _folioTxt = _escFoliosTxt(e);
   const tramiteTxt = (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? (t[0]+' - '+t[1]) : '—'; })();
   const construccionTxt = e.conCasa ? 'Con Construcción' : (e.sinCasa ? 'Sin Construcción' : '—');
   const ifreoTxt = e.caracterIfreo==='definitivo' ? 'Definitivo' : (e.caracterIfreo==='preventivo' ? 'Preventivo' : (e.caracterIfreo==='sinregistro' ? 'Sin Registro' : '—'));
@@ -5130,16 +5166,27 @@ function escMostrarFormulario(){
   const _bh = document.getElementById('eFolioBadgeHdr'); if(_bh) _bh.style.display='none';
   const _fh = document.getElementById('eFoliosHdr'); if(_fh) _fh.style.display='none';
 }
-// Desde el badge "FOLIO" del encabezado de la ficha: cierra la Escritura y
-// abre la ficha del recibo vinculado, reutilizando el mismo camino que ya usa
-// "abrirFolioDesdeCliente" (ir a Nuevo Recibo en modo consulta).
-function escVerFolioVinculado(){
-  const e = (_escIdx>=0 && D.escrituras[_escIdx]) ? D.escrituras[_escIdx] : null;
-  if(!e || !e.folioRecibo){ if(typeof toast==='function') toast('Sin folio vinculado','err'); return; }
+// Abre directamente la ficha de un recibo por su número de folio, cierra la
+// Escritura y reutiliza el mismo camino que ya usa "abrirFolioDesdeCliente"
+// (ir a Nuevo Recibo en modo consulta). Se usa tanto desde el badge "FOLIO"
+// como desde cada número individual cuando hay varios folios vinculados.
+function escAbrirRecibo(folio){
+  if(!folio){ if(typeof toast==='function') toast('Sin folio vinculado','err'); return; }
   if(typeof cerrar==='function') cerrar('mEscritura');
   if(typeof ir==='function') ir('nuevo-recibo');
   document.body.classList.add('modo-consulta');
-  if(typeof abrirFolioPBC==='function') abrirFolioPBC(e.folioRecibo, false);
+  if(typeof abrirFolioPBC==='function') abrirFolioPBC(folio, false);
+}
+// Desde el badge "FOLIO" del encabezado de la ficha (o desde uno de sus
+// números si hay varios): si no se indica un folio puntual, abre el primero
+// de la lista de la escritura actualmente abierta.
+function escVerFolioVinculado(folio){
+  let f = folio;
+  if(!f){
+    const e = (_escIdx>=0 && D.escrituras[_escIdx]) ? D.escrituras[_escIdx] : null;
+    f = e ? _escFoliosArr(e)[0] : null;
+  }
+  escAbrirRecibo(f);
 }
 function escModoEditar(){
   escMostrarFormulario();
@@ -5225,17 +5272,16 @@ function escRender(){
     const rolAdq   = _parCaracterCard ? esc(_parCaracterCard[0]) : 'Comprador(a)/Donatario(a)';
     const rolTrans = _parCaracterCard ? esc(_parCaracterCard[1]) : 'Vendedor(a)/Donante';
     const actoTxt = (() => { const t=(ESC_TIPOS_TRAMITE_CATASTRO[e.tipoMovimiento]||[]).find(x=>x[0]===e.tipoTramiteCatastro); return t ? esc(t[1].toUpperCase()) : ''; })();
-    // Instrumento, Volumen y fecha de celebración/firma — se muestran justo
-    // antes del tipo de trámite (ej. "Instr. 9,100 · Vol. 125 · 15 ene 2019").
+    // Instrumento, Volumen y fecha de celebración/firma — se muestran como
+    // campos independientes (etiqueta + valor) junto al tipo de trámite.
     const _fechaFirmaCard = e.fechaFirma
       ? new Date(e.fechaFirma+'T12:00:00').toLocaleDateString('es-MX',{day:'numeric',month:'short',year:'numeric'})
       : (e.fechaFirmaTexto ? esc(e.fechaFirmaTexto) : '');
-    const _instrVolTxt = [e.instrumento?('Instr. '+esc(e.instrumento)):'', e.volumen?('Vol. '+esc(e.volumen)):''].filter(Boolean).join(' · ');
-    const datosActoTxt = [_instrVolTxt, _fechaFirmaCard].filter(Boolean).join(' · ');
-    // Folio del recibo vinculado (mismo cálculo que en la ficha de detalle).
-    const _recVincCard = e.folioRecibo ? ((typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))||[]).find(r=>r.folio===e.folioRecibo) : null;
-    const _letraVincCard = _recVincCard?.letra || (typeof letraVersion==='function' ? letraVersion(_recVincCard||{}) : '') || 'A';
-    const folioRecTxt = e.folioRecibo ? (typeof folioConLetra==='function' ? folioConLetra(e.folioRecibo, _recVincCard?.anio_folio, _letraVincCard) : (e.folioRecibo+_letraVincCard)) : '';
+    const _instrTxt = e.instrumento ? esc(e.instrumento) : '';
+    const _volTxt   = e.volumen ? esc(e.volumen) : '';
+    // Folio(s) del recibo vinculado — uno o varios, cada uno clickeable
+    // (mismo helper que la ficha de detalle).
+    const folioRecHtml = _escFoliosHtml(e, 'escAbrirRecibo', '<br>');
     const folioPendiente = _folioPendienteMap.get(e);
     // Mini línea del tiempo con estado correcto
     const pasoActivo = completados < 5 ? completados : -1;
@@ -5261,28 +5307,32 @@ function escRender(){
     }).join('<div style="flex:1;height:2px;background:#e0ddd5;margin-top:13px;"></div>');
     return `<div onclick="escAbrirDetalle(${idx})" style="background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;">
-        <div style="min-width:0;">
-          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:4px;flex-wrap:wrap;">
-            ${folioPendiente?`<div style="text-align:left;line-height:1.1;flex-shrink:0;">
-              <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.05em;color:#8c6518;font-weight:700;">ESCRITURA</div>
-              <div style="font-size:1.25rem;font-weight:800;color:#8c6518;">${folioPendiente}</div>
-            </div>`:''}
-            ${actoTxt?`<div style="font-family:monospace;font-size:0.78rem;font-weight:800;color:#8c6518;letter-spacing:0.03em;">${actoTxt}</div>`:''}
-            ${datosActoTxt?`<div style="font-family:monospace;font-size:0.62rem;color:var(--muted);white-space:nowrap;">${datosActoTxt}</div>`:''}
+        <div style="display:flex;gap:14px;min-width:0;flex:1;">
+          ${folioPendiente?`<div style="flex-shrink:0;line-height:1.15;">
+            <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.05em;color:#8c6518;font-weight:700;">ESCRITURA</div>
+            <div style="font-size:1.25rem;font-weight:800;color:#8c6518;">${folioPendiente}</div>
+          </div>`:''}
+          <div style="min-width:0;">
+            <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:4px;">
+              ${actoTxt?`<div style="font-family:monospace;font-size:0.78rem;font-weight:800;color:#8c6518;letter-spacing:0.03em;">${actoTxt}</div>`:''}
+              ${_instrTxt?`<div style="font-family:monospace;font-size:0.62rem;color:var(--muted);white-space:nowrap;"><span style="font-weight:700;">INSTR.</span> ${_instrTxt}</div>`:''}
+              ${_volTxt?`<div style="font-family:monospace;font-size:0.62rem;color:var(--muted);white-space:nowrap;"><span style="font-weight:700;">VOL.</span> ${_volTxt}</div>`:''}
+              ${_fechaFirmaCard?`<div style="font-family:monospace;font-size:0.62rem;color:var(--muted);white-space:nowrap;"><span style="font-weight:700;">FECHA DE FIRMA</span> ${_fechaFirmaCard}</div>`:''}
+            </div>
+            <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">👤 ${esc(comp)} <span style="font-size:0.6rem;color:#1a4a8a;text-transform:uppercase;font-weight:700;">${rolAdq}</span></div>
+            ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ ${esc(vend)} <span style="font-size:0.58rem;color:#8c6518;text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
           </div>
-          <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">👤 ${esc(comp)} <span style="font-size:0.6rem;color:#1a4a8a;text-transform:uppercase;font-weight:700;">${rolAdq}</span></div>
-          ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ ${esc(vend)} <span style="font-size:0.58rem;color:#8c6518;text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <div style="font-family:serif;font-size:1.15rem;color:#8c6518;font-weight:700;white-space:nowrap;">${e.num?('CARP.- '+esc(e.num)):'—'}</div>
-            ${folioRecTxt?`<div style="text-align:center;line-height:1.15;">
-              <div style="font-family:serif;font-size:0.55rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;">FOLIO</div>
-              <div style="font-family:serif;font-size:0.95rem;color:#1a4a8a;font-weight:800;">${esc(folioRecTxt)}</div>
-            </div>`:''}
+        <div style="display:flex;align-items:baseline;gap:10px;flex-shrink:0;">
+          <div style="font-family:serif;font-size:1.05rem;color:#8c6518;font-weight:700;white-space:nowrap;">${e.num?('CARP.- '+esc(e.num)):'—'}</div>
+          ${folioRecHtml?`<div style="border-left:1.5px solid #8c6518;padding-left:10px;line-height:1.3;text-align:left;">
+            <div style="font-family:serif;font-size:0.55rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;">FOLIO</div>
+            <div style="font-family:serif;font-size:0.95rem;color:#1a4a8a;font-weight:800;">${folioRecHtml}</div>
+          </div>`:''}
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+            <span style="font-size:0.65rem;font-weight:700;color:${cfg.col};background:${cfg.bg};padding:3px 10px;border-radius:12px;white-space:nowrap;">${cfg.lbl}</span>
+            <span style="font-family:monospace;font-size:0.62rem;color:var(--muted);">${pct}% completado</span>
           </div>
-          <span style="font-size:0.65rem;font-weight:700;color:${cfg.col};background:${cfg.bg};padding:3px 10px;border-radius:12px;">${cfg.lbl}</span>
-          <span style="font-family:monospace;font-size:0.62rem;color:var(--muted);">${pct}% completado</span>
         </div>
       </div>
       <div style="display:flex;align-items:flex-start;gap:4px;">${miniTimeline}</div>
@@ -5357,7 +5407,7 @@ function escAbrirDetalle(idx){
     const _eCC3 = document.getElementById('eRectifDatos');   if(_eCC3) _eCC3.value = e.rectifDatos ? '1' : '';
     _escRefrescarCaracteristicasBoxes();
     const _eCC  = document.getElementById('eCuentaCatastral'); if(_eCC) _eCC.value = e.cuentaCatastral||'';
-    const _eFV  = document.getElementById('eFolioVinculo'); if(_eFV) _eFV.value = e.folioRecibo||'';
+    const _eFV  = document.getElementById('eFolioVinculo'); if(_eFV) _eFV.value = _escFoliosArr(e).join(',');
     escActualizarBotonVincular();
     const _bitEdit = document.getElementById('esc-bitacora-lista-edit'); if(_bitEdit) _bitEdit.innerHTML = escRenderBitacora(e.bitacora||[], true);
     (e.compradores||[]).forEach(p=>escAgregarPersona('comprador', typeof p==='string'?{nombre:p}:p));
@@ -5393,17 +5443,26 @@ function _escLimpiarForm(){
   const _notasEdit = document.getElementById('esc-notas-etapa-edit'); if(_notasEdit) _notasEdit.innerHTML='';
 }
 function escActualizarBotonVincular(){
-  const inp = document.getElementById('eFolioVinculo');
-  const btn = document.getElementById('eFolioVincularBtn');
+  const inp  = document.getElementById('eFolioVinculo');
+  const btn  = document.getElementById('eFolioVincularBtn');
+  const otro = document.getElementById('eFolioVincularOtroLink');
   if(!btn) return;
-  const folio = inp && inp.value ? parseInt(inp.value,10) : 0;
-  if(folio){
-    const rec = (typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))?.find(r=>r.folio===folio);
-    const fStr = typeof folioFormato==='function' ? folioFormato(folio, rec?.anio_folio) : folio;
-    btn.textContent = '🔗 Folio #'+fStr+' vinculado';
+  const arr = (inp && inp.value ? inp.value.split(',') : []).map(s=>parseInt(s,10)).filter(n=>!isNaN(n)&&n>0);
+  if(arr.length){
+    const recibos = (typeof REC!=='undefined' ? REC.recibos : (typeof appData!=='undefined'?appData.recibos:[]))||[];
+    // Cada número es un enlace independiente: abre su recibo sin disparar
+    // el clic del botón contenedor (que sigue abriendo el buscador para
+    // reemplazar/gestionar el vínculo cuando se hace clic fuera del número).
+    const spans = arr.map(folio=>{
+      const rec = recibos.find(r=>r.folio===folio);
+      const fStr = typeof folioFormato==='function' ? folioFormato(folio, rec?.anio_folio) : folio;
+      return `<span onclick="event.stopPropagation();escVerFolioVinculado(${folio})" style="text-decoration:underline;">${fStr}</span>`;
+    }).join(', ');
+    btn.innerHTML = arr.length>1 ? ('🔗 FOLIO: '+spans) : ('🔗 Folio #'+spans+' vinculado');
   } else {
     btn.textContent = 'FOLIO / 🔗 vincular';
   }
+  if(otro) otro.style.display = arr.length ? 'inline-block' : 'none';
 }
 // Solo recibos originales de serie A (no complementos B/C…) — son los que
 // representan el pago real por el que se contrató el trámite.
@@ -5414,9 +5473,15 @@ function _escRecibosSerieA(q){
   const ql = q.toLowerCase();
   return serieA.filter(r => (r.nombre||'').toLowerCase().includes(ql) || String(r.folio).includes(q));
 }
-function escAbrirVincularFolio(){
+let _escVincularAppend = false;
+function escAbrirVincularFolio(append){
+  _escVincularAppend = !!append;
   escRenderFoliosVinculacion('');
   const q = document.getElementById('escFolioQ'); if(q) q.value='';
+  // "Quitar vínculo" solo tiene sentido cuando se está reemplazando/gestionando
+  // el vínculo desde el botón principal; en modo "agregar otro" se oculta,
+  // porque no hay forma de saber cuál de los varios folios se querría quitar.
+  const qb = document.getElementById('eFolioQuitarVinculoBtn'); if(qb) qb.style.display = _escVincularAppend ? 'none' : '';
   $('mEscVincularFolio').classList.add('show');
 }
 function escFiltrarFoliosVinculacion(){
@@ -5440,7 +5505,17 @@ function escRenderFoliosVinculacion(q){
 }
 function escVincularFolioSeleccionar(folio){
   const inp = document.getElementById('eFolioVinculo');
-  if(inp) inp.value = folio ? String(folio) : '';
+  if(inp){
+    let arr = inp.value ? inp.value.split(',').map(s=>parseInt(s,10)).filter(n=>!isNaN(n)&&n>0) : [];
+    if(folio===null){
+      arr = []; // "Quitar vínculo"
+    } else if(_escVincularAppend){
+      if(folio && !arr.includes(folio)) arr.push(folio);
+    } else {
+      arr = folio ? [folio] : [];
+    }
+    inp.value = arr.join(',');
+  }
   escActualizarBotonVincular();
   cerrar('mEscVincularFolio');
   toast(folio ? 'Folio vinculado ✓' : 'Vínculo eliminado', 'ok');
@@ -5780,7 +5855,11 @@ function escGuardar(){
         return _escIdx>=0 ? (D.escrituras[_escIdx]?.volInstr||'') : '';
       })(),
       folios:      (document.getElementById('eFolios')?.value||'').trim(),
-      folioRecibo: (() => { const v=(document.getElementById('eFolioVinculo')?.value||'').trim(); const n=parseInt(v,10); return isNaN(n)?0:n; })(),
+      // foliosRecibo es la lista completa (uno o varios); folioRecibo se
+      // conserva en paralelo (= el primero) por compatibilidad con código
+      // que aún lo lea como campo suelto.
+      foliosRecibo: (() => { const v=(document.getElementById('eFolioVinculo')?.value||'').trim(); return v ? v.split(',').map(s=>parseInt(s,10)).filter(n=>!isNaN(n)&&n>0) : []; })(),
+      folioRecibo: (() => { const v=(document.getElementById('eFolioVinculo')?.value||'').trim(); const n=parseInt(v.split(',')[0],10); return isNaN(n)?0:n; })(),
       cuentaCatastral: (document.getElementById('eCuentaCatastral')?.value||'').trim(),
       tramite:     document.getElementById('eTramite')?.value||'',
       caracterIfreo: document.getElementById('eCaracterIfreo')?.value||'',
@@ -6145,7 +6224,8 @@ async function escProcesarArchivoExcel(input){
         fechaMod: new Date().toISOString(),
         pasoActivoFecha: new Date().toISOString(),
         pasoActivoRequerimientos: false,
-        pasoActivoEnEspera: false
+        pasoActivoEnEspera: false,
+        foliosRecibo: []
       });
       creadas++;
     });

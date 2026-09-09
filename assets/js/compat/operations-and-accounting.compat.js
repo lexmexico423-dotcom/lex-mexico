@@ -1977,7 +1977,15 @@ const _LEX_REALTIME_COOLDOWN = 800; // reducido a 800ms para sincronización cas
 // suspendida, pestaña en segundo plano) y ningún aviso llega — sin esto, el
 // usuario se queda con datos viejos hasta que refresca la página a mano.
 let _lexPollingTimer = null;
-const _LEX_POLLING_MS = 30000;
+// Subido de 30s a 120s (04/sep/2026): el polling es solo respaldo — Realtime
+// ya cubre la sincronización instantánea normal — pero cada tick vuelve a
+// bajar el estado COMPLETO (app_state.data + recibos) sin nada incremental.
+// Con varias pestañas abiertas todo el día esto disparó el egress de
+// Supabase muy por encima de la cuota del plan Free (11GB/5GB = 220%,
+// con una base de datos de apenas 46MB — es decir, se estaba re-descargando
+// el mismo estado cientos de veces). 120s sigue siendo una red de seguridad
+// razonable y reduce el consumo ~4x.
+const _LEX_POLLING_MS = 120000;
 /* Movido a modules/core/index.js: lexPollingIniciar */
 /* Movido a modules/recibos/index.js: _lexPollingTick */
 // ═══ FIN REALTIME ═══

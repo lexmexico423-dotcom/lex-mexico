@@ -12739,7 +12739,7 @@ function renderTareasHoyLista(){
       : '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
         + '<div style="font-size:0.62rem;color:var(--muted);">'+esc(t.creadoPor||'')+' · '+esc((t.fechaCreacion||'').slice(0,10))+'</div>'
         + '<div style="display:flex;gap:6px;">'
-        + '<button onclick="marcarTareaResuelta(\''+t.id+'\')" style="background:#eef3ff;color:'+TCOL+';font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">RESUELTO</button>'
+        + '<button onclick="marcarTareaResuelta(\''+t.id+'\')" title="Marcar como resuelto" style="background:#eef3ff;color:'+TCOL+';font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">✓ MARCAR RESUELTO</button>'
         + '<button onclick="abrirEditarTarea(\''+t.id+'\')" style="background:#e6f1fb;color:#185fa5;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">EDITAR</button>'
         + '</div></div>';
     return '<div style="position:relative;display:flex;align-items:stretch;background:var(--surface,#fdfaf4);border:1px solid var(--border-l);border-radius:10px;margin-bottom:8px;overflow:hidden;'+(resuelta?'opacity:0.65;':'')+'">'
@@ -13150,7 +13150,7 @@ function renderAdeudosLista(){
       : '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
         + '<div style="font-size:0.62rem;color:var(--muted);">'+esc(a.creadoPor||'')+' · '+esc((a.fechaCreacion||'').slice(0,10))+'</div>'
         + '<div style="display:flex;gap:6px;">'
-        + '<button onclick="marcarAdeudoCobrado(\''+a.id+'\')" style="background:#fff3e6;color:'+ACOL+';font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">COBRADO</button>'
+        + '<button onclick="marcarAdeudoCobrado(\''+a.id+'\')" title="Marcar como cobrado" style="background:#fff3e6;color:'+ACOL+';font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">✓ MARCAR COBRADO</button>'
         + '<button onclick="abrirEditarAdeudo(\''+a.id+'\')" style="background:#e6f1fb;color:#185fa5;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">EDITAR</button>'
         + '</div></div>';
     return '<div style="position:relative;display:flex;align-items:stretch;background:var(--surface,#fdfaf4);border:1px solid var(--border-l);border-radius:10px;margin-bottom:8px;overflow:hidden;'+(cobrado?'opacity:0.65;':'')+'">'

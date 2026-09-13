@@ -1270,6 +1270,33 @@ async function reconciliarDeshacerUltimo(opts){
   return { restaurados: candidatos.map(function(t){ return t.id; }) };
 }
 
+// ── Fusión genérica por id + fechaMod (gana el más reciente) ────────────────
+// Mismo patrón que ya usa sincronizarFolio() al BAJAR datos (recibos/index.js)
+// para escrituras/tareasHoy/adeudosSinRecibo. Se reutiliza aquí para la SUBIDA:
+// FIX pérdida de datos (13-sep-2026) — tareasHoy y adeudosSinRecibo se subían
+// tal cual estaban en memoria local, sin comparar contra el servidor (a
+// diferencia de recibos/movimientos, que sí se fusionan). Una pestaña con esos
+// dos campos vacíos/desactualizados en memoria los borraba para todos en el
+// siguiente guardado, sin que ningún guardrail lo detectara.
+function _lexFusionarListaPorId(local, remoto){
+  const _local  = Array.isArray(local)  ? local  : [];
+  const _remoto = Array.isArray(remoto) ? remoto : [];
+  const _mapaLocal = {};
+  _local.forEach(function(x){ if(x && x.id) _mapaLocal[x.id] = x; });
+  const _remotoIds = new Set(_remoto.map(function(x){ return x && x.id; }));
+  const _fusionadas = _remoto.map(function(x){
+    const _loc = x && x.id ? _mapaLocal[x.id] : null;
+    if(_loc){
+      const tsLoc = Date.parse(_loc.fechaMod || 0) || 0;
+      const tsRem = Date.parse(x.fechaMod || 0) || 0;
+      if(tsLoc > tsRem) return _loc;
+    }
+    return x;
+  });
+  const _soloLocales = _local.filter(function(x){ return x && x.id && !_remotoIds.has(x.id); });
+  return _fusionadas.concat(_soloLocales);
+}
+
 async function syncEstadoSupabase(_intentoConcurrencia){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
   // Prevenir llamadas concurrentes — si ya hay una en curso, usar debounce
@@ -1364,6 +1391,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     // recibos/movimientos hay AHORA MISMO en Supabase para comparar más abajo,
     // antes de escribir, contra lo que esta pestaña está a punto de subir.
     let _sbRecibosCountGuard = null, _sbMovsCountGuard = null;
+    let _sbTareasCountGuard = null, _sbAdeudosCountGuard = null;
     try {
       const { data: _sbPreSync } = await _sbConTimeout(window.SB
         .from('app_state').select('recibos, data, rev')
@@ -1372,6 +1400,18 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       const _sbTombsPreSync = (_sbPreSync && _sbPreSync.recibos && _sbPreSync.recibos.folios_eliminados) || [];
       const _sbRecibosPreSync = (_sbPreSync && _sbPreSync.recibos && Array.isArray(_sbPreSync.recibos.recibos)) ? _sbPreSync.recibos.recibos : [];
       _sbRecibosCountGuard = _sbRecibosPreSync.length;
+      // ── FIX pérdida de datos (13-sep-2026) — ver nota de _lexFusionarListaPorId
+      // arriba: fusionar tareasHoy/adeudosSinRecibo con Supabase ANTES de subir,
+      // en vez de sobrescribir a ciegas con lo que haya en memoria local.
+      const _sbDataPreSync    = (_sbPreSync && _sbPreSync.data) || {};
+      const _sbTareasPreSync  = Array.isArray(_sbDataPreSync.tareasHoy) ? _sbDataPreSync.tareasHoy : [];
+      const _sbAdeudosPreSync = Array.isArray(_sbDataPreSync.adeudosSinRecibo) ? _sbDataPreSync.adeudosSinRecibo : [];
+      _sbTareasCountGuard  = _sbTareasPreSync.length;
+      _sbAdeudosCountGuard = _sbAdeudosPreSync.length;
+      estado.tareasHoy        = _lexFusionarListaPorId(D.tareasHoy, _sbTareasPreSync);
+      estado.adeudosSinRecibo = _lexFusionarListaPorId(D.adeudosSinRecibo, _sbAdeudosPreSync);
+      D.tareasHoy        = estado.tareasHoy;
+      D.adeudosSinRecibo = estado.adeudosSinRecibo;
       // Fusionar tombstones
       if (_sbTombsPreSync.length > 0) {
         if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
@@ -1597,16 +1637,22 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       return nuevo < actual * 0.7;
     }
     if (_caidaSospechosa(recibos.recibos.length, _sbRecibosCountGuard) ||
-        _caidaSospechosa(estado.movimientos.length, _sbMovsCountGuard)) {
+        _caidaSospechosa(estado.movimientos.length, _sbMovsCountGuard) ||
+        _caidaSospechosa(estado.tareasHoy.length, _sbTareasCountGuard) ||
+        _caidaSospechosa(estado.adeudosSinRecibo.length, _sbAdeudosCountGuard)) {
       _syncEnCurso = false;
       const _msjGuard = '⚠ Guardado bloqueado por seguridad: tu copia local tiene muchos menos datos (' +
-        recibos.recibos.length + ' recibos, ' + estado.movimientos.length + ' movimientos) que el servidor (' +
-        _sbRecibosCountGuard + ' recibos, ' + _sbMovsCountGuard + ' movimientos). ' +
+        recibos.recibos.length + ' recibos, ' + estado.movimientos.length + ' movimientos, ' +
+        estado.tareasHoy.length + ' tareas, ' + estado.adeudosSinRecibo.length + ' adeudos) que el servidor (' +
+        _sbRecibosCountGuard + ' recibos, ' + _sbMovsCountGuard + ' movimientos, ' +
+        _sbTareasCountGuard + ' tareas, ' + _sbAdeudosCountGuard + ' adeudos). ' +
         'Esta pestaña parece desactualizada. Presiona Ctrl+Shift+R para recargar antes de seguir trabajando.';
       console.error('[SB] ' + _msjGuard);
       if (typeof registrarError === 'function') registrarError('syncEstadoSupabase.guardrailCaida', _msjGuard, {
         recibosLocal: recibos.recibos.length, recibosSB: _sbRecibosCountGuard,
-        movsLocal: estado.movimientos.length, movsSB: _sbMovsCountGuard
+        movsLocal: estado.movimientos.length, movsSB: _sbMovsCountGuard,
+        tareasLocal: estado.tareasHoy.length, tareasSB: _sbTareasCountGuard,
+        adeudosLocal: estado.adeudosSinRecibo.length, adeudosSB: _sbAdeudosCountGuard
       });
       if (typeof toast === 'function') toast(_msjGuard, 'err');
       else try { alert(_msjGuard); } catch(_eAl){}

@@ -12556,16 +12556,25 @@ if(typeof toast==='function') toast('✅ Token de Drive guardado — haz clic en
 // (crear/resolver/editar/eliminar, con persistencia y sync), pero sin
 // secciones (Placas/Escrituras/Juicios) — solo Título + texto libre.
 // D.tareasHoy[] = [{id, titulo, texto, estado:'pendiente'|'resuelta',
-//   creadoPor, fechaCreacion, fechaResolucion, fechaMod}]
+//   creadoPor, fechaCreacion, fechaResolucion, fechaMod, fechaProgramada}]
+// fechaProgramada ('YYYY-MM-DD', opcional): si tiene una fecha FUTURA, la
+// tarea vive en la pestaña "📅 Programadas" y no cuenta como activa — el día
+// que llega esa fecha (fechaProgramada <= hoy) pasa sola a Activas, sin que
+// nadie tenga que moverla a mano (13-sep-2026, a petición del usuario).
 // ═══════════════════════════════════════════════════════════════════════
 let _tareaEdId = null;
-let _tareasVerResueltas = false;
+let _tareasVista = 'activas'; // 'activas' | 'programadas' | 'resueltas'
 
 function renderTareasHoyCount(){
   const cnt = document.getElementById('tareasHoyCount');
   const sub = document.getElementById('tareasHoySub');
   if(!cnt) return;
-  const pend = (Array.isArray(D.tareasHoy) ? D.tareasHoy : []).filter(function(t){ return t && t.estado !== 'resuelta'; });
+  const hoyStr = typeof hoy === 'function' ? hoy() : new Date().toISOString().slice(0,10);
+  // No cuenta las programadas a futuro — esas no son "pendientes de hoy"
+  // todavía, aparecen solas cuando llega su fecha.
+  const pend = (Array.isArray(D.tareasHoy) ? D.tareasHoy : []).filter(function(t){
+    return t && t.estado !== 'resuelta' && !(t.fechaProgramada && t.fechaProgramada > hoyStr);
+  });
   cnt.textContent = pend.length;
   if(sub) sub.textContent = pend.length === 1 ? 'pendiente' : 'pendientes';
 }
@@ -12638,25 +12647,31 @@ async function _tareasPurgarResueltosViejos(){
 function abrirTareasHoy(){
   const buscar = document.getElementById('tareasBuscar'); if(buscar) buscar.value = '';
   const fechaEl = document.getElementById('tareasFechaHoy'); if(fechaEl) fechaEl.textContent = _tareasFechaHoyTexto();
-  _tareasVerResueltas = false;
   _tareasSeleccion.clear();
-  const p = document.getElementById('tareasEstadoPendientes'); if(p) p.style.display = 'flex';
-  const r = document.getElementById('tareasEstadoResueltos'); if(r) r.style.display = 'none';
   ir('tareas-hoy');
-  renderTareasHoyLista();
+  tareasCambiarVista('activas');
 }
 
-function toggleTareasResueltas(){
-  _tareasVerResueltas = !_tareasVerResueltas;
+// Tres pestañas (Activas / Programadas / Resueltas) — reemplaza el toggle de
+// dos estados que había antes (13-sep-2026, a petición del usuario: agregar
+// una pestaña para programar tareas que aparezcan solas en un día futuro).
+function tareasCambiarVista(vista){
+  _tareasVista = vista;
   _tareasSeleccion.clear();
   const chkTodas = document.getElementById('tareasSelTodasChk');
   if(chkTodas) chkTodas.checked = false;
-  const p = document.getElementById('tareasEstadoPendientes');
-  const r = document.getElementById('tareasEstadoResueltos');
-  if(p && r){
-    p.style.display = _tareasVerResueltas ? 'none' : 'flex';
-    r.style.display = _tareasVerResueltas ? 'flex' : 'none';
-  }
+  const btns = {
+    activas:     document.getElementById('tareasTabActivas'),
+    programadas: document.getElementById('tareasTabProgramadas'),
+    resueltas:   document.getElementById('tareasTabResueltas')
+  };
+  Object.keys(btns).forEach(function(k){
+    const b = btns[k]; if(!b) return;
+    b.classList.toggle('btn-primary', k===vista);
+    b.classList.toggle('btn-ghost', k!==vista);
+  });
+  const acciones = document.getElementById('tareasAccionesResueltas');
+  if(acciones) acciones.style.display = (vista==='resueltas') ? 'flex' : 'none';
   renderTareasHoyLista();
 }
 
@@ -12675,7 +12690,7 @@ async function vaciarTareasResueltas(){
   if(typeof save === 'function') save();
   if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
   if(typeof toast==='function') toast('🗑 '+aBorrar.length+' tarea(s) resuelta(s) eliminada(s)','ok');
-  toggleTareasResueltas();
+  tareasCambiarVista('activas');
 }
 
 // Convierte *texto* en negritas rojo brillante. Se aplica DESPUÉS de esc()
@@ -12694,17 +12709,31 @@ function renderTareasHoyLista(){
   const TCOL = '#1a4a8a'; // azul — color de tema de "Tareas para hoy"
   const q = (document.getElementById('tareasBuscar')?.value || '').toLowerCase().trim();
   const todas = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
-  const pendCount = todas.filter(function(t){ return t && t.estado !== 'resuelta'; }).length;
+  const hoyStr = typeof hoy === 'function' ? hoy() : new Date().toISOString().slice(0,10);
+  // Una tarea es "programada" solo si tiene fechaProgramada FUTURA y no está
+  // resuelta — en cuanto esa fecha llega (fechaProgramada <= hoy) deja de
+  // contar como programada y pasa a verse en Activas automáticamente.
+  const esProgramada = function(t){ return !!(t && t.fechaProgramada && t.fechaProgramada > hoyStr && t.estado !== 'resuelta'); };
+  const activasList = todas.filter(function(t){ return t && t.estado !== 'resuelta' && !esProgramada(t); });
+  const programadasList = todas.filter(esProgramada);
+  const pendCount = activasList.length;
   const contador = document.getElementById('tareasHoyContador');
   if(contador) contador.textContent = pendCount;
-  let lista = todas.filter(function(t){ return t && (_tareasVerResueltas ? t.estado==='resuelta' : t.estado!=='resuelta'); });
+  const badgeProg = document.getElementById('tareasProgramadasCount');
+  if(badgeProg) badgeProg.textContent = programadasList.length ? ('('+programadasList.length+')') : '';
+  let lista = todas.filter(function(t){
+    if(!t) return false;
+    if(_tareasVista === 'resueltas')   return t.estado === 'resuelta';
+    if(_tareasVista === 'programadas') return esProgramada(t);
+    return t.estado !== 'resuelta' && !esProgramada(t);
+  });
   if(q) lista = lista.filter(function(t){ return (t.titulo||'').toLowerCase().includes(q) || (t.texto||'').toLowerCase().includes(q); });
-  // N° de ficha — posición entre las tareas ACTIVAS (no resueltas), ordenadas
-  // por antigüedad (la más vieja = 1). Igual que en Pendientes, se recalcula
-  // solo en cada render; las resueltas no muestran número.
+  // N° de ficha — posición entre las tareas ACTIVAS (no resueltas, no
+  // programadas a futuro), ordenadas por antigüedad (la más vieja = 1). Igual
+  // que en Pendientes, se recalcula solo en cada render; las resueltas y las
+  // programadas no muestran número.
   const _tareasNumMapa = (function(){
-    const activas = todas.filter(function(x){ return x && x.estado !== 'resuelta'; });
-    const orden = activas.slice().sort(function(a,b){
+    const orden = activasList.slice().sort(function(a,b){
       const ka=a.fechaCreacion||'', kb=b.fechaCreacion||'';
       return ka<kb?-1:ka>kb?1:0;
     });
@@ -12712,19 +12741,29 @@ function renderTareasHoyLista(){
     orden.forEach(function(x,pos){ mapa.set(x, pos+1); });
     return mapa;
   })();
-  lista = lista.slice().sort(function(a,b){ return (b.fechaCreacion||'').localeCompare(a.fechaCreacion||''); });
+  // En Programadas se ordena por la fecha en que aparecerán (la más próxima
+  // primero) — en las otras vistas, por antigüedad de creación.
+  lista = lista.slice().sort(function(a,b){
+    if(_tareasVista === 'programadas') return (a.fechaProgramada||'').localeCompare(b.fechaProgramada||'');
+    return (b.fechaCreacion||'').localeCompare(a.fechaCreacion||'');
+  });
   if(!lista.length){
-    cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;">'
-      + (_tareasVerResueltas ? 'No hay tareas resueltas todavía.' : 'No hay tareas pendientes — ¡todo al día! ✓')
-      + '</div>';
+    const msjVacio = _tareasVista === 'resueltas' ? 'No hay tareas resueltas todavía.'
+      : _tareasVista === 'programadas' ? 'No hay tareas programadas — usa "📅 Programar para" al crear una tarea.'
+      : 'No hay tareas pendientes — ¡todo al día! ✓';
+    cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;">'+msjVacio+'</div>';
     return;
   }
   cont.innerHTML = lista.map(function(t){
     const resuelta = t.estado === 'resuelta';
-    const numFicha = resuelta ? '' : (_tareasNumMapa.get(t)||'');
+    const programada = esProgramada(t);
+    const numFicha = (resuelta || programada) ? '' : (_tareasNumMapa.get(t)||'');
+    const _fProgFmt = t.fechaProgramada ? t.fechaProgramada.slice(8,10)+'/'+t.fechaProgramada.slice(5,7)+'/'+t.fechaProgramada.slice(0,4) : '';
     const badge = resuelta
       ? '<span style="background:'+TCOL+';color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">RESUELTA</span>'
-      : '<span style="background:#8c6518;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">PENDIENTE</span>';
+      : programada
+        ? '<span style="background:#7a4a10;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">📅 '+esc(_fProgFmt)+'</span>'
+        : '<span style="background:#8c6518;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">PENDIENTE</span>';
     const circulo = resuelta
       ? '<div onclick="event.stopPropagation();reabrirTareaHoy(\''+t.id+'\')" title="Reabrir" style="width:20px;height:20px;border-radius:50%;background:'+TCOL+';flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;cursor:pointer;">✓</div>'
       : '<div onclick="event.stopPropagation();marcarTareaResuelta(\''+t.id+'\')" title="Marcar resuelto" style="width:20px;height:20px;border-radius:50%;border:2px solid '+TCOL+';flex-shrink:0;cursor:pointer;"></div>';
@@ -12739,7 +12778,7 @@ function renderTareasHoyLista(){
       : '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
         + '<div style="font-size:0.62rem;color:var(--muted);">'+esc(t.creadoPor||'')+' · '+esc((t.fechaCreacion||'').slice(0,10))+'</div>'
         + '<div style="display:flex;gap:6px;">'
-        + '<button onclick="marcarTareaResuelta(\''+t.id+'\')" title="Marcar como resuelto" style="background:#eef3ff;color:'+TCOL+';font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">✓ MARCAR RESUELTO</button>'
+        + (programada ? '' : '<button onclick="marcarTareaResuelta(\''+t.id+'\')" title="Marcar como resuelto" style="background:#eef3ff;color:'+TCOL+';font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">✓ MARCAR RESUELTO</button>')
         + '<button onclick="abrirEditarTarea(\''+t.id+'\')" style="background:#e6f1fb;color:#185fa5;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">EDITAR</button>'
         + '</div></div>';
     return '<div style="position:relative;display:flex;align-items:stretch;background:var(--surface,#fdfaf4);border:1px solid var(--border-l);border-radius:10px;margin-bottom:8px;overflow:hidden;'+(resuelta?'opacity:0.65;':'')+'">'
@@ -12962,6 +13001,7 @@ function abrirNuevaTarea(){
   const elElim = document.getElementById('tareaBtnElim'); if(elElim) elElim.style.display = 'none';
   const ti = document.getElementById('tareaTitulo'); if(ti) ti.value = '';
   const tx = document.getElementById('tareaTexto'); if(tx) tx.value = '';
+  const fp = document.getElementById('tareaFechaProgramada'); if(fp) fp.value = '';
   const adjBtn = document.getElementById('tareaModalAdjBtn'); if(adjBtn) adjBtn.style.display = 'none';
   const adjCont = document.getElementById('tareaModalAdjuntos'); if(adjCont) adjCont.innerHTML = '';
   const adjHint = document.getElementById('tareaModalAdjHint'); if(adjHint) adjHint.style.display = 'inline';
@@ -12977,6 +13017,7 @@ function abrirEditarTarea(id){
   const elElim = document.getElementById('tareaBtnElim'); if(elElim) elElim.style.display = 'inline-flex';
   const ti = document.getElementById('tareaTitulo'); if(ti) ti.value = tarea.titulo || '';
   const tx = document.getElementById('tareaTexto'); if(tx) tx.value = tarea.texto || '';
+  const fp = document.getElementById('tareaFechaProgramada'); if(fp) fp.value = tarea.fechaProgramada || '';
   const adjHint = document.getElementById('tareaModalAdjHint'); if(adjHint) adjHint.style.display = 'none';
   const adjBtn = document.getElementById('tareaModalAdjBtn');
   if(adjBtn){ adjBtn.style.display = 'inline-flex'; adjBtn.onclick = function(){ _tareaAdjuntarDoc(id); }; }
@@ -12988,17 +13029,18 @@ function abrirEditarTarea(id){
 function guardarTareaHoy(){
   const titulo = document.getElementById('tareaTitulo')?.value.trim() || '';
   const texto  = document.getElementById('tareaTexto')?.value.trim() || '';
+  const fechaProgramada = document.getElementById('tareaFechaProgramada')?.value || '';
   if(!titulo){ if(typeof toast==='function') toast('El título es obligatorio','err'); return; }
   if(!Array.isArray(D.tareasHoy)) D.tareasHoy = [];
   if(_tareaEdId){
     const tarea = D.tareasHoy.find(function(x){ return x && x.id === _tareaEdId; });
     if(tarea){
-      tarea.titulo = titulo; tarea.texto = texto; tarea.fechaMod = new Date().toISOString();
+      tarea.titulo = titulo; tarea.texto = texto; tarea.fechaProgramada = fechaProgramada; tarea.fechaMod = new Date().toISOString();
     }
   } else {
     D.tareasHoy.unshift({
       id: 'TH-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
-      titulo: titulo, texto: texto, estado: 'pendiente',
+      titulo: titulo, texto: texto, estado: 'pendiente', fechaProgramada: fechaProgramada,
       creadoPor: (typeof empleadoActual !== 'undefined' && empleadoActual) ? empleadoActual.nombre : (typeof NOMBRE_TITULAR !== 'undefined' ? NOMBRE_TITULAR : ''),
       fechaCreacion: new Date().toISOString(), fechaResolucion: '',
       fechaMod: new Date().toISOString()
@@ -13007,7 +13049,8 @@ function guardarTareaHoy(){
   cerrar('mTareaEditar');
   if(typeof save === 'function') save();
   if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
-  if(typeof toast==='function') toast('✅ Tarea guardada — sincronizando...');
+  const _hoyGuardar = typeof hoy === 'function' ? hoy() : new Date().toISOString().slice(0,10);
+  if(typeof toast==='function') toast((fechaProgramada && fechaProgramada > _hoyGuardar) ? '📅 Tarea programada — sincronizando...' : '✅ Tarea guardada — sincronizando...');
   renderTareasHoyLista();
   renderTareasHoyCount();
 }

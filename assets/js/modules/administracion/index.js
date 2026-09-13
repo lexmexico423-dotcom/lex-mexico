@@ -5363,6 +5363,18 @@ async function adminBorrarMovimientosPorFecha() {
   if (st) st.textContent = '⏳ Paso 2/3 — Subiendo tombstones a Supabase...';
   try {
     if (window.SB && window.SB_DESPACHO_ID) {
+      // FIX pérdida de datos (13-sep-2026): fusionar tareasHoy/adeudosSinRecibo
+      // con Supabase antes de subir — ver nota en syncEstadoSupabase (contabilidad).
+      // Esta ruta escribe directo, sin pasar por syncEstadoSupabase.
+      try {
+        var _preTA = await window.SB.from('app_state').select('data')
+          .eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+        var _sbDataPreTA = (_preTA && _preTA.data && _preTA.data.data) || {};
+        if (typeof _lexFusionarListaPorId === 'function') {
+          D.tareasHoy        = _lexFusionarListaPorId(D.tareasHoy, _sbDataPreTA.tareasHoy);
+          D.adeudosSinRecibo = _lexFusionarListaPorId(D.adeudosSinRecibo, _sbDataPreTA.adeudosSinRecibo);
+        }
+      } catch(_eFusionTA){ console.warn('[adminBorrarFecha] fusión tareasHoy/adeudos:', _eFusionTA); }
       var movsLimpios = (D.movimientos || []).filter(function(m){ return m && m.id && !/^R-\d+$/.test(m.id); });
       var estado = {
         movimientos:          movsLimpios,
@@ -7227,6 +7239,18 @@ async function adminRevertirLetraA(idx) {
   toast('⏳ Revirtiendo a VER.A y sincronizando...');
   try {
     if (window.SB && window.SB_DESPACHO_ID) {
+      // FIX pérdida de datos (13-sep-2026): fusionar tareasHoy/adeudosSinRecibo
+      // con Supabase antes de subir — ver nota en syncEstadoSupabase (contabilidad).
+      // Esta ruta escribe directo, sin pasar por syncEstadoSupabase.
+      try {
+        var _preTA2 = await window.SB.from('app_state').select('data')
+          .eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+        var _sbDataPreTA2 = (_preTA2 && _preTA2.data && _preTA2.data.data) || {};
+        if (typeof _lexFusionarListaPorId === 'function') {
+          D.tareasHoy        = _lexFusionarListaPorId(D.tareasHoy, _sbDataPreTA2.tareasHoy);
+          D.adeudosSinRecibo = _lexFusionarListaPorId(D.adeudosSinRecibo, _sbDataPreTA2.adeudosSinRecibo);
+        }
+      } catch(_eFusionTA2){ console.warn('[revertirLetraA] fusión tareasHoy/adeudos:', _eFusionTA2); }
       var movsLimpios = (D.movimientos || []).filter(function(m){ return m && m.id && !/^R-\d+$/.test(m.id); });
       var estado = {
         movimientos: movsLimpios,

@@ -6211,6 +6211,26 @@ function _conceptoTxtDeRecibo(r){
   return '';
 }
 
+// Última "rev" conocida — mismo contador que la BD incrementa sola en cada
+// UPDATE de app_state (trigger app_state_bump_rev) que ya usa
+// syncEstadoSupabase() para su control de concurrencia optimista. El
+// respaldo periódico la reutiliza para no volver a bajar el estado completo
+// si nada cambió desde el último pull: primero pregunta solo el número
+// (unos cuantos bytes) y solo baja todo si es distinto al que ya tenía.
+// Ante cualquier duda (error de red, primera vez, valor inesperado) se
+// sincroniza de todas formas — nunca se omite un pull por quedarse callado.
+let _lexUltimaRevConocida = null;
+async function _lexHayCambiosPendientes(){
+  try{
+    if(!window.SB || !window.SB_DESPACHO_ID) return true;
+    const { data, error } = await window.SB.from('app_state')
+      .select('rev').eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+    if(error || !data || typeof data.rev !== 'number') return true;
+    const cambio = (_lexUltimaRevConocida===null) || (data.rev !== _lexUltimaRevConocida);
+    _lexUltimaRevConocida = data.rev;
+    return cambio;
+  }catch(e){ console.warn('[Polling] chequeo de rev:', e); return true; }
+}
 function _lexPollingTick() {
   try {
     // No interferir si hay una subida o bajada ya en curso, o si nosotros
@@ -6218,20 +6238,23 @@ function _lexPollingTick() {
     if (_syncEnCurso) return;
     if ((Date.now() - (_ultimoSyncPropio || 0)) < 10000) return;
     if (typeof sincronizarFolio !== 'function') return;
-    sincronizarFolio(true).then(function () {
-      safeExec('renderHistorial',    () => typeof renderHistorial   === 'function' && renderHistorial());
-      safeExec('renderCaja',         () => typeof renderCaja        === 'function' && renderCaja());
-      safeExec('renderContab',       () => typeof renderContab      === 'function' && renderContab());
-      safeExec('badges',             () => typeof badges            === 'function' && badges());
-      safeExec('hjRenderTerminos',   () => typeof hjRenderTerminos  === 'function' && hjRenderTerminos());
-      safeExec('hjRenderLista',      () => typeof hjRenderLista     === 'function' && hjRenderLista());
-      safeExec('renderVencimientos', () => typeof renderVencimientos=== 'function' && renderVencimientos());
-      safeExec('renderPend',         () => typeof renderPend        === 'function' && renderPend());
-      safeExec('renderJuicios',      () => typeof renderJuicios     === 'function' && renderJuicios());
-      safeExec('renderCitas',        () => typeof renderCitas       === 'function' && renderCitas());
-      safeExec('gestFiltrar',        () => typeof gestFiltrar       === 'function' && gestFiltrar());
-      safeExec('capturaMesCargarSupabase', () => typeof capturaMesCargarSupabase === 'function' && capturaMesCargarSupabase());
-    }).catch(function (e) { console.warn('[Polling] sincronizarFolio:', e); });
+    _lexHayCambiosPendientes().then(function(hayCambios){
+      if(!hayCambios) return; // nada nuevo desde el último pull — no bajar todo otra vez
+      sincronizarFolio(true).then(function () {
+        safeExec('renderHistorial',    () => typeof renderHistorial   === 'function' && renderHistorial());
+        safeExec('renderCaja',         () => typeof renderCaja        === 'function' && renderCaja());
+        safeExec('renderContab',       () => typeof renderContab      === 'function' && renderContab());
+        safeExec('badges',             () => typeof badges            === 'function' && badges());
+        safeExec('hjRenderTerminos',   () => typeof hjRenderTerminos  === 'function' && hjRenderTerminos());
+        safeExec('hjRenderLista',      () => typeof hjRenderLista     === 'function' && hjRenderLista());
+        safeExec('renderVencimientos', () => typeof renderVencimientos=== 'function' && renderVencimientos());
+        safeExec('renderPend',         () => typeof renderPend        === 'function' && renderPend());
+        safeExec('renderJuicios',      () => typeof renderJuicios     === 'function' && renderJuicios());
+        safeExec('renderCitas',        () => typeof renderCitas       === 'function' && renderCitas());
+        safeExec('gestFiltrar',        () => typeof gestFiltrar       === 'function' && gestFiltrar());
+        safeExec('capturaMesCargarSupabase', () => typeof capturaMesCargarSupabase === 'function' && capturaMesCargarSupabase());
+      }).catch(function (e) { console.warn('[Polling] sincronizarFolio:', e); });
+    });
   } catch (e) { console.warn('[Polling] tick:', e); }
 }
 

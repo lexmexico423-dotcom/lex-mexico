@@ -6135,18 +6135,34 @@ async function backupAppData() {
         recibos:         appData.recibos || []
       },
       data: {
-        movimientos:          (D && D.movimientos)          || [],
-        directorio:           (D && D.directorio)           || [],
-        carpetas:             (D && D.carpetas)             || [],
-        juicios:              (D && D.juicios)              || [],
-        pendientes:           (D && D.pendientes)           || [],
-        cierres:              (D && D.cierres)              || [],
-        prestamos:            (D && D.prestamos)            || [],
-        escrituras:           (D && D.escrituras)           || [],
-        recibosExcluidosCaja: (D && D.recibosExcluidosCaja) || [],
-        saldoAcumulado:       (D && D.saldoAcumulado)       || 0,
-        cortesDeshabilitados: (D && D.cortesDeshabilitados)  || [],
-        preRecibos:           (D && D.preRecibos)            || []
+        movimientos:           (D && D.movimientos)           || [],
+        // FIX (13-sep-2026): el snapshot de respaldo diario nunca había
+        // incluido tareasHoy/adeudosSinRecibo (ni varios otros campos más
+        // nuevos) — si se perdían en Supabase, tampoco había forma de
+        // recuperarlos de aquí. Se completan todos los campos que ya viven
+        // en D/appData para que el respaldo sea realmente completo.
+        movimientos_eliminados: Array.isArray(D && D.movimientos_eliminados) ? D.movimientos_eliminados : [],
+        directorio:            (D && D.directorio)            || [],
+        carpetas:              (D && D.carpetas)               || [],
+        juicios:               (D && D.juicios)                || [],
+        gestiones:             (D && D.gestiones)               || [],
+        pendientes:            (D && D.pendientes)              || [],
+        citas:                 (D && D.citas)                   || [],
+        cierres:               (D && D.cierres)                 || [],
+        prestamos:             (D && D.prestamos)               || [],
+        tareasHoy:             (D && D.tareasHoy)               || [],
+        adeudosSinRecibo:      (D && D.adeudosSinRecibo)        || [],
+        escrituras:            (D && D.escrituras)              || [],
+        recibosExcluidosCaja:  (D && D.recibosExcluidosCaja)    || [],
+        saldoAcumulado:        (D && D.saldoAcumulado)          || 0,
+        cortesDeshabilitados:  (D && D.cortesDeshabilitados)    || [],
+        preRecibos:            (D && D.preRecibos)              || [],
+        leyes:                 (D && D.leyes)                   || [],
+        captura_meses:         (typeof capturaMesCargar === 'function' ? capturaMesCargar() : null) || (D && D.captura_meses) || {},
+        retro_global:          window._retroGlobalActivo !== undefined
+                               ? { activo: !!window._retroGlobalActivo }
+                               : ((D && D.retro_global) || null),
+        tiempoExtra:           (D && D.tiempoExtra)             || {}
       }
     };
 

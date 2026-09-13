@@ -1263,6 +1263,12 @@ function _avisoProgramadoChequear(){
     // Cierre automático de caja: revisa (sin bloquear este chequeo) si el
     // servidor ya marcó que pasaron las 5:30 p.m. y hoy no se ha cerrado.
     if(typeof _chequearCierreAutomaticoCaja === 'function') _chequearCierreAutomaticoCaja();
+    // Auto-registro de días sin actividad: rellena huecos en D.cierres entre
+    // el último cierre y ayer (ej. cuando Supabase se bloqueó varios días
+    // seguidos por exceso de cuota y nadie pudo entrar al sistema esas
+    // noches, o un fin de semana largo). Antes esta función existía en el
+    // código pero nunca se llamaba desde ninguna parte — quedaba huérfana.
+    if(typeof autoRegistrarDiasSinActividad === 'function') autoRegistrarDiasSinActividad();
     // FIX (caso real: empleada siguió trabajando después de las 5:30 con la
     // sesión ya abierta desde antes): el candado real (_horarioGateMostrar)
     // antes solo se evaluaba UNA VEZ, al iniciar sesión (horarioGateLogin) —

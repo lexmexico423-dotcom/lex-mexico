@@ -889,15 +889,12 @@ function guardarPend(){
     const nombre = document.getElementById('pOtrosNombre')?.value.trim()||document.getElementById('pPersona')?.value.trim()||'';
     const desc   = document.getElementById('pOtrosDesc')?.value.trim()||document.getElementById('pTxt')?.value.trim()||'';
     if(!desc){ toast('La descripción es obligatoria','err'); return; }
-    // Prioridad/Responsable/Fecha límite de "Otros" tienen sus propios campos
-    // dedicados (pOtrosPri/pOtrosResp/pOtrosFecha) — antes se leían de los
-    // genéricos pPri/pRe/pFecha, que pSecCambio() oculta siempre.
     especifico = {
       id: (eiP>=0 && D.pendientes[eiP]?.id) || ('P-'+Date.now()),
       texto: desc, persona: nombre, seccion: sec,
-      prioridad: document.getElementById('pOtrosPri')?.value||'normal',
-      resp: document.getElementById('pOtrosResp')?.value||'Antonieta',
-      fechaLimite: document.getElementById('pOtrosFecha')?.value||'',
+      prioridad: document.getElementById('pPri')?.value||'normal',
+      resp: document.getElementById('pRe')?.value||'Antonieta',
+      fechaLimite: document.getElementById('pFecha')?.value||'',
       carpeta: document.getElementById('pCarpeta')?.value.trim()||'',
       obs: document.getElementById('pOb')?.value.trim()||''
     };
@@ -1258,6 +1255,17 @@ function restaurarBackup(tipo, claveBackup) {
 }
 
 function driveChipClick() {
+  // FIX (13-sep-2026): el chip decía "⚠ Error al guardar — clic para
+  // reintentar" pero el clic siempre caía en la rama de abajo y ofrecía
+  // CERRAR SESIÓN, sin importar el estado — contradiciendo su propio texto.
+  // Si el último guardado falló, el clic debe reintentarlo, no cerrar sesión.
+  if (_syncState === 'error') {
+    if (typeof toast === 'function') toast('🔄 Reintentando guardar...');
+    if (typeof syncEstadoSupabase === 'function') {
+      syncEstadoSupabase().catch(function(e){ if(typeof registrarError==='function') registrarError('driveChipClick.reintento', e); });
+    }
+    return;
+  }
   if (sbSession && Date.now() < sbExpiry) {
     if (confirm('¿Cerrar sesión?\n\nLos datos locales se conservan. Solo se desconecta la sincronización en la nube.')) {
       sbSession = null; sbExpiry = 0;
@@ -1832,4 +1840,3 @@ async function _prInicializarPanel() {
   await _prCargarDesdeR2();
   _prRenderLista();
 }
-

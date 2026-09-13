@@ -16385,15 +16385,16 @@ Recibo original im…</td>
       </div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
         <input id="tareasBuscar" type="search" placeholder="Buscar tarea de hoy..." oninput="renderTareasHoyLista()" autocomplete="off" style="flex:1;min-width:140px;padding:8px 12px;border:1.5px solid var(--border-l);border-radius:20px;font-size:0.82rem;">
-        <div id="tareasEstadoPendientes" style="display:flex;gap:8px;align-items:center;">
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);border:1.5px solid var(--border-l);border-radius:var(--radius-sm);padding:6px 20px;flex-shrink:0;line-height:1.15;">
-            <span id="tareasHoyContador" style="font-size:1.3rem;font-weight:800;color:#8c6518;font-family:monospace;">0</span>
-            <span style="font-size:0.62rem;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Pendientes</span>
-          </div>
-          <button class="btn btn-ghost" onclick="toggleTareasResueltas()">✓ Resueltos</button>
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);border:1.5px solid var(--border-l);border-radius:var(--radius-sm);padding:6px 20px;flex-shrink:0;line-height:1.15;">
+          <span id="tareasHoyContador" style="font-size:1.3rem;font-weight:800;color:#8c6518;font-family:monospace;">0</span>
+          <span style="font-size:0.62rem;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Pendientes</span>
         </div>
-        <div id="tareasEstadoResueltos" style="display:none;gap:8px;align-items:center;">
-          <button class="btn btn-primary" onclick="toggleTareasResueltas()">← Activos</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn btn-primary" id="tareasTabActivas" onclick="tareasCambiarVista('activas')">Activas</button>
+          <button class="btn btn-ghost" id="tareasTabProgramadas" onclick="tareasCambiarVista('programadas')">📅 Programadas <span id="tareasProgramadasCount"></span></button>
+          <button class="btn btn-ghost" id="tareasTabResueltas" onclick="tareasCambiarVista('resueltas')">✓ Resueltas</button>
+        </div>
+        <div id="tareasAccionesResueltas" style="display:none;gap:8px;align-items:center;">
           <label style="display:flex;align-items:center;gap:5px;font-size:0.74rem;color:var(--muted);cursor:pointer;white-space:nowrap;">
             <input type="checkbox" id="tareasSelTodasChk" onclick="_tareaSeleccionarTodas(this.checked)">
             Todas
@@ -18625,6 +18626,7 @@ Recibo original im…</td>
   </div>
   <div class="modal-body">
     <div class="field"><label>Título *</label><input id="tareaTitulo" type="text" placeholder="Ej: Llamar a Juan Pérez..."></div>
+    <div class="field"><label>📅 Programar para (opcional)</label><input id="tareaFechaProgramada" type="date"><div style="font-size:0.68rem;color:var(--muted);margin-top:3px;">Vacío = aparece de inmediato en Activas. Con fecha futura, aparece sola en Activas ese día — mientras tanto vive en "📅 Programadas".</div></div>
     <div class="field"><label>Actividad</label><textarea id="tareaTexto" rows="18" style="width:100%;min-height:420px;font-size:0.95rem;line-height:1.5;resize:vertical;" placeholder="Describe la actividad... (usa *texto* para negritas rojas)"></textarea></div>
     <div class="field">
       <label>Archivos adjuntos</label>
@@ -19391,7 +19393,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=202609068"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=202609069"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

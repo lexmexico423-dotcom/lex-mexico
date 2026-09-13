@@ -1545,8 +1545,32 @@ function lexRealtimeDesconectar() {
   if (_lexPollingTimer) { clearInterval(_lexPollingTimer); _lexPollingTimer = null; }
 }
 
+// Pausa el temporizador de respaldo cuando la pestaña queda oculta (nadie la
+// está viendo) y lo retoma —con un chequeo inmediato— al volver a estar
+// visible. La mayoría del consumo de egress ocurre en pestañas de fondo que
+// nadie está usando en ese momento; esto lo evita sin tocar sincronizarFolio()
+// en sí (esa función también se usa en el login y otros flujos, así que la
+// pausa se maneja únicamente aquí, a nivel del temporizador).
+let _lexPollingVisibleListenerListo = false;
+function _lexPollingVisibilidadInit(){
+  if (_lexPollingVisibleListenerListo) return;
+  _lexPollingVisibleListenerListo = true;
+  document.addEventListener('visibilitychange', function(){
+    if (document.hidden){
+      if (_lexPollingTimer) { clearInterval(_lexPollingTimer); _lexPollingTimer = null; }
+    } else {
+      // Un chequeo inmediato al volver (respeta los guards internos de
+      // _lexPollingTick contra sincronizaciones simultáneas/redundantes),
+      // y luego se reanuda el temporizador normal.
+      if (typeof _lexPollingTick === 'function') _lexPollingTick();
+      lexPollingIniciar();
+    }
+  });
+}
 function lexPollingIniciar() {
   if (_lexPollingTimer) return; // ya iniciado
+  _lexPollingVisibilidadInit();
+  if (document.hidden) return; // no arrancar mientras esté oculta; se activa sola al volver a ser visible
   _lexPollingTimer = setInterval(_lexPollingTick, _LEX_POLLING_MS);
   console.log('[Polling] Respaldo activo cada ' + (_LEX_POLLING_MS/1000) + 's');
 }

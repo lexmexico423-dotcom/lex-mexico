@@ -6347,11 +6347,18 @@ function escGuardarPaso(){
     if(estadoNuevo==='completado' && _escPasoIdx<4){
       const _sig = _escPasoIdx+1;
       const _sigActual = e.pasos[_sig] || {estado:'pendiente',notas:'',fecha:''};
-      if(_sigActual.estado==='pendiente' && !_sigActual.notas){
+      // Antes solo arrancaba el reloj si el paso siguiente no tenía NINGUNA
+      // nota — si alguien ya había anotado algo ahí antes de completar este
+      // paso (o vino así de una importación), el reloj de 10 días nunca
+      // arrancaba y el marcador "i" no volvía a aparecer jamás. Ahora arranca
+      // siempre que el siguiente paso siga "pendiente" (sin importar si ya
+      // tiene nota) — y si ya tenía una nota propia, la conserva en vez de
+      // pisarla con el texto genérico.
+      if(_sigActual.estado==='pendiente'){
         e.pasos[_sig] = {
           estado:'activo',
-          notas: ESC_NOTAS_AUTO_INTERMEDIO[_sig]||'',
-          fecha,
+          notas: _sigActual.notas || ESC_NOTAS_AUTO_INTERMEDIO[_sig]||'',
+          fecha: _sigActual.fecha || fecha,
           fechaAutoInicio: new Date().toISOString(),
           intermedioSuperado: false
         };

@@ -1412,6 +1412,32 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       estado.adeudosSinRecibo = _lexFusionarListaPorId(D.adeudosSinRecibo, _sbAdeudosPreSync);
       D.tareasHoy        = estado.tareasHoy;
       D.adeudosSinRecibo = estado.adeudosSinRecibo;
+      // FIX (14-sep-2026): mismo problema que tareasHoy/adeudosSinRecibo —
+      // escrituras se subía tal cual estaba en memoria local sin comparar
+      // contra el servidor, aunque SÍ se fusiona al BAJAR (sincronizarFolio
+      // en recibos/index.js). Una pestaña con datos viejos en memoria (o un
+      // ajuste hecho directo en la base de datos, ej. soporte) podía pisar
+      // cambios recientes en el siguiente guardado. Se fusiona por 'num' +
+      // fechaMod, mismo criterio que ya usa la descarga.
+      const _sbEscriturasPreSync = Array.isArray(_sbDataPreSync.escrituras) ? _sbDataPreSync.escrituras : [];
+      estado.escrituras = (function(){
+        const _local = Array.isArray(D.escrituras) ? D.escrituras : [];
+        const _mapaLocal = {};
+        _local.forEach(function(e){ if(e && e.num) _mapaLocal[e.num] = e; });
+        const _remotoNums = new Set(_sbEscriturasPreSync.map(function(e){ return e && e.num; }));
+        const _fusionadas = _sbEscriturasPreSync.map(function(e){
+          const _loc = e && e.num ? _mapaLocal[e.num] : null;
+          if(_loc){
+            const tsLoc = Date.parse(_loc.fechaMod || 0) || 0;
+            const tsRem = Date.parse(e.fechaMod || 0) || 0;
+            if(tsLoc > tsRem) return _loc;
+          }
+          return e;
+        });
+        const _soloLocales = _local.filter(function(e){ return e && e.num && !_remotoNums.has(e.num); });
+        return _fusionadas.concat(_soloLocales);
+      })();
+      D.escrituras = estado.escrituras;
       // Fusionar tombstones
       if (_sbTombsPreSync.length > 0) {
         if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];

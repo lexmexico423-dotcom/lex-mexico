@@ -5537,7 +5537,7 @@ function escRender(){
     // del recibo (dibujarMarcaAgua): texto grande, gris, girado, muy baja
     // opacidad, sin estorbar el click ni el resto del contenido.
     const _marcaAguaCard = _esCanceladaCard ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-family:serif;font-weight:800;font-size:2.4rem;letter-spacing:0.08em;color:#000;opacity:0.06;white-space:nowrap;pointer-events:none;z-index:1;">CANCELADO</div>` : '';
-    return `<div onclick="escAbrirDetalle(${idx})" style="position:relative;overflow:hidden;background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
+    return `<div onclick="escAbrirDetalle(${idx})" style="position:relative;background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
       ${_marcaAguaCard}
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;position:relative;z-index:2;">
         <div style="display:flex;gap:14px;min-width:0;flex:1;">

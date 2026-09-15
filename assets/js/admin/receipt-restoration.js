@@ -4656,7 +4656,7 @@ function escMostrarDetalle(e){
     listo:  {col:'#1a7a3a',bg:'rgba(26,122,58,0.08)', lbl:'🟢 Listo p/Entregar'},
     espera: {col:'#7a6840',bg:'rgba(0,0,0,0.04)',      lbl:'⬜ En Espera'},
     archivado:{col:'#7a6840',bg:'rgba(122,104,64,0.08)',lbl:'🗄 Archivado'},
-    cancelado:{col:'#a32d2d',bg:'rgba(163,45,45,0.08)',lbl:'❌ Cancelado'},
+    cancelado:{col:'#6b6b6b',bg:'rgba(107,107,107,0.08)',lbl:'✕ Cancelado'},
     noprocedio:{col:'#7a2020',bg:'rgba(122,32,32,0.08)',lbl:'⛔ No Procedió'}
   };
   const st = cfg[e.estado||'proceso']||cfg.proceso;
@@ -5010,6 +5010,18 @@ function escRenderNotasEtapa(e){
     }
     const i = pasoActivo;
     const p = pasos[i];
+    // REDISEÑO (14-sep-2026) — "tarjeta de acción grande": en vez de que el
+    // empleado tenga que interpretar colores/círculos de la línea de
+    // progreso, aquí se muestra en texto plano la fase real (esperando vs
+    // en proceso), cuántos días lleva, y UN botón grande y claro para la
+    // siguiente acción — la línea de 5 círculos abajo queda solo como
+    // referencia visual secundaria.
+    const _faseActiva  = p.estado==='activo';
+    const _faseTxt      = _faseActiva ? '🔵 En Proceso' : '🟡 Esperando iniciar';
+    const _colorFase    = _faseActiva ? '#2563eb' : '#c8952a';
+    const _bgFase       = _faseActiva ? '#eef3ff' : '#fff8e8';
+    const _diasFaseNum  = p.fechaAutoInicio ? Math.max(0, Math.floor((Date.now()-new Date(p.fechaAutoInicio).getTime())/86400000)) : null;
+    const _diasFaseTxt  = _diasFaseNum===null ? '' : (_diasFaseNum===0 ? 'Empezó hoy.' : `Llevas ${_diasFaseNum} día(s) ${_faseActiva?'trabajando en este paso':'esperando que se inicie este paso'}.`);
     if(!editable){
       // Punto intermedio con plazo de 10 días vencido (p.fechaAutoInicio):
       // toma prioridad sobre el aviso genérico de 30 días de abajo, porque
@@ -5024,12 +5036,12 @@ function escRenderNotasEtapa(e){
             <div style="font-size:1.3rem;">🎯</div>
             <div style="flex:1;min-width:160px;">
               <div style="font-size:0.85rem;font-weight:700;color:${_est.fg};">Llamado a la Acción</div>
-              <div style="font-family:monospace;font-size:0.6rem;color:${_est.fg};opacity:0.8;">${i+1}. ${ESC_PASOS[i]} — plazo de ${ESC_DIAS_INTERMEDIO} días vencido</div>
+              <div style="font-family:monospace;font-size:0.6rem;color:${_est.fg};opacity:0.8;">${i+1}. ${ESC_PASOS[i]} · ${_faseTxt} — plazo de ${ESC_DIAS_INTERMEDIO} días vencido</div>
             </div>
             <span style="font-family:monospace;font-size:0.62rem;font-weight:700;color:${_est.fg};background:${_est.border};padding:5px 12px;border-radius:14px;">${_est.icon} ${_est.label} · ${_diasIntermedio} día(s) de retraso</span>
           </div>
           <div style="font-family:sans-serif;font-size:0.72rem;color:${_est.fg};margin-top:10px;"><b>Razón:</b> ${p.notas?esc(p.notas):'Sin razón registrada — ábrelo y escribe una para poder guardar cualquier cambio.'}</div>
-          <button type="button" onclick="escAbrirPaso(${i})" style="margin-top:10px;background:none;border:1px solid ${_est.border};color:${_est.fg};font-family:sans-serif;font-size:0.68rem;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;">ABRIR PASO</button>
+          <button type="button" onclick="escAccionRapidaPaso(${i}, '${_faseActiva?'completado':'activo'}')" style="margin-top:10px;background:none;border:1px solid ${_est.border};color:${_est.fg};font-family:sans-serif;font-size:0.68rem;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;">ABRIR PASO</button>
         </div>`;
         return;
       }
@@ -5069,13 +5081,18 @@ function escRenderNotasEtapa(e){
         </div>`;
         return;
       }
+      const _botonAccion = _faseActiva
+        ? `<button type="button" onclick="escAccionRapidaPaso(${i},'completado')" style="margin-top:10px;display:block;width:100%;box-sizing:border-box;background:linear-gradient(135deg,#1a7a3a,#155c2c);border:none;color:#fff;border-radius:8px;padding:11px 14px;font-size:0.85rem;font-weight:800;cursor:pointer;">✓ Ya completé este paso</button>`
+        : `<button type="button" onclick="escAccionRapidaPaso(${i},'activo')" style="margin-top:10px;display:block;width:100%;box-sizing:border-box;background:linear-gradient(135deg,#2563eb,#1a4a9a);border:none;color:#fff;border-radius:8px;padding:11px 14px;font-size:0.85rem;font-weight:800;cursor:pointer;">▶ Ya inicié este paso</button>`;
       cont.innerHTML = `<div style="margin-bottom:16px;">
         <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:4px;">🎯 Llamado a la Acción</div>
         <div style="font-size:0.68rem;color:var(--muted);margin-bottom:10px;">Nota del paso activo — distinta de Observaciones.</div>
-        <div style="background:#fff8e8;border-left:4px solid #c8952a;border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(200,149,42,0.15);padding:10px 12px;">
-          <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;">${i+1}. ${ESC_PASOS[i]} · 🟡 En proceso</div>
+        <div style="background:${_bgFase};border-left:4px solid ${_colorFase};border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(0,0,0,0.08);padding:12px 14px;">
+          <div style="font-family:monospace;font-size:0.68rem;font-weight:700;color:${_colorFase};">${i+1}. ${ESC_PASOS[i]} · ${_faseTxt}</div>
+          ${_diasFaseTxt?`<div style="font-size:0.72rem;color:var(--ink);font-weight:600;margin-top:4px;">${_diasFaseTxt}</div>`:''}
           ${p.notas ? `<div style="font-size:0.75rem;color:#5c5648;margin-top:6px;">${esc(p.notas)}</div>` : ''}
           ${_fechaActFmt?`<div style="font-size:0.62rem;color:#a08050;margin-top:6px;">Última actualización: ${esc(_fechaActFmt)}</div>`:''}
+          ${_botonAccion}
         </div>
       </div>`;
       return;
@@ -5084,11 +5101,20 @@ function escRenderNotasEtapa(e){
     // vuelo en escGuardar() (botón GUARDAR general del formulario), igual
     // que el resto de los campos — evita una segunda fuente de verdad que
     // se pisaba con el modal de paso y hacía parecer que "no guardaba".
-    cont.innerHTML = `<div style="background:#fff8e8;border-left:4px solid #c8952a;border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(200,149,42,0.15);padding:10px 12px;">
-      <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;">${i+1}. ${ESC_PASOS[i]} · 🟡 En proceso</div>
-      <textarea id="esc-nota-etapa-${suf?suf+'-':''}${i}" rows="2" placeholder="Escribe el estatus de esta etapa..." style="width:100%;box-sizing:border-box;border:1.5px solid #c8952a;border-radius:6px;background:#fff;padding:6px 9px;font-size:0.75rem;font-family:sans-serif;resize:vertical;margin-top:6px;">${esc(p.notas||'')}</textarea>
+    cont.innerHTML = `<div style="background:${_bgFase};border-left:4px solid ${_colorFase};border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(0,0,0,0.08);padding:10px 12px;">
+      <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:${_colorFase};">${i+1}. ${ESC_PASOS[i]} · ${_faseTxt}</div>
+      ${_diasFaseTxt?`<div style="font-size:0.68rem;color:var(--ink);font-weight:600;margin-top:4px;">${_diasFaseTxt}</div>`:''}
+      <textarea id="esc-nota-etapa-${suf?suf+'-':''}${i}" rows="2" placeholder="Escribe el estatus de esta etapa..." style="width:100%;box-sizing:border-box;border:1.5px solid ${_colorFase};border-radius:6px;background:#fff;padding:6px 9px;font-size:0.75rem;font-family:sans-serif;resize:vertical;margin-top:6px;">${esc(p.notas||'')}</textarea>
     </div>`;
   });
+}
+// Botón grande de "Llamado a la Acción": abre el modal del paso con la
+// respuesta destino ya preseleccionada en la pregunta de opción múltiple
+// (Ya inicié → B) En proceso, Ya completé → C) Concluido) — el empleado
+// solo confirma o cambia de respuesta si hace falta, y presiona Guardar.
+function escAccionRapidaPaso(i, estadoDestino){
+  escAbrirPaso(i);
+  escPasoSetEstado(estadoDestino);
 }
 // Menú desplegable del botón "TOMAR ACCIÓN" del aviso de Requiere Atención.
 function escToggleMenuAtencion(ev){
@@ -5370,7 +5396,10 @@ function escRender(){
     listo:    {col:'#1a7a3a',bg:'rgba(26,122,58,0.08)',dot:'#1a7a3a',lbl:'🟢 Listo p/Entregar'},
     espera:   {col:'#7a6840',bg:'rgba(0,0,0,0.04)',dot:'#aaa',lbl:'⬜ En Espera'},
     archivado:{col:'#7a6840',bg:'rgba(122,104,64,0.08)',dot:'#7a6840',lbl:'🗄 Archivado'},
-    cancelado:{col:'#a32d2d',bg:'rgba(163,45,45,0.08)',dot:'#a32d2d',lbl:'❌ Cancelado'},
+    // Cancelado se muestra en gris (no rojo) — es un estado "apagado", no una
+    // alerta activa; la línea de progreso (miniTimeline) conserva sus
+    // colores reales sin importar el estado del trámite.
+    cancelado:{col:'#6b6b6b',bg:'rgba(107,107,107,0.08)',dot:'#6b6b6b',lbl:'✕ Cancelado'},
     noprocedio:{col:'#7a2020',bg:'rgba(122,32,32,0.08)',dot:'#7a2020',lbl:'⛔ No Procedió'},
   };
   cont.innerHTML = lista.map(e=>{
@@ -5492,29 +5521,34 @@ function escRender(){
       </div>`;
       return i<4 ? circulo+_conectorTramo(i) : circulo;
     }).join('');
+    // Cancelado también apaga el acento dorado/crema (nombre de acto, número
+    // de CARP, ESCRITURA, FOLIO, rol del transmitente) a gris — antes solo
+    // el borde y la píldora de estado cambiaban, el resto seguía viéndose
+    // "vigente" con el mismo dorado que un trámite activo.
+    const _colorAcento = e.estado==='cancelado' ? cfg.col : '#8c6518';
     return `<div onclick="escAbrirDetalle(${idx})" style="background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;">
         <div style="display:flex;gap:14px;min-width:0;flex:1;">
           ${folioPendiente?`<div style="flex-shrink:0;line-height:1.15;text-align:center;">
-            <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.05em;color:#8c6518;font-weight:700;">ESCRITURA</div>
-            <div style="font-size:0.9rem;font-weight:800;color:#8c6518;">${folioPendiente}</div>
+            <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.05em;color:${_colorAcento};font-weight:700;">ESCRITURA</div>
+            <div style="font-size:0.9rem;font-weight:800;color:${_colorAcento};">${folioPendiente}</div>
           </div>`:''}
           <div style="min-width:0;">
             <div style="display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;margin-bottom:4px;">
-              ${actoTxt?`<div style="font-family:monospace;font-size:0.78rem;font-weight:800;color:#8c6518;letter-spacing:0.03em;">${actoTxt}</div>`:''}
+              ${actoTxt?`<div style="font-family:monospace;font-size:0.78rem;font-weight:800;color:${_colorAcento};letter-spacing:0.03em;">${actoTxt}</div>`:''}
               ${_instrTxt?`<div style="font-family:monospace;font-size:0.62rem;white-space:nowrap;"><span style="font-weight:700;color:var(--muted);">INSTR.</span> <span style="color:var(--ink);font-weight:700;">${_instrTxt}</span></div>`:''}
               ${_volTxt?`<div style="font-family:monospace;font-size:0.62rem;white-space:nowrap;"><span style="font-weight:700;color:var(--muted);">VOL.</span> <span style="color:var(--ink);font-weight:700;">${_volTxt}</span></div>`:''}
               ${_fechaFirmaCard?`<div style="font-family:monospace;font-size:0.62rem;white-space:nowrap;"><span style="font-weight:700;color:var(--muted);">FECHA DE FIRMA</span> <span style="color:var(--ink);font-weight:700;">${_fechaFirmaCard}</span></div>`:''}
             </div>
-            <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">👤 ${esc(comp)} <span style="font-size:0.6rem;color:#1a4a8a;text-transform:uppercase;font-weight:700;">${rolAdq}</span></div>
-            ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ ${esc(vend)} <span style="font-size:0.58rem;color:#8c6518;text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
+            <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">👤 <span style="${e.estado==='cancelado'?'text-decoration:line-through;':''}">${esc(comp)}</span> <span style="font-size:0.6rem;color:#1a4a8a;text-transform:uppercase;font-weight:700;">${rolAdq}</span></div>
+            ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ <span style="${e.estado==='cancelado'?'text-decoration:line-through;':''}">${esc(vend)}</span> <span style="font-size:0.58rem;color:${_colorAcento};text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
           </div>
         </div>
         ${_atencionBadgeHtml}
         <div style="display:flex;align-items:baseline;gap:10px;flex-shrink:0;">
-          <div style="font-family:serif;font-size:1.05rem;color:#8c6518;font-weight:700;white-space:nowrap;">${e.num?(/^carp/i.test(e.num.trim())?esc(e.num):'CARP.- '+esc(e.num)):'—'}</div>
-          ${folioRecHtml?`<div style="border-left:1.5px solid #8c6518;padding-left:10px;line-height:1.3;text-align:left;">
-            <div style="font-family:serif;font-size:0.55rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;">FOLIO</div>
+          <div style="font-family:serif;font-size:1.05rem;color:${_colorAcento};font-weight:700;white-space:nowrap;">${e.num?(/^carp/i.test(e.num.trim())?esc(e.num):'CARP.- '+esc(e.num)):'—'}</div>
+          ${folioRecHtml?`<div style="border-left:1.5px solid ${_colorAcento};padding-left:10px;line-height:1.3;text-align:left;">
+            <div style="font-family:serif;font-size:0.55rem;letter-spacing:0.08em;color:${_colorAcento};font-weight:700;">FOLIO</div>
             <div style="font-family:serif;font-size:0.95rem;color:#1a4a8a;font-weight:800;">${folioRecHtml}</div>
           </div>`:''}
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
@@ -6325,23 +6359,38 @@ function escAbrirPaso(pasoIdx){
     document.getElementById('paso-fecha-upd').textContent = e.pasoActivoFecha
       ? 'Última actualización: '+new Date(e.pasoActivoFecha).toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
       : 'Sin actualizaciones aún';
-    // Resaltar botón de estado activo
-    ['pendiente','activo','completado'].forEach(s=>{
-      const btn=document.getElementById('paso-btn-'+s);
-      if(btn) btn.style.opacity=p.estado===s?'1':'0.4';
-    });
+    // Resaltar la respuesta seleccionada de "¿Cómo va este paso?"
+    _escPintarBotonesEstado(p.estado||'pendiente');
     $('mEscPaso').classList.add('show');
   }catch(err){
     console.error('[escAbrirPaso]', err);
     toast('Error al abrir el paso: '+err.message,'err');
   }
 }
-function escPasoSetEstado(estado){
-  document.getElementById('paso-estado-hidden').value=estado;
+// Pinta las 3 respuestas de "¿Cómo va este paso?" (Pendiente/En proceso/
+// Concluido) — cada una conserva su propio color (igual que antes: dorado
+// apagado, azul, verde) para que siga siendo fácil distinguirlas a simple
+// vista, y la respuesta elegida se resalta con opacidad completa mientras
+// las otras dos quedan atenuadas.
+const ESC_PASO_BTN_ESTILOS = {
+  pendiente:  {border:'#d0c8b8', bg:'#f5f0e8', color:'#7a6840'},
+  activo:     {border:'#3b82f6', bg:'#eef3ff', color:'#1a4a8a'},
+  completado: {border:'#1a7a3a', bg:'#e8f5ec', color:'#1a7a3a'}
+};
+function _escPintarBotonesEstado(estadoSel){
   ['pendiente','activo','completado'].forEach(s=>{
     const btn=document.getElementById('paso-btn-'+s);
-    if(btn) btn.style.opacity=estado===s?'1':'0.4';
+    if(!btn) return;
+    const st = ESC_PASO_BTN_ESTILOS[s];
+    btn.style.borderColor = st.border;
+    btn.style.background  = st.bg;
+    btn.style.color       = st.color;
+    btn.style.opacity     = s===estadoSel ? '1' : '0.4';
   });
+}
+function escPasoSetEstado(estado){
+  document.getElementById('paso-estado-hidden').value=estado;
+  _escPintarBotonesEstado(estado);
 }
 function escGuardarPaso(){
   try{

@@ -5467,10 +5467,16 @@ function escRender(){
     // activo — aún no se marca En Proceso) o "activo" (azul, en el tramo que
     // SALE del paso activo — ya se marcó En Proceso). El resto queda gris,
     // y lo ya superado se pinta verde de punta a punta.
+    // Cancelado: TODA la línea de proceso (círculos, conectores, marcador
+    // "ⓘ") se apaga a gris uniforme, igual que el recibo PDF de un trámite
+    // cancelado (campoV en generarPDF) — ya no tiene caso mostrar el avance
+    // real ni explicar retrasos de un trámite que quedó sin efecto.
+    const _esCanceladaCard = e.estado==='cancelado';
     const _pasoFaseCard = pasoActivo>=0 ? (pasos[pasoActivo]||null) : null;
     const _esperandoCard = !!_pasoFaseCard && _pasoFaseCard.estado==='pendiente' && pasoActivo>0;
     const _segRelojCard = pasoActivo<0 ? -1 : (_esperandoCard ? pasoActivo-1 : pasoActivo);
     const _conectorTramo = (i) => {
+      if(_esCanceladaCard) return `<div style="flex:1;height:2px;background:#d0d0d0;margin-top:13px;"></div>`;
       if(pasoActivo===-1 || i<_segRelojCard || (i===_segRelojCard && _pasoFaseCard && _pasoFaseCard.intermedioSuperado)) return `<div style="flex:1;height:2px;background:#1a7a3a;margin-top:13px;"></div>`;
       if(i===_segRelojCard && _segRelojCard>=0 && _pasoFaseCard && (_pasoFaseCard.estado==='activo' || _esperandoCard)){
         // Mismo marcador "ⓘ" del punto medio que la ficha/formulario: al
@@ -5491,7 +5497,7 @@ function escRender(){
         const _bordeTip = _diasTramo>0 ? '#c99' : _colorFaseCard;
         const _colorTit = _diasTramo>0 ? '#a32d2d' : _colorFaseCard;
         return `<div style="flex:1;height:2px;margin-top:13px;position:relative;background:linear-gradient(to right,${_colorFaseCard} 0%,${_colorFaseCard} 50%,#e0ddd5 50%,#e0ddd5 100%);">
-          <button type="button" onclick="event.stopPropagation();const t=document.getElementById('esc-tramo-tip-${idx}');if(t)t.style.display=t.style.display==='block'?'none':'block';" title="${_tituloCard}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#fff;border:1.5px solid ${_bordeTip};color:${_colorTit};font-size:0.55rem;font-weight:700;cursor:pointer;padding:0;line-height:1;z-index:2;">i</button>
+          <button type="button" onclick="event.stopPropagation();const t=document.getElementById('esc-tramo-tip-${idx}');const _abrir=t&&t.style.display!=='block';_escCerrarTodosTramoTips(_abrir?'esc-tramo-tip-${idx}':null);if(t)t.style.display=_abrir?'block':'none';" title="${_tituloCard}" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:#fff;border:1.5px solid ${_bordeTip};color:${_colorTit};font-size:0.55rem;font-weight:700;cursor:pointer;padding:0;line-height:1;z-index:2;">i</button>
           <div id="esc-tramo-tip-${idx}" style="display:none;position:absolute;left:50%;top:20px;transform:translateX(-50%);background:#fff;border:1px solid ${_bordeTip};border-radius:8px;padding:6px 10px;font-size:0.62rem;color:var(--ink);width:200px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:6;">
             <div style="font-weight:700;color:${_colorTit};margin-bottom:2px;">${_tituloCard}</div>${_razonTramo}${_badgeTramo}
             <button type="button" onclick="event.stopPropagation();escSuperarTramoCard(${idx});" style="margin-top:6px;display:block;background:#eef8f0;border:1px solid #7fae7f;color:#1a7a3a;font-weight:700;font-size:0.56rem;padding:3px 8px;border-radius:8px;cursor:pointer;">✓ Ya se presume superado</button>
@@ -5509,7 +5515,8 @@ function escRender(){
       // (estado 'activo' explícito), dorado = pendiente pero es el siguiente
       // paso a trabajar, gris = pendiente y bloqueado.
       let col, bg, fc;
-      if(esComp){ col='#1a7a3a'; bg='#1a7a3a'; fc='#fff'; }
+      if(_esCanceladaCard){ col='#c0c0c0'; bg=(esComp?'#c0c0c0':'#f0f0ee'); fc=(esComp?'#fff':'#bbb'); }
+      else if(esComp){ col='#1a7a3a'; bg='#1a7a3a'; fc='#fff'; }
       else if(esActivo){ col='#2563eb'; bg='#2563eb'; fc='#fff'; }
       else if(esSiguiente){ col='#c8952a'; bg='#fff8e8'; fc='#8c6518'; }
       else { col='#d0c8b8'; bg='#f5f0e8'; fc='#bbb'; }
@@ -5526,8 +5533,13 @@ function escRender(){
     // el borde y la píldora de estado cambiaban, el resto seguía viéndose
     // "vigente" con el mismo dorado que un trámite activo.
     const _colorAcento = e.estado==='cancelado' ? cfg.col : '#8c6518';
-    return `<div onclick="escAbrirDetalle(${idx})" style="background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;">
+    // Marca de agua diagonal "CANCELADO" — mismo lenguaje visual que el PDF
+    // del recibo (dibujarMarcaAgua): texto grande, gris, girado, muy baja
+    // opacidad, sin estorbar el click ni el resto del contenido.
+    const _marcaAguaCard = _esCanceladaCard ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-family:serif;font-weight:800;font-size:2.4rem;letter-spacing:0.08em;color:#000;opacity:0.06;white-space:nowrap;pointer-events:none;z-index:1;">CANCELADO</div>` : '';
+    return `<div onclick="escAbrirDetalle(${idx})" style="position:relative;overflow:hidden;background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
+      ${_marcaAguaCard}
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;position:relative;z-index:2;">
         <div style="display:flex;gap:14px;min-width:0;flex:1;">
           ${folioPendiente?`<div style="flex-shrink:0;line-height:1.15;text-align:center;">
             <div style="font-family:monospace;font-size:0.5rem;letter-spacing:0.05em;color:${_colorAcento};font-weight:700;">ESCRITURA</div>
@@ -5540,8 +5552,8 @@ function escRender(){
               ${_volTxt?`<div style="font-family:monospace;font-size:0.62rem;white-space:nowrap;"><span style="font-weight:700;color:var(--muted);">VOL.</span> <span style="color:var(--ink);font-weight:700;">${_volTxt}</span></div>`:''}
               ${_fechaFirmaCard?`<div style="font-family:monospace;font-size:0.62rem;white-space:nowrap;"><span style="font-weight:700;color:var(--muted);">FECHA DE FIRMA</span> <span style="color:var(--ink);font-weight:700;">${_fechaFirmaCard}</span></div>`:''}
             </div>
-            <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">👤 <span style="${e.estado==='cancelado'?'text-decoration:line-through;':''}">${esc(comp)}</span> <span style="font-size:0.6rem;color:#1a4a8a;text-transform:uppercase;font-weight:700;">${rolAdq}</span></div>
-            ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ <span style="${e.estado==='cancelado'?'text-decoration:line-through;':''}">${esc(vend)}</span> <span style="font-size:0.58rem;color:${_colorAcento};text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
+            <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">👤 <span style="${e.estado==='cancelado'?'color:'+_colorAcento+';text-decoration:line-through;':''}">${esc(comp)}</span> <span style="font-size:0.6rem;color:${e.estado==='cancelado'?_colorAcento:'#1a4a8a'};text-transform:uppercase;font-weight:700;">${rolAdq}</span></div>
+            ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ <span style="${e.estado==='cancelado'?'color:'+_colorAcento+';text-decoration:line-through;':''}">${esc(vend)}</span> <span style="font-size:0.58rem;color:${_colorAcento};text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
           </div>
         </div>
         ${_atencionBadgeHtml}
@@ -5549,7 +5561,7 @@ function escRender(){
           <div style="font-family:serif;font-size:1.05rem;color:${_colorAcento};font-weight:700;white-space:nowrap;">${e.num?(/^carp/i.test(e.num.trim())?esc(e.num):'CARP.- '+esc(e.num)):'—'}</div>
           ${folioRecHtml?`<div style="border-left:1.5px solid ${_colorAcento};padding-left:10px;line-height:1.3;text-align:left;">
             <div style="font-family:serif;font-size:0.55rem;letter-spacing:0.08em;color:${_colorAcento};font-weight:700;">FOLIO</div>
-            <div style="font-family:serif;font-size:0.95rem;color:#1a4a8a;font-weight:800;">${folioRecHtml}</div>
+            <div style="font-family:serif;font-size:0.95rem;color:${e.estado==='cancelado'?_colorAcento:'#1a4a8a'};font-weight:800;">${folioRecHtml}</div>
           </div>`:''}
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
             <span style="font-size:0.65rem;font-weight:700;color:${cfg.col};background:${cfg.bg};padding:3px 10px;border-radius:12px;white-space:nowrap;">${cfg.lbl}</span>
@@ -5804,6 +5816,29 @@ function _escBarraGradiente(pasoActivo, estadoActivo, superado){
   }
   return `linear-gradient(to right, ${stops.join(', ')})`;
 }
+// Cierra cualquier tooltip "ⓘ" que haya quedado abierto — el de las
+// tarjetas de la lista (esc-tramo-tip-N) y los de la ficha/formulario
+// (esc-tramo-tooltip / esc-tramo-tooltip-d). Se llama antes de abrir uno
+// nuevo (para que nunca queden dos superpuestos, como pasaba antes) y desde
+// el listener global de abajo, para que un click en cualquier otro lado de
+// la pantalla — o abrir otra tarjeta/modal — lo cierre automáticamente.
+function _escCerrarTodosTramoTips(exceptoId){
+  document.querySelectorAll('[id^="esc-tramo-tip-"]').forEach(function(t){
+    if(t.id !== exceptoId) t.style.display = 'none';
+  });
+  ['esc-tramo-tooltip','esc-tramo-tooltip-d'].forEach(function(id){
+    if(id === exceptoId) return;
+    const t = document.getElementById(id);
+    if(t) t.style.display = 'none';
+  });
+}
+if(!window._escTramoTipListenerAttached){
+  window._escTramoTipListenerAttached = true;
+  document.addEventListener('click', function(e){
+    if(e.target.closest('[id^="esc-tramo-tip-"]') || e.target.closest('[id^="esc-tramo-tooltip"]') || e.target.closest('[id^="esc-tramo-info"]')) return;
+    _escCerrarTodosTramoTips();
+  });
+}
 // Marcador "ⓘ" en el punto medio del tramo con reloj activo (misma posición
 // exacta que el corte del degradado de _escBarraGradiente) — al tocarlo
 // despliega la razón real por la que ese paso no ha avanzado/iniciado: la
@@ -5851,7 +5886,9 @@ function _escActualizarMarcadorTramo(pasos, pasoActivo, sufijo){
 function escToggleRazonTramo(sufijo){
   const tip = document.getElementById('esc-tramo-tooltip'+sufijo);
   if(!tip) return;
-  tip.style.display = tip.style.display==='block' ? 'none' : 'block';
+  const abrir = tip.style.display !== 'block';
+  _escCerrarTodosTramoTips(abrir ? tip.id : null);
+  tip.style.display = abrir ? 'block' : 'none';
 }
 // Casillas cuadradas TOTAL/PARCIAL (se marcan con una X) en vez del
 // desplegable anterior; el valor real sigue viviendo en el input oculto

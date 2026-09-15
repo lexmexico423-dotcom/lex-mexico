@@ -15381,11 +15381,19 @@ Recibo original im…</td>
           <button class="modal-x" onclick="cerrar(&#39;mEscPaso&#39;)">✕</button>
         </div>
         <div class="modal-body" style="padding:16px;">
-          <!-- Estado del paso -->
-          <div style="display:flex;gap:8px;margin-bottom:14px;">
-            <button onclick="escPasoSetEstado(&#39;pendiente&#39;)" id="paso-btn-pendiente" style="flex:1;padding:8px;border-radius:8px;border:2px solid #d0c8b8;background:#f5f0e8;color:#7a6840;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">⬜ Pendiente</button>
-            <button onclick="escPasoSetEstado(&#39;activo&#39;)" id="paso-btn-activo" style="flex:1;padding:8px;border-radius:8px;border:2px solid #3b82f6;background:#eef3ff;color:#1a4a8a;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">🔵 En Proceso</button>
-            <button onclick="escPasoSetEstado(&#39;completado&#39;)" id="paso-btn-completado" style="flex:1;padding:8px;border-radius:8px;border:2px solid #1a7a3a;background:#e8f5ec;color:#1a7a3a;cursor:pointer;font-family:sans-serif;font-size:0.78rem;font-weight:700;">✅ Completado</button>
+          <!-- Estado del paso, como pregunta directa en lenguaje simple con
+               3 respuestas de opción (sin colores/iconos técnicos que haya
+               que interpretar) — la respuesta seleccionada se resalta en
+               oscuro, el resto queda en gris neutro. Al abrir desde el botón
+               grande de "Llamado a la Acción" ya viene preseleccionada la
+               respuesta que corresponde. -->
+          <div style="margin-bottom:14px;">
+            <div style="font-size:0.85rem;color:#3a3327;font-weight:600;margin-bottom:8px;">¿Cómo va este paso?</div>
+            <div id="paso-estado-row" style="display:flex;gap:8px;">
+              <button onclick="escPasoSetEstado(&#39;pendiente&#39;)" id="paso-btn-pendiente" style="flex:1;padding:9px;border-radius:8px;border:2px solid #d0c8b8;background:#f5f0e8;color:#7a6840;cursor:pointer;font-family:sans-serif;font-size:0.8rem;font-weight:700;">Pendiente</button>
+              <button onclick="escPasoSetEstado(&#39;activo&#39;)" id="paso-btn-activo" style="flex:1;padding:9px;border-radius:8px;border:2px solid #3b82f6;background:#eef3ff;color:#1a4a8a;cursor:pointer;font-family:sans-serif;font-size:0.8rem;font-weight:700;">En proceso</button>
+              <button onclick="escPasoSetEstado(&#39;completado&#39;)" id="paso-btn-completado" style="flex:1;padding:9px;border-radius:8px;border:2px solid #1a7a3a;background:#e8f5ec;color:#1a7a3a;cursor:pointer;font-family:sans-serif;font-size:0.8rem;font-weight:700;">Concluido</button>
+            </div>
           </div>
           <input type="hidden" id="paso-estado-hidden" value="pendiente">
           <!-- Notas del paso -->
@@ -19393,7 +19401,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=202609071"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=202609078"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

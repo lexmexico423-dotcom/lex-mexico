@@ -776,8 +776,11 @@ async function sincronizarFolio(forzarSB){
     if(typeof renderDirec==='function') renderDirec();
     if(typeof renderPend==='function') renderPend();
     if(typeof badges==='function') badges();
-    if(typeof capturaMesCargarSupabase==='function') capturaMesCargarSupabase();
-    if(typeof retroGlobalCargarSupabase==='function') retroGlobalCargarSupabase();
+    // Ahorro de egreso (2026-09-21): les pasamos el bloque 'data' que este
+    // mismo sincronizarFolio() ya bajó unas líneas arriba, para que no
+    // vuelvan a pedir los ~550KB completos de app_state por su cuenta.
+    if(typeof capturaMesCargarSupabase==='function') capturaMesCargarSupabase(data && data.data);
+    if(typeof retroGlobalCargarSupabase==='function') retroGlobalCargarSupabase(data && data.data);
     // Auto-corregir letras de movimientos y paths R2 (silencioso, 8s después)
     if(typeof _autoCorregirLetrasR2 === 'function') _autoCorregirLetrasR2();
     // Verificar y corregir movimientos con monto erróneo para recibos Sin Anticipo (con modal de confirmación)

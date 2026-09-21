@@ -6094,21 +6094,22 @@ function escGuardar(){
     const compradores = leerPersonas('eCompradores-list');
     if(!compradores.length){ toast('Agrega al menos un comprador o donatario','err'); return; }
     const num = (document.getElementById('eNum')?.value||'').trim();
-    if(!num){ toast('Selecciona o crea una carpeta para vincular la escritura','err'); return; }
-    // El número de escritura ya no se autogenera de forma independiente:
-    // debe corresponder siempre a una carpeta real de Carpetas
-    // (elegida de la lista o creada al vuelo con "＋ Crear carpeta nueva").
-    // Sin esta validación, un valor tecleado a mano quedaría "firme" aunque
-    // no existiera ninguna carpeta con ese número.
-    // Excepción: si se está editando una escritura ya guardada y el número
-    // no cambió, no se bloquea el guardado aunque la carpeta ya no exista
-    // (p. ej. si se borró después) — así no se pierde la posibilidad de
-    // editar el resto de los datos de esa escritura.
+    // A petición expresa (2026-09-21): ya NO es obligatorio vincular una
+    // carpeta para guardar la escritura — puede quedar sin carpeta (num:'')
+    // hasta que se le asigne una manualmente después desde Carpetas. Esto
+    // aplica tanto a escrituras nuevas como a las importadas desde Excel
+    // (que ya de por sí se importan sin carpeta, ver escProcesarArchivoExcel).
+    // Si SÍ se escribió un número, se sigue validando que corresponda a una
+    // carpeta real — para no dejar "firme" un número tecleado a mano que no
+    // existe. Excepción: si se está editando una escritura ya guardada y el
+    // número no cambió, no se bloquea el guardado aunque la carpeta ya no
+    // exista (p. ej. si se borró después) — así no se pierde la posibilidad
+    // de editar el resto de los datos de esa escritura.
     const numOriginal = _escIdx>=0 ? (D.escrituras[_escIdx]?.num||'') : '';
     const numSinCambios = _escIdx>=0 && num===numOriginal;
-    const carpetaVinculada = (D.carpetas||[]).find(c=>c.num===num);
-    if(!carpetaVinculada && !numSinCambios){
-      toast('⚠ Ese número no corresponde a ninguna carpeta existente. Selecciónala de la lista o créala con "＋ Crear carpeta nueva".','err');
+    const carpetaVinculada = num ? (D.carpetas||[]).find(c=>c.num===num) : null;
+    if(num && !carpetaVinculada && !numSinCambios){
+      toast('⚠ Ese número no corresponde a ninguna carpeta existente. Selecciónala de la lista, créala con "＋ Crear carpeta nueva", o deja el campo vacío para guardar sin carpeta por ahora.','err');
       const el=document.getElementById('eNum'); if(el){ el.style.borderColor='var(--rojo,#c0161a)'; el.focus(); }
       return;
     }

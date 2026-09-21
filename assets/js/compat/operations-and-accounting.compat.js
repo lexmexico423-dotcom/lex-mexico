@@ -2153,7 +2153,15 @@ const _despachoRestaurado = await obtenerDespachoActivo();
       return;
     }
     syncEstadoSupabaseDebounced();
-  }, 5*60*1000);
+  // Ahorro de egreso (2026-09-21): este intervalo es una RED DE SEGURIDAD
+  // (por si el guardado con debounce de 800ms tras cada edición no se
+  // completó, ej. se cerró la pestaña a media subida) — no es la vía
+  // principal para guardar cambios. syncEstadoSupabase() vuelve a bajar el
+  // bloque completo (~550KB) cada vez que se dispara, sin checar si algo
+  // cambió realmente, así que 5 minutos era demasiado seguido para un
+  // simple respaldo. Se sube a 20 minutos: sigue detectando cualquier
+  // guardado perdido en un plazo razonable, con una cuarta parte del gasto.
+  }, 20*60*1000);
   // Aplicar bloqueo si la caja ya fue cerrada hoy
   setTimeout(aplicarEstadoCierre, 200);
   // Inicializar sistema de recibos después del LEX

@@ -6761,12 +6761,21 @@ function aplicarRetroGlobal(activo){
     if(hDisp){ hDisp.style.color=''; hDisp.style.fontWeight=''; }
   }
 }
-async function retroGlobalCargarSupabase(){
+async function retroGlobalCargarSupabase(_datosPrecargados){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
   try {
-    const { data } = await window.SB.from('app_state')
-      .select('data').eq('despacho_id', window.SB_DESPACHO_ID).single();
-    const d = (data && data.data) ? data.data : {};
+    // Ahorro de egreso (2026-09-21): si quien llama YA bajó el bloque
+    // completo de Supabase hace un instante (ej. sincronizarFolio), nos lo
+    // pasa directo en vez de que volvamos a pedir los mismos ~550KB otra
+    // vez. Solo se hace el fetch propio cuando se llama de forma aislada.
+    let d;
+    if(_datosPrecargados){
+      d = _datosPrecargados;
+    } else {
+      const { data } = await window.SB.from('app_state')
+        .select('data').eq('despacho_id', window.SB_DESPACHO_ID).single();
+      d = (data && data.data) ? data.data : {};
+    }
     const activo = !!(d.retro_global && d.retro_global.activo);
     window._retroGlobalActivo = activo;
     aplicarRetroGlobal(activo);
@@ -6918,14 +6927,22 @@ async function guardarCapturaMes(){
   if(typeof cerrarAdminModal==='function') cerrarAdminModal();
 }
 // Cargar config desde Supabase al iniciar
-async function capturaMesCargarSupabase(){
+async function capturaMesCargarSupabase(_datosPrecargados){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
   try{
-    const { data } = await window.SB.from('app_state')
-      .select('data')
-      .eq('despacho_id', window.SB_DESPACHO_ID)
-      .single();
-    const cfg_sb = data && data.data && data.data.captura_meses;
+    // Ahorro de egreso (2026-09-21): mismo criterio que retroGlobalCargarSupabase
+    // — reusar el bloque ya bajado por quien llama en vez de repetir el fetch.
+    let d;
+    if(_datosPrecargados){
+      d = _datosPrecargados;
+    } else {
+      const { data } = await window.SB.from('app_state')
+        .select('data')
+        .eq('despacho_id', window.SB_DESPACHO_ID)
+        .single();
+      d = (data && data.data) ? data.data : {};
+    }
+    const cfg_sb = d && d.captura_meses;
     if(cfg_sb && Object.keys(cfg_sb).length > 0){
       if(typeof D !== 'undefined' && D) D.captura_meses = cfg_sb;
       console.log('[CapturaMes] Config cargada:', Object.keys(cfg_sb).length, 'meses');

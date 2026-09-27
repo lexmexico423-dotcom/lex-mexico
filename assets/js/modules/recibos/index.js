@@ -3655,11 +3655,21 @@ async function _imprimirActualizacionReal(){
   // versiones previas, inflando el total (folio 56, caso audiencia de pruebas +
   // audiencia de alegatos). Los trámites normales conservan el comportamiento previo.
   const _costosExtraParaPDF = _esAbiertoImp ? _costosNuevos : costosExtra;
-  // "PAGO REGISTRADO EN ESTE RECIBO" (sección impresa) debe mostrar SOLO el
-  // abono de ESTA transacción, nunca un historial acumulado — antes esto solo
-  // se filtraba para Sin Costo Total Pactado; ahora aplica siempre, para todo
-  // tipo de recibo (Costo Pactado, con o sin Servicio Complementario).
-  const _pagosParcialesParaPDF = pagosParciales_conAuth.filter(p => !p.locked);
+  // FIX (caso real: folio 63C, 2026-09-26): la sección impresa "PAGO
+  // REGISTRADO EN ESTE RECIBO" que motivó filtrar a solo-nuevo ya fue
+  // ELIMINADA (ver comentario "ELIMINADA a petición expresa" más abajo, en
+  // generarPDF) — pero este filtro se quedó aplicándose SIEMPRE, y
+  // datos.pagosParciales también alimenta el cálculo de ADEUDO ANTERIOR/
+  // SALDO RESTANTE dentro de generarPDF (_saldoAnteriorResumen_CP, que suma
+  // los pagosParciales de TODAS las letras anteriores). Al filtrar a solo
+  // "no bloqueados" (el abono de esta sesión), esa suma perdía los abonos de
+  // versiones previas ya impresas y el ADEUDO ANTERIOR salía inflado (folio
+  // 63C mostró ADEUDO $68,000 en vez de $58,000 — le faltaba restar el abono
+  // de 63B). Igual que _costosExtraParaPDF arriba: el historial completo solo
+  // debe filtrarse a "solo nuevo" en modo Sin Costo Total Pactado (_esAbiertoImp),
+  // donde cada recibo es independiente; en Costo Pactado normal se necesita el
+  // historial completo para que el saldo arrastrado sea correcto.
+  const _pagosParcialesParaPDF = _esAbiertoImp ? pagosParciales_conAuth.filter(p => !p.locked) : pagosParciales_conAuth;
   // Texto de "Saldo Restante" (concepto/descripción) editado en pantalla — visible
   // tanto con como sin Servicio Complementario, siempre que NO sea Sin Costo Total
   // Pactado y haya algo que mostrar (ver recalcularResumenActualizacion). Si el

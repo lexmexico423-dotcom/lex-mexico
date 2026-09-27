@@ -3008,12 +3008,46 @@ function agregarCostoExtra(data){
         '<td><textarea class="ce-concepto concepto-ta" rows="1" placeholder="Escribe el concepto...">'+escHTML((data&&data.concepto)||'')+'</textarea></td>'
       + '<td><textarea class="ce-descripcion concepto-ta" rows="1" placeholder="Descripci\u00f3n">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
       + '<td style="vertical-align:top">'
-      +   '<input type="text" class="ce-precio price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.precio)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()">'
+      +   '<input type="text" class="ce-precio price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.precio)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion();sincronizarLiquidacionConComplementarios()">'
       + '</td>'
       + '<td style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#7a6840;">'+fechaHora+'</td>'
       + '<td><button class="del-concept" onclick="quitarCostoExtra(\''+id+'\')">✕</button></td>';
   }
   tbody.appendChild(tr);
+  recalcularResumenActualizacion();
+  sincronizarLiquidacionConComplementarios();
+}
+
+// FIX (caso real: folio 81B, 2026-09-27): en el flujo "PAGO TOTAL"
+// (desde-liquidacion), ejecutarLiquidacionTotal() precarga la fila
+// "Liquidación total" con el saldo que existía ANTES de abrir la pantalla.
+// Si después, en esa misma pantalla, se agrega (o edita, o quita) un
+// Servicio Complementario con el botón "＋ Agregar servicio complementario",
+// ese monto nuevo nunca se sumaba al ya precargado — el campo capturado se
+// quedaba corto exactamente por lo que vale el complementario, aunque el
+// cliente pagara todo (caso real: folio 81B, faltaron $198 capturados de
+// $198 realmente cobrados). Esta función mantiene la fila de Liquidación
+// total en (saldo original + suma de los Servicios Complementarios
+// capturados ahora) — SOLO mientras la cajera no la haya editado a mano
+// (dataset.manualEdit, mismo mecanismo que nombre_cliente_firma); en cuanto
+// la toca directamente, se respeta lo que ella escriba y se deja de ajustar.
+function sincronizarLiquidacionConComplementarios(){
+  if(!document.body.classList.contains('desde-liquidacion')) return;
+  // Sin Costo Total Pactado tiene su propio flujo de adeudo (no usa
+  // reciboEnActualizacion.saldoPendiente, que en ese modo no se mantiene
+  // actualizado) — no tocar la fila ahí, evita usar un saldo base incorrecto.
+  if(typeof window._abiertoSinCosto === 'function' && reciboEnActualizacion && window._abiertoSinCosto(reciboEnActualizacion)) return;
+  const filaLiq = document.querySelector('#pagos-parciales-tbody tr[data-auto-liquidacion="1"]');
+  if(!filaLiq) return;
+  const cantEl = filaLiq.querySelector('.pp-cantidad');
+  if(!cantEl || cantEl.dataset.manualEdit) return;
+  const saldoBase = reciboEnActualizacion ? (parseFloat(reciboEnActualizacion.saldoPendiente) || 0) : 0;
+  const sumaComplementarios = Array.from(document.querySelectorAll('#costos-extra-tbody tr:not(.ce-row-locked)'))
+    .reduce(function(s, trEl){
+      const inp = trEl.querySelector('.ce-precio');
+      return s + (inp ? (parsePrecio(inp.value) || 0) : 0);
+    }, 0);
+  cantEl.value = fmtMXN(saldoBase + sumaComplementarios);
   recalcularResumenActualizacion();
 }
 
@@ -3068,6 +3102,11 @@ function agregarPagoParcial(data){
   if(hasAuthInline) tr.dataset.hasAuthInline = '1';
   // Preservar la letra de ORIGEN real del abono (ver misma nota en agregarCostoExtra).
   tr.dataset.folioLetra = (data && data.folioLetra) || '';
+  // FIX (caso real: folio 81B, 2026-09-27): marcar la fila auto-generada de
+  // "Liquidación total" (creada por ejecutarLiquidacionTotal) para poder
+  // mantenerla sincronizada si después se agrega un Servicio Complementario
+  // en la misma pantalla — ver sincronizarLiquidacionConComplementarios().
+  if(!isLocked && !isExisting && concepto === 'Liquidación total') tr.dataset.autoLiquidacion = '1';
   if(isLocked){
     // Fila completamente bloqueada (anticipo original o pagos ya impresos).
     // A petición expresa: esta tabla ("PAGO REGISTRADO EN ESTE RECIBO") debe
@@ -3097,7 +3136,7 @@ function agregarPagoParcial(data){
     tr.innerHTML =
         '<td><textarea class="pp-concepto concepto-ta pp-concepto-fijo" rows="1" readonly>'+escHTML(concepto)+'</textarea></td>'
       + '<td><textarea class="pp-descripcion concepto-ta" rows="1" placeholder="\u00bfPor qu\u00e9 se hizo este pago?">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
-      + '<td><input type="text" class="pp-cantidad price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.cantidad)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()"></td>'
+      + '<td><input type="text" class="pp-cantidad price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.cantidad)||''))+'" oninput="formatPrecio(this);this.dataset.manualEdit=\'1\';recalcularResumenActualizacion()"></td>'
       + '<td class="pp-fecha-master" style="font-family:\'DM Mono\',monospace;font-size:0.7rem;color:#8b5cf6;font-weight:700;" title="Sincronizada con la fecha del encabezado (RETRO)">'+escHTML(_ddmmyyyy+' '+retroHora+' hrs.')+'</td>'
       + '<td><button class="del-concept" onclick="quitarPagoParcial(\''+id+'\')">\u2715</button></td>';
   } else {
@@ -3105,7 +3144,7 @@ function agregarPagoParcial(data){
     tr.innerHTML =
         '<td><textarea class="pp-concepto concepto-ta pp-concepto-fijo" rows="1" readonly>'+escHTML(concepto)+'</textarea></td>'
       + '<td><textarea class="pp-descripcion concepto-ta" rows="1" placeholder="\u00bfPor qu\u00e9 se hizo este pago?">'+escHTML((data&&data.descripcion)||'')+'</textarea></td>'
-      + '<td><input type="text" class="pp-cantidad price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.cantidad)||''))+'" oninput="formatPrecio(this);recalcularResumenActualizacion()"></td>'
+      + '<td><input type="text" class="pp-cantidad price-input" placeholder="0.00" inputmode="decimal" value="'+escHTML(String((data&&data.cantidad)||''))+'" oninput="formatPrecio(this);this.dataset.manualEdit=\'1\';recalcularResumenActualizacion()"></td>'
       + '<td style="font-family:\'DM Mono\',monospace;font-size:0.72rem;color:#7a6840;">'+fechaHora+'</td>'
       + '<td><button class="del-concept" onclick="quitarPagoParcial(\''+id+'\')">\u2715</button></td>';
   }
@@ -3247,11 +3286,17 @@ function recalcularResumenActualizacion(){
     ? ((typeof window._adeudoServicioComplementario==='function') ? window._adeudoServicioComplementario(reciboEnActualizacion).total : 0)
     : (parseFloat(reciboEnActualizacion.saldoPendiente) || 0);
   const totalGeneral = totalOriginal + sumaCostosExtra;
-  // PAGO TOTAL: el complementario se paga en el momento (sigue el flujo del folio).
-  // NO se mete en la fila de liquidación; solo se cuenta como cubierto para que el
-  // folio quede en ceros. En PAGO PARCIAL el complementario se suma a la deuda (igual que antes).
+  // FIX (caso real: folio 81B, 2026-09-27): "Pago Total" daba por cubierto el
+  // Servicio Complementario nuevo SIN verificar que lo realmente capturado en
+  // esta sesión alcanzara para pagar adeudo anterior + el cargo nuevo — un
+  // folio con $12,139 de deuda vieja y $198 de complementario nuevo, donde el
+  // cajero solo cobró los $12,139, terminaba con el complementario marcado
+  // como "cubierto" igual, mostrando el folio en $0 cuando en realidad
+  // quedaban $198 sin cobrar. Ahora el complementario solo se da por cubierto
+  // si lo capturado alcanza para pagar TODO; si no, se refleja como saldo
+  // pendiente, igual que en PAGO PARCIAL.
   const _esPagoTotalRes = document.body.classList.contains('desde-liquidacion') || !!reciboEnActualizacion._esPagoTotal;
-  const _compCubierto = (_esPagoTotalRes && !_esAbiertoRes) ? sumaCostosExtra : 0;
+  const _compCubierto = (_esPagoTotalRes && !_esAbiertoRes && sumaAbonosNuevos >= (saldoAnterior + sumaCostosExtra)) ? sumaCostosExtra : 0;
   const _abonoTotalSesion = sumaAbonosNuevos + _compCubierto;
   // El nuevo saldo = saldo anterior + costos nuevos - abonos (en pago total el complementario va como cubierto)
   const nuevoSaldo = Math.max(0, saldoAnterior + sumaCostosExtra - _abonoTotalSesion);
@@ -3562,9 +3607,14 @@ async function _imprimirActualizacionReal(){
   const totalGeneral = _esAbiertoImp
     ? ((_adeudoSCImp ? _adeudoSCImp.bruto : 0) + sumaCostosExtra)
     : (totalOriginal + sumaCostosExtra);
-  // PAGO TOTAL: el complementario se paga en el momento (cubierto), no deja saldo.
-  // En PAGO PARCIAL se suma a la deuda como siempre.
-  const _compCubiertoImp = (esPagoTotal && !_esAbiertoImp) ? sumaCostosExtra : 0;
+  // FIX (caso real: folio 81B, 2026-09-27): ver mismo fix aplicado arriba en
+  // _compCubierto (vista previa) — "Pago Total" daba por cubierto el
+  // Servicio Complementario nuevo sin verificar que lo cobrado alcanzara
+  // para pagarlo, lo que además inflaba el ingreso registrado en
+  // caja/contabilidad (ver montoNuevosAbonos más abajo) con dinero que nunca
+  // se recibió. Ahora solo se da por cubierto si lo cobrado alcanza para
+  // pagar adeudo anterior + el cargo nuevo completo.
+  const _compCubiertoImp = (esPagoTotal && !_esAbiertoImp && sumaAbonosNuevos >= (saldoAnterior + sumaCostosExtra)) ? sumaCostosExtra : 0;
   const saldoNuevo = Math.max(0, saldoAnterior + sumaCostosExtra - sumaAbonosNuevos - _compCubiertoImp);
   const totalAbonado = totalGeneral - saldoNuevo;
   const fechasImpresion = (recibo.fechasImpresion && recibo.fechasImpresion.length)

@@ -13,16 +13,31 @@ function generarQRPreview(){
     width:90,height:90,colorDark:'#1a1008',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
 }
 
-function sincronizarFirmaCliente(input, id) {
-  // Solo el primer cliente sincroniza el campo de firma
-  const primerInput = document.querySelector('#clientes-wrapper .cliente-row [id^="nombre_"]');
-  if (primerInput && primerInput.id === 'nombre_' + id) {
-    const firmaField = $('nombre_cliente_firma');
-    if (firmaField && !firmaField.dataset.manualEdit) {
-      firmaField.value = input.value;
-    }
-  }
+// FIX (a petición expresa, 2026-09-26): antes SOLO el primer cliente
+// sincronizaba el campo de firma ("nombre_cliente_firma") — cuando había 2+
+// clientes registrados y era el SEGUNDO quien en realidad llegó a firmar
+// (caso real: folio 81B, firmó Genoveva pero el PDF salió con el nombre de
+// Clara, el primer cliente), no había forma de indicarlo desde el formulario
+// y había que escribirlo a mano en el campo de firma, algo fácil de olvidar.
+// Ahora cada cliente tiene su propia casilla "VA A FIRMAR" (ver
+// agregarCliente/cargarReciboEnFormulario) y este campo se recalcula
+// juntando los nombres de TODOS los clientes marcados — uno solo, varios
+// unidos con "Y", o ninguno si se desmarcan todos. Si el usuario edita el
+// campo de firma a mano, dataset.manualEdit bloquea este auto-cálculo,
+// igual que antes.
+function sincronizarFirmantesClientes() {
+  const firmaField = $('nombre_cliente_firma');
+  if (!firmaField || firmaField.dataset.manualEdit) return;
+  const nombres = Array.from(document.querySelectorAll('#clientes-wrapper .cliente-row')).filter(function(r){
+    const chk = r.querySelector('[id^="firmante_"]');
+    return chk ? chk.checked : false;
+  }).map(function(r){
+    return (r.querySelector('[id^="nombre_"]')||{}).value || '';
+  }).filter(Boolean);
+  firmaField.value = nombres.join(' Y ');
 }
+// Alias retrocompatible por si algo aún invoca el nombre anterior.
+function sincronizarFirmaCliente(){ sincronizarFirmantesClientes(); }
 
 function agregarCliente(){
   clienteCount++;
@@ -33,18 +48,23 @@ function agregarCliente(){
     '<div class="cliente-fila-top">'
       +'<div class="field-group"><label>Nombre completo</label>'
         +'<input type="text" id="nombre_'+id+'" placeholder="NOMBRE DEL CLIENTE" style="text-transform:uppercase" '
-        +'oninput="this.value=this.value.toUpperCase().normalize(\'NFD\').replace(/[\\u0300-\\u036f]/g,\'\').replace(/\\./g,\'\');generarQRPreview();sincronizarFirmaCliente(this,\''+id+'\')""></div>'
+        +'oninput="this.value=this.value.toUpperCase().normalize(\'NFD\').replace(/[\\u0300-\\u036f]/g,\'\').replace(/\\./g,\'\');generarQRPreview();sincronizarFirmantesClientes()""></div>'
       +'<div class="field-group"><label>Móvil</label>'
         +'<input type="text" id="movil_'+id+'" placeholder="000-000-0000" oninput="formatTelefono(this)" maxlength="12"></div>'
       +'<div class="field-group"><label>Tel. Casa</label>'
         +'<input type="text" id="tel_'+id+'" placeholder="000-000-0000" oninput="formatTelefono(this)" maxlength="12"></div>'
       +(clienteCount>1?'<button class="remove-btn" onclick="quitarCliente(\''+id+'\')">✕</button>':'<div></div>')
     +'</div>'
-    +'<div class="cliente-fila-bot">'
-      +'<div class="field-group"><label>Domicilio</label>'
+    +'<div class="cliente-fila-bot" style="display:flex;align-items:flex-end;gap:12px;">'
+      +'<div class="field-group" style="flex:1;"><label>Domicilio</label>'
         +'<input type="text" id="domicilio_'+id+'" placeholder="Calle, número, colonia, municipio..."></div>'
+      +'<div class="field-group" style="flex:0 0 auto;"><label>&nbsp;</label>'
+        +'<label style="display:flex;align-items:center;gap:5px;font-size:0.7rem;font-family:\'DM Mono\',monospace;letter-spacing:0.05em;color:var(--muted);white-space:nowrap;cursor:pointer;user-select:none;text-transform:none;">'
+          +'<span>¿Va a firmar?</span><input type="checkbox" id="firmante_'+id+'" '+(clienteCount===1?'checked':'')+' onchange="sincronizarFirmantesClientes()" style="width:15px;height:15px;margin:0;cursor:pointer;">'
+        +'</label></div>'
     +'</div>';
   wrap.appendChild(div);
+  sincronizarFirmantesClientes();
 }
 
 function quitarCliente(id){ const r=document.getElementById('cliente-row-'+id); if(r)r.remove(); }
@@ -54,7 +74,11 @@ function getClientes(){
     nombre:   r.querySelector('[id^="nombre_"]')?.value||'',
     movil:    r.querySelector('[id^="movil_"]')?.value||'',
     tel:      r.querySelector('[id^="tel_"]')?.value||'',
-    domicilio:r.querySelector('[id^="domicilio_"]')?.value||''
+    domicilio:r.querySelector('[id^="domicilio_"]')?.value||'',
+    // "VA A FIRMAR" — quién de los clientes registrados firma el PDF (ver
+    // sincronizarFirmantesClientes). Se guarda para poder restaurar la
+    // casilla correctamente al reabrir el recibo en cargarReciboEnFormulario.
+    firmante: r.querySelector('[id^="firmante_"]')?.checked || false
   })).filter(c=>c.nombre||c.movil||c.tel);
 }
 
@@ -97,9 +121,10 @@ function cargarReciboEnFormulario(recibo){
   const wrap = $('clientes-wrapper');
   wrap.innerHTML = ''; clienteCount = 0;
   const clientes = recibo.clientes || [{nombre: recibo.nombre||'', movil:'', tel:'', domicilio:''}];
-  clientes.forEach(c => {
+  clientes.forEach((c, _idxCliCarga) => {
     clienteCount++;
     const cid = 'c'+clienteCount;
+    const _esFirmanteCarga = (c.firmante !== undefined) ? !!c.firmante : (_idxCliCarga === 0);
     const _nomUp = (c.nombre||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[.]/g,'');
     const div = document.createElement('div');
     div.className = 'cliente-row'; div.id = 'cliente-row-'+cid;
@@ -107,16 +132,20 @@ function cargarReciboEnFormulario(recibo){
       '<div class="cliente-fila-top">'
       +'<div class="field-group"><label>Nombre completo</label>'
         +'<input type="text" id="nombre_'+cid+'" value="'+escHTML(_nomUp)+'" style="text-transform:uppercase" '
-        +'oninput="this.value=this.value.toUpperCase().normalize(\'NFD\').replace(/[\\u0300-\\u036f]/g,\'\').replace(/\\./g,\'\');if(typeof generarQRPreview===\'function\')generarQRPreview();if(typeof sincronizarFirmaCliente===\'function\')sincronizarFirmaCliente(this,\''+cid+'\')"></div>'
+        +'oninput="this.value=this.value.toUpperCase().normalize(\'NFD\').replace(/[\\u0300-\\u036f]/g,\'\').replace(/\\./g,\'\');if(typeof generarQRPreview===\'function\')generarQRPreview();if(typeof sincronizarFirmantesClientes===\'function\')sincronizarFirmantesClientes()"></div>'
       +'<div class="field-group"><label>M\u00f3vil</label>'
         +'<input type="text" id="movil_'+cid+'" value="'+escHTML(c.movil||'')+'"></div>'
       +'<div class="field-group"><label>Tel. Casa</label>'
         +'<input type="text" id="tel_'+cid+'" value="'+escHTML(c.tel||'')+'"></div>'
       +'<div></div>'
       +'</div>'
-      +'<div class="cliente-fila-bot">'
-        +'<div class="field-group"><label>Domicilio</label>'
+      +'<div class="cliente-fila-bot" style="display:flex;align-items:flex-end;gap:12px;">'
+        +'<div class="field-group" style="flex:1;"><label>Domicilio</label>'
           +'<input type="text" id="domicilio_'+cid+'" value="'+escHTML(c.domicilio||'')+'"></div>'
+        +'<div class="field-group" style="flex:0 0 auto;"><label>&nbsp;</label>'
+          +'<label style="display:flex;align-items:center;gap:5px;font-size:0.7rem;font-family:\'DM Mono\',monospace;letter-spacing:0.05em;color:var(--muted);white-space:nowrap;cursor:pointer;user-select:none;text-transform:none;">'
+            +'<span>¿Va a firmar?</span><input type="checkbox" id="firmante_'+cid+'" '+(_esFirmanteCarga?'checked':'')+' onchange="sincronizarFirmantesClientes()" style="width:15px;height:15px;margin:0;cursor:pointer;">'
+          +'</label></div>'
       +'</div>';
     wrap.appendChild(div);
   });

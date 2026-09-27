@@ -6394,11 +6394,11 @@ function adminRenderRecibos(q) {
       '<div style="font-size:0.62rem;color:rgba(200,149,42,0.4);">' + (r.fecha||'') + ' &middot; <span style="color:' + colorEst + '">' + estado + '</span></div>',
       '</div>',
       '<div style="display:flex;gap:5px;flex-shrink:0;">',
-      '<button onclick="adminAbrirEditarRecibo(' + idx + ')" ',
+      '<button onclick="adminAbrirEditarRecibo(' + (r.folio||0) + ',\'' + (r.letra||letraVersion(r)||'A') + '\')" ',
       'style="background:#1a4a8a;border:none;border-radius:4px;color:#fff;',
       'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;">',
       '✏️ Editar</button>',
-      '<button onclick="adminAbrirCambiarFecha(' + idx + ')" ',
+      '<button onclick="adminAbrirCambiarFecha(' + (r.folio||0) + ',\'' + (r.letra||letraVersion(r)||'A') + '\')" ',
       'style="background:#5a3a8a;border:none;border-radius:4px;color:#fff;',
       'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;">',
       '📅 Fecha</button>',
@@ -6407,13 +6407,13 @@ function adminRenderRecibos(q) {
       'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;">',
       '🗑 Eliminar</button>',
       (r.tipoTramite === 'vehicular' && !esSecundario ? [
-        '<button onclick="adminCrearPendientePlacas(' + idx + ')" ',
+        '<button onclick="adminCrearPendientePlacas(' + (r.folio||0) + ',\'' + (r.letra||letraVersion(r)||'A') + '\')" ',
         'style="background:#1a6a3a;border:none;border-radius:4px;color:#fff;',
         'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;">',
         '🚗 Pendiente</button>'
       ].join('') : ''),
       (esSecundario ? [
-        '<button onclick="adminRevertirLetraA(' + idx + ')" ',
+        '<button onclick="adminRevertirLetraA(' + (r.folio||0) + ',\'' + (r.letra||letraVersion(r)||'A') + '\')" ',
         'style="background:#5a3a8a;border:none;border-radius:4px;color:#fff;',
         'padding:5px 9px;cursor:pointer;font-size:0.65rem;white-space:nowrap;" ',
         'title="Revertir este recibo a VER.A (deshacer la versión secundaria)">',
@@ -6561,9 +6561,14 @@ function confirmarEliminarRecibo(){
   }
 }
 
-function adminCrearPendientePlacas(idx) {
+function adminCrearPendientePlacas(folio, letra) {
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
-  var r = recibos[idx];
+  // ⚠️ FIX: mismo patrón que adminAbrirEditarRecibo() — relocalizar por
+  // folio+letra en vez de un índice calculado al dibujar la lista.
+  var r = recibos.find(function(x){
+    return x.folio === folio && !x.esComplemento &&
+      (x.letra || (typeof letraVersion==='function' ? letraVersion(x) : 'A') || 'A') === (letra||'A');
+  });
   if (!r) return;
   var folioStr = folioFormato(r.folio||0, r.anio_folio);
   if (r.tipoTramite !== 'vehicular') {
@@ -6952,10 +6957,18 @@ async function adminEliminarRecibo(idx, skipConfirm, silent) {
   }
 }
 
-function adminAbrirCambiarFecha(idx) {
+function adminAbrirCambiarFecha(folio, letra) {
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
-  var r = recibos[idx];
-  if (!r) return;
+  // ⚠️ FIX: mismo patrón que adminAbrirEditarRecibo() — relocalizar por
+  // folio+letra en el momento del clic en vez de confiar en un índice
+  // calculado al dibujar la lista (ver ese comentario para el caso real).
+  var _letraBuscarCF = letra || 'A';
+  var r = recibos.find(function(x){
+    return x.folio === folio && !x.esComplemento &&
+      (x.letra || (typeof letraVersion==='function' ? letraVersion(x) : 'A') || 'A') === _letraBuscarCF;
+  });
+  var idx = recibos.indexOf(r);
+  if (!r) { if (typeof toast === 'function') toast('Recibo no encontrado', 'err'); return; }
   var folio = folioFormato(r.folio||0);
   var fechaActual = r.fecha || r.fecha_recibo || '';
   var horaActual = r.hora || r.hora_recibo || '';
@@ -7178,9 +7191,19 @@ function adminConfirmarCambioFecha(){
   }
 }
 
-async function adminRevertirLetraA(idx) {
+async function adminRevertirLetraA(folio, letra) {
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
-  var r = recibos[idx];
+  // ⚠️ FIX: mismo patrón que adminAbrirEditarRecibo() — relocalizar por
+  // folio+letra en el momento del clic en vez de confiar en un índice
+  // calculado al dibujar la lista (acción destructiva/irreversible, así
+  // que es aún más importante no arriesgarse a operar sobre el recibo
+  // equivocado por un índice desincronizado).
+  var _letraBuscarRA = letra || 'A';
+  var r = recibos.find(function(x){
+    return x.folio === folio && !x.esComplemento &&
+      (x.letra || (typeof letraVersion==='function' ? letraVersion(x) : 'A') || 'A') === _letraBuscarRA;
+  });
+  var idx = recibos.indexOf(r);
   if (!r) { toast('Recibo no encontrado', 'err'); return; }
   var letraActual = r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A';
   if (letraActual === 'A') { toast('Este recibo ya es VER.A — no necesita revertirse', 'err'); return; }
@@ -7302,10 +7325,25 @@ async function adminRevertirLetraA(idx) {
   toast('✅ Recibo #' + folioStrA + ' revertido a VER.A correctamente');
 }
 
-function adminAbrirEditarRecibo(idx) {
+function adminAbrirEditarRecibo(folio, letra) {
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
-  var r = recibos[idx];
-  if (!r) return;
+  // ⚠️ FIX (caso real: folio 81B abría el editor con los datos de 81A):
+  // antes se recibía un índice crudo calculado al DIBUJAR la lista
+  // (recibos.indexOf(r)). Si entre ese dibujo y el clic del usuario
+  // appData.recibos se reordenaba o refrescaba (sync en segundo plano,
+  // polling de respaldo cada 30s, una corrección hecha directo en Supabase,
+  // etc.), ese número quedaba apuntando a OTRO recibo — el editor abría
+  // silenciosamente un folio/letra distinto al que se clickeó, sin ningún
+  // error visible. Mismo patrón de fix ya aplicado en adminGuardarEdicionRecibo()
+  // y adminAbrirEdicionCompleta(): relocalizar SIEMPRE por folio+letra en el
+  // momento del clic, nunca confiar en un índice guardado de antes.
+  var _letraBuscar = letra || 'A';
+  var r = recibos.find(function(x){
+    return x.folio === folio && !x.esComplemento &&
+      (x.letra || (typeof letraVersion==='function' ? letraVersion(x) : 'A') || 'A') === _letraBuscar;
+  });
+  var idx = recibos.indexOf(r);
+  if (!r) { if (typeof toast === 'function') toast('Recibo no encontrado', 'err'); return; }
   _lockIntentarAdquirir(r.folio).then(function(_lockRes){
   if (!_lockRes.ok) { _lockAvisoBloqueo(_lockRes, r.folio); return; }
 
@@ -7324,8 +7362,16 @@ function adminAbrirEditarRecibo(idx) {
   var _lRef = document.getElementById('adminEditLetraRef'); if(_lRef) _lRef.value = _letraEdit;
   document.getElementById('adminEditFolioLabel').textContent = '#' + folioConLetra(r.folio||0, r.anio_folio, _letraEdit);
   document.getElementById('adminEditNombre').value = r.nombre || '';
-  document.getElementById('adminEditFecha').value = r.fecha || r.fecha_recibo || '';
-  document.getElementById('adminEditHora').value = r.hora || r.hora_recibo || '';
+  // FIX (caso real: folio 81B, 2026-09-27): en un secundario (B, C, D…) la
+  // fecha/hora propia de ESA versión vive en la última entrada de
+  // fechasImpresion (o fechaActualizacion/horaActualizacion) — r.fecha /
+  // r.fecha_recibo suelen traer heredada la del folio A (81B mostraba
+  // 28/05/2026 11:23 en vez de 11/07/2026 13:09), y al guardar se pisaba.
+  var _fpsQ = (_esSecundario && r.fechasImpresion && r.fechasImpresion.length) ? r.fechasImpresion[r.fechasImpresion.length - 1] : null;
+  var _fechaQ = _esSecundario ? ((_fpsQ && _fpsQ.fecha) || r.fechaActualizacion || r.fecha || r.fecha_recibo || '') : (r.fecha || r.fecha_recibo || '');
+  var _horaQ  = _esSecundario ? ((_fpsQ && _fpsQ.hora)  || r.horaActualizacion  || r.hora  || r.hora_recibo  || '') : (r.hora  || r.hora_recibo  || '');
+  document.getElementById('adminEditFecha').value = _fechaQ;
+  document.getElementById('adminEditHora').value = _horaQ;
   document.getElementById('adminEditTramites').value = r.tramites || '';
   document.getElementById('adminEditResponsable').value = (r.responsable || r.generadoPor || 'LIC ANTONIETA CHAVEZ MONTAR').toUpperCase();
   var _tipoSel = document.getElementById('adminEditTipoTramite');
@@ -7382,7 +7428,7 @@ function adminAbrirEditarRecibo(idx) {
       var elTotAb = document.getElementById('adminEditCtxTotalAbonado');
       if (elTotAb) elTotAb.textContent = '$' + (_padreAnticipo + _sumaPPAntes + _sumaPPEsta).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
       var elFechaAct = document.getElementById('adminEditCtxFechaAct');
-      if (elFechaAct) elFechaAct.textContent = (r.fecha || r.fecha_recibo || '—') + ' ' + (r.hora || r.hora_recibo || '');
+      if (elFechaAct) elFechaAct.textContent = (_fechaQ || '—') + ' ' + (_horaQ || '');
       var elPagos = document.getElementById('adminEditCtxPagos');
       if (elPagos) {
         elPagos.innerHTML = _ppEsta.length
@@ -7517,6 +7563,15 @@ function adminAbrirEdicionCompleta() {
     r = recibos[idx];
   }
   if (!r) { if (typeof toast === 'function') toast('Error: recibo no encontrado', 'err'); return; }
+  // FIX (caso real: folio 81B, 2026-09-27): los folios secundarios (B, C, D…)
+  // se abren en el mismo modo en que se capturaron (pago total / parcial /
+  // complementario), con su Servicio Complementario, su pago y su fecha
+  // propia — no con el formulario plano de folio A (ver _abrirEdicionSecundario).
+  var _letraAEC = r.letra || (typeof letraVersion==='function' ? letraVersion(r) : 'A') || 'A';
+  if (_letraAEC !== 'A' && typeof _abrirEdicionSecundario === 'function') {
+    _abrirEdicionSecundario(r, recibos);
+    return;
+  }
   _lockIntentarAdquirir(r.folio).then(function(_lockRes){
   if (!_lockRes.ok) { _lockAvisoBloqueo(_lockRes, r.folio); return; }
   window._edicionCompletaActiva = true; // ⚠️ evita que ir() limpie el form y pise el folio
@@ -7666,7 +7721,12 @@ async function adminGuardarEdicionRecibo() {
     var _totalFrozenG = 0;
     (_padreG.conceptos||[]).forEach(function(c){ _totalFrozenG += parseFloat(c.precio||0) * parseFloat(c.cantidad||1); });
     var _padreAnticipoG = parseFloat(_padreG.anticipo || 0) || 0;
-    nuevoTotal = _totalFrozenG;
+    // FIX (caso real: folio 81B, 2026-09-27): el total de un secundario incluye
+    // sus Servicios Complementarios (misma regla que al crear la actualización).
+    // Antes quedaba solo el total del A ($17,000 en vez de $17,198) y el PDF
+    // regenerado descuadraba SALDO PENDIENTE / SUMA TOTAL DE ADEUDOS.
+    var _sumaCEG = (r.costosExtra || []).reduce(function(s,c){ return s + (parseFloat(c.precio)||0); }, 0);
+    nuevoTotal = _totalFrozenG + _sumaCEG;
     r.total    = nuevoTotal;
     r.anticipo = String(_padreAnticipoG); // se relee del padre — autocorrige cualquier valor viejo/corrupto
     var _pp = (r.pagosParciales || []).slice();
@@ -7695,6 +7755,17 @@ async function adminGuardarEdicionRecibo() {
   r.fecha_recibo         = nuevaFecha;
   r.hora                 = nuevaHora;
   r.hora_recibo          = nuevaHora;
+  if (_esSecGuardar) {
+    // La fecha/hora de un secundario es la de ESA versión: se refleja también
+    // en la última entrada de fechasImpresion (de ahí la toma el PDF).
+    r.fechaActualizacion = nuevaFecha;
+    r.horaActualizacion  = nuevaHora;
+    if (r.fechasImpresion && r.fechasImpresion.length) {
+      var _fpsG = r.fechasImpresion.slice();
+      _fpsG[_fpsG.length - 1] = Object.assign({}, _fpsG[_fpsG.length - 1], { fecha: nuevaFecha, hora: nuevaHora });
+      r.fechasImpresion = _fpsG;
+    }
+  }
   r.tramites             = nuevoTramites;
   r.responsable          = nuevoResp;
   r.generadoPor          = nuevoResp;
@@ -7729,7 +7800,9 @@ async function adminGuardarEdicionRecibo() {
       const _letraRecibo = r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A';
       const folioStrConLetra = typeof folioConLetra === 'function'
         ? folioConLetra(r.folio, r.anio_folio, _letraRecibo) : folioStr2 + _letraRecibo;
-      const idMov = 'M-REC-' + r.folio;
+      // En secundarios el id nuevo lleva la letra — "M-REC-81" es el del A y
+      // crear otro igual para B causaba que ambas versiones se confundieran.
+      const idMov = _esSecGuardar ? ('M-REC-' + r.folio + '-' + _letraRecibo) : ('M-REC-' + r.folio);
       // Monto del MOVIMIENTO de contabilidad: en folio A es el anticipo/abono
       // completo del registro; en un secundario (B, C, D…) debe ser SOLO el
       // abono de ESTA transacción (nuevoAnticipoInput) — nuevoAnticipo ahí ya

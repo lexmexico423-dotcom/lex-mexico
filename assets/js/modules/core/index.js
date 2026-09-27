@@ -269,7 +269,13 @@ function pintarCostosExtra(arr){
 
 function quitarCostoExtra(id){
   const r = document.getElementById('costo-extra-row-'+id);
-  if(r){ r.remove(); recalcularResumenActualizacion(); }
+  if(r){
+    r.remove();
+    recalcularResumenActualizacion();
+    // Re-ajustar la fila "Liquidación total" al quitar el cargo (ver fix
+    // folio 81B, 2026-09-27, en sincronizarLiquidacionConComplementarios).
+    if(typeof sincronizarLiquidacionConComplementarios === 'function') sincronizarLiquidacionConComplementarios();
+  }
 }
 
 function _ppParsearFechaHoraExistente(str){

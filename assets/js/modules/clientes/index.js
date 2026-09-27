@@ -879,6 +879,36 @@ async function guardarRecibo(){
   btn.disabled=false;
 }
 
+// A petición expresa (2026-09-27): el buscador de clientes también debe
+// encontrar a la 2ª, 3ª… persona registrada en un recibo (r.clientes), no
+// solo al titular (r.nombre). Caso real: GENOVEVA MILAN MONTIEL, segunda
+// cliente del folio 81, no aparecía al buscarla. Cada recibo se agrupa bajo
+// CADA nombre que coincida; si solo coincide el folio, bajo el titular.
+function _nombresDelRecibo(r, norm){
+  const vistos = {}, lista = [];
+  [r.nombre].concat((r.clientes||[]).map(function(c){ return c && c.nombre; })).forEach(function(n){
+    const k = norm(n);
+    if(!k || vistos[k]) return;
+    vistos[k] = 1;
+    lista.push({ k: k, n: String(n).trim() });
+  });
+  return lista;
+}
+function _agruparReciboPorNombres(r, norm, qn, coincideFolio, grupos){
+  let agregado = false;
+  _nombresDelRecibo(r, norm).forEach(function(x){
+    if(!x.k.includes(qn)) return;
+    if(!grupos[x.k]) grupos[x.k] = { nombre: x.n, recibos: [] };
+    grupos[x.k].recibos.push(r);
+    agregado = true;
+  });
+  if(!agregado && coincideFolio){
+    const nk = norm(r.nombre);
+    if(!grupos[nk]) grupos[nk] = { nombre: r.nombre, recibos: [] };
+    grupos[nk].recibos.push(r);
+  }
+}
+
 function buscarClientePBC(){
   const q = ($('pbc-input').value || '').trim();
   const clearBtn = document.getElementById('pbc-clear');
@@ -891,12 +921,10 @@ function buscarClientePBC(){
   const qnFolio = qn.replace(/^#/,'');
   const grupos = {};
   (appData.recibos||[]).forEach(r=>{
-    const nk = norm(r.nombre);
-    // Coincide por nombre O por número de folio (con o sin letra, ej. "57" / "57b" / "#57B")
+    // Coincide por nombre (titular o 2º, 3º… cliente) O por número de folio
+    // (con o sin letra, ej. "57" / "57b" / "#57B")
     const folioStr = norm(folioConLetra(r.folio, r.anio_folio, r.letra || 'A'));
-    if(!nk.includes(qn) && !folioStr.includes(qnFolio)) return;
-    if(!grupos[nk]) grupos[nk]={ nombre:r.nombre, recibos:[] };
-    grupos[nk].recibos.push(r);
+    _agruparReciboPorNombres(r, norm, qn, folioStr.includes(qnFolio), grupos);
   });
   const clientes = Object.values(grupos);
   if(!clientes.length){
@@ -995,15 +1023,13 @@ function buscarClienteCaja(){
   const folioExacto = esNumerico ? parseInt(q, 10) : null;
   const grupos = {};
   (appData.recibos||[]).forEach(r=>{
-    const nk = norm(r.nombre);
-    // Coincide por nombre, o por folio: exacto si se escribió solo el número
-    // (ej. "1" → solo folio 1), o parcial si se combina con letra (ej. "57b")
+    // Coincide por nombre (titular o 2º, 3º… cliente), o por folio: exacto si
+    // se escribió solo el número (ej. "1" → solo folio 1), o parcial si se
+    // combina con letra (ej. "57b")
     const coincideFolio = esNumerico
       ? (r.folio === folioExacto)
       : norm(folioConLetra(r.folio, r.anio_folio, r.letra || 'A')).includes(qnFolio);
-    if(!nk.includes(qn) && !coincideFolio) return;
-    if(!grupos[nk]) grupos[nk]={ nombre:r.nombre, recibos:[] };
-    grupos[nk].recibos.push(r);
+    _agruparReciboPorNombres(r, norm, qn, coincideFolio, grupos);
   });
   _renderCajaBuscaResultados(Object.values(grupos), resDiv, countEl, escHTML(q));
 }
@@ -1026,13 +1052,17 @@ function abrirClienteRapido(nombre){
   if(typeof limpiarBuscaCaja==='function') limpiarBuscaCaja();
   const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
   const nNorm = norm(nombre);
-  const recibos = (appData.recibos||[]).filter(r => norm(r.nombre) === nNorm);
+  // Incluye los recibos donde la persona aparece como 2º, 3º… cliente.
+  const recibos = (appData.recibos||[]).filter(r => norm(r.nombre) === nNorm ||
+    (r.clientes||[]).some(c => c && norm(c.nombre) === nNorm));
   if(!recibos.length) return;
-  // Datos de contacto: tomar del recibo más reciente que los tenga
+  // Datos de contacto: tomar del recibo más reciente que los tenga — de la
+  // ficha de ESA persona dentro del recibo (no siempre el primer cliente).
   const sorted = [...recibos].sort((a,b) => b.folio - a.folio);
   let movil = '', tel = '', domicilio = '';
   for(const r of sorted){
-    const c = (r.clientes||[])[0] || {};
+    const c = (r.clientes||[]).find(x => x && norm(x.nombre) === nNorm)
+           || (norm(r.nombre) === nNorm ? (r.clientes||[])[0] : null) || {};
     if(!movil    && c.movil)    movil    = c.movil;
     if(!tel      && c.tel)      tel      = c.tel;
     if(!domicilio && c.domicilio) domicilio = c.domicilio;

@@ -2988,6 +2988,10 @@ function agregarCostoExtra(data){
   // versión que se está guardando ahora — evita que un cargo de 56B quede
   // reetiquetado como 56C solo por venir arrastrado como fila bloqueada.
   tr.dataset.folioLetra = (data && data.folioLetra) || '';
+  // Conservar "liquidado al momento" de cargos ya guardados — getCostosExtra()
+  // antes los regresaba siempre en false/0 y una Edición Completa los perdía.
+  if(data && data.liquidadoAlMomento) tr.dataset.liquidadoAlMomento = '1';
+  if(data && parseFloat(data.montoLiquidado) > 0) tr.dataset.montoLiquidado = String(parseFloat(data.montoLiquidado));
   if(isLocked){
     // Mismo criterio que en agregarPagoParcial(): esta tabla debe mostrar solo
     // los servicios complementarios que se agregan AHORA, no el historial
@@ -3056,8 +3060,8 @@ function toggleCeLiquidado(id){ /* eliminado: ya no se usa el modo liquidar-al-m
 function getCostosExtra(){
   const filas = document.querySelectorAll('#costos-extra-tbody tr');
   return Array.from(filas).map(tr => {
-    const liquidadoAlMomento = false;
-    const montoLiquidado = 0;
+    const liquidadoAlMomento = tr.dataset.liquidadoAlMomento === '1';
+    const montoLiquidado = parseFloat(tr.dataset.montoLiquidado) || 0;
     return {
       concepto:            tr.querySelector('.ce-concepto').value || '',
       descripcion:         tr.querySelector('.ce-descripcion').value || '',
@@ -7311,7 +7315,22 @@ function _abrirEdicionSecundario(r, recibos) {
     });
   }
 
-  var tipo = _inferirTipoFolioSecundario(r);
+  // FIX (caso real: folio 81B, 2026-09-27): el tipo se decide SOLO con los
+  // pagos/cargos que nacieron en ESTA letra — pagosParciales/costosExtra de
+  // cada versión arrastran el historial completo de las anteriores, y usarlos
+  // tal cual podía clasificar mal la versión (ej. un C "servicio
+  // complementario" tomado como "pago total" por el abono de B). Si no se
+  // puede determinar, se abre igual en modo actualización (nunca con el
+  // formulario plano de folio A, que oculta complementarios y pagos).
+  var _ppEstaTipo = (r.pagosParciales || []).filter(function(p){ return p && (p.folioLetra || '') === letra; });
+  var _ceEstaTipo = (r.costosExtra   || []).filter(function(c){ return c && (c.folioLetra || '') === letra; });
+  var _hayLetrasTipo = (r.pagosParciales || []).concat(r.costosExtra || []).some(function(x){ return x && x.folioLetra; });
+  var tipo = _inferirTipoFolioSecundario(_hayLetrasTipo
+    ? Object.assign({}, r, { pagosParciales: _ppEstaTipo, costosExtra: _ceEstaTipo })
+    : r);
+  if (tipo !== 'liquidacion' && tipo !== 'pago_parcial' && tipo !== 'servicio_complementario') {
+    tipo = (parseFloat(r.saldoPendiente) > 0) ? 'pago_parcial' : 'liquidacion';
+  }
   var folioStr = typeof folioConLetra==='function' ? folioConLetra(r.folio, r.anio_folio, letra) : (r.folio + letra);
   var tipoLabel = tipo === 'liquidacion' ? 'PAGO TOTAL' : tipo === 'pago_parcial' ? 'PAGO PARCIAL' : tipo === 'servicio_complementario' ? 'SERV. COMPLEMENTARIO' : 'SECUNDARIO';
 
@@ -7403,8 +7422,30 @@ function _abrirEdicionSecundario(r, recibos) {
       // decir, el saldoPendiente del PADRE directo (74A, 74B…), NO el de _r2
       // mismo (que ya es el saldo DESPUÉS del pago: normalmente $0 si liquidó,
       // por eso el resumen siempre mostraba $0.00 al editar un secundario).
+      // FIX (caso real: folio 81B, 2026-09-27): el saldoPendiente GUARDADO en
+      // el padre no es confiable — cuando una versión posterior liquida, el
+      // padre queda marcado en $0 (81A decía $0 aunque antes de 81B se debían
+      // $12,139), y el resumen en pantalla arrancaba con ADEUDO ANTERIOR $0.
+      // En Costo Pactado se reconstruye con la misma fórmula que usa el PDF:
+      // concepto(s) del folio A + complementarios de versiones ANTERIORES
+      // − anticipo del A − pagos de versiones ANTERIORES.
+      var _saldoAntesVersion = _padre2 ? _padre2.saldoPendiente : _r2.saldoPendiente;
+      var _esAbiertoSec = (typeof window._abiertoSinCosto === 'function') && window._abiertoSinCosto(_r2);
+      if (!_esAbiertoSec) {
+        var _folioA_sec = _recibos2.find(function(x){
+          return x.folio === r.folio && !x.esComplemento &&
+                 (x.letra || (typeof letraVersion==='function' ? letraVersion(x) : 'A') || 'A') === 'A';
+        });
+        var _sumConcA_sec = (recalculado.conceptos || []).reduce(function(s,c){ return s + (parseFloat(c.precio)||0); }, 0);
+        var _antA_sec = parseFloat(_folioA_sec ? _folioA_sec.anticipo : _r2.anticipo) || 0;
+        var _ceAntes_sec = (_r2.costosExtra || []).filter(function(c){ return c && c.folioLetra && c.folioLetra < letra; })
+          .reduce(function(s,c){ return s + (parseFloat(c.precio)||0); }, 0);
+        var _ppAntes_sec = (_r2.pagosParciales || []).filter(function(p){ return p && p.folioLetra && p.folioLetra < letra; })
+          .reduce(function(s,p){ return s + (parseFloat(p.cantidad)||0); }, 0);
+        _saldoAntesVersion = Math.max(0, _sumConcA_sec + _ceAntes_sec - _antA_sec - _ppAntes_sec);
+      }
       var _reciboParaResumen = Object.assign({}, _r2, {
-        saldoPendiente: _padre2 ? _padre2.saldoPendiente : _r2.saldoPendiente
+        saldoPendiente: _saldoAntesVersion
       });
       if (tipo === 'liquidacion') {
         // Modo pago total: congela conceptos, habilita pagos parciales, marca como liquidación
@@ -7446,6 +7487,24 @@ function _abrirEdicionSecundario(r, recibos) {
 
       // Cargar en formulario
       if (typeof cargarReciboEnFormulario === 'function') cargarReciboEnFormulario(recalculado);
+
+      // ── Servicios Complementarios: solo los de ESTA versión quedan editables ──
+      // cargarReciboEnFormulario() carga TODOS los costosExtra desbloqueados. En
+      // un C, los complementarios de B se contarían como cargos nuevos de C y se
+      // sumarían dos veces (ya van dentro del saldo anterior). Los de otras
+      // letras se reinsertan bloqueados/ocultos (se conservan al guardar); los
+      // de esta letra quedan visibles y editables.
+      (function _ceSoloEstaVersionEditable(){
+        var _tbodyCE = document.getElementById('costos-extra-tbody');
+        if (!_tbodyCE || typeof agregarCostoExtra !== 'function') return;
+        var _srcCE = (_r2.costosExtra || []).map(function(c){ return Object.assign({}, c); });
+        _tbodyCE.innerHTML = '';
+        if (typeof costoExtraCount !== 'undefined') costoExtraCount = 0;
+        _srcCE.forEach(function(ce){
+          var _esEsta = !ce.folioLetra || ce.folioLetra === letra;
+          agregarCostoExtra(Object.assign({}, ce, { locked: !_esEsta }));
+        });
+      })();
 
       // ── Volver editable la fila de "Pago Registrado" de ESTA versión ──────
       // cargarReciboEnFormulario() carga todo pagosParciales como bloqueado/
@@ -7534,6 +7593,21 @@ function _ajustarAnchoBannerEdicion(){
 function editarReciboEnConsulta(rParam) {
   const r = rParam || reciboEnConsulta;
   if (!r) { if (typeof toast === 'function') toast('No hay recibo en consulta', 'err'); return; }
+  // FIX (caso real: folio 81B, 2026-09-27): un folio secundario (B, C, D…)
+  // NO se puede editar con el formulario plano de folio A — ahí solo se ven el
+  // concepto original, el anticipo del A y la fecha del A; el Servicio
+  // Complementario y el pago de esa versión quedan en secciones ocultas, y al
+  // guardar se pisaba la fecha/total de la versión. Se abre en el mismo modo en
+  // que se capturó (pago total / parcial / complementario) vía
+  // _abrirEdicionSecundario().
+  var _letraECR = r.letra || (typeof letraVersion==='function' ? letraVersion(r) : 'A') || 'A';
+  if (_letraECR !== 'A' && typeof _abrirEdicionSecundario === 'function') {
+    var _mvECR = document.getElementById('modal-versiones');
+    if (_mvECR) _mvECR.classList.remove('show');
+    if (typeof cerrarFichaFolio === 'function') cerrarFichaFolio();
+    _abrirEdicionSecundario(r, (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : []);
+    return;
+  }
   _lockIntentarAdquirir(r.folio).then(function(_lockRes){
   if (!_lockRes.ok) { _lockAvisoBloqueo(_lockRes, r.folio); return; }
   window._edicionCompletaActiva = true; // ⚠️ evita que ir() limpie el form y pise el folio
@@ -7652,13 +7726,19 @@ async function guardarEdicionCompleta() {
   const folioChanged  = false;
   var recibos = (typeof appData !== 'undefined' && appData.recibos) ? appData.recibos : [];
   // ⚠️ FIX: si editamos un secundario (B, C, D...) buscar por folio+letra para no pisar la versión A
-  var _letraSecBuscar = (window._edicionSecundarioActiva && window._edicionSecundarioActiva.letra) || null;
-  var idx = _letraSecBuscar
-    ? recibos.findIndex(function(r){
-        return r.folio === folioOriginal && !r.esComplemento &&
-               (r.letra || (typeof letraVersion==='function' ? letraVersion(r) : 'A') || 'A') === _letraSecBuscar;
-      })
-    : recibos.findIndex(function(r){ return r.folio === folioOriginal; });
+  // FIX (caso real: folio 81B, 2026-09-27): SIEMPRE por folio+letra. Antes,
+  // si no venía por _abrirEdicionSecundario, se tomaba el PRIMER registro con
+  // ese número de folio — según el orden interno podía ser el A cuando se
+  // estaba editando el B (o al revés) y se sobrescribía la versión equivocada.
+  var _letraSecBuscar = (window._edicionSecundarioActiva && window._edicionSecundarioActiva.letra)
+                     || (letraSelectEl && letraSelectEl.value) || 'A';
+  var idx = recibos.findIndex(function(r){
+    return r.folio === folioOriginal && !r.esComplemento &&
+           (r.letra || (typeof letraVersion==='function' ? letraVersion(r) : 'A') || 'A') === _letraSecBuscar;
+  });
+  if (idx < 0 && _letraSecBuscar === 'A') {
+    idx = recibos.findIndex(function(r){ return r.folio === folioOriginal && !r.esComplemento && !r.letra; });
+  }
   if (idx < 0) { window._desactivarRegistrandoRecibo(); if (typeof toast === 'function') toast('Error: recibo no encontrado en memoria', 'err'); return; }
   var r = recibos[idx];
   const letraOriginal = r.letra || 'A'; // capturar antes de cualquier mutación
@@ -7691,6 +7771,16 @@ async function guardarEdicionCompleta() {
              (x.letra || (typeof letraVersion==='function' ? letraVersion(x):'A') || 'A') === 'A';
     });
     anticipo = _padreEdit ? (parseFloat(_padreEdit.anticipo)||0) : (parseFloat(r.anticipo)||0);
+    // FIX (caso real: folio 81B, 2026-09-27): en B, C, D… el total guardado
+    // debe incluir los Servicios Complementarios (misma regla que al crear la
+    // actualización: totalOriginal + sumaCostosExtra). Antes solo sumaba los
+    // conceptos del A — 81B quedó con total $17,000 en vez de $17,198 y su
+    // PDF salía con SALDO PENDIENTE $11,941 / SUMA TOTAL $12,139.
+    total = total + costosExtra.reduce(function(s,c){ return s + (parseFloat(c.precio)||0); }, 0);
+    // Todo lo que se guarda de una versión ya es historial: bloqueado y con su
+    // letra de origen (igual que _imprimirActualizacionReal).
+    costosExtra    = costosExtra.map(function(c){ return Object.assign({}, c, { locked: true, folioLetra: c.folioLetra || letraRecibo }); });
+    pagosParciales = pagosParciales.map(function(p){ return Object.assign({}, p, { locked: true, folioLetra: p.folioLetra || letraRecibo }); });
     var _sumaPPEdit = pagosParciales.reduce(function(s,p){ return s + (parseFloat(p.cantidad)||0); }, 0);
     saldo = Math.max(0, total - anticipo - _sumaPPEdit);
   } else {
@@ -7794,6 +7884,13 @@ async function guardarEdicionCompleta() {
     r.total                = total;
     r.anticipo             = String(anticipo);
     r.saldoPendiente       = saldo;
+    if (letraRecibo !== 'A') {
+      // Mantener coherentes los campos que usan la Ficha/PDF en secundarios.
+      r.saldoNuevo   = saldo;
+      r.totalAbonado = Math.max(0, total - saldo);
+      r.fechaActualizacion = fechaRecibo;
+      r.horaActualizacion  = horaRecibo;
+    }
     if (saldo <= 0 && typeof _eliminarPendientePorFolio === 'function')
       _eliminarPendientePorFolio(r.folio);
     r.fecha                = fechaRecibo;
@@ -7841,7 +7938,7 @@ async function guardarEdicionCompleta() {
       folioAnterior: r.folioAnterior || null,
       historialPagosRef: r.historialPagosRef || [],
       totalGeneral: total,
-      totalAbonado: anticipo,
+      totalAbonado: (letraRecibo !== 'A') ? Math.max(0, total - saldo) : anticipo,
       saldoNuevo: saldo,
       descripcionVehicular: descripVeh,
       letra: letraRecibo,
@@ -7888,7 +7985,13 @@ async function guardarEdicionCompleta() {
       const idMovConLetra = letraRecibo !== 'A' ? 'M-REC-' + r.folio + '-' + letraRecibo : null;
       const idMovSinLetra = 'M-REC-' + r.folio;
       const idMovViejo    = 'M-REC-' + folioOriginal;
+      // FIX (caso real: folio 81, 2026-09-27): el movimiento se busca SIEMPRE
+      // de la MISMA letra. Antes "M-REC-81" (id sin letra) se tomaba aunque
+      // perteneciera a otra versión — editar 81B podía reescribir el ingreso
+      // del 81A (monto, fecha, letra) y viceversa.
+      const _esSecMov = letraRecibo !== 'A';
       const idxMov = D.movimientos.findIndex(function(m){
+        if ((m.letra || 'A') !== letraRecibo && m.id !== idMovConLetra) return false;
         return m.id === idMovConLetra
             || m.id === idMovSinLetra
             || m.id === idMovViejo
@@ -7904,7 +8007,22 @@ async function guardarEdicionCompleta() {
       const txtConc = c0 ? ((c0.concepto||'') + (c0.descripcion ? ' — ' + c0.descripcion : '')) : '';
       const movDesc = txtConc || folioStr2;
       const estatus = anticipo < total ? 'Anticipo' : 'Liquidado';
-      if (idxMov >= 0) {
+      if (idxMov >= 0 && _esSecMov) {
+        // Secundario (B, C, D…): el ingreso de ESTA versión es solo lo cobrado
+        // en ella (pagos con su letra + cargos liquidados al momento), nunca el
+        // anticipo del A. Se conservan id, letra, categoría y estatus.
+        const _montoVerMov = pagosParciales
+          .filter(function(p){ return (p.folioLetra || letraRecibo) === letraRecibo; })
+          .reduce(function(s,p){ return s + (parseFloat(p.cantidad)||0); }, 0)
+          + costosExtra
+          .filter(function(c){ return c.liquidadoAlMomento && (c.folioLetra || letraRecibo) === letraRecibo; })
+          .reduce(function(s,c){ return s + (parseFloat(c.montoLiquidado)||0); }, 0);
+        D.movimientos[idxMov].nombre      = primerNombre;
+        D.movimientos[idxMov].fecha       = fechaRecibo;
+        D.movimientos[idxMov].hora        = horaRecibo;
+        D.movimientos[idxMov].responsable = responsable;
+        if (_montoVerMov > 0) D.movimientos[idxMov].monto = _montoVerMov;
+      } else if (idxMov >= 0) {
         D.movimientos[idxMov].id          = idMovSinLetra;
         D.movimientos[idxMov].folio       = r.folio;
         D.movimientos[idxMov].letra       = letraRecibo;

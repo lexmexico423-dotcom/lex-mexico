@@ -25,7 +25,23 @@ function generarQRPreview(){
 // unidos con "Y", o ninguno si se desmarcan todos. Si el usuario edita el
 // campo de firma a mano, dataset.manualEdit bloquea este auto-cálculo,
 // igual que antes.
+// A petición expresa (2026-09-27): con UN solo cliente no se pregunta
+// "¿Va a firmar?" — es obvio que firma él. La casilla se oculta (y queda
+// marcada) mientras haya un solo cliente, y aparece en automático en todos
+// los renglones en cuanto se agrega un segundo cliente.
+function _actualizarVisibilidadFirmantes() {
+  const filas = Array.from(document.querySelectorAll('#clientes-wrapper .cliente-row'));
+  const varios = filas.length > 1;
+  filas.forEach(function(r){
+    const chk = r.querySelector('[id^="firmante_"]');
+    if (!chk) return;
+    const grupo = chk.closest('.field-group');
+    if (grupo) grupo.style.display = varios ? '' : 'none';
+    if (!varios) chk.checked = true;
+  });
+}
 function sincronizarFirmantesClientes() {
+  _actualizarVisibilidadFirmantes();
   const firmaField = $('nombre_cliente_firma');
   if (!firmaField || firmaField.dataset.manualEdit) return;
   const nombres = Array.from(document.querySelectorAll('#clientes-wrapper .cliente-row')).filter(function(r){
@@ -67,7 +83,7 @@ function agregarCliente(){
   sincronizarFirmantesClientes();
 }
 
-function quitarCliente(id){ const r=document.getElementById('cliente-row-'+id); if(r)r.remove(); }
+function quitarCliente(id){ const r=document.getElementById('cliente-row-'+id); if(r)r.remove(); sincronizarFirmantesClientes(); }
 
 function getClientes(){
   return Array.from(document.querySelectorAll('.cliente-row')).map(r=>({
@@ -149,6 +165,7 @@ function cargarReciboEnFormulario(recibo){
       +'</div>';
     wrap.appendChild(div);
   });
+  _actualizarVisibilidadFirmantes();
   // Campos de vehiculo / trámite — selects e inputs simples
   ['tramites','clase','marca','tipo_veh','serie','motor','personas_veh','anio','puertas',
    'color_veh','transmision','cilindros','placa','ultima_tenencia','origen','combustible'].forEach(fid=>{

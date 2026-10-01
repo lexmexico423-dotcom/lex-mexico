@@ -5471,7 +5471,12 @@ function escRender(){
     // "ⓘ") se apaga a gris uniforme, igual que el recibo PDF de un trámite
     // cancelado (campoV en generarPDF) — ya no tiene caso mostrar el avance
     // real ni explicar retrasos de un trámite que quedó sin efecto.
-    const _esCanceladaCard = e.estado==='cancelado';
+    // A petición expresa (2026-09-30): las escrituras ARCHIVADAS (concluidas y
+    // entregadas) se ven igual que las canceladas — tarjeta en gris, línea de
+    // proceso apagada y marca de agua — pero con la leyenda "CONCLUIDO" y SIN
+    // tachar los nombres (el trámite sí se concretó).
+    const _esCanceladaCard = e.estado==='cancelado' || e.estado==='archivado';
+    const _tacharCard = e.estado==='cancelado';
     const _pasoFaseCard = pasoActivo>=0 ? (pasos[pasoActivo]||null) : null;
     const _esperandoCard = !!_pasoFaseCard && _pasoFaseCard.estado==='pendiente' && pasoActivo>0;
     const _segRelojCard = pasoActivo<0 ? -1 : (_esperandoCard ? pasoActivo-1 : pasoActivo);
@@ -5532,12 +5537,15 @@ function escRender(){
     // de CARP, ESCRITURA, FOLIO, rol del transmitente) a gris — antes solo
     // el borde y la píldora de estado cambiaban, el resto seguía viéndose
     // "vigente" con el mismo dorado que un trámite activo.
-    const _colorAcento = e.estado==='cancelado' ? cfg.col : '#8c6518';
+    const _colorAcento = _esCanceladaCard ? '#6b6b6b' : '#8c6518';
     // Marca de agua diagonal "CANCELADO" — mismo lenguaje visual que el PDF
     // del recibo (dibujarMarcaAgua): texto grande, gris, girado, muy baja
     // opacidad, sin estorbar el click ni el resto del contenido.
-    const _marcaAguaCard = _esCanceladaCard ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-family:serif;font-weight:800;font-size:2.4rem;letter-spacing:0.08em;color:#000;opacity:0.06;white-space:nowrap;pointer-events:none;z-index:1;">CANCELADO</div>` : '';
-    return `<div onclick="escAbrirDetalle(${idx})" style="position:relative;background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${cfg.col};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
+    const _marcaAguaCard = _esCanceladaCard ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-family:serif;font-weight:800;font-size:2.4rem;letter-spacing:0.08em;color:#000;opacity:0.06;white-space:nowrap;pointer-events:none;z-index:1;">${_tacharCard ? 'CANCELADO' : 'CONCLUIDO'}</div>` : '';
+    const _colorBordeCard = _esCanceladaCard ? '#6b6b6b' : cfg.col;
+    const _pillColCard = _esCanceladaCard ? '#6b6b6b' : cfg.col;
+    const _pillBgCard  = _esCanceladaCard ? 'rgba(107,107,107,0.08)' : cfg.bg;
+    return `<div onclick="escAbrirDetalle(${idx})" style="position:relative;background:var(--surface);border:1.5px solid var(--border-l);border-left:4px solid ${_colorBordeCard};border-radius:10px;padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:box-shadow 0.15s,transform 0.15s;" onmouseover="this.style.boxShadow='0 4px 18px rgba(0,0,0,0.1)';this.style.transform='translateY(-1px)'" onmouseout="this.style.boxShadow='';this.style.transform=''">
       ${_marcaAguaCard}
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;position:relative;z-index:2;">
         <div style="display:flex;gap:14px;min-width:0;flex:1;">
@@ -5552,8 +5560,8 @@ function escRender(){
               ${_volTxt?`<div style="font-family:monospace;font-size:0.62rem;white-space:nowrap;"><span style="font-weight:700;color:var(--muted);">VOL.</span> <span style="color:var(--ink);font-weight:700;">${_volTxt}</span></div>`:''}
               ${_fechaFirmaCard?`<div style="font-family:monospace;font-size:0.62rem;white-space:nowrap;"><span style="font-weight:700;color:var(--muted);">FECHA DE FIRMA</span> <span style="color:var(--ink);font-weight:700;">${_fechaFirmaCard}</span></div>`:''}
             </div>
-            <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">👤 <span style="${e.estado==='cancelado'?'color:'+_colorAcento+';text-decoration:line-through;':''}">${esc(comp)}</span> <span style="font-size:0.6rem;color:${e.estado==='cancelado'?_colorAcento:'#1a4a8a'};text-transform:uppercase;font-weight:700;">${rolAdq}</span></div>
-            ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ <span style="${e.estado==='cancelado'?'color:'+_colorAcento+';text-decoration:line-through;':''}">${esc(vend)}</span> <span style="font-size:0.58rem;color:${_colorAcento};text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
+            <div style="font-size:0.9rem;font-weight:700;color:var(--ink);">👤 <span style="${_esCanceladaCard?'color:'+_colorAcento+';'+(_tacharCard?'text-decoration:line-through;':''):''}">${esc(comp)}</span> <span style="font-size:0.6rem;color:${_esCanceladaCard?_colorAcento:'#1a4a8a'};text-transform:uppercase;font-weight:700;">${rolAdq}</span></div>
+            ${vend?`<div style="font-size:0.75rem;color:var(--muted);margin-top:2px;">↔ <span style="${_esCanceladaCard?'color:'+_colorAcento+';'+(_tacharCard?'text-decoration:line-through;':''):''}">${esc(vend)}</span> <span style="font-size:0.58rem;color:${_colorAcento};text-transform:uppercase;font-weight:700;">${rolTrans}</span></div>`:''}
           </div>
         </div>
         ${_atencionBadgeHtml}
@@ -5561,10 +5569,10 @@ function escRender(){
           <div style="font-family:serif;font-size:1.05rem;color:${_colorAcento};font-weight:700;white-space:nowrap;">${e.num?(/^carp/i.test(e.num.trim())?esc(e.num):'CARP.- '+esc(e.num)):'—'}</div>
           ${folioRecHtml?`<div style="border-left:1.5px solid ${_colorAcento};padding-left:10px;line-height:1.3;text-align:left;">
             <div style="font-family:serif;font-size:0.55rem;letter-spacing:0.08em;color:${_colorAcento};font-weight:700;">FOLIO</div>
-            <div style="font-family:serif;font-size:0.95rem;color:${e.estado==='cancelado'?_colorAcento:'#1a4a8a'};font-weight:800;">${folioRecHtml}</div>
+            <div style="font-family:serif;font-size:0.95rem;color:${_esCanceladaCard?_colorAcento:'#1a4a8a'};font-weight:800;">${folioRecHtml}</div>
           </div>`:''}
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
-            <span style="font-size:0.65rem;font-weight:700;color:${cfg.col};background:${cfg.bg};padding:3px 10px;border-radius:12px;white-space:nowrap;">${cfg.lbl}</span>
+            <span style="font-size:0.65rem;font-weight:700;color:${_pillColCard};background:${_pillBgCard};padding:3px 10px;border-radius:12px;white-space:nowrap;">${cfg.lbl}</span>
             <span style="font-family:monospace;font-size:0.62rem;color:var(--muted);">${pct}% completado</span>
           </div>
         </div>

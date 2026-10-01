@@ -6216,8 +6216,14 @@ function escGuardar(){
         : (_escIdx>=0 ? !!D.escrituras[_escIdx].pasoActivoEnEspera : false)
     };
     if(!Array.isArray(D.escrituras)) D.escrituras = [];
-    if(_escIdx>=0) D.escrituras[_escIdx] = e;
-    else { D.escrituras.unshift(e); _escIdx = 0; }
+    // Conservar el id permanente y cualquier dato que este formulario no
+    // captura (p. ej. quién recibió la entrega, cancelación) — antes el
+    // objeto se reconstruía desde cero y esos datos se perdían al editar.
+    const _prevEsc = _escIdx>=0 ? D.escrituras[_escIdx] : null;
+    const _idEsc = (_prevEsc && _prevEsc.id) || (typeof _escNuevoId === 'function' ? _escNuevoId() : ('ESC-' + Date.now()));
+    const eFinal = Object.assign({}, _prevEsc || {}, e, { id: _idEsc });
+    if(_escIdx>=0) D.escrituras[_escIdx] = eFinal;
+    else { D.escrituras.unshift(eFinal); _escIdx = 0; }
     escSyncYRefrescar();
     cerrar('mEscritura');
     toast('✅ Escritura '+e.num+' guardada');
@@ -6621,6 +6627,7 @@ async function escProcesarArchivoExcel(input){
       const nombreComprador = comprador || cliente;
       const _vi = _escSplitVolInstr(volInstr);
       D.escrituras.push({
+        id: (typeof _escNuevoId === 'function' ? _escNuevoId() : ('ESC-' + Date.now() + '-' + Math.random().toString(36).slice(2,8))),
         num: '',
         notaria, instrumento:_vi.instrumento, volumen:_vi.volumen,
         fechaFirma, fechaFirmaTexto,

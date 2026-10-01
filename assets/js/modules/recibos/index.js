@@ -460,7 +460,12 @@ async function sincronizarFolio(forzarSB){
             return c;
           });
           const _soloLocalesCarp = _localCarpetas.filter(function(c){ return !_sbCarpNums.has(c.num); });
-          D.carpetas = [..._fusionadasCarp, ..._soloLocalesCarp];
+          // FIX (caso real: CARP.- 41, 2026-09-30): las carpetas que solo
+          // existen en local son las RECIÉN creadas (aún sin subir) — van
+          // ARRIBA, igual que las agrega guardarCarpeta() con unshift. Antes
+          // se ponían al FINAL y, si el pull llegaba antes de subirla, la
+          // carpeta nueva quedaba guardada hasta abajo de la lista.
+          D.carpetas = [..._soloLocalesCarp, ..._fusionadasCarp];
         })();
         // Merge pendientes: mismo problema de carrera ya corregido en
         // carpetas/escrituras/citas — sobreescribir D.pendientes entero con
@@ -577,7 +582,9 @@ async function sincronizarFolio(forzarSB){
             return e;
           });
           const _soloLocalesEsc = _localEscrituras.filter(function(e){ return !_sbEscNums.has(e.num); });
-          D.escrituras = [..._fusionadasEsc, ..._soloLocalesEsc];
+          D.escrituras = (typeof _lexFusionarEscrituras === 'function')
+            ? _lexFusionarEscrituras(_localEscrituras, _sbEscrituras)
+            : [..._fusionadasEsc, ..._soloLocalesEsc];
         })();
         // Merge tareas para hoy (recordatorios libres del día — módulo aparte
         // de Pendientes) — mismo patrón que escrituras: se compara fechaMod y

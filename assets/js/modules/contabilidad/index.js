@@ -781,6 +781,13 @@ function renderCarp(){
     if(filtroCT==='cancelada')return esCancelada;
     return true;
   }).filter(c=>!q||_carpTextoBusqueda(c).includes(q));
+  // FIX (caso real: CARP.- 41, 2026-09-30): la tabla se mostraba en el orden
+  // interno del arreglo, y una carpeta guardada fuera de lugar (p. ej. por una
+  // sincronización que la dejó al final) aparecía "desfasada" debajo de la
+  // CARP.- 1. Ahora siempre se ordena por número, de la más reciente a la más
+  // antigua; las que no tienen número quedan al final.
+  const _numCarpOrden = c => { const m = String((c&&c.num)||'').match(/(\d+)/); return m ? parseInt(m[1],10) : -1; };
+  l = l.slice().sort((a,b) => _numCarpOrden(b) - _numCarpOrden(a));
   const el=$('listaCarp');
   if(!l.length){el.innerHTML='<div style="color:var(--muted);padding:24px;font-size:0.76rem;">Sin carpetas en este filtro.</div>';return;}
   function estatusCell(est){
@@ -1278,6 +1285,50 @@ async function reconciliarDeshacerUltimo(opts){
 // diferencia de recibos/movimientos, que sí se fusionan). Una pestaña con esos
 // dos campos vacíos/desactualizados en memoria los borraba para todos en el
 // siguiente guardado, sin que ningún guardrail lo detectara.
+// FIX (caso real: escritura de Leonila López, 2026-09-30): las escrituras se
+// empataban con las del servidor SOLO por su número de carpeta (num). Desde
+// que se permitió guardarlas sin carpeta (y se desvincularon las importadas de
+// Excel), las 112 escrituras tenían num '' — ninguna empataba, siempre ganaba
+// la copia del servidor y CUALQUIER cambio (archivar, avanzar paso, notas,
+// cancelar) y las escrituras nuevas se descartaban en silencio al sincronizar.
+// Ahora cada escritura tiene un id único y permanente; se empata por id y,
+// solo para copias viejas en memoria que aún no lo traen, por num.
+function _escNuevoId(){
+  return 'ESC-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
+}
+function _lexFusionarEscrituras(local, remoto){
+  const _local  = Array.isArray(local)  ? local  : [];
+  const _remoto = Array.isArray(remoto) ? remoto : [];
+  const _porId = {}, _porNum = {};
+  _local.forEach(function(e){
+    if(!e) return;
+    if(e.id) _porId[e.id] = e;
+    else if(e.num) _porNum[e.num] = e;
+  });
+  const _usados = new Set();
+  const _fusionadas = _remoto.map(function(e){
+    if(!e) return e;
+    let _loc = e.id ? (_porId[e.id] || null) : null;
+    if(!_loc && e.num) _loc = _porNum[e.num] || null;
+    if(_loc){
+      _usados.add(_loc);
+      const tsLoc = Date.parse(_loc.fechaMod || 0) || 0;
+      const tsRem = Date.parse(e.fechaMod || 0) || 0;
+      if(tsLoc > tsRem) return (e.id && !_loc.id) ? Object.assign({}, _loc, { id: e.id }) : _loc;
+    }
+    return e;
+  });
+  const _remIds  = new Set(_remoto.map(function(e){ return e && e.id; }).filter(Boolean));
+  const _remNums = new Set(_remoto.map(function(e){ return e && e.num; }).filter(Boolean));
+  const _soloLocales = _local.filter(function(e){
+    if(!e || _usados.has(e)) return false;
+    if(e.id)  return !_remIds.has(e.id);
+    if(e.num) return !_remNums.has(e.num);
+    return false;
+  });
+  return _soloLocales.concat(_fusionadas);
+}
+
 function _lexFusionarListaPorId(local, remoto){
   const _local  = Array.isArray(local)  ? local  : [];
   const _remoto = Array.isArray(remoto) ? remoto : [];
@@ -1420,23 +1471,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       // cambios recientes en el siguiente guardado. Se fusiona por 'num' +
       // fechaMod, mismo criterio que ya usa la descarga.
       const _sbEscriturasPreSync = Array.isArray(_sbDataPreSync.escrituras) ? _sbDataPreSync.escrituras : [];
-      estado.escrituras = (function(){
-        const _local = Array.isArray(D.escrituras) ? D.escrituras : [];
-        const _mapaLocal = {};
-        _local.forEach(function(e){ if(e && e.num) _mapaLocal[e.num] = e; });
-        const _remotoNums = new Set(_sbEscriturasPreSync.map(function(e){ return e && e.num; }));
-        const _fusionadas = _sbEscriturasPreSync.map(function(e){
-          const _loc = e && e.num ? _mapaLocal[e.num] : null;
-          if(_loc){
-            const tsLoc = Date.parse(_loc.fechaMod || 0) || 0;
-            const tsRem = Date.parse(e.fechaMod || 0) || 0;
-            if(tsLoc > tsRem) return _loc;
-          }
-          return e;
-        });
-        const _soloLocales = _local.filter(function(e){ return e && e.num && !_remotoNums.has(e.num); });
-        return _fusionadas.concat(_soloLocales);
-      })();
+      estado.escrituras = _lexFusionarEscrituras(D.escrituras, _sbEscriturasPreSync);
       D.escrituras = estado.escrituras;
       // Fusionar tombstones
       if (_sbTombsPreSync.length > 0) {

@@ -5779,13 +5779,15 @@ function abrirPendiente(idx){
     else if(p.juiExpediente || p.juiEtapa) sec = 'juicios';
   }
   if(secEl){ secEl.value = sec; pSecCambio(); }
+  // El campo oculto de observaciones nunca debe arrastrar texto de otro pendiente.
+  const _pObEl = document.getElementById('pOb'); if(_pObEl) _pObEl.value = '';
   if(p){
     if(sec === 'placas') _pPlacasCargar(p);
     else if(sec === 'escrituras') _pEscCargar(p);
     else if(sec === 'juicios') _pJuiCargar(p);
     else {
       const _s=(id,v)=>{const e=document.getElementById(id);if(e)e.value=v||'';};
-      _s('pOtrosNombre',p.persona);_s('pOtrosDesc',p.obs||p.texto);
+      _s('pOtrosNombre',p.persona);_s('pOtrosDesc',p.texto||p.obs);
     }
     const priEl=document.getElementById('pPri');if(priEl)priEl.value=p.prioridad||'normal';
     const reEl=document.getElementById('pRe');if(reEl)reEl.value=p.resp||'Antonieta';
@@ -5795,7 +5797,7 @@ function abrirPendiente(idx){
     _pPlacasLimpiar();
     _pEscCargar(null);
     _pJuiCargar(null);
-    ['pPri','pRe','pFecha','pCarpeta','pOtrosNombre','pOtrosDesc'].forEach(id=>{
+    ['pPri','pRe','pFecha','pCarpeta','pOtrosNombre','pOtrosDesc','pOb'].forEach(id=>{
       const e=document.getElementById(id);if(e)e.value = id==='pPri'?'normal':id==='pRe'?'Antonieta':'';
     });
   }

@@ -5541,7 +5541,7 @@ function escRender(){
     // Marca de agua diagonal "CANCELADO" — mismo lenguaje visual que el PDF
     // del recibo (dibujarMarcaAgua): texto grande, gris, girado, muy baja
     // opacidad, sin estorbar el click ni el resto del contenido.
-    const _marcaAguaCard = _esCanceladaCard ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-family:serif;font-weight:800;font-size:2.4rem;letter-spacing:0.08em;color:${_tacharCard ? '#000' : '#1a7a3a'};opacity:${_tacharCard ? '0.06' : '0.16'};white-space:nowrap;pointer-events:none;z-index:1;">${_tacharCard ? 'CANCELADO' : 'CONCLUIDO'}</div>` : '';
+    const _marcaAguaCard = _esCanceladaCard ? `<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-18deg);font-family:serif;font-weight:800;font-size:2.4rem;letter-spacing:0.08em;color:${_tacharCard ? '#c0161a' : '#1a7a3a'};opacity:0.32;white-space:nowrap;pointer-events:none;z-index:1;">${_tacharCard ? 'CANCELADO' : 'CONCLUIDO'}</div>` : '';
     const _colorBordeCard = _esCanceladaCard ? '#6b6b6b' : cfg.col;
     const _pillColCard = _esCanceladaCard ? '#6b6b6b' : cfg.col;
     const _pillBgCard  = _esCanceladaCard ? 'rgba(107,107,107,0.08)' : cfg.bg;

@@ -896,7 +896,15 @@ function guardarPend(){
       resp: document.getElementById('pRe')?.value||'Antonieta',
       fechaLimite: document.getElementById('pFecha')?.value||'',
       carpeta: document.getElementById('pCarpeta')?.value.trim()||'',
-      obs: document.getElementById('pOb')?.value.trim()||''
+      // FIX (caso real: pendiente "Copias certificadas para el Sr Jesus Cerero",
+      // 2026-09-30): el campo "Detalle / Observaciones" (#pOb) está OCULTO en
+      // todas las secciones (ver pSecCambio) y nunca se limpiaba al abrir un
+      // pendiente nuevo — cualquier texto que quedara ahí se guardaba sin que
+      // nadie lo viera (apareció "Firma de contrato del sr Víctor Zarate…"
+      // dentro de un pendiente ajeno). Ya no se lee ese campo oculto: al
+      // editar se conservan las observaciones que ya tenía el pendiente y uno
+      // nuevo nace sin ellas.
+      obs: (eiP>=0 && D.pendientes[eiP] && D.pendientes[eiP].obs) || ''
     };
   }
   const prevP = eiP >= 0 ? D.pendientes[eiP] : null;

@@ -61,6 +61,28 @@ window._adeudoServicioComplementario = function(recibo){
     var _origen = versiones.find(function(v){ return (v.letra||'A').toUpperCase()===_letraOrigen; }) || ultima;
     return { concepto: ce.concepto||'Servicio', fecha: ce.fechaHora||'', responsable: _origen.responsable||'', monto: parseFloat(ce.precio)||0 };
   });
+  // FIX (caso real: folio 129, 2026-10-02): el saldo que quedó pendiente del
+  // RECIBO INICIAL (A) también es adeudo real del folio. Antes solo contaban los
+  // Servicios Complementarios: 129A cobró $15,000 de contestación de demanda con
+  // anticipo de $5,000, y el sistema veía adeudo $0.00 — no se podía liquidar
+  // los $10,000 restantes con Pago Total/Parcial. Se agrega como el PRIMER cargo
+  // (el más antiguo), así los abonos posteriores se le aplican primero (FIFO).
+  var _verA = versiones[0];
+  var _pendA = 0;
+  if(_verA && String(_verA.letra||'A').toUpperCase()==='A'){
+    var _sumConcA = (_verA.conceptos||[]).reduce(function(s,c){ return s+(parseFloat(c && c.precio)||0); }, 0);
+    _pendA = Math.max(0, _sumConcA - (parseFloat(_verA.anticipo)||0));
+    if(_pendA > 0.005){
+      var _c0A = (_verA.conceptos||[])[0] || {};
+      items.unshift({
+        concepto: _c0A.concepto || 'Saldo del recibo inicial',
+        fecha: ((_verA.fecha_recibo||_verA.fecha||'')+' '+(_verA.hora_recibo||_verA.hora||'')).trim(),
+        responsable: _verA.responsable||'',
+        monto: _pendA,
+        saldoInicial: true
+      });
+    } else { _pendA = 0; }
+  }
   // Total BRUTO acumulado (antes de restar abonos) — sirve como cifra estable de
   // "servicios complementarios cargados hasta ahora" para cualquier UI que necesite
   // guardar/mostrar un total, deduplicado por si algun dato viejo ya trae repetidos.
@@ -71,6 +93,7 @@ window._adeudoServicioComplementario = function(recibo){
     _seenBruto[k]=1;
     return s+(parseFloat(ce.precio)||0);
   }, 0);
+  bruto += _pendA;
   var abonadoAcum = (ultima.pagosParciales||[]).reduce(function(s,p){ return s+(parseFloat(p.cantidad)||0); }, 0);
   var restante = abonadoAcum;
   items = items.map(function(it){

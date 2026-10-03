@@ -556,7 +556,9 @@ async function sincronizarFolio(forzarSB){
           const _keyCierre = function(c){ return c && ((c.fecha||'')+'|'+(c.hora||'')+'|'+(c.automatico||c.auto?'auto':'man')); };
           const _sbCierreKeys = new Set(_sbCierres.map(_keyCierre));
           const _soloLocalesCierre = _localCierres.filter(function(c){ const k=_keyCierre(c); return k && !_sbCierreKeys.has(k); });
-          D.cierres = [..._sbCierres, ..._soloLocalesCierre];
+          D.cierres = (typeof _lexFusionarCierres === 'function')
+            ? _lexFusionarCierres(_localCierres, _sbCierres)
+            : [..._sbCierres, ..._soloLocalesCierre];
         })();
         D.prestamos             = data.data.prestamos     || [];
         D.saldoAcumulado        = data.data.saldoAcumulado || 0;

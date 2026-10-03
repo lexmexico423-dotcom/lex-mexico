@@ -1599,6 +1599,25 @@ async function generarPDF(datos,folio,qrDataURL){
           const _origenSC = _todasVersSC.find(function(v){ return (v.letra||'A').toUpperCase()===_letraOrigenSC; }) || _prevRecSC;
           _adeudoItemsSC.push({ concepto: ce.concepto||'Servicio', fecha: ce.fechaHora||'', iniciales: _inicialesDeSC(_origenSC.responsable||''), monto: m });
         });
+        // FIX (caso real: folio 129, 2026-10-02): el saldo pendiente del recibo
+        // inicial (A) es el cargo MÁS ANTIGUO del folio — se antepone para que
+        // aparezca en ADEUDO ANTERIOR y reciba primero los abonos (FIFO). Misma
+        // regla que window._adeudoServicioComplementario().
+        (function(){
+          const _verA_SC = _todasVersSC.find(function(v){ return String(v.letra||'A').toUpperCase()==='A'; });
+          if(!_verA_SC) return;
+          const _sumConcA_SC = (_verA_SC.conceptos||[]).reduce(function(s,c){ return s+(parseFloat(c && c.precio)||0); }, 0);
+          const _pendA_SC = Math.max(0, _sumConcA_SC - (parseFloat(_verA_SC.anticipo)||0));
+          if(_pendA_SC > 0.005){
+            const _c0A_SC = (_verA_SC.conceptos||[])[0] || {};
+            _adeudoItemsSC.unshift({
+              concepto: _c0A_SC.concepto || 'Saldo del recibo inicial',
+              fecha: ((_verA_SC.fecha_recibo||_verA_SC.fecha||'')+' '+(_verA_SC.hora_recibo||_verA_SC.hora||'')).trim(),
+              iniciales: _inicialesDeSC(_verA_SC.responsable||''),
+              monto: _pendA_SC
+            });
+          }
+        })();
         // Aplicar los abonos acumulados (de esa misma versión anterior, que ya
         // incluye todos los abonos hasta ese punto) en orden cronológico (FIFO)
         // contra cada cargo, para que cada línea de "ADEUDO ANTERIOR" muestre lo

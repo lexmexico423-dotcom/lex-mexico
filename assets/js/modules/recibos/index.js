@@ -1662,7 +1662,89 @@ async function generarPDF(datos,folio,qrDataURL){
     : (!_hayCargoRealSC
         ? 'RECIBO DE PAGO PARCIAL'
         : (_restaTransSC > 0 ? 'RECIBO DE PAGO PARCIAL' : 'RECIBO DE PAGO TOTAL'));
-  const _tituloRecibo = _esCancelacion ? 'RECIBO DE CANCELACIÓN'
+  // ═══ ESTADO DE CUENTA — recibos B, C, D… (2026-10-03, a petición expresa:
+  // los clientes no entendían los recibos de serie B — "TOTAL $10,000" en un
+  // trámite de $15,000, sin decir qué se había pagado antes ni en qué recibo).
+  // Se arma un estado de cuenta del folio con la MISMA regla para Costo
+  // Pactado y Sin Costo Total Pactado: lo cargado (costo del trámite + servicios
+  // complementarios) menos lo pagado en recibos anteriores = saldo pendiente;
+  // más lo nuevo de este recibo = total a pagar; menos el pago de hoy = saldo
+  // restante. No aplica a cancelaciones (conservan su propio formato).
+  const _edo = (function(){
+    if(!_esUpdate || _esCancelacion) return null;
+    const L = _letraActual;
+    const _anioF = datos.anio_folio;
+    const _vers = (typeof appData !== 'undefined' && appData.recibos ? appData.recibos : [])
+      .filter(function(x){ return x && Number(x.folio) === Number(folio) && !x.esComplemento; });
+    const _verDe = function(l){ return _vers.find(function(v){ return String(v.letra||'A').toUpperCase() === l; }) || null; };
+    const _fechaVer = function(l){
+      const v = _verDe(l);
+      if(l === 'A') return (v && (v.fecha_recibo || v.fecha)) || (_fps[0] && _fps[0].fecha) || '';
+      if(l === L && _fps.length) return _fps[_fps.length-1].fecha || '';
+      if(!v) return '';
+      const f = v.fechasImpresion || [];
+      return (f.length && f[f.length-1].fecha) || v.fechaActualizacion || v.fecha || '';
+    };
+    const _mesCorto = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const _fmtCorta = function(iso){
+      const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+      return m ? (parseInt(m[3],10) + '-' + _mesCorto[parseInt(m[2],10)-1] + '-' + m[1]) : '';
+    };
+    const _ref = function(l, fechaTxt){
+      const f = fechaTxt || _fmtCorta(_fechaVer(l));
+      return folioConLetra(folio, _anioF, l) + (f ? ' · ' + f : '');
+    };
+    const cargosAntes = [], abonosAntes = [], cargosHoy = [];
+    let pagoHoy = 0;
+    const costo = (datos.conceptos||[]).reduce(function(s,c){ return s + (parseFloat(c && c.precio)||0); }, 0);
+    if(costo > 0) cargosAntes.push({ txt: _conceptoFolioAUnificado() + ' (costo del trámite)', ref: _ref('A'), monto: costo });
+    const ant = parseFloat(datos.anticipo)||0;
+    if(ant > 0) abonosAntes.push({ txt: 'Anticipo', ref: _ref('A'), monto: ant });
+    (datos.costosExtra||[]).forEach(function(c){
+      if(!c) return;
+      const lc = String(c.folioLetra || L).toUpperCase();
+      if(lc > L) return;
+      const m = parseFloat(c.precio)||0;
+      const fTxt = c.fechaHora ? _fmtCorta(String(c.fechaHora).slice(0,10)) : '';
+      if(m > 0){
+        const it = { txt: c.concepto || 'Servicio complementario', ref: _ref(lc, fTxt), monto: m };
+        if(lc < L) cargosAntes.push(it); else cargosHoy.push(it);
+      }
+      const ml = c.liquidadoAlMomento ? (parseFloat(c.montoLiquidado)||0) : 0;
+      if(ml > 0){
+        if(lc < L) abonosAntes.push({ txt: 'Pago de ' + (c.concepto || 'servicio complementario'), ref: _ref(lc, fTxt), monto: ml });
+        else pagoHoy += ml;
+      }
+    });
+    (datos.pagosParciales||[]).forEach(function(p){
+      if(!p || p._esAnticipoOriginal) return;
+      const lp = String(p.folioLetra || 'A').toUpperCase();
+      if(lp > L) return;
+      const m = parseFloat(p.cantidad)||0;
+      if(m <= 0) return;
+      if(lp < L) abonosAntes.push({ txt: 'Pago', ref: _ref(lp), monto: m });
+      else pagoHoy += m;
+    });
+    const _suma = function(a){ return a.reduce(function(s,x){ return s + x.monto; }, 0); };
+    const saldoAntes = Math.max(0, _suma(cargosAntes) - _suma(abonosAntes));
+    const totalAPagar = saldoAntes + _suma(cargosHoy);
+    const restante = Math.max(0, totalAPagar - pagoHoy);
+    const _anteriores = [];
+    for(let cc = 65; cc < L.charCodeAt(0); cc++) _anteriores.push(String.fromCharCode(cc));
+    return {
+      cargosAntes: cargosAntes, abonosAntes: abonosAntes, cargosHoy: cargosHoy,
+      saldoAntes: saldoAntes, totalAPagar: totalAPagar, pagoHoy: pagoHoy, restante: restante,
+      totalCargado: _suma(cargosAntes) + _suma(cargosHoy),
+      totalPagado: _suma(abonosAntes) + pagoHoy,
+      numRecibo: L.charCodeAt(0) - 64,
+      anterior: _anteriores.length ? folioConLetra(folio, _anioF, _anteriores[_anteriores.length-1]) : ''
+    };
+  })();
+  const _tituloEdo = _edo
+    ? ((_edo.restante <= 0.005 && _edo.pagoHoy > 0.005) ? 'RECIBO DE LIQUIDACIÓN'
+       : (_edo.cargosHoy.length ? 'RECIBO DE SERVICIO COMPLEMENTARIO' : 'RECIBO DE PAGO PARCIAL'))
+    : null;
+  const _tituloRecibo = _tituloEdo ? _tituloEdo : _esCancelacion ? 'RECIBO DE CANCELACIÓN'
                       : _esAbiertoPDF  ? (_esUpdate ? _tituloSinCostoSC : 'RECIBO DE PAGO INICIAL')
                       : _esFinalLiq    ? 'RECIBO DE PAGO TOTAL'
                       : _tieneCE       ? 'RECIBO DE SERVICIO COMPLEMENTARIO'
@@ -1690,6 +1772,14 @@ async function generarPDF(datos,folio,qrDataURL){
   let yLineaFechas = yAfterH;
   doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.line(margin,yLineaFechas+1.5,pageW-margin,yLineaFechas+1.5);
   let y=yLineaFechas+4.5;
+  if(_edo){
+    // Subtítulo: deja claro que este recibo es la continuación de otro.
+    doc.setFontSize(7); doc.setFont('helvetica','italic'); doc.setTextColor(110,80,30);
+    doc.text('Recibo ' + _edo.numRecibo + ' del folio ' + folioFormato(folio, datos.anio_folio)
+      + (_edo.anterior ? ' · continúa del recibo ' + _edo.anterior : '')
+      + ' · abajo se detalla lo pagado en recibos anteriores', margin, y);
+    y += 5;
+  }
   const campo=(label,val,x,cy,w)=>{
     doc.setFontSize(5.5); doc.setTextColor(130,100,50); doc.setFont('helvetica','normal'); doc.text(label,x,cy);
     doc.setFontSize(8); doc.setTextColor(20,10,5); doc.text(val||'—',x,cy+4);
@@ -1780,9 +1870,9 @@ async function generarPDF(datos,folio,qrDataURL){
   const _esEscrituraOJuicio = (_tipoTramitePDF === 'escritura' || _tipoTramitePDF === 'juicio');
   {
     let _textoPoder = '';
-    if (_tipoTramitePDF === 'escritura' && _letraPDF === 'A') {
+    if (_tipoTramitePDF === 'escritura') {
       _textoPoder = 'Otorgo al Despacho Jurídico LEX-MÉXICO y a sus integrantes debidamente autorizados facultades amplias y suficientes para realizar, en mi nombre y representación, las gestiones, trámites y diligencias necesarias para la debida tramitación de mi escritura pública.\n\nManifiesto haber sido debidamente informado, que el importe señalado en el presente recibo no incluye el pago del Impuesto Sobre la Renta (ISR) ni del Impuesto de Traslación de Dominio, cuyos montos serán determinados posteriormente por la base catastral asignada.\n\nBajo protesta de decir verdad, declaro que la documentación proporcionada es auténtica, completa y veraz. En caso de detectarse inconsistencias, omisiones o requerirse documentación complementaria durante el trámite, me comprometo a subsanarlas a la brevedad. Asimismo, manifiesto contar con la solvencia económica para cubrir cualquier gasto, derecho, contribución o erogación adicional que resulte necesaria para la conclusión del trámite, deslindando al Despacho Jurídico LEX-MÉXICO de cualquier responsabilidad derivada de dichas circunstancias.';
-    } else if (_tipoTramitePDF === 'juicio' && _letraPDF === 'A') {
+    } else if (_tipoTramitePDF === 'juicio') {
       _textoPoder = 'Otorgo al Despacho Jurídico LEX-MÉXICO y a sus integrantes debidamente autorizados poder amplio y suficiente para representarme en el juicio o procedimiento legal correspondiente, incluyendo la realización de gestiones, promociones, recursos y diligencias necesarias para la atención, seguimiento y defensa del presente asunto.\n\nLos importes señalados en el presente recibo corresponden exclusivamente a los servicios profesionales contratados y no incluyen gastos, derechos, impuestos, certificaciones, peritajes, viáticos, honorarios de terceros ni cualquier otra erogación que pudiera generarse durante la sustanciación del procedimiento.\n\nBajo protesta de decir verdad, declaro que la información y documentación proporcionadas son auténticas, completas y veraces, comprometiéndome a entregar cualquier documento adicional que se requiera y a comparecer cuando resulte necesario. En caso de detectarse omisiones o inconsistencias en la documentación, me comprometo a subsanarlas a la brevedad, deslindando al Despacho Jurídico LEX-MÉXICO de cualquier responsabilidad atribuible a tales circunstancias.';
     } else if (_tipoTramitePDF === 'vehicular' && _letraPDF === 'A') {
       // A petición expresa: solo en el folio A de trámites vehiculares (las
@@ -2036,6 +2126,47 @@ async function generarPDF(datos,folio,qrDataURL){
       }
     }
   }
+  if(_edo){
+    // ── ESTADO DE CUENTA DEL TRÁMITE (recibos B, C, D…) ─────────────────────
+    const _xRef = margin + cW*0.55;
+    const _filaEdo = function(txt, refTxt, montoTxt, estilo){
+      estilo = estilo || {};
+      doc.setFontSize(estilo.size || 8);
+      doc.setFont('helvetica', estilo.bold ? 'bold' : 'normal');
+      const col = estilo.color || [20,10,5];
+      doc.setTextColor(col[0], col[1], col[2]);
+      const lineas = doc.splitTextToSize(txt, cW*0.53);
+      const alto = lineas.length * 3.8 + 1.6;
+      if(y + alto > 262){ doc.addPage(); y = 18; }
+      doc.text(lineas, margin, y);
+      if(refTxt){ doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(110,90,55); doc.text(refTxt, _xRef, y); }
+      doc.setFontSize(estilo.size || 8); doc.setFont('helvetica', estilo.bold ? 'bold' : 'normal'); doc.setTextColor(col[0], col[1], col[2]);
+      doc.text(montoTxt, margin+cW, y, {align:'right'});
+      if(estilo.lineaArriba){ doc.setDrawColor(180,140,40); doc.setLineWidth(0.4); doc.line(margin, y-3.4, margin+cW, y-3.4); }
+      else { doc.setDrawColor(230,215,180); doc.setLineWidth(0.2); doc.line(margin, y+alto-2.8, margin+cW, y+alto-2.8); }
+      y += alto;
+    };
+    const _banda = function(titulo, colFondo, colTexto){
+      if(y + 9 > 262){ doc.addPage(); y = 18; }
+      doc.setFillColor(colFondo[0], colFondo[1], colFondo[2]); doc.rect(margin, y-3, cW, 5, 'F');
+      doc.setTextColor(colTexto[0], colTexto[1], colTexto[2]); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+      doc.text(titulo, margin+1, y);
+      doc.text('RECIBO · FECHA', _xRef, y);
+      doc.text('IMPORTE', margin+cW, y, {align:'right'});
+      y += 4;
+    };
+    _banda('ESTADO DE CUENTA DEL TRÁMITE', [248,244,232], [154,110,24]);
+    _edo.cargosAntes.forEach(function(it){ _filaEdo(it.txt, it.ref, '$'+fmtMXN(it.monto)); });
+    _edo.abonosAntes.forEach(function(it){ _filaEdo('(-) ' + it.txt, it.ref, '-$'+fmtMXN(it.monto), { color: [42,110,58] }); });
+    _filaEdo('SALDO PENDIENTE ANTES DE ESTE RECIBO', '', '$'+fmtMXN(_edo.saldoAntes), { bold: true, color: [154,110,24], lineaArriba: true });
+    if(_edo.cargosHoy.length){
+      y += 1.5;
+      _banda('SERVICIO COMPLEMENTARIO (NUEVO EN ESTE RECIBO)', [255,240,220], [160,80,16]);
+      _edo.cargosHoy.forEach(function(it){ _filaEdo('(+) ' + it.txt, it.ref, '$'+fmtMXN(it.monto)); });
+      _filaEdo('TOTAL A PAGAR', '', '$'+fmtMXN(_edo.totalAPagar), { bold: true, color: [160,80,16], lineaArriba: true });
+    }
+    y += 1;
+  } else
   if(!(_esAbiertoPDF && _esUpdate)){
     if(_esFilaSaldoPendienteCP){
       _dibujarEncabezadoSaldoPendiente(false, _conMontoSaldoPendiente);
@@ -2189,7 +2320,7 @@ async function generarPDF(datos,folio,qrDataURL){
   }
   // ── SERVICIO COMPLEMENTARIO (si hay) ──
   let totalCostosExtra = 0;
-  if(datos.costosExtra && datos.costosExtra.length){
+  if(!_edo && datos.costosExtra && datos.costosExtra.length){
     y += 0.5;
     const yMaxContenidoCE = 262;
     function asegurarEspacioCE(altoFila){
@@ -2355,7 +2486,32 @@ async function generarPDF(datos,folio,qrDataURL){
   }
   // ── RESUMEN DE PAGO (solo en versiones B+ que NO son Sin Costo Total Pactado:
   // liquidación o abono parcial normal, que sí arrastra saldo anterior) ──
-  if(_esUpdate && !_esAbiertoPDF){
+  // ── Cuadro de totales del ESTADO DE CUENTA (recibos B, C, D…) ──
+  if(_edo){
+    if(y + 34 > 262){ doc.addPage(); y = 18; }
+    y += 0.5;
+    if(qrDataURL){ try{doc.addImage(qrDataURL,'PNG',margin,y,18,18);}catch(e){ registrarError('catch vacio', e); } }
+    doc.setFillColor(255,255,255); doc.rect(margin+cW-66,y,66,22,'F');
+    doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.rect(margin+cW-66,y,66,22);
+    doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
+    doc.text('SALDO PENDIENTE:', margin+cW-64, y+5);
+    doc.text('PAGO RECIBIDO HOY:', margin+cW-64, y+11);
+    doc.setFont('helvetica','bold'); doc.setTextColor(154,110,24);
+    doc.text('SALDO RESTANTE:', margin+cW-64, y+18);
+    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
+    doc.text('$'+fmtMXN(_edo.totalAPagar), margin+cW-1.5, y+5, {align:'right'});
+    doc.setTextColor(139,90,43);
+    doc.text('$'+fmtMXN(_edo.pagoHoy), margin+cW-1.5, y+11, {align:'right'});
+    doc.setFontSize(11.5); doc.setTextColor(_edo.restante>0?154:42, _edo.restante>0?110:122, _edo.restante>0?24:58);
+    doc.text('$'+fmtMXN(_edo.restante), margin+cW-1.5, y+18.5, {align:'right'});
+    y += 26;
+    doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+    const _completo = _edo.totalCargado > 0 && _edo.totalPagado >= _edo.totalCargado - 0.005;
+    doc.setTextColor(_completo?42:154, _completo?122:110, _completo?58:24);
+    doc.text('Total pagado del trámite: $'+fmtMXN(_edo.totalPagado)+' de $'+fmtMXN(_edo.totalCargado), margin+cW, y, {align:'right'});
+    y += 3;
+  }
+  if(_esUpdate && !_esAbiertoPDF && !_edo){
     // Los números (_saldoAnteriorResumen_CP / _pagoEstaVersion_CP /
     // _saldoRestante_CP) ya se calcularon arriba, al inicio de la función —
     // misma fuente de verdad que usa también el bloque "SUMA TOTAL DE
@@ -2404,7 +2560,7 @@ async function generarPDF(datos,folio,qrDataURL){
   // en ESTA transacción, RESTA = lo que sigue faltando de ESE cargo específico.
   // Si NO hay ningún cargo real (abono suelto, sin relación a ningún servicio): el
   // recibo es completamente independiente — TOTAL = ABONADO = lo entregado, RESTA $0.00.
-  if(_esUpdate && _esAbiertoPDF){
+  if(_esUpdate && _esAbiertoPDF && !_edo){
     const _totalCajaSC  = _hayCargoRealSC ? _totalConAdeudoSC : _totalPagosParcialesPreSC;
     const _abonoCajaSC  = _totalPagosParcialesPreSC;
     const _restaCajaSC  = _hayCargoRealSC ? _restaTransSC : 0;
@@ -2630,6 +2786,7 @@ async function generarPDF(datos,folio,qrDataURL){
   if(_esAbiertoPDF && _esUpdate){
     saldoFinal = _restaTransSC;
   }
+  if(_edo) saldoFinal = _edo.restante;
   if(saldoFinal <= 0 && (parseFloat(datos.totalGeneral||datos.total||0)) > 0){
     dibujarMarcaAgua(doc, 'PAGADO', [30, 140, 60]);
   }

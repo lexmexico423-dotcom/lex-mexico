@@ -1309,8 +1309,18 @@ function _lexFusionarCierres(local, remoto){
   // Los CORTES nunca se descartan entre sí (puede haber más de uno en un
   // día); solo se quitan copias idénticas (misma fecha, hora y monto).
   const _cortes = [], _vistosCorte = new Set();
+  // CORTES ELIMINADOS (lápidas): un registro {corteEliminado:true,
+  // corteFecha, corteHora} indica que ese corte se borró a propósito. Sin
+  // esto, como la fusión nunca pierde cierres, cualquier copia vieja en la
+  // memoria de una pestaña lo volvería a traer. La lápida viaja junto con
+  // los cierres (sin campo "fecha", así no cuenta como cierre de ningún día).
+  const _corteBorrado = new Set();
+  _todos.forEach(function(c){
+    if(c && c.corteEliminado) _corteBorrado.add((c.corteFecha||'') + '|' + (c.corteHora||''));
+  });
   _todos.forEach(function(c){
     if(!c) return;
+    if(c.esCorte && c.fecha && _corteBorrado.has(c.fecha + '|' + (c.hora||''))) return;
     if(c.esCorte && c.fecha){
       const kc = c.fecha + '|' + (c.hora||'') + '|' + String(c.saldoEntregado||'');
       if(!_vistosCorte.has(kc)){ _vistosCorte.add(kc); _cortes.push(c); }
@@ -2002,7 +2012,7 @@ function verCierres() {
     tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted);">Sin cierres registrados.</td></tr>';
     return;
   }
-  tb.innerHTML=D.cierres.map(function(c) {
+  tb.innerHTML=D.cierres.filter(function(c){ return c && !c.corteEliminado; }).map(function(c) {
     // Cierres sin movimientos contables (manuales o auto-registrados)
     if (c.sinMovimientos === true) {
       var etiqAuto = c.auto ? ' <span style="font-size:0.55rem;color:#888;font-style:italic;">(auto)</span>' : '';

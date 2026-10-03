@@ -4422,7 +4422,7 @@ async function adminModernizarPDFs() {
     try {
       var qrTxt = 'LEX-MEXICO|Folio:' + folioStr + '|' + (r.nombre||'') + '|' + (r.fecha_recibo||r.fecha||'') + ' ' + (r.hora_recibo||r.hora||'');
       var qrURL = await qrToDataURL(qrTxt);
-      var doc = await generarPDF(Object.assign({}, r, { anio_folio: r.anio_folio||2026, letra: letra }), r.folio, qrURL);
+      var doc = await generarPDF(_datosRegenerarPDF(r, letra), r.folio, qrURL);
       r.pdfBase64 = doc.output('datauristring');
       try { subirPDFaDrive(doc.output('blob'), folioStr + '.pdf'); } catch(e2){}
       ok++;
@@ -4438,10 +4438,81 @@ async function adminModernizarPDFs() {
   if(typeof toast==='function') toast('OK: ' + ok + ' PDFs modernizados' + (err ? ' · ' + err + ' errores' : ''));
 }
 
+// Arma los datos para volver a generar el PDF de un recibo guardado. Si es una
+// versión B, C, D… sin historial de fechas completo (recibos viejos), se arma
+// con la fecha del A y la de esta versión, para que generarPDF() la reconozca
+// como continuación y le ponga el ESTADO DE CUENTA (solo para el PDF).
+function _datosRegenerarPDF(r, letra) {
+  var d = Object.assign({}, r, { anio_folio: r.anio_folio||2026, letra: letra });
+  if (String(letra||'A').toUpperCase() !== 'A' && (!Array.isArray(d.fechasImpresion) || d.fechasImpresion.length < 2)) {
+    var _verA = (appData.recibos || []).find(function(x){ return x && x.folio === r.folio && !x.esComplemento && String(x.letra||'A').toUpperCase() === 'A'; });
+    d.fechasImpresion = [
+      { fecha: _verA ? (_verA.fecha_recibo || _verA.fecha || '') : '', hora: _verA ? (_verA.hora_recibo || _verA.hora || '') : '', etiqueta: 'Original' },
+      { fecha: r.fechaActualizacion || r.fecha_recibo || r.fecha || '', hora: r.horaActualizacion || r.hora_recibo || r.hora || '', etiqueta: 'Actualización' }
+    ];
+  }
+  return d;
+}
+// ── Regenerar SOLO los recibos B, C, D… con el formato de ESTADO DE CUENTA
+// (2026-10-03, a petición expresa: los clientes no entendían los recibos de
+// serie B). generarPDF() ya arma el estado de cuenta para toda versión B+ que
+// no esté cancelada; aquí se vuelven a generar y se reemplaza el PDF guardado
+// en R2 de cada una, sin tocar los recibos A ni los cancelados.
+async function adminRegenerarPDFsSerieB() {
+  var recibos = (appData.recibos || []).filter(function(r){
+    if (!r || r.folio == null || r.esComplemento || r.cancelado) return false;
+    var l = String(r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'A') || 'A').toUpperCase();
+    return l !== 'A';
+  });
+  if (!recibos.length) { if(typeof toast==='function') toast('No hay recibos B, C, D… para regenerar', 'err'); return; }
+  var muestra = recibos.slice(0,8).map(function(r){ return '#'+folioConLetra(r.folio, r.anio_folio||2026, r.letra||'B'); }).join(', ') + (recibos.length>8 ? ' +'+(recibos.length-8)+' más' : '');
+  if (!confirm('¿Regenerar ' + recibos.length + ' recibo(s) B, C, D… con el nuevo formato de ESTADO DE CUENTA?\n\n' +
+    'Cada PDF mostrará el costo del trámite, lo pagado en recibos anteriores (con folio y fecha), el saldo pendiente, el pago recibido, el saldo restante y el total pagado del trámite.\n\n' +
+    'Folios: ' + muestra + '\n\n' +
+    'Se reemplaza el PDF guardado de cada recibo. Los recibos A y los cancelados no se tocan. El papel ya firmado no cambia.\n\n¿Continuar?')) return;
+  var ok = 0, err = 0;
+  for (var i = 0; i < recibos.length; i++) {
+    var r = recibos[i];
+    var letra = String(r.letra || (typeof letraVersion === 'function' ? letraVersion(r) : 'B') || 'B').toUpperCase();
+    var folioStr = typeof folioConLetra === 'function' ? folioConLetra(r.folio, r.anio_folio, letra) : r.folio + letra;
+    if(typeof toast==='function') toast('Regenerando ' + (i+1) + '/' + recibos.length + ' — #' + folioStr);
+    try {
+      var datosR = Object.assign({}, r, { anio_folio: r.anio_folio||2026, letra: letra });
+      // generarPDF() reconoce una versión B+ por su historial de fechas; si un
+      // recibo viejo no lo trae completo, se arma con la fecha del A y la de
+      // esta versión (solo para generar el PDF, no se guarda).
+      if (!Array.isArray(datosR.fechasImpresion) || datosR.fechasImpresion.length < 2) {
+        var _verA = (appData.recibos || []).find(function(x){ return x && x.folio === r.folio && !x.esComplemento && String(x.letra||'A').toUpperCase() === 'A'; });
+        datosR.fechasImpresion = [
+          { fecha: _verA ? (_verA.fecha_recibo || _verA.fecha || '') : '', hora: _verA ? (_verA.hora_recibo || _verA.hora || '') : '', etiqueta: 'Original' },
+          { fecha: r.fechaActualizacion || r.fecha_recibo || r.fecha || '', hora: r.horaActualizacion || r.hora_recibo || r.hora || '', etiqueta: 'Actualización' }
+        ];
+      }
+      var _fpU = datosR.fechasImpresion[datosR.fechasImpresion.length - 1] || {};
+      var qrTxt = 'LEX-MEXICO|Folio:' + folioStr + '|' + (r.nombre||'') + '|' + (_fpU.fecha||r.fecha_recibo||r.fecha||'') + ' ' + (_fpU.hora||r.hora_recibo||r.hora||'');
+      var qrURL = await qrToDataURL(qrTxt);
+      var doc = await generarPDF(datosR, r.folio, qrURL);
+      r.pdfBase64 = doc.output('datauristring');
+      var r2n = (typeof _nombreArchivoR2 === 'function') ? _nombreArchivoR2(folioStr, r.nombre||'') : folioStr+'.pdf';
+      var _okSubida = false;
+      try { _okSubida = await subirPDFaDrive(doc.output('blob'), folioStr + '.pdf', r2n); } catch(e2){}
+      if (_okSubida === false) throw new Error('no se pudo subir el PDF');
+      ok++;
+    } catch(e) {
+      console.warn('[regenerarPDFsSerieB] error en folio', r.folio, e);
+      err++;
+    }
+    await new Promise(function(res){ setTimeout(res, 100); });
+  }
+  try { await actualizarArchivoControl(); } catch(e){}
+  try { await syncEstadoSupabase(); } catch(e){}
+  if(typeof toast==='function') toast('OK: ' + ok + ' recibos B, C, D… regenerados' + (err ? ' · ' + err + ' con error (ver consola)' : ''), err ? 'err' : 'ok');
+}
+
 async function adminRegenerarPDFsDocumentos() {
   var recibos = (appData.recibos || []).filter(function(r){ return r && r.folio != null; });
   if (!recibos.length) { if(typeof toast==='function') toast('No hay recibos para regenerar', 'err'); return; }
-  if (!confirm('Regenerar TODOS los PDFs (' + recibos.length + ') con el formato más reciente?\n\nAplica TODO lo último: (1) ya no se imprime "PAGOS PARCIALES" — ese detalle ahora vive en la Ficha del Folio (Autorizó incluido); (2) corrige la etiqueta Copia Simple/Escaneo en "DOCUMENTOS QUE DEJA EL INTERESADO"; (3) en actualizaciones de Costo Pactado sin Servicio Complementario, la columna cambia a SALDO RESTANTE con LIQUIDACIÓN TOTAL/ADEUDO ANTERIOR; (4) corrige el saldo en $0.00 que salía mal al reimprimir/regenerar; (5) agrega la caja "PAGO REGISTRADO EN ESTE RECIBO" también en los recibos originales (letra A), mostrando el anticipo dejado en ese recibo; (6) en esa misma caja, la columna Descripción ahora solo muestra "Autorizó: [iniciales]" — ya no el texto completo con folio y fecha repetidos.\n\nEsto reemplaza el archivo PDF guardado de cada recibo por una versión nueva. El papel ya firmado no cambia, solo el PDF archivado en el sistema.\n\nEl proceso tarda unos segundos por recibo. No cierres la app.')) return;
+  if (!confirm('Regenerar TODOS los PDFs (' + recibos.length + ') con el formato más reciente?\n\nAplica TODO lo último: (0) los recibos B, C, D… salen con el nuevo ESTADO DE CUENTA del trámite (lo pagado antes con folio y fecha, pago recibido hoy, saldo restante y total pagado del trámite); (1) ya no se imprime "PAGOS PARCIALES" — ese detalle ahora vive en la Ficha del Folio (Autorizó incluido); (2) corrige la etiqueta Copia Simple/Escaneo en "DOCUMENTOS QUE DEJA EL INTERESADO"; (3) en actualizaciones de Costo Pactado sin Servicio Complementario, la columna cambia a SALDO RESTANTE con LIQUIDACIÓN TOTAL/ADEUDO ANTERIOR; (4) corrige el saldo en $0.00 que salía mal al reimprimir/regenerar; (5) agrega la caja "PAGO REGISTRADO EN ESTE RECIBO" también en los recibos originales (letra A), mostrando el anticipo dejado en ese recibo; (6) en esa misma caja, la columna Descripción ahora solo muestra "Autorizó: [iniciales]" — ya no el texto completo con folio y fecha repetidos.\n\nEsto reemplaza el archivo PDF guardado de cada recibo por una versión nueva. El papel ya firmado no cambia, solo el PDF archivado en el sistema.\n\nEl proceso tarda unos segundos por recibo. No cierres la app.')) return;
   var ok = 0, err = 0;
   for (var i = 0; i < recibos.length; i++) {
     var r = recibos[i];
@@ -4451,7 +4522,7 @@ async function adminRegenerarPDFsDocumentos() {
     try {
       var qrTxt = 'LEX-MEXICO|Folio:' + folioStr + '|' + (r.nombre||'') + '|' + (r.fecha_recibo||r.fecha||'') + ' ' + (r.hora_recibo||r.hora||'');
       var qrURL = await qrToDataURL(qrTxt);
-      var doc = await generarPDF(Object.assign({}, r, { anio_folio: r.anio_folio||2026, letra: letra }), r.folio, qrURL);
+      var doc = await generarPDF(_datosRegenerarPDF(r, letra), r.folio, qrURL);
       r.pdfBase64 = doc.output('datauristring');
       var r2n = (typeof _nombreArchivoR2 === 'function') ? _nombreArchivoR2(folioStr, r.nombre||'') : folioStr+'.pdf';
       try { await subirPDFaDrive(doc.output('blob'), folioStr + '.pdf', r2n); } catch(e2){}
@@ -4485,7 +4556,7 @@ async function adminRegenerarPDFsVehiculares() {
     try {
       var qrTxt = 'LEX-MEXICO|Folio:' + folioStr + '|' + (r.nombre||'') + '|' + (r.fecha_recibo||r.fecha||'') + ' ' + (r.hora_recibo||r.hora||'');
       var qrURL = await qrToDataURL(qrTxt);
-      var doc = await generarPDF(Object.assign({}, r, { anio_folio: r.anio_folio||2026, letra: letra }), r.folio, qrURL);
+      var doc = await generarPDF(_datosRegenerarPDF(r, letra), r.folio, qrURL);
       r.pdfBase64 = doc.output('datauristring');
       var r2n = (typeof _nombreArchivoR2 === 'function') ? _nombreArchivoR2(folioStr, r.nombre||'') : folioStr+'.pdf';
       try { await subirPDFaDrive(doc.output('blob'), folioStr + '.pdf', r2n); } catch(e2){}

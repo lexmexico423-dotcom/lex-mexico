@@ -1293,6 +1293,50 @@ async function reconciliarDeshacerUltimo(opts){
 // cancelar) y las escrituras nuevas se descartaban en silencio al sincronizar.
 // Ahora cada escritura tiene un id único y permanente; se empata por id y,
 // solo para copias viejas en memoria que aún no lo traen, por num.
+// FIX (caso real: corte de caja del 01-oct-2026, $35,884): los cierres se
+// subían tal cual estaban en la memoria de la pestaña, sin compararlos con el
+// servidor. Una pestaña abierta desde antes del corte (sin ese corte en
+// memoria) registró a la mañana siguiente el cierre automático pendiente del
+// 01-oct y, al guardar, subió su lista vieja — el corte desapareció de los
+// cierres y el "Saldo en caja" volvió a sumar lo ya entregado. Ahora se
+// fusionan local + servidor (nunca se pierde un cierre) dejando UNO por fecha,
+// con la misma prioridad que limpiarCierresDuplicados(): corte > cierre normal
+// > sin movimientos; luego el más completo; luego la hora más tardía.
+function _lexFusionarCierres(local, remoto){
+  const _todos = (Array.isArray(remoto) ? remoto : []).concat(Array.isArray(local) ? local : []);
+  const _prio = function(c){ return c.esCorte ? 0 : (c.sinMovimientos ? 2 : 1); };
+  const _mejor = {}, _sinFecha = [], _vistosSF = new Set();
+  // Los CORTES nunca se descartan entre sí (puede haber más de uno en un
+  // día); solo se quitan copias idénticas (misma fecha, hora y monto).
+  const _cortes = [], _vistosCorte = new Set();
+  _todos.forEach(function(c){
+    if(!c) return;
+    if(c.esCorte && c.fecha){
+      const kc = c.fecha + '|' + (c.hora||'') + '|' + String(c.saldoEntregado||'');
+      if(!_vistosCorte.has(kc)){ _vistosCorte.add(kc); _cortes.push(c); }
+      return;
+    }
+    if(!c.fecha){
+      const k = JSON.stringify(c);
+      if(!_vistosSF.has(k)){ _vistosSF.add(k); _sinFecha.push(c); }
+      return;
+    }
+    const a = _mejor[c.fecha];
+    if(!a){ _mejor[c.fecha] = c; return; }
+    if(_prio(c) !== _prio(a)){ if(_prio(c) < _prio(a)) _mejor[c.fecha] = c; return; }
+    const ca = (a.ingresos||0) + (a.egresos||0), cc = (c.ingresos||0) + (c.egresos||0);
+    if(cc !== ca){ if(cc > ca) _mejor[c.fecha] = c; return; }
+    if((c.hora||'') > (a.hora||'')) _mejor[c.fecha] = c;
+  });
+  // Un cierre normal/automático no convive con un corte de la misma fecha
+  // (mismo criterio que limpiarCierresDuplicados: el corte gana).
+  const _fechasCorte = new Set(_cortes.map(function(c){ return c.fecha; }));
+  const _normales = Object.keys(_mejor).filter(function(f){ return !_fechasCorte.has(f); })
+    .map(function(f){ return _mejor[f]; });
+  return _cortes.concat(_normales)
+    .sort(function(x,y){ return ((y.fecha||'')+'T'+(y.hora||'')).localeCompare((x.fecha||'')+'T'+(x.hora||'')); })
+    .concat(_sinFecha);
+}
 function _escNuevoId(){
   return 'ESC-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
 }
@@ -1473,6 +1517,10 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       const _sbEscriturasPreSync = Array.isArray(_sbDataPreSync.escrituras) ? _sbDataPreSync.escrituras : [];
       estado.escrituras = _lexFusionarEscrituras(D.escrituras, _sbEscriturasPreSync);
       D.escrituras = estado.escrituras;
+      // Cierres/cortes de caja: fusionar con el servidor antes de subir (ver
+      // _lexFusionarCierres) — una pestaña vieja ya no puede borrar un corte.
+      estado.cierres = _lexFusionarCierres(D.cierres, Array.isArray(_sbDataPreSync.cierres) ? _sbDataPreSync.cierres : []);
+      D.cierres = estado.cierres;
       // Fusionar tombstones
       if (_sbTombsPreSync.length > 0) {
         if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];

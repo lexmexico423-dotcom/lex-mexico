@@ -1392,8 +1392,122 @@ function _lexFusionarListaPorId(local, remoto){
   return _fusionadas.concat(_soloLocales);
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// GUARDIAS CONTRA PESTAÑAS VIEJAS (2026-10-02, caso real: el corte de
+// caja del 01-oct se borró dos veces). Una pestaña que carga una copia
+// VIEJA del sistema (publicación nueva recién terminada, caché del
+// navegador, o una pestaña olvidada abierta desde antes de una
+// actualización) ejecutaba código viejo sin las protecciones nuevas y, al
+// guardar, pisaba datos buenos del servidor.
+//
+// 1) GUARDIA DE VERSIÓN — compara las versiones (?v=) de los archivos que
+//    ESTA pestaña cargó contra las del index.html publicado AHORA en
+//    Cloudflare (no consulta Supabase). Si no coinciden, la pestaña deja
+//    de guardar y muestra un aviso a pantalla completa para recargar.
+//    Costo: una petición HEAD (solo encabezados) cada 2 minutos; el
+//    index.html completo solo se descarga al abrir y cuando cambia.
+// 2) PESTAÑA DORMIDA — si la pestaña estuvo oculta o la computadora
+//    suspendida 30+ min, al volver primero baja los datos del servidor
+//    antes de permitir guardar o cerrar caja; 8+ horas, se recarga sola.
+//    Costo en Supabase: una sola lectura normal al volver (el sistema ya
+//    lee cada 30 s mientras está abierto).
+// ═══════════════════════════════════════════════════════════════════
+window._lexVersionDesactualizada = false;
+var _lexVerEtagVerificado = null;
+var _lexVerUltimoChequeo = 0;
+var _lexVerChequeoEnCurso = null;
+function _lexFirmaScripts(srcs){
+  return (srcs || []).map(function(s){
+    var m = String(s || '').match(/(assets\/[^"'?#\s]+)\?v=([^"'&#\s]+)/);
+    return m ? (m[1] + '@' + m[2]) : null;
+  }).filter(Boolean).sort().join('|');
+}
+function _lexFirmaPropia(){
+  return _lexFirmaScripts(Array.from(document.scripts).map(function(s){ return s.getAttribute('src') || ''; }));
+}
+function _lexMostrarAvisoVersion(){
+  if (document.getElementById('lex-aviso-version')) return;
+  var d = document.createElement('div');
+  d.id = 'lex-aviso-version';
+  d.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(10,7,3,0.92);display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
+  d.innerHTML = '<div style="background:#fdfaf4;border:2px solid #c8952a;border-radius:12px;max-width:440px;padding:26px 28px;text-align:center;box-shadow:0 10px 40px rgba(0,0,0,0.5);">'
+    + '<div style="font-size:2rem;margin-bottom:6px;">🔄</div>'
+    + '<div style="font-family:serif;font-size:1.2rem;font-weight:700;color:#8c6518;margin-bottom:10px;">Hay una versión nueva del sistema</div>'
+    + '<div style="font-size:0.85rem;color:#4a3a20;line-height:1.55;margin-bottom:18px;">Esta pestaña tiene una versión anterior. Para proteger tu información <b>ya no guardará cambios</b> hasta que la recargues.</div>'
+    + '<button type="button" onclick="location.reload()" style="background:#8c6518;color:#fff;border:none;border-radius:8px;padding:10px 26px;font-weight:700;cursor:pointer;font-size:0.9rem;">Recargar ahora</button>'
+    + '</div>';
+  (document.body || document.documentElement).appendChild(d);
+}
+async function _lexVerificarVersion(forzar){
+  if (window._lexVersionDesactualizada) { _lexMostrarAvisoVersion(); return true; }
+  var propia = _lexFirmaPropia();
+  if (!propia) return false; // versión de un solo archivo (sin ?v=): no aplica
+  if (!forzar && (Date.now() - _lexVerUltimoChequeo) < 60000) return false;
+  if (_lexVerChequeoEnCurso) return _lexVerChequeoEnCurso;
+  _lexVerUltimoChequeo = Date.now();
+  _lexVerChequeoEnCurso = (async function(){
+    try {
+      var url = location.pathname || '/';
+      var h = await fetch(url, { method: 'HEAD', cache: 'no-store', credentials: 'same-origin', redirect: 'manual' });
+      if (!h || !h.ok) return false;
+      var etag = h.headers.get('etag') || h.headers.get('last-modified') || '';
+      if (etag && etag === _lexVerEtagVerificado) return false;
+      var r = await fetch(url + (url.indexOf('?') >= 0 ? '&' : '?') + '_lexv=' + Date.now(), { cache: 'no-store', credentials: 'same-origin', redirect: 'manual' });
+      if (!r || !r.ok) return false;
+      var html = await r.text();
+      var srcs = [];
+      html.replace(/<script[^>]+src=["']([^"']+)["']/gi, function(m, s){ srcs.push(s); return m; });
+      var remota = _lexFirmaScripts(srcs);
+      if (!remota) return false; // p. ej. pantalla de inicio de sesión de Cloudflare
+      if (remota !== propia) {
+        window._lexVersionDesactualizada = true;
+        _lexMostrarAvisoVersion();
+        return true;
+      }
+      _lexVerEtagVerificado = etag || null;
+      return false;
+    } catch (e) { return false; }
+    finally { _lexVerChequeoEnCurso = null; }
+  })();
+  return _lexVerChequeoEnCurso;
+}
+window._lexDatosFrescosPendiente = false;
+var _lexOcultaDesde = (typeof document !== 'undefined' && document.hidden) ? Date.now() : null;
+var _lexUltimoLatido = Date.now();
+async function _lexAlVolverDeAusencia(ausenteMs){
+  if (ausenteMs >= 8 * 3600 * 1000) { location.reload(); return; }
+  if (ausenteMs >= 30 * 60 * 1000 && !window._lexDatosFrescosPendiente) {
+    window._lexDatosFrescosPendiente = true;
+    try { if (typeof sincronizarFolio === 'function') await sincronizarFolio(true); }
+    catch (e) { console.warn('[lex] refresco al volver de ausencia:', e); }
+    finally { window._lexDatosFrescosPendiente = false; }
+  }
+  _lexVerificarVersion(true);
+}
+document.addEventListener('visibilitychange', function(){
+  if (document.hidden) { _lexOcultaDesde = Date.now(); return; }
+  var ausente = _lexOcultaDesde ? (Date.now() - _lexOcultaDesde) : 0;
+  _lexOcultaDesde = null;
+  _lexAlVolverDeAusencia(ausente);
+});
+setInterval(function(){
+  var ahora = Date.now();
+  var hueco = ahora - _lexUltimoLatido;
+  _lexUltimoLatido = ahora;
+  // Hueco grande entre latidos = la computadora estuvo suspendida.
+  if (hueco >= 30 * 60 * 1000) { _lexAlVolverDeAusencia(hueco); return; }
+  if (!document.hidden) _lexVerificarVersion(true);
+}, 120000);
+setTimeout(function(){ _lexVerificarVersion(true); }, 8000);
+
 async function syncEstadoSupabase(_intentoConcurrencia){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
+  // Guardias contra pestañas viejas (ver bloque de arriba).
+  if (window._lexDatosFrescosPendiente) {
+    setTimeout(function(){ if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); }, 3000);
+    return;
+  }
+  if (typeof _lexVerificarVersion === 'function' && await _lexVerificarVersion(false)) return;
   // Prevenir llamadas concurrentes — si ya hay una en curso, usar debounce
   if(_syncEnCurso) {
     clearTimeout(_syncDebounceTimer);
@@ -2015,6 +2129,8 @@ async function cerrarCajaAutomatico(fechaObjetivo) {
   const fechaCierre = fechaObjetivo || hoy();
   const esHoy = fechaCierre === hoy();
   if (esHoy && cajaBloqueada()) return;
+  // No cerrar caja con datos posiblemente viejos ni desde una versión anterior.
+  if (window._lexDatosFrescosPendiente || window._lexVersionDesactualizada) return;
   // Defensa extra: si ya existe un cierre para esa fecha (otro cliente se
   // adelantó, o se cerró manualmente mientras tanto), no duplicar — solo
   // limpiar la bandera pendiente.

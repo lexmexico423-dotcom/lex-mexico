@@ -1035,6 +1035,14 @@
     box-shadow: 0 2px 8px rgba(212,160,96,0.2);
   }
   .btn-serv-comp:hover { background: #fde8cc; border-color: #a05010; transform: translateY(-1px); }
+  /* Folio sin costo pactado ya liquidado: el botón pasa a "Generar nuevo recibo" en verde */
+  body.modo-consulta .btn-serv-comp.btn-nuevo-recibo {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    background: #1f883d; border: 1px solid #1a7f37; color: #ffffff;
+    font-weight: 700; border-radius: 6px; letter-spacing: 0.08em; padding: 9px 14px;
+    box-shadow: 0 1px 0 rgba(31,35,40,0.1);
+  }
+  body.modo-consulta .btn-serv-comp.btn-nuevo-recibo:hover { background: #1a7f37; border-color: #116329; color: #ffffff; transform: translateY(-1px); }
   .btn-cancelado {
     padding: 6px 10px;
     border: none;

@@ -588,6 +588,18 @@ async function activarModoConsulta(recibo){
   } else {
     document.body.classList.remove('folio-liquidado');
   }
+  // ── Sin Costo Total Pactado SIN adeudo (2026-10-03, a petición expresa) ──
+  // Cuando el juicio/escritura sin costo pactado no debe nada, "Pago total" y
+  // "Pago parcial" no tienen sentido (y confundían al personal): solo quedan
+  // "Generar nuevo recibo" — que es el mismo Servicio Complementario, solo
+  // cambia el nombre — y "Cerrar consulta". Si hay adeudo, todo sigue igual.
+  const _btnSCHeader = document.querySelector('#header-pago-btns .btn-serv-comp');
+  if(_btnSCHeader && !_btnSCHeader.dataset.textoOriginal) _btnSCHeader.dataset.textoOriginal = _btnSCHeader.textContent;
+  const _adeudoAbiertoHeader = (_esJuicioAbierto && typeof window._adeudoServicioComplementario === 'function')
+    ? window._adeudoServicioComplementario(recibo).total : 0;
+  const _abiertoSinAdeudo = _esJuicioAbierto && !recibo.cancelado && _adeudoAbiertoHeader <= 0.005;
+  document.body.classList.toggle('folio-abierto-sin-adeudo', _abiertoSinAdeudo);
+  if(_btnSCHeader) _btnSCHeader.textContent = _abiertoSinAdeudo ? '＋ GENERAR NUEVO RECIBO' : (_btnSCHeader.dataset.textoOriginal || '＋ SERVICIO COMPLEMENTARIO');
   // Si el recibo está cancelado: ocultar botones de pago y anular
   if(recibo.cancelado){
     document.body.classList.add('folio-cancelado');
@@ -7656,7 +7668,7 @@ function adminAbrirEdicionCompleta() {
   function _cargarFormEdicion() {
     // 1. Quitar TODAS las clases de modo
     ['modo-actualizacion','recibo-frozen','desde-liquidacion','actualizacion-impresa',
-     'modo-consulta','folio-liquidado','folio-cancelado','modo-edicion-completa',
+     'modo-consulta','folio-liquidado','folio-cancelado','folio-abierto-sin-adeudo','modo-edicion-completa',
      'paneles-busqueda-abiertos']
       .forEach(function(cl){ document.body.classList.remove(cl); });
     // 2. Cerrar panel de búsqueda

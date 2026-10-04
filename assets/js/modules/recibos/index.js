@@ -3627,6 +3627,31 @@ async function imprimirActualizacion(){
     showModal('Sin cambios','Agrega al menos un servicio complementario o un abono nuevo antes de imprimir.');
     return;
   }
+  // CANDADO (caso real: folio 91B — y antes 10B, 12B, 45B, 81B): en "PAGO
+  // TOTAL" el pago capturado DEBE ser exactamente el saldo pendiente más los
+  // Servicios Complementarios agregados en esta misma pantalla. Si no cuadra,
+  // el folio se marcaba como liquidado (saldo $0) y Contabilidad registraba el
+  // cobro completo, pero el recibo guardaba un pago menor — la Ficha y el PDF
+  // mostraban después un adeudo falso. Ahora no se deja imprimir hasta que cuadre.
+  if(document.body.classList.contains('desde-liquidacion')
+     && !(typeof window._abiertoSinCosto === 'function' && window._abiertoSinCosto(reciboEnActualizacion))){
+    const _saldoBaseLiq = parseFloat(reciboEnActualizacion.saldoPendiente) || 0;
+    const _ceNuevosLiq  = _costosExtraTmp.filter(c => c.locked !== true)
+      .reduce((s, c) => s + (parseFloat(c.precio) || 0), 0);
+    const _requeridoLiq = Math.round((_saldoBaseLiq + _ceNuevosLiq) * 100) / 100;
+    const _pagadoLiq    = Math.round(_abonosNuevosTmp.reduce((s, p) => s + (parseFloat(p.cantidad) || 0), 0) * 100) / 100;
+    if(Math.abs(_pagadoLiq - _requeridoLiq) > 0.5){
+      const _f = v => '$' + (typeof fmtMXN === 'function' ? fmtMXN(v) : v.toFixed(2));
+      showModal('El pago total no cuadra',
+        'Saldo pendiente: ' + _f(_saldoBaseLiq)
+        + (_ceNuevosLiq > 0 ? '<br>Servicios complementarios nuevos: + ' + _f(_ceNuevosLiq) : '')
+        + '<br>Total a liquidar: ' + _f(_requeridoLiq)
+        + '<br><br>Pago capturado: ' + _f(_pagadoLiq)
+        + '<br><br>Corrige el monto de "Liquidación total" a ' + _f(_requeridoLiq)
+        + '. Si el cliente no va a pagar todo, cancela y usa "Pago Parcial".');
+      return;
+    }
+  }
   // Todas las validaciones pasaron: activar flag justo antes de confirmar.
   // Si el usuario cancela el modal de confirmacion, desactivar el flag.
   window._activarRegistrandoRecibo();

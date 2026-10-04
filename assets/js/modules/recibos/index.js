@@ -1160,7 +1160,7 @@ function limpiarFormCompleto(){
   // 0. Quitar TODAS las clases de modo (actualización, congelado, consulta, etc.)
   paso('clases-body', ()=>{
     ['modo-actualizacion','recibo-frozen','desde-liquidacion','actualizacion-impresa',
-     'modo-consulta','folio-liquidado','folio-cancelado','modo-edicion-completa',
+     'modo-consulta','folio-liquidado','folio-cancelado','folio-abierto-sin-adeudo','modo-edicion-completa',
      'modo-restauracion',
      'paneles-busqueda-abiertos','paneles-abiertos-consulta','en-accion-pago'].forEach(c=>document.body.classList.remove(c));
     var _antReset = document.getElementById('anticipo'); if(_antReset) _antReset.readOnly = false;
@@ -3001,7 +3001,7 @@ function cancelarAbonoNuevo(){
   if(banner) banner.style.display='none';
   if(typeof limpiarFormCompleto==='function') limpiarFormCompleto();
   // Restaurar estado limpio con buscador visible
-  document.body.classList.remove('modo-consulta','folio-liquidado','folio-cancelado',
+  document.body.classList.remove('modo-consulta','folio-liquidado','folio-cancelado','folio-abierto-sin-adeudo',
     'modo-actualizacion','recibo-frozen','en-accion-pago','paneles-abiertos-consulta');
   if(typeof actualizarFolioDisplay==='function') actualizarFolioDisplay();
   if(typeof setStatus==='function') setStatus('ok','Folio #'+(typeof folioFormato==='function'?folioFormato(appData.folioActual):appData.folioActual)+' listo para capturar','ok');
@@ -7551,7 +7551,7 @@ function _abrirEdicionSecundario(r, recibos) {
   function _cargarSecundario() {
     // Limpiar clases de modo
     ['modo-actualizacion','recibo-frozen','desde-liquidacion','actualizacion-impresa',
-     'modo-consulta','folio-liquidado','folio-cancelado','modo-edicion-completa',
+     'modo-consulta','folio-liquidado','folio-cancelado','folio-abierto-sin-adeudo','modo-edicion-completa',
      'paneles-busqueda-abiertos']
       .forEach(function(cl){ document.body.classList.remove(cl); });
 
@@ -7807,7 +7807,7 @@ function editarReciboEnConsulta(rParam) {
   window._reciboEdicionBackup = r.folio;
   function _cargar() {
     ['modo-actualizacion','recibo-frozen','desde-liquidacion','actualizacion-impresa',
-     'modo-consulta','folio-liquidado','folio-cancelado','modo-edicion-completa',
+     'modo-consulta','folio-liquidado','folio-cancelado','folio-abierto-sin-adeudo','modo-edicion-completa',
      'paneles-busqueda-abiertos']
       .forEach(cl => document.body.classList.remove(cl));
     _panelesBusquedaAbiertos = false;

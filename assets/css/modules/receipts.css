@@ -937,6 +937,10 @@
   body.modo-consulta.folio-cancelado .btn-serv-comp { opacity: 0.38 !important; pointer-events: none !important; cursor: not-allowed !important; }
   /* Folio liquidado: deshabilitar Servicios Complementarios */
   body.modo-consulta.folio-liquidado .btn-serv-comp { opacity: 0.38 !important; pointer-events: none !important; cursor: not-allowed !important; }
+  /* Sin Costo Total Pactado sin adeudo: solo "Generar nuevo recibo" y "Cerrar consulta" */
+  body.modo-consulta.folio-abierto-sin-adeudo .btn-liquidacion,
+  body.modo-consulta.folio-abierto-sin-adeudo .btn-pago-parcial,
+  body.modo-consulta.folio-abierto-sin-adeudo .btn-cancelado { display: none !important; }
   /* Cuadro "Estado del folio anterior" — aspecto cancelado */
   #info-folio-anterior.cancelado-box {
     filter: grayscale(1);

@@ -599,7 +599,14 @@ async function activarModoConsulta(recibo){
     ? window._adeudoServicioComplementario(recibo).total : 0;
   const _abiertoSinAdeudo = _esJuicioAbierto && !recibo.cancelado && _adeudoAbiertoHeader <= 0.005;
   document.body.classList.toggle('folio-abierto-sin-adeudo', _abiertoSinAdeudo);
-  if(_btnSCHeader) _btnSCHeader.textContent = _abiertoSinAdeudo ? '＋ GENERAR NUEVO RECIBO' : (_btnSCHeader.dataset.textoOriginal || '＋ SERVICIO COMPLEMENTARIO');
+  if(_btnSCHeader){
+    _btnSCHeader.classList.toggle('btn-nuevo-recibo', _abiertoSinAdeudo);
+    if(_abiertoSinAdeudo){
+      _btnSCHeader.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink:0"><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16l-3-2-2 2-2-2-2 2-2-2-3 2"/><path d="M9 7h6M9 11h6M13 15h2"/></svg><span>GENERAR NUEVO RECIBO</span>';
+    } else {
+      _btnSCHeader.textContent = _btnSCHeader.dataset.textoOriginal || '＋ SERVICIO COMPLEMENTARIO';
+    }
+  }
   // Si el recibo está cancelado: ocultar botones de pago y anular
   if(recibo.cancelado){
     document.body.classList.add('folio-cancelado');

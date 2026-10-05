@@ -17485,7 +17485,7 @@ Recibo original im…</td>
 <script src="assets/js/modules/clientes/index.js?v=20260927c"></script>
 <script src="assets/js/modules/directorio/index.js?v=20260904d"></script>
 <script src="assets/js/modules/expedientes/index.js?v=20261004a"></script>
-<script src="assets/js/modules/documentos/index.js?v=20261004a"></script>
+<script src="assets/js/modules/documentos/index.js?v=20261005a"></script>
 <script src="assets/js/modules/integraciones/index.js?v=20260904d"></script>
 <script src="assets/js/modules/administracion/index.js?v=20261005a"></script>
 <script src="assets/js/modules/core/index.js?v=20260927a"></script>
@@ -18735,8 +18735,11 @@ Recibo original im…</td>
   </div>
   <div class="modal-ftr" style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap;">
     <div style="display:flex;gap:8px;align-items:center;">
-      <button class="btn btn-secondary" id="docPreviewBtnDescargar" onclick="_pVerDocDescargar()" style="display:none;">
+      <button class="btn" id="docPreviewBtnDescargar" onclick="_pVerDocDescargar()" style="display:none;background:#1a4a8a;color:#fff;border-color:#1a4a8a;">
         ⭳ Descargar
+      </button>
+      <button class="btn" id="docPreviewBtnImprimir" onclick="_pVerDocImprimir()" style="background:#fff;color:#1a4a8a;border:1.5px solid #1a4a8a;">
+        🖨 Imprimir
       </button>
       <button class="btn" id="docPreviewBtnEliminar" onclick="_pVerDocEliminar()" style="display:none;background:#c0161a;color:#fff;border-color:#c0161a;">
         🗑 Eliminar

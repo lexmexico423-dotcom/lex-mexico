@@ -675,6 +675,7 @@ async function sincronizarFolio(forzarSB){
           if(!Array.isArray(appData.recibos)) return;
           var _lbSB = JSON.parse(localStorage.getItem('lex-placas-liquidados') || '[]');
           var _borrados = 0;
+          var _docsPreservadosLb = false;
           D.pendientes = D.pendientes.filter(function(p){
             if(p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
             var _versLb = appData.recibos.filter(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
@@ -697,6 +698,9 @@ async function sincronizarFolio(forzarSB){
             if(_versLb.length === 0 || _cancelLb || !(saldo > 0)){
               var fs = String(p.reciboVinculadoFolio);
               if(_lbSB.indexOf(fs) < 0) _lbSB.push(fs);
+              // Respaldar los documentos del pendiente en el recibo ANTES de
+              // borrarlo — si no, el Expediente Digital queda vacío (folio 121).
+              if(typeof _placasPreservarDocsEnRecibo === 'function' && _placasPreservarDocsEnRecibo(p)) _docsPreservadosLb = true;
               _borrados++;
               return false;
             }
@@ -707,6 +711,8 @@ async function sincronizarFolio(forzarSB){
             console.log('[LEX] Limpieza SB-load: ' + _borrados + ' pendiente(s) de placas liquidados eliminados.');
             // Persistir en Supabase para que no vuelvan en la próxima recarga
             setTimeout(function(){ if(typeof save === 'function') save(); }, 800);
+            if(_docsPreservadosLb && typeof syncEstadoSupabaseDebounced === 'function')
+              setTimeout(function(){ syncEstadoSupabaseDebounced().catch(function(){}); }, 1200);
           }
           // Migración: propagar saldo mínimo real al registro A para folios históricos
           // donde _imprimirActualizacionReal nunca actualizó A (bug corregido en 2026-06-04).
@@ -4674,6 +4680,8 @@ function _eliminarPendientePorFolio(folio) {
     }
   } catch(e) {}
   if (idx >= 0) {
+    // Respaldar documentos del pendiente en el recibo antes de borrarlo (folio 121).
+    if (typeof _placasPreservarDocsEnRecibo === 'function') _placasPreservarDocsEnRecibo(D.pendientes[idx]);
     D.pendientes.splice(idx, 1);
     if (typeof save === 'function') save();
     if (typeof renderPend === 'function') renderPend();
@@ -5900,6 +5908,7 @@ function _marcarExpDigitalVinculado(folio, carpetaId){
       rv.expDigital.driveFolderId = carpetaId;
       rv.expDigital.driveFolderUrl = url;
       rv.expDigital.fecha = fecha;
+      rv.expDigital.carpetaPorFolio = true;
     }
   });
 }
@@ -9937,6 +9946,327 @@ function _expDigDocsArray(paraEscribir) {
   return [];
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// RESPALDO Y RECUPERACIÓN DE DOCUMENTOS DE PLACAS (oct-2026)
+// Caso real: folio 121 (y todos los vehiculares ya liquidados) — los archivos
+// adjuntos al pendiente de Placas se suben a Drive (Placas/NOMBRE/...), pero
+// la ÚNICA referencia a ellos (driveFileId/nombre) vivía dentro del pendiente.
+// Al liquidar el folio el pendiente se borra automáticamente y el Expediente
+// Digital del recibo quedaba vacío ("Sin archivos" / "Carpeta sin vincular"),
+// aunque las imágenes seguían intactas en Drive.
+//  1) _placasPreservarDocsEnRecibo(p): antes de borrar un pendiente de Placas,
+//     copia sus documentos a TODAS las versiones del recibo vinculado.
+//  2) _expDigRecuperarFolioDesdeDrive(r, token): para los que ya se perdieron,
+//     busca la carpeta Placas/NOMBRE en Drive (solo lectura, no crea ni borra)
+//     y vuelve a ligar los archivos que encuentre al recibo.
+// ══════════════════════════════════════════════════════════════════════
+function _expDigClaveDoc(d){
+  return d ? (d.driveFileId || ((d.nombre||'') + '|' + (d.bytes||''))) : '';
+}
+function _expDigFusionarDocs(prev, nuevos){
+  var out = Array.isArray(prev) ? prev.filter(Boolean).slice() : [];
+  var vistos = {};
+  out.forEach(function(d){ vistos[_expDigClaveDoc(d)] = 1; });
+  (nuevos || []).forEach(function(d){
+    if(!d) return;
+    var k = _expDigClaveDoc(d);
+    if(!k || vistos[k]) return;
+    vistos[k] = 1;
+    out.push(d);
+  });
+  return out;
+}
+// Escribe (fusionando, sin duplicar) la lista de documentos en todas las
+// versiones del folio y lo marca como vinculado en Drive. Devuelve true si
+// cambió algo (para saber si hay que subir a Supabase).
+function _expDigGuardarDocsEnFolio(folio, docs, extra){
+  if(!folio || typeof appData === 'undefined' || !Array.isArray(appData.recibos)) return false;
+  docs = (docs || []).filter(Boolean);
+  extra = extra || {};
+  var hoy = new Date().toLocaleDateString('es-MX',{timeZone:'America/Mexico_City',year:'numeric',month:'2-digit',day:'2-digit'}).split('/').reverse().join('-');
+  var cambio = false;
+  appData.recibos.forEach(function(rv){
+    if(!rv || rv.esComplemento || Number(rv.folio) !== Number(folio)) return;
+    if(docs.length){
+      var prev = Array.isArray(rv.expDigitalDocumentosPlacas) ? rv.expDigitalDocumentosPlacas : [];
+      var merged = _expDigFusionarDocs(prev, docs);
+      if(merged.length !== prev.length){ rv.expDigitalDocumentosPlacas = merged; cambio = true; }
+    }
+    var tieneDrive = (rv.expDigitalDocumentosPlacas || []).some(function(d){ return d && d.driveFileId; }) || !!extra.driveFolderId;
+    if(tieneDrive){
+      var ed = rv.expDigital || {};
+      if(ed.estatus !== 'vinculado' && ed.estatus !== 'enviado'){ ed.estatus = 'vinculado'; ed.fecha = ed.fecha || hoy; cambio = true; }
+      if(extra.driveFolderId && !ed.driveFolderId){
+        ed.driveFolderId = extra.driveFolderId;
+        ed.driveFolderUrl = 'https://drive.google.com/drive/folders/' + extra.driveFolderId;
+        cambio = true;
+      }
+      rv.expDigital = ed;
+    }
+  });
+  return cambio;
+}
+function _placasPreservarDocsEnRecibo(p){
+  try {
+    if(!p || !p.reciboVinculadoFolio) return false;
+    var docs = Array.isArray(p.documentos) ? p.documentos.filter(Boolean) : [];
+    var extra = p.expDigitalDriveFolderId ? { driveFolderId: p.expDigitalDriveFolderId } : {};
+    if(!docs.length && !extra.driveFolderId) return false;
+    var c = _expDigGuardarDocsEnFolio(p.reciboVinculadoFolio, docs, extra);
+    if(c) console.log('[Placas] Documentos del pendiente respaldados en el recibo — folio #' + p.reciboVinculadoFolio + ' (' + docs.length + ' archivo(s))');
+    return c;
+  } catch(e){ console.warn('[Placas] no se pudieron respaldar documentos del pendiente:', e); return false; }
+}
+// Posibles nombres de la carpeta del cliente en Drive: el adjuntar del
+// pendiente usa el nombre tal cual (a veces con espacio al final) y el del
+// Expediente Digital lo "sanitiza" — se prueban todas las variantes.
+function _expDigNombresCarpeta(r){
+  var base = [r && r.nombre, r && r.clientes && r.clientes[0] && r.clientes[0].nombre];
+  var out = [];
+  base.forEach(function(n){
+    if(!n) return;
+    var crudo = String(n);
+    [crudo, crudo.trim()].forEach(function(v){
+      [v, v.replace(/[^a-zA-Z0-9_\- ]/g,'_').substring(0,50)].forEach(function(x){
+        if(x && out.indexOf(x) < 0) out.push(x);
+      });
+    });
+  });
+  return out;
+}
+async function _expDigBuscarCarpetaCliente(token, nombres){
+  if(typeof driveBuscarCarpetaId !== 'function') return null;
+  window._driveFolderCache = window._driveFolderCache || {};
+  var placasId = window._driveFolderCache['Placas'];
+  if(!placasId){
+    placasId = await driveBuscarCarpetaId(token, 'Placas', '1TtVVL0Jbw6BFkwLw8Wo1LZfxLN0I_ndU');
+    if(!placasId) return null;
+    window._driveFolderCache['Placas'] = placasId;
+  }
+  for(var i = 0; i < nombres.length; i++){
+    var id = await driveBuscarCarpetaId(token, nombres[i], placasId);
+    if(id) return { id: id, nombre: nombres[i] };
+  }
+  return null;
+}
+// Devuelve cuántos archivos quedaron ligados a ESTE folio (0 si no hay nada en Drive).
+// Usa el organizador por folio: renombra/reparte la carpeta vieja del cliente
+// (una carpeta por folio con la fecha como distintivo) y liga lo que encuentre.
+async function _expDigRecuperarFolioDesdeDrive(r, token){
+  if(!r || !token || typeof _placasOrganizarCliente !== 'function') return 0;
+  var res = await _placasOrganizarCliente(token, r.nombre);
+  var x = (res.folios || []).filter(function(f){ return Number(f.folio) === Number(r.folio); })[0];
+  return x ? x.archivos : 0;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// UNA CARPETA DE DRIVE POR FOLIO (oct-2026, a petición expresa)
+// Antes la carpeta era Placas/NOMBRE DEL CLIENTE: si el mismo cliente tenía
+// dos trámites vehiculares, los archivos de ambos quedaban revueltos en la
+// misma carpeta. Ahora cada folio tiene la suya, con la fecha del recibo
+// como distintivo:   Placas/NOMBRE - DD-MM-AAAA
+// (si el mismo cliente tiene dos folios el MISMO día, al segundo se le
+// agrega " - F<folio>").  _placasOrganizarCliente() renombra/reparte las
+// carpetas viejas en Drive y vuelve a ligar los archivos a cada folio.
+// ══════════════════════════════════════════════════════════════════════
+var _PLACAS_DRIVE_ROOT = '1TtVVL0Jbw6BFkwLw8Wo1LZfxLN0I_ndU';
+function _placasNormNombre(n){ return String(n||'').trim().replace(/\s+/g,' ').toUpperCase(); }
+function _placasSanitizar(n){ return String(n||'').trim().replace(/[^a-zA-Z0-9_\- ]/g,'_').substring(0,50).trim(); }
+function _placasFechaISO(r){ return String((r && (r.fecha_recibo || r.fecha)) || '').slice(0,10); }
+function _placasFechaDMY(iso){
+  var m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m) return m[3] + '-' + m[2] + '-' + m[1];
+  var d = new Date();
+  return String(d.getDate()).padStart(2,'0') + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + d.getFullYear();
+}
+function _placasReciboA(folio){
+  if(typeof appData === 'undefined' || !Array.isArray(appData.recibos)) return null;
+  var vs = appData.recibos.filter(function(r){ return r && !r.esComplemento && Number(r.folio) === Number(folio); });
+  return vs.filter(function(r){ return (r.letra||'A') === 'A'; })[0] || vs[0] || null;
+}
+// Folios vehiculares (registro A) del mismo cliente, del más antiguo al más reciente.
+function _placasFoliosDelCliente(nombre){
+  var k = _placasNormNombre(nombre);
+  if(!k || typeof appData === 'undefined' || !Array.isArray(appData.recibos)) return [];
+  var vistos = {};
+  return appData.recibos.filter(function(r){
+    if(!r || r.esComplemento || r.tipoTramite !== 'vehicular') return false;
+    if(_placasNormNombre(r.nombre) !== k) return false;
+    if(vistos[r.folio]) return false;
+    vistos[r.folio] = 1; return true;
+  }).map(function(r){ return _placasReciboA(r.folio) || r; })
+    .sort(function(a,b){
+      var fa = _placasFechaISO(a), fb = _placasFechaISO(b);
+      return fa < fb ? -1 : (fa > fb ? 1 : Number(a.folio) - Number(b.folio));
+    });
+}
+// Nombre de la carpeta de Drive de un folio: "NOMBRE - DD-MM-AAAA".
+function _placasCarpetaNombre(folio, nombreFallback){
+  var rA = folio ? _placasReciboA(folio) : null;
+  var nombre = (rA && rA.nombre) || nombreFallback || 'cliente';
+  var iso = _placasFechaISO(rA);
+  var base = _placasSanitizar(nombre) + ' - ' + _placasFechaDMY(iso);
+  if(rA && iso){
+    // Mismo cliente y misma fecha en otro folio anterior → distinguir con el folio.
+    var mismoDia = _placasFoliosDelCliente(nombre).filter(function(x){ return _placasFechaISO(x) === iso; });
+    if(mismoDia.length > 1 && Number(mismoDia[0].folio) !== Number(rA.folio)) base += ' - F' + rA.folio;
+  }
+  return base;
+}
+async function _placasCarpetaRaiz(token, crear){
+  window._driveFolderCache = window._driveFolderCache || {};
+  if(window._driveFolderCache['Placas']) return window._driveFolderCache['Placas'];
+  var id = crear ? await driveObtenerOCrearCarpeta(token, 'Placas', _PLACAS_DRIVE_ROOT)
+                 : await driveBuscarCarpetaId(token, 'Placas', _PLACAS_DRIVE_ROOT);
+  if(id) window._driveFolderCache['Placas'] = id;
+  return id;
+}
+async function _placasDriveListar(token, folderId){
+  var q = encodeURIComponent("'" + folderId + "' in parents and trashed = false");
+  var fields = encodeURIComponent('files(id,name,mimeType,createdTime,size)');
+  var r = await fetch('https://www.googleapis.com/drive/v3/files?q=' + q + '&fields=' + fields + '&pageSize=500', { headers: { Authorization: 'Bearer ' + token } });
+  if(!r.ok) throw new Error('No se pudo listar la carpeta de Drive (' + r.status + ')');
+  var d = await r.json();
+  return (d.files || []).filter(function(f){ return f.mimeType !== 'application/vnd.google-apps.folder'; });
+}
+async function _placasDriveRenombrar(token, id, nombre){
+  var r = await fetch('https://www.googleapis.com/drive/v3/files/' + id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: nombre })
+  });
+  if(!r.ok) throw new Error('No se pudo renombrar la carpeta (' + r.status + ')');
+}
+async function _placasDriveMover(token, fileId, desde, hacia){
+  var r = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '?addParents=' + hacia + '&removeParents=' + desde + '&fields=id', {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: '{}'
+  });
+  if(!r.ok) throw new Error('No se pudo mover el archivo (' + r.status + ')');
+}
+// Carpeta del folio (la crea si no existe). Devuelve { id, nombre }.
+async function _placasCarpetaFolio(token, folio, nombreFallback){
+  var nombre = _placasCarpetaNombre(folio, nombreFallback);
+  var key = 'Placas/' + nombre;
+  window._driveFolderCache = window._driveFolderCache || {};
+  if(window._driveFolderCache[key]) return { id: window._driveFolderCache[key], nombre: nombre };
+  var raiz = await _placasCarpetaRaiz(token, true);
+  if(!raiz) return { id: '', nombre: nombre };
+  var id = await driveObtenerOCrearCarpeta(token, nombre, raiz);
+  if(id) window._driveFolderCache[key] = id;
+  return { id: id || '', nombre: nombre };
+}
+// Marca en todas las versiones del folio la carpeta propia de Drive.
+function _placasMarcarCarpetaFolio(folio, carpetaId){
+  if(!carpetaId || typeof appData === 'undefined' || !Array.isArray(appData.recibos)) return;
+  var hoy = new Date().toLocaleDateString('es-MX',{timeZone:'America/Mexico_City',year:'numeric',month:'2-digit',day:'2-digit'}).split('/').reverse().join('-');
+  appData.recibos.forEach(function(rv){
+    if(!rv || rv.esComplemento || Number(rv.folio) !== Number(folio)) return;
+    var ed = rv.expDigital || {};
+    ed.estatus = (ed.estatus === 'enviado') ? 'enviado' : 'vinculado';
+    ed.fecha = ed.fecha || hoy;
+    ed.driveFolderId = carpetaId;
+    ed.driveFolderUrl = 'https://drive.google.com/drive/folders/' + carpetaId;
+    ed.carpetaPorFolio = true;
+    rv.expDigital = ed;
+  });
+}
+// Reparte y renombra las carpetas del cliente: una por folio. Los archivos
+// conocidos (driveFileId registrado en el pendiente o en el recibo) van a su
+// folio; los demás se asignan por fecha de creación (al folio más reciente
+// cuya fecha sea anterior o igual a la del archivo). Solo renombra y mueve:
+// nunca borra nada.  Devuelve un resumen por folio.
+async function _placasOrganizarCliente(token, nombre){
+  var res = { folios: [], movidos: 0, renombradas: 0, ligados: 0, errores: [] };
+  var folios = _placasFoliosDelCliente(nombre);
+  if(!folios.length) return res;
+  var raiz = await _placasCarpetaRaiz(token, false);
+  if(!raiz) return res;
+  var pendDe = function(folio){
+    return ((typeof D !== 'undefined' && D.pendientes) || []).filter(function(p){ return p && p.seccion === 'placas' && Number(p.reciboVinculadoFolio) === Number(folio); })[0] || null;
+  };
+  // 1) Carpetas viejas (por nombre del cliente, en todas sus variantes)
+  var variantes = [];
+  folios.forEach(function(r){ _expDigNombresCarpeta(r).forEach(function(v){ if(variantes.indexOf(v) < 0) variantes.push(v); }); });
+  var viejas = [];
+  for(var vi = 0; vi < variantes.length; vi++){
+    var idV = await driveBuscarCarpetaId(token, variantes[vi], raiz);
+    if(idV && viejas.indexOf(idV) < 0) viejas.push(idV);
+  }
+  // Archivos ya registrados → folio dueño
+  var duenoPorArchivo = {};
+  folios.forEach(function(rA){
+    var p = pendDe(rA.folio);
+    var docs = [].concat((p && p.documentos) || []);
+    (appData.recibos || []).forEach(function(rv){ if(Number(rv.folio) === Number(rA.folio)) docs = docs.concat(rv.expDigitalDocumentosPlacas || []); });
+    docs.forEach(function(d){ if(d && d.driveFileId) duenoPorArchivo[d.driveFileId] = Number(rA.folio); });
+  });
+  // 2) Carpeta destino de cada folio (la del más antiguo reutiliza la vieja, renombrándola)
+  var destino = {}, viejasLibres = viejas.slice();
+  for(var i = 0; i < folios.length; i++){
+    var rA = folios[i], nom = _placasCarpetaNombre(rA.folio);
+    var id = await driveBuscarCarpetaId(token, nom, raiz);
+    if(!id && viejasLibres.length){
+      id = viejasLibres.shift();
+      try { await _placasDriveRenombrar(token, id, nom); res.renombradas++; }
+      catch(e){ res.errores.push('#' + rA.folio + ': ' + e.message); id = ''; }
+    }
+    if(!id) id = await driveObtenerOCrearCarpeta(token, nom, raiz);
+    destino[rA.folio] = { id: id, nombre: nom };
+    window._driveFolderCache = window._driveFolderCache || {};
+    if(id) window._driveFolderCache['Placas/' + nom] = id;
+  }
+  // 3) Repartir los archivos de las carpetas viejas
+  var folioPorFecha = function(created){
+    var dia = String(created || '').slice(0,10), elegido = folios[0];
+    folios.forEach(function(r){ var f = _placasFechaISO(r); if(f && f <= dia) elegido = r; });
+    return elegido;
+  };
+  for(var j = 0; j < viejas.length; j++){
+    var origen = viejas[j];
+    var archivos = [];
+    try { archivos = await _placasDriveListar(token, origen); } catch(e){ res.errores.push(e.message); continue; }
+    for(var k = 0; k < archivos.length; k++){
+      var f = archivos[k];
+      var folioDueno = duenoPorArchivo[f.id] || Number(folioPorFecha(f.createdTime).folio);
+      var dest = destino[folioDueno];
+      if(!dest || !dest.id || dest.id === origen) continue;
+      try { await _placasDriveMover(token, f.id, origen, dest.id); res.movidos++; }
+      catch(e){ res.errores.push(f.name + ': ' + e.message); }
+    }
+  }
+  // 4) Ligar al folio todo lo que quedó en su carpeta
+  for(var m = 0; m < folios.length; m++){
+    var rF = folios[m], dst = destino[rF.folio];
+    if(!dst || !dst.id) continue;
+    var lista = [];
+    try { lista = await _placasDriveListar(token, dst.id); } catch(e){ res.errores.push(e.message); continue; }
+    var porId = {};
+    var docs = lista.map(function(f){
+      porId[f.id] = f;
+      return { nombre: f.name, tipo: f.mimeType, bytes: Number(f.size)||undefined, driveFileId: f.id, drivePath: 'Placas/' + dst.nombre + '/' + f.name };
+    });
+    var p = pendDe(rF.folio);
+    if(p){
+      // Pendiente activo: actualizar la ruta de los que ya tenía y agregar los que falten.
+      (p.documentos || []).forEach(function(d){ if(d && porId[d.driveFileId]) d.drivePath = 'Placas/' + dst.nombre + '/' + porId[d.driveFileId].name; });
+      var antes = (p.documentos || []).length;
+      p.documentos = _expDigFusionarDocs(p.documentos || [], docs);
+      p.expDigitalDriveFolderId = dst.id;
+      res.ligados += p.documentos.length - antes;
+    } else {
+      (appData.recibos || []).forEach(function(rv){
+        if(Number(rv.folio) !== Number(rF.folio)) return;
+        (rv.expDigitalDocumentosPlacas || []).forEach(function(d){ if(d && porId[d.driveFileId]) d.drivePath = 'Placas/' + dst.nombre + '/' + porId[d.driveFileId].name; });
+      });
+      var prevN = ((_placasReciboA(rF.folio) || {}).expDigitalDocumentosPlacas || []).length;
+      _expDigGuardarDocsEnFolio(rF.folio, docs, { driveFolderId: dst.id });
+      res.ligados += Math.max(0, ((_placasReciboA(rF.folio) || {}).expDigitalDocumentosPlacas || []).length - prevN);
+    }
+    _placasMarcarCarpetaFolio(rF.folio, dst.id);
+    res.folios.push({ folio: rF.folio, carpeta: dst.nombre, archivos: lista.length });
+  }
+  return res;
+}
+
 function _expDigAdjuntarClick() {
   var pend = _expDigPendienteActual();
   if (pend) {
@@ -9979,7 +10309,7 @@ function _expDigAdjuntarSinPendiente() {
     toast('Subiendo ' + archivos.length + ' archivo(s)...', 'ok');
     try {
       var token = '', carpetaCliente = '';
-      var nombreCliente = (r.nombre || 'cliente').replace(/[^a-zA-Z0-9_\- ]/g,'_').substring(0,50);
+      var nombreCliente = (typeof _placasCarpetaNombre === 'function') ? _placasCarpetaNombre(r.folio, r.nombre) : (r.nombre || 'cliente').replace(/[^a-zA-Z0-9_\- ]/g,'_').substring(0,50); // una carpeta por folio (NOMBRE - fecha)
       var cacheKey = 'Placas/' + nombreCliente;
       try {
         token = typeof driveGetAccessToken === 'function' ? await _sbConTimeout(driveGetAccessToken(), 10000, 'Drive token') : '';
@@ -10113,22 +10443,26 @@ async function _expDigIntentarReconstruirDesdeDrive() {
   var r = _expDigState.recibo;
   if (!r) return;
   if (_expDigDocsArray(false).length) return; // ya hay algo registrado, no hace falta
-  var folderId = r.expDigital && r.expDigital.driveFolderId;
-  if (!folderId) return;
+  // Con pendiente de Placas activo los documentos viven en el pendiente — no tocar.
+  if (_expDigPendienteActual()) return;
+  // FIX (oct-2026, folio 121): antes solo se intentaba si el recibo ya tenía
+  // driveFolderId registrado — los folios cuyo pendiente se borró al liquidar
+  // nunca lo tuvieron, así que su expediente quedaba vacío para siempre. Ahora
+  // también se busca la carpeta Placas/NOMBRE DEL CLIENTE en Drive (solo
+  // lectura) y se vuelven a ligar los archivos que ya estaban ahí.
   var prog = document.getElementById('exp-digital-progress');
   try {
     var token = await driveGetAccessToken();
     if (!token) return;
     if (prog) { prog.style.display = 'block'; prog.style.color = '#4a6ea8'; prog.textContent = 'Buscando archivos ya guardados en Drive...'; }
-    var archivos = await _sbConTimeout(_expDigListarCarpetaDrive(folderId, token), 15000, 'Listar carpeta Drive');
-    if (!archivos.length) { if (prog) { prog.style.display = 'none'; prog.textContent = ''; } return; }
-    var destino = _expDigDocsArray(true);
-    archivos.forEach(function(f){ destino.push({ nombre: f.name, tipo: f.mimeType, driveFileId: f.id }); });
+    var n = await _sbConTimeout(_expDigRecuperarFolioDesdeDrive(r, token), 20000, 'Buscar expediente en Drive');
+    if (prog) { prog.style.display = 'none'; prog.textContent = ''; }
+    if (!n) return;
     if (typeof save === 'function') save();
     if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
+    _expDigRenderStatus();
     _expDigRenderArchivos();
-    if (prog) { prog.style.display = 'none'; prog.textContent = ''; }
-    if (typeof toast === 'function') toast('📂 Se encontraron ' + archivos.length + ' archivo(s) ya guardados en Drive', 'ok');
+    if (typeof toast === 'function') toast('📂 Se recuperaron ' + n + ' archivo(s) que ya estaban guardados en Drive', 'ok');
   } catch(e) {
     console.warn('[ExpDig] no se pudo reconstruir desde Drive:', e);
     if (prog) { prog.style.display = 'none'; prog.textContent = ''; }
@@ -10146,7 +10480,7 @@ async function _expDigVincularCarpeta() {
     var token = await driveGetAccessToken();
     if (!token) throw new Error('Sin acceso a Google Drive. Autoriza en el Panel Admin.');
     if (prog) prog.textContent = 'Preparando carpeta en Drive...';
-    var nombreCliente = (r.nombre || 'cliente').replace(/[^a-zA-Z0-9_\- ]/g,'_').substring(0,50);
+    var nombreCliente = (typeof _placasCarpetaNombre === 'function') ? _placasCarpetaNombre(r.folio, r.nombre) : (r.nombre || 'cliente').replace(/[^a-zA-Z0-9_\- ]/g,'_').substring(0,50); // una carpeta por folio (NOMBRE - fecha)
     var cacheKey = 'Placas/' + nombreCliente;
     var carpetaCliente = window._driveFolderCache[cacheKey];
     if (!carpetaCliente) {
@@ -10200,7 +10534,7 @@ async function _expDigVerExpediente() {
   try {
     var token = await driveGetAccessToken();
     if (!token) throw new Error('Sin acceso a Google Drive. Autoriza en el Panel Admin.');
-    var nombreCliente = (r.nombre || 'cliente').replace(/[^a-zA-Z0-9_\- ]/g,'_').substring(0,50);
+    var nombreCliente = (typeof _placasCarpetaNombre === 'function') ? _placasCarpetaNombre(r.folio, r.nombre) : (r.nombre || 'cliente').replace(/[^a-zA-Z0-9_\- ]/g,'_').substring(0,50); // una carpeta por folio (NOMBRE - fecha)
     var cacheKey = 'Placas/' + nombreCliente;
     var carpetaCliente = window._driveFolderCache[cacheKey];
     if (!carpetaCliente) {

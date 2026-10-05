@@ -1242,25 +1242,40 @@ async function _docObtenerBlobActual(d){
   if (d.dataURL || d.base64) { const res = await fetch(d.dataURL || d.base64); return await res.blob(); }
   return null;
 }
-async function _pVerDocDescargar(){
+function _docDispararDescarga(blob, d){
+  const nombre = _docNombreDescarga(d);
+  const file = (typeof File === 'function') ? new File([blob], nombre, { type: blob.type || d.tipo || 'application/octet-stream' }) : blob;
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url; a.download = nombre; a.rel = 'noopener'; a.style.display = 'none';
+  document.body.appendChild(a);   // algunos navegadores (Brave/Firefox) ignoran el clic si el enlace no está en la página
+  a.click();
+  setTimeout(function(){ a.remove(); URL.revokeObjectURL(url); }, 60000);
+  if (typeof toast === 'function') toast('⭳ Descargado: ' + nombre + ' — si no aparece, revisa que el navegador permita descargas de este sitio', 'ok');
+}
+function _pVerDocDescargar(){
   const ctx = window._docPreviewCtx;
   if (!ctx || !ctx.d) return;
   const d = ctx.d;
+  // FIX (oct-2026, Brave): si el archivo ya está cargado en pantalla, la
+  // descarga se dispara EN EL MISMO CLIC, sin esperas de por medio. Con una
+  // espera (await) el navegador ya no la consideraba hecha por el usuario y
+  // la bloqueaba como "descarga automática" (ícono tachado en la barra).
+  if (window._docPrevBlob && window._docPrevBlob.d === d && window._docPrevBlob.blob) {
+    try { _docDispararDescarga(window._docPrevBlob.blob, d); }
+    catch(e){ console.error('[Descargar documento]', e); if (typeof toast === 'function') toast('Error al descargar: ' + ((e && e.message) || e), 'err'); }
+    return;
+  }
+  return _pVerDocDescargarAsync(d);
+}
+async function _pVerDocDescargarAsync(d){
   const btn = document.getElementById('docPreviewBtnDescargar');
   const txtOrig = btn ? btn.innerHTML : '';
   try {
     if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Descargando…'; }
     const blob = await _docObtenerBlobActual(d);
     if (!blob) throw new Error('Sin archivo');
-    const nombre = _docNombreDescarga(d);
-    const file = (typeof File === 'function') ? new File([blob], nombre, { type: blob.type || d.tipo || 'application/octet-stream' }) : blob;
-    const url = URL.createObjectURL(file);
-    const a = document.createElement('a');
-    a.href = url; a.download = nombre; a.style.display = 'none';
-    document.body.appendChild(a);   // algunos navegadores (Brave/Firefox) ignoran el clic si el enlace no está en la página
-    a.click();
-    setTimeout(function(){ a.remove(); URL.revokeObjectURL(url); }, 4000);
-    if (typeof toast === 'function') toast('⭳ Descargado: ' + nombre, 'ok');
+    _docDispararDescarga(blob, d);
   } catch(e) {
     console.error('[Descargar documento]', e);
     if (typeof toast === 'function') toast('Error al descargar: ' + ((e && e.message) || e), 'err');

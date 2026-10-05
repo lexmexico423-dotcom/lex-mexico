@@ -252,6 +252,13 @@
             <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a8e0b4;text-align:center;line-height:1.3;">Regenerar recibos<br>B, C, D…</div>
             <div style="font-family:monospace;font-size:0.5rem;color:rgba(168,224,180,0.65);text-align:center;line-height:1.4;padding:0 4px;">Vuelve a generar solo los recibos de continuación (B, C, D…) con el nuevo formato: estado de cuenta del trámite, lo pagado antes con folio y fecha, pago recibido hoy, saldo restante y total pagado. No toca los recibos A ni los cancelados.</div>
           </div>
+          <!-- 2e-1. Organizar expedientes de Placas en Drive: una carpeta por folio (2026-10-04) -->
+          <div onclick="adminRecuperarExpedientesPlacas()" style="position:relative;background:rgba(30,90,168,0.08);border:1.5px solid rgba(30,90,168,0.35);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;" onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#c8952a';this.style.boxShadow='0 8px 20px rgba(200,149,42,0.25)'" onmouseout="this.style.transform='';this.style.borderColor='rgba(30,90,168,0.35)';this.style.boxShadow=''">
+            <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
+            <div style="width:60px;height:60px;border-radius:14px;background:#0f2a4a;display:flex;align-items:center;justify-content:center;font-size:1.7rem;">📂</div>
+            <div style="font-family:sans-serif;font-size:0.78rem;font-weight:700;color:#a8c8f0;text-align:center;line-height:1.3;">Organizar expedientes<br>de Placas (Drive)</div>
+            <div style="font-family:monospace;font-size:0.5rem;color:rgba(168,200,240,0.65);text-align:center;line-height:1.4;padding:0 4px;">Deja una carpeta por folio en Drive (Placas/NOMBRE - fecha): renombra la carpeta de cada cliente, separa los archivos cuando el cliente tiene varios folios y los vuelve a ligar a su Expediente Digital. No borra nada.</div>
+          </div>
           <!-- 2e. Regenerar TODOS los PDFs con la plantilla/formato más reciente -->
           <div onclick="adminRegenerarPDFsDocumentos()" style="position:relative;background:rgba(200,149,42,0.08);border:1.5px solid rgba(200,149,42,0.32);border-radius:16px;padding:22px 10px 16px;display:flex;flex-direction:column;align-items:center;gap:10px;cursor:pointer;transition:transform 0.18s,box-shadow 0.18s,border-color 0.18s;" onmouseover="this.style.transform='translateY(-3px)';this.style.borderColor='#c8952a';this.style.boxShadow='0 8px 20px rgba(200,149,42,0.25)'" onmouseout="this.style.transform='';this.style.borderColor='rgba(200,149,42,0.32)';this.style.boxShadow=''">
             <span style="position:absolute;top:8px;right:9px;font-size:0.62rem;opacity:0.4;">🔒</span>
@@ -17472,15 +17479,15 @@ Recibo original im…</td>
 <!-- ═══ FIN EXPEDIENTE DIGITAL VEHICULAR ═══ -->
 
 <script src="assets/js/config/public-config.js?v=20260904d"></script>
-<script src="assets/js/modules/recibos/index.js?v=20261004c"></script>
+<script src="assets/js/modules/recibos/index.js?v=20261004e"></script>
 <script src="assets/js/modules/caja/index.js?v=20260904d"></script>
 <script src="assets/js/modules/contabilidad/index.js?v=20261002c"></script>
 <script src="assets/js/modules/clientes/index.js?v=20260927c"></script>
 <script src="assets/js/modules/directorio/index.js?v=20260904d"></script>
-<script src="assets/js/modules/expedientes/index.js?v=20260904d"></script>
+<script src="assets/js/modules/expedientes/index.js?v=20261004a"></script>
 <script src="assets/js/modules/documentos/index.js?v=20261004a"></script>
 <script src="assets/js/modules/integraciones/index.js?v=20260904d"></script>
-<script src="assets/js/modules/administracion/index.js?v=20261004a"></script>
+<script src="assets/js/modules/administracion/index.js?v=20261004c"></script>
 <script src="assets/js/modules/core/index.js?v=20260927a"></script>
 <script src="assets/js/compat/receipts-and-supabase.compat.js?v=20261002a"></script>
 <script src="assets/js/compat/operations-and-accounting.compat.js?v=20260921a"></script>
@@ -19408,7 +19415,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20261001b"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=20261004a"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

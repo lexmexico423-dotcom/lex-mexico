@@ -224,6 +224,22 @@
   body:not(.panel-nuevo-recibo) #actions-actualizacion,
   body:not(.panel-nuevo-recibo) #actions-post-print,
   body:not(.panel-nuevo-recibo) #actions-edicion-completa { display: none !important; }
+  /* FIX (oct-2026): algunos flujos (Pago Parcial / Pago Total / Servicio
+     Complementario) dejan en la barra un estilo INLINE "display:flex !important",
+     que le gana a la regla de arriba — si se salía a otro panel sin terminar
+     (o cancelar) la actualización, los botones "Cancelar / Imprimir
+     Actualización" se quedaban flotando en la pantalla Principal. Estas
+     propiedades no las toca ningún estilo inline, así que la barra queda
+     oculta de verdad fuera de "Generar Recibo", sin importar cómo llegó ahí. */
+  body:not(.panel-nuevo-recibo) #actions-normal,
+  body:not(.panel-nuevo-recibo) #actions-consulta,
+  body:not(.panel-nuevo-recibo) #actions-actualizacion,
+  body:not(.panel-nuevo-recibo) #actions-post-print,
+  body:not(.panel-nuevo-recibo) #actions-edicion-completa {
+    visibility: hidden !important; pointer-events: none !important;
+    max-height: 0 !important; height: 0 !important; overflow: hidden !important;
+    margin: 0 !important; padding: 0 !important; border: 0 !important;
+  }
   /* Barra "Total del periodo" de Contabilidad — oculta a pedido. */
   #contab-gran-total { display: none !important; }
   .btn { padding: 10px 22px; border: none; border-radius: 2px; cursor: pointer; font-family: 'DM Mono', monospace; font-size: 0.73rem; letter-spacing: 0.1em; text-transform: uppercase; transition: all 0.2s; }

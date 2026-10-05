@@ -1061,7 +1061,9 @@ textarea.cb-input.cb-textarea{
 .carp-tipo{font-size:0.68rem;color:var(--muted);margin-top:2px;}
 /* ───────── TOAST ───────── */
 .toast{
-  position:fixed;bottom:24px;right:24px;z-index:9999;
+  /* z-index máximo: el aviso debe verse ENCIMA de cualquier ventana abierta
+     (antes quedaba detrás del visor de documentos, z-index 20050). */
+  position:fixed;bottom:24px;right:24px;z-index:2147483000;
   background:var(--ink);color:var(--gold-l);
   border:1px solid rgba(200,149,42,0.3);border-radius:var(--radius);
   padding:10px 18px;font-family:monospace;font-size:0.7rem;

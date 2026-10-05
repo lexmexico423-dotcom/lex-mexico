@@ -1434,353 +1434,264 @@ function cerrarModalDriveDesconectado() {
   if (el) el.classList.remove('show');
 }
 
+// ── Estado de Cuenta (formato claro, 3 bloques) ──────────────────────────
+// A petición expresa (oct-2026): el formato anterior (tabla de 9 columnas con
+// Cargo / Adeudo anterior / Abono / Saldo restante) resultaba confuso para
+// empleados y clientes. Ahora el documento responde tres preguntas, en orden:
+//   1. COSTO DEL TRÁMITE  (una sola línea con el total; desglose chico solo
+//      si hubo más de un cargo, p. ej. un Servicio Complementario)
+//   2. CUÁNTO HA PAGADO   (una línea por pago: fecha · recibo · importe)
+//   3. CUÁNTO DEBE        (una sola leyenda: "TRÁMITE CONCLUIDO Y PAGADO" / "ADEUDO: $X")
+// Usa exactamente los mismos datos que ya calcula _calcularEstadoCuenta()
+// (datos.filas / datos.totales) — solo cambia la presentación.
+function _ecFechaLarga(iso){
+  var s = String(iso||'').slice(0,10);
+  var m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return s || '—';
+  var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return parseInt(m[3],10) + ' de ' + meses[parseInt(m[2],10)-1] + ' de ' + m[1];
+}
+
+function _ecFolioSinLetra(datos){
+  var s = String(datos.folioStr || datos.folio || '');
+  return s.replace(/[A-Za-z]$/, '');
+}
+
+// Convierte las filas del estado de cuenta en dos listas simples:
+// cargos (lo que cuesta) y pagos (lo que ha pagado).
+function _ecListas(datos){
+  var cargos = [], pagos = [];
+  (datos.filas || []).forEach(function(f){
+    if(!f) return;
+    var letra = String(f.folioStr||'').slice(-1).toUpperCase();
+    if((parseFloat(f.cargo)||0) > 0.005){
+      cargos.push({
+        concepto: String(f.concepto||'').trim() || 'Costo del trámite',
+        monto: parseFloat(f.cargo)||0,
+        esOriginal: letra === 'A',
+        fecha: f.fecha, recibo: f.folioStr, cancelado: !!f.cancelado
+      });
+    }
+    if((parseFloat(f.abono)||0) > 0.005){
+      pagos.push({ fecha: f.fecha, recibo: f.folioStr, monto: parseFloat(f.abono)||0, cancelado: !!f.cancelado });
+    }
+  });
+  return { cargos: cargos, pagos: pagos };
+}
+
+// Estado final del folio → una sola leyenda (sin recuadro), a petición expresa:
+//   pagado  → "TRÁMITE CONCLUIDO Y PAGADO"
+//   adeuda  → "ADEUDO: $X"
+function _ecEstado(datos){
+  var t = datos.totales || {};
+  var fmt = function(v){ return typeof fmtMXN==='function' ? fmtMXN(parseFloat(v||0)) : parseFloat(v||0).toFixed(2); };
+  if(t.cancelado){
+    var tipo = t.cancelacionTipo || '';
+    var monto = parseFloat(t.cancelacionMonto||0);
+    var extra = '';
+    if(monto > 0.005 && tipo !== 'sin_movimiento'){
+      extra = (tipo === 'ingreso' ? 'Honorarios por cancelación: $' : 'Reintegro al cliente: $') + fmt(monto);
+    }
+    return { clave:'cancelado', texto:'TRÁMITE CANCELADO', extra:extra, rgb:[150,28,28] };
+  }
+  var debe = parseFloat(t.adeudo||0);
+  if(debe > 0.005){
+    return { clave:'debe', texto:'ADEUDO: $' + fmt(debe), extra:'', rgb:[168,40,30] };
+  }
+  if(datos.abierto){
+    return { clave:'abierto', texto:'SIN ADEUDO POR AHORA · TRÁMITE EN CURSO',
+             extra:'Sin costo total pactado: pueden agregarse cargos conforme avance el trámite.', rgb:[26,110,58] };
+  }
+  return { clave:'pagado', texto:'TRÁMITE CONCLUIDO Y PAGADO',
+           extra: datos.placa ? ('Placas: ' + String(datos.placa).toUpperCase()) : '', rgb:[26,110,58] };
+}
+
 function generarPDFEstadoCuenta(datos){
   datos = datos || window._estadoCuentaDatos;
   if(!datos){ if(typeof toast==='function') toast('No hay datos de estado de cuenta cargados','err'); return; }
   var jsPDFctor = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : window.jsPDF;
-  var doc = new jsPDFctor({ orientation:'landscape', unit:'mm', format:'letter' });
+  var doc = new jsPDFctor({ orientation:'portrait', unit:'mm', format:'letter' });
   var W = doc.internal.pageSize.getWidth();
   var H = doc.internal.pageSize.getHeight();
-  var mL = 14, mR = W-14;
-  var fmt=function(v){ return typeof fmtMXN==='function'?fmtMXN(parseFloat(v||0)):parseFloat(v||0).toFixed(2); };
-  var y = 16;
+  var mL = 20, mR = W - 20;
+  var fmt = function(v){ return typeof fmtMXN==='function' ? fmtMXN(parseFloat(v||0)) : parseFloat(v||0).toFixed(2); };
+  var ahora = new Date();
+  var folioTxt = _ecFolioSinLetra(datos);
+  var listas = _ecListas(datos);
+  var estado = _ecEstado(datos);
+  var t = datos.totales || {};
+  // Paleta sobria tipo estado de cuenta bancario
+  var NAVY = [34,28,16], ORO = [176,138,52], ORO_CLARO = [226,206,150], TINTA = [28,24,18],
+      GRIS = [118,110,96], GRIS_CLARO = [222,216,204], FONDO = [248,245,238], VERDE = [26,110,58];
+  var y = 0;
+  var limiteY = H - 28;
 
-  // ── Paginación: antes todo el contenido se dibujaba en una sola hoja y, si
-  // el desglose de conceptos hacía la tabla más alta de lo normal, el
-  // recuadro "RESUMEN DEL FOLIO" y el pie de página terminaban encimados.
-  // Ahora se controla cuánto cabe por hoja y se agregan hojas adicionales
-  // cuando hace falta, con encabezado de tabla repetido y "Página X de Y"
-  // correcto en cada una (el total de páginas no se sabe hasta el final, así
-  // que ese número se rellena en una segunda pasada con doc.setPage()).
-  var _limiteYEC = H - 20;
-  var _paginaActualEC = 1;
-  var _paginasInfoEC = [];
-  function _piePaginaEC(pageNum){
-    var _yPieEC = H-14;
-    doc.setDrawColor(150,150,150); doc.setLineWidth(0.2);
-    doc.line(mL, _yPieEC-4, mR, _yPieEC-4);
-    doc.setFont('times','normal'); doc.setFontSize(7); doc.setTextColor(90,90,90);
-    var _fechaGenEC=ahora.toLocaleDateString('es-MX')+', '+String(ahora.getHours()).padStart(2,'0')+':'+String(ahora.getMinutes()).padStart(2,'0')+' hrs.';
-    doc.text('Generado el '+_fechaGenEC, mL, _yPieEC);
-    doc.text('Este documento es de carácter informativo y no es un recibo oficial de pago.', W/2, _yPieEC, {align:'center'});
-    doc.text('LEX-MÉXICO · Santiago Juxtlahuaca, Oaxaca · Tel. 953 128 7511', W/2, _yPieEC+4, {align:'center'});
-    doc.setTextColor(0,0,0);
-    _paginasInfoEC.push({pageNum:pageNum, yPie:_yPieEC});
+  function color(c){ doc.setTextColor(c[0],c[1],c[2]); }
+  function linea(x1,y1,x2,y2,c,w){ doc.setDrawColor(c[0],c[1],c[2]); doc.setLineWidth(w); doc.line(x1,y1,x2,y2); }
+  // jsPDF no considera charSpace al alinear a la derecha/centro: se calcula a mano.
+  function espaciado(txt, x, yy, align, cs){
+    txt = String(txt);
+    var w = doc.getTextWidth(txt) + cs * Math.max(0, txt.length - 1);
+    var x0 = align === 'right' ? x - w : (align === 'center' ? x - w/2 : x);
+    doc.text(txt, x0, yy, {charSpace: cs});
   }
-  var ahora=new Date(); // se necesita ya aquí porque _piePaginaEC la usa
-
-  // Bandera de "sin adeudo" (se usa más abajo para leyenda, placas y marca de agua).
-  // Un folio CANCELADO no cuenta como "concluido y liquidado" — es su propio
-  // tercer estado, con su propia leyenda/marca de agua (ver más abajo).
-  var _canceladoEC = !!(datos.totales && datos.totales.cancelado);
-  // Sin Costo Total Pactado y aún abierto: no se muestra el sello de
-  // "concluido" solo porque el saldo encadenado dé $0 en un momento dado —
-  // solo se considera concluido cuando se cierra manualmente el trámite.
-  var _abiertoEC = !!datos.abierto;
-  var _sinAdeudoWM = !_canceladoEC && !_abiertoEC && datos.totales && datos.totales.adeudo<=0.005;
-
-  doc.setFont('times','bold'); doc.setFontSize(16); doc.setTextColor(20,20,20);
-  doc.text('LEX-MÉXICO', W/2, y, {align:'center'});
-  y+=5.5;
-  doc.setFont('times','normal'); doc.setFontSize(9);
-  doc.text('Despacho Jurídico', W/2, y, {align:'center'});
-  y+=4.5;
-  doc.setFontSize(8);
-  doc.text('Calle Miguel Hidalgo esq. México No. 200, Local B, Col. Centro, Santiago Juxtlahuaca, Oaxaca', W/2, y, {align:'center'});
-  y+=4;
-  doc.text('Tel. oficina · informes y citas: 953 128 7511', W/2, y, {align:'center'});
-  y+=3.5;
-
-  // Doble raya punteada bajo el membrete
-  doc.setLineDashPattern([0.6,1], 0);
-  doc.setDrawColor(60,60,60); doc.setLineWidth(0.3);
-  doc.line(mL, y, mR, y);
-  y+=4;
-  doc.setLineDashPattern([], 0);
-
-  // Título + folio grande
-  doc.setFont('times','bold'); doc.setFontSize(12); doc.setTextColor(0,0,0);
-  doc.text('ESTADO DE CUENTA', mL, y+2);
-  doc.setFontSize(17);
-  doc.text('Folio: '+datos.folioStr, mR, y+2, {align:'right'});
-  y+=6.5;
-  doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(60,60,60);
-  var fechaEmision=ahora.toLocaleDateString('es-MX',{day:'numeric',month:'long',year:'numeric'})+', '+
-    String(ahora.getHours()).padStart(2,'0')+':'+String(ahora.getMinutes()).padStart(2,'0')+' hrs.';
-  doc.text('Fecha de emisión: '+fechaEmision, mR, y, {align:'right'});
-  y+=5;
-
-  // Caja punteada con datos del cliente
-  var boxY0=y;
-  doc.setFont('times','bold'); doc.setFontSize(8.5); doc.setTextColor(0,0,0);
-  doc.text('Cliente:', mL+2, y+4.5);
-  doc.setFont('times','normal');
-  doc.text(String(datos.nombre||'—'), mL+16, y+4.5);
-  var _contactoTxtPdf = String(datos.contacto||'—');
-  doc.setFont('times','normal');
-  doc.text(_contactoTxtPdf, mR-2, y+4.5, {align:'right'});
-  var _contactoWPdf = doc.getStringUnitWidth(_contactoTxtPdf)*8.5/doc.internal.scaleFactor;
-  doc.setFont('times','bold');
-  doc.text('Contacto:', mR-2-_contactoWPdf-2, y+4.5, {align:'right'});
-  doc.setFont('times','bold');
-  doc.text('Domicilio:', mL+2, y+9.5);
-  doc.setFont('times','normal');
-  doc.text(String(datos.domicilio||'—'), mL+18, y+9.5);
-  doc.setFont('times','bold');
-  doc.text('Trámite:', mL+2, y+14.5);
-  doc.setFont('times','normal');
-  doc.text(String(datos.tramite||'—'), mL+16, y+14.5);
-  y+=18.5;
-  doc.setLineDashPattern([0.6,1], 0);
-  doc.setDrawColor(60,60,60); doc.setLineWidth(0.25);
-  doc.rect(mL, boxY0, mR-mL, y-boxY0);
-  doc.setLineDashPattern([], 0);
-  y+=5;
-
-  // Tabla
-  var cols=[
-    {t:'FOLIO', w:16, align:'left'}, {t:'TIPO DE RECIBO', w:24, align:'left'},
-    {t:'FECHA', w:18, align:'left'}, {t:'CONCEPTO', w:38, align:'left'},
-    {t:'DESCRIPCIÓN', w:58, align:'left'}, {t:'CARGO', w:24, align:'right'},
-    {t:'ADEUDO ANT.', w:22, align:'right'},
-    {t:'ABONO', w:24, align:'right'}, {t:'SALDO REST.', w:24, align:'right'}
-  ];
-  var tableW=cols.reduce(function(s,c){return s+c.w;},0);
-  var x0=mL+(mR-mL-tableW)/2;
-  var rowH=6.2; // alto mínimo de una fila de una sola línea
-  var lineH=3.3; // alto por línea cuando el texto necesita envolver
-  var padTop=2.3;
-
-  // Posición X del borde izquierdo de cada columna (+ borde derecho final) —
-  // se usa para dibujar las líneas verticales que encasillan CARGO/ADEUDO
-  // ANT./ABONO/SALDO REST.
-  var colX=[]; (function(){ var cx=x0; cols.forEach(function(c){ colX.push(cx); cx+=c.w; }); colX.push(cx); })();
-  var MONEY_COLS=[5,6,7,8]; // CARGO, ADEUDO ANT., ABONO, SALDO REST.
-
-  // Envuelve el texto completo dentro del ancho de columna (varias líneas si
-  // hace falta) en vez de truncarlo con "…" — misma lógica que ya usa la
-  // ventana del modal (HTML normal), donde el texto siempre se ve completo.
-  function drawRow(vals, opts){
-    opts=opts||{};
-    doc.setFont('times', opts.bold?'bold':'normal');
-    doc.setFontSize(8);
-    var wrapped = cols.map(function(c,i){
-      var txt=String(vals[i]==null?'':vals[i]);
-      if(!txt) return [''];
-      var maxW=c.w-3;
-      var lines = doc.splitTextToSize(txt, maxW);
-      return lines && lines.length ? lines : [''];
-    });
-    var nLines = wrapped.reduce(function(m,l){ return Math.max(m,l.length); }, 1);
-    var rh = Math.max(rowH, padTop+2 + nLines*lineH);
-
-    var x=x0;
-    if(opts.shade){ doc.setFillColor(230,230,230); doc.rect(x0,y,tableW,rh,'F'); }
-    doc.setTextColor(opts.cancelado?150:0,opts.cancelado?150:0,opts.cancelado?145:0);
-    cols.forEach(function(c,i){
-      var lines=wrapped[i];
-      // Encabezado: nombre de cada casilla siempre centrado, sin importar
-      // cómo se alinee el dato de esa columna en las filas normales.
-      var align = opts.header ? 'center' : c.align;
-      var tx = align==='center' ? x+c.w/2 : (align==='right' ? x+c.w-2 : x+2);
-      lines.forEach(function(ln, li){
-        doc.text(ln, tx, y+padTop+li*lineH+2, {align:align});
-      });
-      // Recibo de cancelación: tachar solo las columnas de dinero (cargo/adeudo
-      // anterior/abono/saldo restante) — el trámite quedó sin efecto, el estado
-      // real vive en la leyenda. Los montos siempre caben en una sola línea.
-      if(opts.cancelado && MONEY_COLS.indexOf(i)>=0 && lines[0]){
-        var _twEC = doc.getStringUnitWidth(lines[0])*8/doc.internal.scaleFactor;
-        var _xEC = c.align==='right' ? tx-_twEC : tx;
-        var _tyEC = y+padTop+2-1.1;
-        doc.setDrawColor(150,150,145); doc.setLineWidth(0.3);
-        doc.line(_xEC, _tyEC, _xEC+_twEC, _tyEC);
-      }
-      x+=c.w;
-    });
-    y+=rh;
-    return rh;
+  function etiqueta(txt, x, yy, align){
+    doc.setFont('helvetica','normal'); doc.setFontSize(6.8); color(GRIS);
+    espaciado(String(txt).toUpperCase(), x, yy, align||'left', 0.35);
   }
-  // Mide cuánto va a ocupar una fila ANTES de dibujarla — se usa para decidir
-  // si hay que saltar de página antes de empezarla (evita partir una fila a
-  // la mitad y que el recuadro de resumen termine encimado con el pie).
-  function _alturaFilaEC(vals){
-    var nLines = 1;
-    cols.forEach(function(c,i){
-      var txt = String(vals[i]==null?'':vals[i]);
-      if(!txt) return;
-      var lines = doc.splitTextToSize(txt, c.w-3);
-      nLines = Math.max(nLines, lines && lines.length ? lines.length : 1);
-    });
-    return Math.max(rowH, padTop+2 + nLines*lineH);
+  function pie(){
+    var yp = H - 18;
+    linea(mL, yp, mR, yp, ORO, 0.4);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); color(GRIS);
+    doc.text('Documento informativo. Resume los recibos oficiales del folio ' + folioTxt + ' y no los sustituye.', mL, yp + 5);
+    doc.text('LEX-MÉXICO · Despacho Jurídico · Calle Miguel Hidalgo esq. México No. 200, Local B, Col. Centro, Santiago Juxtlahuaca, Oaxaca · Tel. 953 128 7511', mL, yp + 9);
   }
-  // Cierra el recuadro de la tabla en la página actual y dibuja el encabezado
-  // de columnas de nuevo al iniciar la siguiente.
-  function _saltoDePaginaTablaEC(){
-    doc.setDrawColor(0,0,0); doc.setLineWidth(0.3);
-    doc.rect(x0, _tablaTopY, tableW, y-_tablaTopY);
-    doc.setDrawColor(140,140,140); doc.setLineWidth(0.2);
-    MONEY_COLS.forEach(function(i){ doc.line(colX[i], _tablaTopY, colX[i], y); });
-    _piePaginaEC(_paginaActualEC);
-    doc.addPage();
-    _paginaActualEC++;
-    y = 16;
-    _tablaTopY = y;
-    drawRow(cols.map(function(c){return c.t;}), {shade:true, bold:true, header:true});
-    doc.setDrawColor(140,140,140); doc.setLineWidth(0.2);
-    doc.line(x0,y,x0+tableW,y);
-  }
-
-  var _tablaTopY = y;
-  drawRow(cols.map(function(c){return c.t;}), {shade:true, bold:true, header:true});
-  doc.setDrawColor(140,140,140); doc.setLineWidth(0.2);
-  doc.line(x0,y,x0+tableW,y);
-
-  datos.filas.forEach(function(f){
-    var vals = [
-      f.folioStr, f.tipo, _fechaCortaEC(f.fecha), f.concepto, f.descripcion,
-      (f.cargo>0.005?'$'+fmt(f.cargo):'—'), (f.adeudoAnterior>0.005?'$'+fmt(f.adeudoAnterior):'—'),
-      (f.abono>0.005?'$'+fmt(f.abono):'—'), (f.adeudo>0.005?'$'+fmt(f.adeudo):'—')
-    ];
-    if(y + _alturaFilaEC(vals) > _limiteYEC){
-      _saltoDePaginaTablaEC();
+  function encabezadoSeccion(titulo, monto, fechaTxt){
+    linea(mL + 0.4, y + 1, mL + 0.4, y + 8.5, ORO, 0.8);
+    linea(mL, y + 9, mR, y + 9, ORO_CLARO, 0.3);
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); color(NAVY);
+    doc.text(titulo, mL + 5, y + 6, {charSpace:0.3});
+    if(monto){ doc.setFontSize(11); color(TINTA); doc.text(monto, mR - 4, y + 6.2, {align:'right'}); }
+    if(fechaTxt){
+      doc.setFontSize(11); var _wM = monto ? doc.getTextWidth(monto) : 0;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9); color(GRIS);
+      doc.text(fechaTxt, mR - 4 - _wM - 8, y + 6.2, {align:'right'});
     }
-    drawRow(vals, {cancelado: !!f.cancelado});
-    doc.setDrawColor(210,210,210); doc.setLineWidth(0.15);
-    doc.line(x0,y,x0+tableW,y);
-  });
-
-  // Si lo que queda de la página no alcanza para el recuadro de resumen +
-  // leyenda (~60mm), se empieza una hoja nueva en vez de encimarlo con el pie.
-  if(y + 60 > _limiteYEC){
-    doc.setDrawColor(0,0,0); doc.setLineWidth(0.3);
-    doc.rect(x0, _tablaTopY, tableW, y-_tablaTopY);
-    doc.setDrawColor(140,140,140); doc.setLineWidth(0.2);
-    MONEY_COLS.forEach(function(i){ doc.line(colX[i], _tablaTopY, colX[i], y); });
-    _piePaginaEC(_paginaActualEC);
-    doc.addPage();
-    _paginaActualEC++;
-    y = 16;
-    _tablaTopY = y; // ya no se vuelve a usar para dibujar tabla, solo por si acaso
+    y += 9;
+  }
+  function asegurarEspacio(alto){
+    if(y + alto <= limiteY) return;
+    pie(); doc.addPage(); y = 20;
   }
 
-  var sinAdeudo=!_canceladoEC && !_abiertoEC && datos.totales.adeudo<=0.005;
-  var sinAdeudoAbierto=!_canceladoEC && _abiertoEC && datos.totales.adeudo<=0.005;
-  doc.setDrawColor(0,0,0); doc.setLineWidth(0.3);
-  doc.rect(x0, _tablaTopY, tableW, y-_tablaTopY);
-  // Líneas verticales que encasillan CARGO / ADEUDO ANT. / ABONO / SALDO REST.
-  // (empiezan en el borde izquierdo de CARGO y terminan en el derecho del
-  // último, que ya coincide con el borde derecho de la tabla).
-  doc.setDrawColor(140,140,140); doc.setLineWidth(0.2);
-  MONEY_COLS.forEach(function(i){ doc.line(colX[i], _tablaTopY, colX[i], y); });
+  // ── Encabezado sin rellenos (ahorro de tinta): solo texto y filetes finos ──
+  doc.setFont('times','bold'); doc.setFontSize(20); color(ORO);
+  doc.text('LEX-MÉXICO', mL, 18);
+  doc.setFont('helvetica','normal'); doc.setFontSize(7.5); color(GRIS);
+  doc.text('DESPACHO JURÍDICO', mL, 24, {charSpace:1.2});
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); color(GRIS);
+  espaciado('ESTADO DE CUENTA', mR, 13, 'right', 1);
+  doc.setFont('helvetica','bold'); doc.setFontSize(18); color(NAVY);
+  doc.text('Folio ' + folioTxt, mR, 22, {align:'right'});
+  linea(mL, 29, mR, 29, ORO, 0.7);
+  linea(mL, 30.2, mR, 30.2, ORO, 0.2);
+  y = 40;
 
-  // ── Resumen del folio — recuadro aparte (igual que en el modal), ya NO es
-  // una fila más dentro de la tabla de movimientos. ──
-  y+=8;
-  var _resW=72, _resX=mR-_resW, _resY0=y;
-  doc.setFont('times','bold'); doc.setFontSize(7.5); doc.setTextColor(0,0,0);
-  doc.setFillColor(230,230,230);
-  doc.rect(_resX, y, _resW, 6, 'F');
-  doc.text('RESUMEN DEL FOLIO', _resX+3, y+4);
-  y+=9;
-  doc.setFont('times','normal'); doc.setFontSize(8.5); doc.setTextColor(90,90,90);
-  doc.text('Total pactado', _resX+3, y);
-  doc.setTextColor(0,0,0);
-  doc.text((datos.totales.cargo>0.005?'$'+fmt(datos.totales.cargo):'—'), _resX+_resW-3, y, {align:'right'});
-  y+=5;
-  doc.setTextColor(90,90,90);
-  doc.text('Abonado', _resX+3, y);
-  doc.setTextColor(20,110,50);
-  doc.text((datos.totales.abono>0.005?'$'+fmt(datos.totales.abono):'—'), _resX+_resW-3, y, {align:'right'});
-  y+=3;
-  doc.setLineDashPattern([0.6,1],0);
-  doc.setDrawColor(170,150,110); doc.setLineWidth(0.2);
-  doc.line(_resX+3, y, _resX+_resW-3, y);
-  doc.setLineDashPattern([],0);
-  y+=5;
-  var _colorSaldoPdf = _canceladoEC ? [140,25,25] : (sinAdeudo ? [20,110,50] : [190,110,10]);
-  doc.setFont('times','bold'); doc.setFontSize(9);
-  doc.setTextColor(_colorSaldoPdf[0],_colorSaldoPdf[1],_colorSaldoPdf[2]);
-  doc.text('Saldo pendiente', _resX+3, y);
-  doc.text((datos.totales.adeudo>0.005?'$'+fmt(datos.totales.adeudo):'—'), _resX+_resW-3, y, {align:'right'});
-  doc.setTextColor(0,0,0);
-  y+=4;
-  doc.setDrawColor(120,110,90); doc.setLineWidth(0.3);
-  doc.rect(_resX, _resY0, _resW, y-_resY0);
+  // ── Datos del cliente (dos columnas) ──
+  var colB = mL + (mR - mL) * 0.62;
+  etiqueta('Cliente', mL, y);
+  etiqueta('Estado de cuenta impreso el:', colB, y);
+  y += 4.5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); color(TINTA);
+  doc.text(String(datos.nombre||'—').toUpperCase(), mL, y);
+  doc.setFont('helvetica','normal');
+  var _isoLocal = ahora.getFullYear() + '-' + String(ahora.getMonth()+1).padStart(2,'0') + '-' + String(ahora.getDate()).padStart(2,'0');
+  var _horaGen = String(ahora.getHours()).padStart(2,'0') + ':' + String(ahora.getMinutes()).padStart(2,'0') + ' hrs.';
+  doc.text(_ecFechaLarga(_isoLocal) + ', ' + _horaGen, colB, y);
+  y += 8;
+  etiqueta('Trámite', mL, y);
+  etiqueta('Contacto', colB, y);
+  y += 4.5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); color(TINTA);
+  var trLines = doc.splitTextToSize(String(datos.tramite||'—').toUpperCase(), colB - mL - 6);
+  doc.text(trLines, mL, y);
+  doc.setFont('helvetica','normal');
+  doc.text(String(datos.contacto||'—'), colB, y);
+  y += 4.5 * trLines.length + 5;
+  linea(mL, y, mR, y, GRIS_CLARO, 0.3);
+  y += 9;
 
-  y+=8;
-  doc.setFont('times','bold'); doc.setFontSize(9);
-  var leyenda = _canceladoEC ? 'TRÁMITE CANCELADO' : (sinAdeudo ? 'TRÁMITE CONCLUIDO Y LIQUIDADO' : (sinAdeudoAbierto ? 'SIN ADEUDO POR EL MOMENTO (TRÁMITE ABIERTO)' : ('ADEUDO PENDIENTE: $'+fmt(datos.totales.adeudo))));
-  if(_canceladoEC) doc.setTextColor(140,25,25);
-  var leyendaEsp = leyenda.split('').join(' ');
-  // Dashes calculados según el ancho real del texto (en vez de un conteo fijo)
-  // para que la línea no se desborde cuando la leyenda es más larga que "SIN ADEUDO".
-  var _anchoDisp = (mR-mL) - 10;
-  var _anchoTxt = doc.getStringUnitWidth(leyendaEsp)*9/doc.internal.scaleFactor;
-  var _anchoUnDash = doc.getStringUnitWidth('- ')*9/doc.internal.scaleFactor;
-  var _numDashes = Math.max(3, Math.floor(((_anchoDisp-_anchoTxt)/2)/_anchoUnDash));
-  var dashes = new Array(_numDashes+1).join('- ');
-  doc.text(dashes+leyendaEsp+' '+dashes, W/2, y, {align:'center'});
-  doc.setTextColor(0,0,0);
-  // Segunda línea: para cancelación, el monto real de la cancelación (reintegro
-  // al cliente / honorarios / sin movimiento); para trámite concluido, las
-  // placas del último recibo (solo si es de vehículos).
-  if(_canceladoEC){
-    var _canMontoPDF = parseFloat(datos.totales.cancelacionMonto||0);
-    var _canTipoPDF  = datos.totales.cancelacionTipo||'';
-    var _canLabelPDF = _canTipoPDF==='ingreso' ? 'Honorarios por cancelación' : (_canTipoPDF==='sin_movimiento' ? '' : 'Reintegro al cliente');
-    if(_canMontoPDF>0.005 && _canLabelPDF){
-      y+=5;
-      doc.setFont('times','bold'); doc.setFontSize(8.5); doc.setTextColor(140,25,25);
-      doc.text(_canLabelPDF+': $'+fmt(_canMontoPDF), W/2, y, {align:'center'});
-      doc.setTextColor(0,0,0);
-    }
-  } else if(sinAdeudo && datos.placa){
-    y+=5;
-    doc.setFont('times','normal'); doc.setFontSize(8); doc.setTextColor(70,70,70);
-    doc.text('Placas: '+String(datos.placa).toUpperCase(), W/2, y, {align:'center'});
-    doc.setTextColor(0,0,0);
-  } else if(sinAdeudoAbierto){
-    y+=5;
-    doc.setFont('times','normal'); doc.setFontSize(7.5); doc.setTextColor(90,90,90);
-    doc.text('Sin costo total pactado — el trámite se considera concluido solo al cerrarlo manualmente.', W/2, y, {align:'center'});
-    doc.setTextColor(0,0,0);
+  // ── 1. COSTO DEL TRÁMITE ──
+  asegurarEspacio(20);
+  // Fecha en que se firmó el recibo original (letra A) — a petición expresa.
+  var _cargoOrig = listas.cargos.filter(function(c){ return c.esOriginal; })[0];
+  var _filaA = (datos.filas||[]).filter(function(f){ return String(f.folioStr||'').slice(-1).toUpperCase()==='A'; })[0];
+  var _fechaFirma = (_cargoOrig && _cargoOrig.fecha) || (_filaA && _filaA.fecha) || '';
+  encabezadoSeccion('1. COSTO DEL TRÁMITE', '$' + fmt(t.cargo), _fechaFirma ? _ecFechaLarga(_fechaFirma) : '');
+  var cargosVisibles = listas.cargos.filter(function(c){ return !c.cancelado; });
+  if(cargosVisibles.length > 1){
+    y += 5.5;
+    cargosVisibles.forEach(function(c){
+      asegurarEspacio(6);
+      var et = c.esOriginal ? c.concepto : (c.concepto + '  ·  ' + _ecFechaLarga(c.fecha) + '  ·  recibo ' + c.recibo);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.8); color(GRIS);
+      var ls = doc.splitTextToSize(et, mR - mL - 45);
+      doc.text(ls, mL + 5, y);
+      doc.text('$' + fmt(c.monto), mR - 4, y, {align:'right'});
+      y += 4.6 * ls.length;
+    });
+    y -= 1;
   }
+  y += 10;
 
-  // Marca de agua horizontal, en el espacio en blanco que queda debajo de la
-  // leyenda y arriba del pie de página — "TRÁMITE CONCLUIDO" si se liquidó
-  // normalmente, "TRÁMITE CANCELADO" si el trámite se anuló.
-  if(_sinAdeudoWM || _canceladoEC){
-    var _wmTxt=_canceladoEC?'TRÁMITE CANCELADO':'TRÁMITE CONCLUIDO';
-    var _wmFont=44;
-    doc.setFont('times','bold');
-    while(_wmFont>10){
-      doc.setFontSize(_wmFont);
-      var _wmW=doc.getStringUnitWidth(_wmTxt)*_wmFont/doc.internal.scaleFactor;
-      if(_wmW <= (mR-mL)-16) break;
-      _wmFont-=2;
-    }
-    if(_canceladoEC) doc.setTextColor(230,205,205); else doc.setTextColor(218,218,218);
-    var _wmTop = y+6, _wmBottom = (H-18)-4;
-    var _wmY = _wmBottom>_wmTop ? _wmTop+(_wmBottom-_wmTop)/2 : _wmTop;
-    doc.text(_wmTxt, W/2, _wmY, {align:'center'});
-    doc.setTextColor(0,0,0);
+  // ── 2. CUÁNTO HA PAGADO ──
+  asegurarEspacio(30);
+  encabezadoSeccion('2. CUÁNTO HA PAGADO', '');
+  y += 6;
+  var xRec = mL + 70;
+  etiqueta('Fecha de pago', mL + 5, y);
+  etiqueta('Recibo', xRec, y);
+  etiqueta('Importe', mR - 4, y, 'right');
+  y += 2.5;
+  linea(mL, y, mR, y, GRIS_CLARO, 0.3);
+  y += 5.5;
+  if(!listas.pagos.length){
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); color(GRIS);
+    doc.text('Sin pagos registrados', mL + 5, y);
+    doc.text('$0.00', mR - 4, y, {align:'right'});
+    y += 3; linea(mL, y, mR, y, GRIS_CLARO, 0.2); y += 5.5;
+  } else {
+    listas.pagos.forEach(function(p){
+      asegurarEspacio(9);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.5); color(TINTA);
+      doc.text(_ecFechaLarga(p.fecha), mL + 5, y);
+      doc.text(String(p.recibo||''), xRec, y);
+      doc.text('$' + fmt(p.monto), mR - 4, y, {align:'right'});
+      y += 3; linea(mL, y, mR, y, GRIS_CLARO, 0.2); y += 5.5;
+    });
   }
+  // Recuadro aparte con "Total pagado" y "Resta por cubrir" — a petición
+  // expresa, para distinguir los totales de la lista de pagos. Solo contorno
+  // (sin relleno) para ahorrar tinta.
+  var _resta = t.cancelado ? 0 : Math.max(0, parseFloat(t.adeudo||0));
+  asegurarEspacio(26);
+  y += 2;
+  var _bxW = 95, _bxX = mR - _bxW, _bxY = y, _bxH = 20;
+  doc.setDrawColor(ORO[0],ORO[1],ORO[2]); doc.setLineWidth(0.45);
+  doc.roundedRect(_bxX, _bxY, _bxW, _bxH, 1.5, 1.5, 'S');
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); color(TINTA);
+  doc.text('Total pagado', _bxX + 5, _bxY + 7.5);
+  color(VERDE);
+  doc.text('$' + fmt(t.abono), mR - 5, _bxY + 7.5, {align:'right'});
+  linea(_bxX + 4, _bxY + 10.5, mR - 4, _bxY + 10.5, ORO_CLARO, 0.3);
+  color(TINTA);
+  doc.text('Resta por cubrir', _bxX + 5, _bxY + 16);
+  color(_resta > 0.005 ? [168,40,30] : TINTA);
+  doc.text('$' + fmt(_resta), mR - 5, _bxY + 16, {align:'right'});
+  y = _bxY + _bxH + 12;
 
-  // Pie de la última página.
-  _piePaginaEC(_paginaActualEC);
+  // ── 3. CUÁNTO DEBE ── (una sola leyenda, sin recuadro)
+  asegurarEspacio(34);
+  encabezadoSeccion('3. CUÁNTO DEBE', '');
+  y += 11;
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); color(estado.rgb);
+  espaciado(estado.texto, W/2, y, 'center', 0.6);
+  if(estado.extra){
+    y += 6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); color(GRIS);
+    doc.text(estado.extra, W/2, y, {align:'center'});
+  }
+  y += 6;
+  linea(W/2 - 45, y, W/2 + 45, y, ORO, 0.3);
 
-  // "Página X de Y" — el total de páginas no se conoce hasta este punto, así
-  // que se completa ahora en cada página ya generada con doc.setPage().
-  var _totalPaginasEC = doc.internal.getNumberOfPages();
-  _paginasInfoEC.forEach(function(info){
-    doc.setPage(info.pageNum);
-    doc.setFont('times','normal'); doc.setFontSize(7); doc.setTextColor(90,90,90);
-    doc.text('Página '+info.pageNum+' de '+_totalPaginasEC, mR, info.yPie, {align:'right'});
-    doc.setTextColor(0,0,0);
-  });
-  doc.setPage(_totalPaginasEC);
-
+  pie();
+  var total = doc.internal.getNumberOfPages();
+  for(var i=1;i<=total;i++){
+    doc.setPage(i);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); color(GRIS);
+    doc.text('Página ' + i + ' de ' + total, mR, H - 5, {align:'right'});
+  }
+  doc.setTextColor(0,0,0);
   return doc;
 }
 

@@ -8631,82 +8631,101 @@ function abrirEstadoCuenta(folioParam){
   var fmt=function(v){ return typeof fmtMXN==='function'?fmtMXN(parseFloat(v||0)):parseFloat(v||0).toFixed(2); };
   var esc=function(s){ return (typeof escHTML==='function')?escHTML(s||''):(s||''); };
 
-  var filasHtml = datos.filas.map(function(f){
-    var colAdeudo = f.adeudo>0 ? '#c8701a' : '#1a7a3a';
-    var _tachaEC = f.cancelado ? 'text-decoration:line-through;' : '';
-    return '<tr style="border-bottom:1px solid #ecdfa8;'+(f.cancelado?'opacity:0.65;':'')+'">'
-      +'<td style="padding:5px 8px;font-weight:700;color:'+(f.cancelado?'#8a1a1a':'#1a5fa8')+';font-family:monospace;">'+esc(f.folioStr)+'</td>'
-      +'<td style="padding:5px 8px;'+(f.cancelado?'color:#8a1a1a;font-weight:700;':'')+'">'+esc(f.tipo)+'</td>'
-      +'<td style="padding:5px 8px;font-family:monospace;">'+esc(_fechaCortaEC(f.fecha))+'</td>'
-      +'<td style="padding:5px 8px;">'+esc(f.concepto)+'</td>'
-      +'<td style="padding:5px 8px;">'+esc(f.descripcion)+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;font-family:monospace;border-left:1px solid #ecdfa8;'+_tachaEC+'">'+(f.cargo>0.005?'$'+fmt(f.cargo):'—')+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;font-family:monospace;color:#7a6840;border-left:1px solid #ecdfa8;'+_tachaEC+'">'+(f.adeudoAnterior>0.005?'$'+fmt(f.adeudoAnterior):'—')+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;font-family:monospace;color:#1a7a3a;border-left:1px solid #ecdfa8;'+_tachaEC+'">'+(f.abono>0.005?'$'+fmt(f.abono):'—')+'</td>'
-      +'<td style="padding:5px 8px;text-align:right;font-family:monospace;font-weight:700;color:'+colAdeudo+';border-left:1px solid #ecdfa8;border-right:1px solid #ecdfa8;'+_tachaEC+'">'+(f.adeudo>0.005?'$'+fmt(f.adeudo):'—')+'</td>'
-      +'</tr>';
-  }).join('');
+  // ── Formato claro (oct-2026): mismo contenido y orden que el PDF impreso ──
+  // 1. Costo del trámite · 2. Cuánto ha pagado (+ recuadro Total pagado /
+  // Resta por cubrir) · 3. Cuánto debe (una sola leyenda). Los helpers
+  // _ecListas/_ecEstado/_ecFechaLarga/_ecFolioSinLetra viven junto a
+  // generarPDFEstadoCuenta() para que pantalla e impresión digan lo mismo.
+  var listasEC = _ecListas(datos);
+  var estadoEC = _ecEstado(datos);
+  var folioTxtEC = _ecFolioSinLetra(datos);
+  var tEC = datos.totales || {};
+  var _restaEC = tEC.cancelado ? 0 : Math.max(0, parseFloat(tEC.adeudo||0));
+  var _cargosVisEC = listasEC.cargos.filter(function(c){ return !c.cancelado; });
+  var _cargoOrigEC = listasEC.cargos.filter(function(c){ return c.esOriginal; })[0];
+  var _filaAEC = (datos.filas||[]).filter(function(f){ return String(f.folioStr||'').slice(-1).toUpperCase()==='A'; })[0];
+  var _fechaFirmaEC = (_cargoOrigEC && _cargoOrigEC.fecha) || (_filaAEC && _filaAEC.fecha) || '';
+  var _rgbEC = 'rgb('+estadoEC.rgb.join(',')+')';
+  var ORO='#b08a34', ORO2='#e2ce96', TINTA='#1c1812', GRIS='#766e60', VERDE='#1a6e3a', ROJO='#a8281e';
+  var _lbl = function(txt){ return '<div style="font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:'+GRIS+';margin-bottom:2px;">'+txt+'</div>'; };
+  var _secc = function(titulo, derecha){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;border-left:3px solid '+ORO+';border-bottom:1px solid '+ORO2+';padding:6px 8px 6px 12px;margin-top:22px;">'
+      + '<span style="font-weight:700;font-size:0.82rem;letter-spacing:0.06em;color:#221c10;">'+titulo+'</span>'
+      + (derecha||'') + '</div>';
+  };
 
-  var cancelado = !!datos.totales.cancelado;
-  // Sin Costo Total Pactado y aún abierto: adeudo en $0 no es "concluido y
-  // liquidado" (podrían venir más cargos) — se muestra como "sin adeudo por
-  // el momento" en vez de dar por terminado el trámite.
-  var abiertoSinCosto = !!datos.abierto;
-  var sinAdeudo = !cancelado && !abiertoSinCosto && datos.totales.adeudo<=0.005;
-  var sinAdeudoAbierto = !cancelado && abiertoSinCosto && datos.totales.adeudo<=0.005;
-  var _canMontoModal = parseFloat(datos.totales.cancelacionMonto||0);
-  var _canTipoModal = datos.totales.cancelacionTipo||'';
-  var _canLabelModal = _canTipoModal==='ingreso' ? 'Honorarios por cancelación' : (_canTipoModal==='sin_movimiento' ? '' : 'Reintegro al cliente');
+  var _desgloseEC = '';
+  if(_cargosVisEC.length > 1){
+    _desgloseEC = '<div style="padding:6px 8px 0 16px;font-size:0.78rem;color:'+GRIS+';line-height:1.7;">'
+      + _cargosVisEC.map(function(c){
+          var et = c.esOriginal ? esc(c.concepto) : (esc(c.concepto)+' &nbsp;·&nbsp; '+esc(_ecFechaLarga(c.fecha))+' &nbsp;·&nbsp; recibo '+esc(c.recibo));
+          return '<div style="display:flex;justify-content:space-between;gap:12px;"><span>'+et+'</span><span>$'+fmt(c.monto)+'</span></div>';
+        }).join('')
+      + '</div>';
+  }
+
+  var _pagosEC = listasEC.pagos.length
+    ? listasEC.pagos.map(function(p){
+        return '<tr style="border-bottom:1px solid #ded8cc;">'
+          + '<td style="padding:7px 8px 7px 16px;">'+esc(_ecFechaLarga(p.fecha))+'</td>'
+          + '<td style="padding:7px 8px;">'+esc(p.recibo)+'</td>'
+          + '<td style="padding:7px 8px;text-align:right;">$'+fmt(p.monto)+'</td></tr>';
+      }).join('')
+    : '<tr style="border-bottom:1px solid #ded8cc;"><td colspan="3" style="padding:7px 8px 7px 16px;color:'+GRIS+';">Sin pagos registrados</td></tr>';
+
   var overlay=document.getElementById('estado-cuenta-overlay');
   if(overlay) overlay.remove();
   overlay=document.createElement('div');
   overlay.id='estado-cuenta-overlay';
   overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(20,14,4,0.55);z-index:99998;display:flex;align-items:center;justify-content:center;padding:18px;';
   overlay.innerHTML =
-    '<div style="background:#fffdf7;border:1px solid #d4b870;border-radius:10px;max-width:1440px;width:100%;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 12px 50px rgba(0,0,0,0.35);font-family:\'Outfit\',sans-serif;overflow:hidden;">'
-    +'<div style="background:#3a2a10;padding:12px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'
-    +  '<div style="color:#e8c875;font-weight:700;font-family:\'DM Mono\',monospace;font-size:0.8rem;letter-spacing:0.06em;">📄 ESTADO DE CUENTA · Folio '+esc(datos.folioStr)+'</div>'
+    '<div style="background:#ffffff;border:1px solid #d4b870;border-radius:10px;max-width:860px;width:100%;max-height:94vh;display:flex;flex-direction:column;box-shadow:0 12px 50px rgba(0,0,0,0.35);font-family:\'Outfit\',sans-serif;overflow:hidden;">'
+    +'<div style="background:#3a2a10;padding:10px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">'
+    +  '<div style="color:#e8c875;font-weight:700;font-family:\'DM Mono\',monospace;font-size:0.78rem;letter-spacing:0.06em;">📄 ESTADO DE CUENTA · Folio '+esc(folioTxtEC)+'</div>'
     +  '<div style="display:flex;gap:8px;">'
     +    '<button onclick="imprimirEstadoCuenta()" style="font-family:\'DM Mono\',monospace;font-size:0.68rem;font-weight:700;padding:6px 14px;border-radius:6px;border:1px solid #c8952a;background:#e8c875;color:#3a2a10;cursor:pointer;">🖨 Imprimir</button>'
     +    '<button onclick="cerrarEstadoCuenta()" style="font-family:\'DM Mono\',monospace;font-size:0.68rem;font-weight:700;padding:6px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.3);background:transparent;color:#e8c875;cursor:pointer;">✕ Cerrar</button>'
     +  '</div>'
     +'</div>'
-    +'<div style="overflow-y:auto;flex:1;padding:18px 22px;">'
-    +  '<div style="border:1px solid #d8c088;border-radius:6px;padding:10px 14px;margin-bottom:14px;font-size:0.8rem;color:#3a2a10;">'
-    +    '<div style="display:flex;justify-content:space-between;gap:12px;"><span><b>Cliente:</b> '+esc(datos.nombre)+'</span><span><b>Contacto:</b> '+esc(datos.contacto||'—')+'</span></div>'
-    +    (datos.domicilio?'<div style="margin-top:3px;"><b>Domicilio:</b> '+esc(datos.domicilio)+'</div>':'')
-    +    '<div style="margin-top:3px;"><b>Trámite:</b> '+esc(datos.tramite)+'</div>'
+    +'<div style="overflow-y:auto;flex:1;padding:22px 30px 26px;color:'+TINTA+';font-size:0.86rem;">'
+    // Encabezado
+    +  '<div style="display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:8px;border-bottom:3px double '+ORO+';">'
+    +    '<div><div style="font-family:Georgia,\'Times New Roman\',serif;font-weight:700;font-size:1.45rem;color:'+ORO+';line-height:1;">LEX-MÉXICO</div>'
+    +    '<div style="font-size:0.62rem;letter-spacing:0.3em;color:'+GRIS+';margin-top:5px;">DESPACHO JURÍDICO</div></div>'
+    +    '<div style="text-align:right;"><div style="font-size:0.64rem;letter-spacing:0.28em;color:'+GRIS+';">ESTADO DE CUENTA</div>'
+    +    '<div style="font-weight:700;font-size:1.35rem;color:#221c10;margin-top:2px;">Folio '+esc(folioTxtEC)+'</div></div>'
     +  '</div>'
-    +  '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">'
-    +    '<thead><tr style="background:#e8c875;color:#1a1008;font-family:\'DM Mono\',monospace;font-size:0.62rem;text-transform:uppercase;letter-spacing:0.04em;">'
-    +      '<th style="padding:6px 8px;text-align:left;">Folio</th><th style="padding:6px 8px;text-align:left;">Tipo de recibo</th>'
-    +      '<th style="padding:6px 8px;text-align:left;">Fecha</th><th style="padding:6px 8px;text-align:left;">Concepto</th>'
-    +      '<th style="padding:6px 8px;text-align:left;">Descripción</th><th style="padding:6px 8px;text-align:right;border-left:1px solid #b8934a;">Cargo</th>'
-    +      '<th style="padding:6px 8px;text-align:right;border-left:1px solid #b8934a;">Adeudo anterior</th>'
-    +      '<th style="padding:6px 8px;text-align:right;border-left:1px solid #b8934a;">Abono</th><th style="padding:6px 8px;text-align:right;border-left:1px solid #b8934a;border-right:1px solid #b8934a;">Saldo restante</th>'
-    +    '</tr></thead>'
-    +    '<tbody>'+filasHtml+'</tbody>'
+    // Datos
+    +  '<div style="display:grid;grid-template-columns:62% 38%;row-gap:12px;padding:14px 0 14px;border-bottom:1px solid #ded8cc;">'
+    // Ventana de consulta para empleados: NO lleva "Estado de cuenta impreso el:"
+    // (esa leyenda solo va en el PDF que se entrega al cliente).
+    +    '<div>'+_lbl('Cliente')+'<div style="font-weight:700;">'+esc(String(datos.nombre||'—').toUpperCase())+'</div></div>'
+    +    '<div>'+_lbl('Contacto')+'<div>'+esc(datos.contacto||'—')+'</div></div>'
+    +    '<div style="grid-column:1 / span 2;">'+_lbl('Trámite')+'<div style="font-weight:700;">'+esc(String(datos.tramite||'—').toUpperCase())+'</div></div>'
+    +  '</div>'
+    // 1. Costo del trámite
+    +  _secc('1. COSTO DEL TRÁMITE',
+         '<span style="display:flex;gap:18px;align-items:baseline;">'
+         + (_fechaFirmaEC ? '<span style="font-size:0.76rem;color:'+GRIS+';">'+esc(_ecFechaLarga(_fechaFirmaEC))+'</span>' : '')
+         + '<span style="font-weight:700;font-size:0.95rem;">$'+fmt(tEC.cargo)+'</span></span>')
+    +  _desgloseEC
+    // 2. Cuánto ha pagado
+    +  _secc('2. CUÁNTO HA PAGADO', '')
+    +  '<table style="width:100%;border-collapse:collapse;font-size:0.84rem;margin-top:4px;">'
+    +    '<tr style="border-bottom:1px solid #ded8cc;font-size:0.6rem;letter-spacing:0.12em;color:'+GRIS+';text-transform:uppercase;">'
+    +      '<td style="padding:8px 8px 4px 16px;">Fecha de pago</td><td style="padding:8px 8px 4px;">Recibo</td><td style="padding:8px 8px 4px;text-align:right;">Importe</td></tr>'
+    +    _pagosEC
     +  '</table>'
-    +  '<div style="margin:16px 0 0 auto;max-width:320px;border:1px solid #d4b870;border-radius:8px;overflow:hidden;">'
-    +    '<div style="background:#2a2013;color:#e8c875;font-family:\'DM Mono\',monospace;font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;padding:6px 14px;">Resumen del folio</div>'
-    +    '<div style="padding:10px 14px;font-family:\'DM Mono\',monospace;font-size:0.78rem;">'
-    +      '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:#7a6840;">Total pactado</span><strong>'+(datos.totales.cargo>0.005?'$'+fmt(datos.totales.cargo):'—')+'</strong></div>'
-    +      '<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="color:#7a6840;">Abonado</span><strong style="color:#1a7a3a;">'+(datos.totales.abono>0.005?'$'+fmt(datos.totales.abono):'—')+'</strong></div>'
-    +      '<div style="border-top:1px dashed #d4b870;margin:5px 0 4px;"></div>'
-    +      '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:0.85rem;"><span style="color:'+(cancelado?'#8a1a1a':(sinAdeudo?'#1a7a3a':'#c8701a'))+';font-weight:700;">Saldo pendiente</span><strong style="color:'+(cancelado?'#8a1a1a':(sinAdeudo?'#1a7a3a':'#c8701a'))+';">'+(datos.totales.adeudo>0.005?'$'+fmt(datos.totales.adeudo):'—')+'</strong></div>'
-    +    '</div>'
+    +  '<div style="margin:12px 0 0 auto;width:360px;max-width:100%;border:1.5px solid '+ORO+';border-radius:6px;padding:4px 14px;">'
+    +    '<div style="display:flex;justify-content:space-between;padding:7px 0;font-weight:700;border-bottom:1px solid '+ORO2+';"><span>Total pagado</span><span style="color:'+VERDE+';">$'+fmt(tEC.abono)+'</span></div>'
+    +    '<div style="display:flex;justify-content:space-between;padding:7px 0;font-weight:700;"><span>Resta por cubrir</span><span style="color:'+(_restaEC>0.005?ROJO:TINTA)+';">$'+fmt(_restaEC)+'</span></div>'
     +  '</div>'
-    +  '<div style="text-align:center;margin-top:16px;font-family:\'DM Mono\',monospace;font-size:0.72rem;font-weight:700;letter-spacing:0.05em;color:'+(cancelado?'#8a1a1a':(sinAdeudo?'#1a7a3a':'#c8701a'))+';">'
-    +    (cancelado ? '- - - - - - - - - - - T R Á M I T E &nbsp;C A N C E L A D O - - - - - - - - - - -'
-        : sinAdeudo ? '- - - - - - - - T R Á M I T E &nbsp;C O N C L U I D O &nbsp;Y &nbsp;L I Q U I D A D O - - - - - - - -'
-        : sinAdeudoAbierto ? '- - - - S I N &nbsp;A D E U D O &nbsp;P O R &nbsp;E L &nbsp;M O M E N T O &nbsp;( T R Á M I T E &nbsp;A B I E R T O ) - - - -'
-                    : '- - - - - - - - - - A D E U D O &nbsp;P E N D I E N T E: &nbsp;$'+fmt(datos.totales.adeudo)+' - - - - - - - - - -')
-    +  '</div>'
-    +    (cancelado && _canMontoModal>0.005 && _canLabelModal ? '<div style="text-align:center;margin-top:6px;font-family:\'DM Mono\',monospace;font-size:0.7rem;font-weight:700;color:#8a1a1a;">'+esc(_canLabelModal)+': $'+fmt(_canMontoModal)+'</div>' : '')
-    +    (sinAdeudoAbierto ? '<div style="text-align:center;margin-top:6px;font-family:\'DM Mono\',monospace;font-size:0.66rem;color:#7a6840;">Sin costo total pactado — el trámite se considera concluido solo al cerrarlo manualmente.</div>' : '')
-    +    (sinAdeudo && datos.placa ? '<div style="text-align:center;margin-top:5px;font-family:\'DM Mono\',monospace;font-size:0.66rem;color:#7a6840;">Placas: '+esc(String(datos.placa).toUpperCase())+'</div>' : '')
-    +    (sinAdeudo ? '<div style="text-align:center;margin-top:22px;pointer-events:none;user-select:none;font-family:serif;font-weight:700;font-size:2.1rem;letter-spacing:0.03em;color:rgba(60,45,15,0.08);">TRÁMITE CONCLUIDO</div>' : '')
-    +    (cancelado ? '<div style="text-align:center;margin-top:22px;pointer-events:none;user-select:none;font-family:serif;font-weight:700;font-size:2.1rem;letter-spacing:0.03em;color:rgba(138,26,26,0.09);">TRÁMITE CANCELADO</div>' : '')
+    // 3. Cuánto debe
+    +  _secc('3. CUÁNTO DEBE', '')
+    +  '<div style="text-align:center;margin-top:18px;font-weight:700;font-size:1.15rem;letter-spacing:0.08em;color:'+_rgbEC+';">'+esc(estadoEC.texto)+'</div>'
+    +  (estadoEC.extra ? '<div style="text-align:center;margin-top:5px;font-size:0.76rem;color:'+GRIS+';">'+esc(estadoEC.extra)+'</div>' : '')
+    +  '<div style="width:260px;max-width:60%;margin:10px auto 0;border-top:1px solid '+ORO+';"></div>'
+    +  '<div style="margin-top:22px;padding-top:8px;border-top:1px solid '+ORO+';font-size:0.68rem;color:'+GRIS+';">Documento informativo. Resume los recibos oficiales del folio '+esc(folioTxtEC)+' y no los sustituye.</div>'
     +'</div>'
     +'</div>';
   document.body.appendChild(overlay);
@@ -8718,7 +8737,7 @@ function imprimirEstadoCuenta(){
   var doc = generarPDFEstadoCuenta(datos);
   if(!doc) return;
   var blob = doc.output('blob');
-  var nombreArchivo = 'Estado de cuenta ' + datos.folioStr + '.pdf';
+  var nombreArchivo = 'Estado de cuenta folio ' + (typeof _ecFolioSinLetra==='function' ? _ecFolioSinLetra(datos) : datos.folioStr) + '.pdf';
   if(typeof imprimirDesdeBlob === 'function') imprimirDesdeBlob(blob, nombreArchivo);
   else { var url=URL.createObjectURL(blob); window.open(url, '_blank'); }
   cerrarEstadoCuenta();

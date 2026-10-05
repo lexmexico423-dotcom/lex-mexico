@@ -8139,7 +8139,9 @@ function sincronizarPendientesPlacas() {
       // se quedaba vacío para siempre en cuanto el folio se liquidaba: los
       // archivos seguían en Drive, pero se perdía la única referencia
       // (driveFileId/nombre) que apuntaba a ellos.
-      if (p.documentos && p.documentos.length) {
+      if (typeof _placasPreservarDocsEnRecibo === 'function') {
+        _placasPreservarDocsEnRecibo(p);
+      } else if (p.documentos && p.documentos.length) {
         _versSync.forEach(function(rv){ rv.expDigitalDocumentosPlacas = p.documentos; });
       }
       _eliminados++;

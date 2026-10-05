@@ -1082,10 +1082,16 @@ function _pVerDocRender(){
   // Renderizar contenido
   if (cont) cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted);">Cargando…</div>';
   const src = d.dataURL || d.base64;
-  function mostrarContenido(url){
+  window._docPrevBlob = null;
+  function mostrarContenido(url, blob){
     if (!cont) return;
+    if (blob) window._docPrevBlob = { d: d, blob: blob };
     if (esPDF) {
-      cont.innerHTML = '<iframe src="'+url+'#toolbar=1&navpanes=1&scrollbar=1" title="'+escHTML(d.nombre||'')+'" allowfullscreen></iframe>';
+      // Sin la barra propia del visor del navegador: su botón de descarga
+      // ponía un nombre de números y letras (el del enlace interno) y no el
+      // nombre real del archivo. Descargar e Imprimir se hacen con los botones
+      // del sistema, que sí conservan el nombre con el que se subió.
+      cont.innerHTML = '<iframe id="docPreviewIframe" src="'+url+'#toolbar=0&navpanes=0&scrollbar=1&view=FitH" title="'+escHTML(d.nombre||'')+'" allowfullscreen></iframe>';
     } else {
       cont.innerHTML = '<img src="'+url+'" id="docPreviewImg" alt="'+escHTML(d.nombre||'')+'" style="max-width:100%;max-height:65vh;border-radius:4px;display:block;margin:0 auto;transform-origin:center center;">';
       // Wheel zoom
@@ -1100,7 +1106,7 @@ function _pVerDocRender(){
         if(cont) cont.innerHTML = '<p style="color:#c0161a;padding:20px;text-align:center;">No se pudo cargar el archivo.<br><small>Verifica tu conexión.</small></p>';
         return;
       }
-      mostrarContenido(URL.createObjectURL(blob));
+      mostrarContenido(URL.createObjectURL(blob), blob);
     }).catch(e => {
       if(cont) cont.innerHTML = '<p style="color:#c0161a;padding:20px;text-align:center;">Error al cargar desde R2.</p>';
       console.error('_pVerDoc R2:', e);
@@ -1182,7 +1188,7 @@ function _pVerDocRender(){
       if (elTxt) elTxt.textContent = 'Abriendo el documento…';
       return new Blob(partes, { type: d.tipo || 'application/octet-stream' });
     }).then(function(blob){
-      mostrarContenido(URL.createObjectURL(blob));
+      mostrarContenido(URL.createObjectURL(blob), blob);
     }).catch(function(e){
       const msg = window._driveNecesitaReconexion
         ? 'Google Drive necesita reconectarse (pide a un administrador que lo haga desde Panel de Control).'
@@ -1209,31 +1215,71 @@ function _pVerDocNav(dir){
   _pVerDocRender();
 }
 
+// Nombre con el que se descarga: el que tenía el archivo al subirlo. Se quita
+// el prefijo numérico que el sistema le agrega en Drive (p. ej. "1712345678901_")
+// y se asegura la extensión correcta.
+function _docNombreDescarga(d){
+  var n = String((d && d.nombre) || 'documento').trim().replace(/^\d{10,}_/, '');
+  n = n.replace(/[\\/:*?"<>|]+/g, '_');
+  if (!/\.[a-z0-9]{2,5}$/i.test(n)) {
+    var t = (d && d.tipo) || '';
+    var ext = t === 'application/pdf' ? '.pdf' : t === 'image/png' ? '.png' : t === 'image/webp' ? '.webp'
+            : /jpe?g/.test(t) ? '.jpg' : /wordprocessingml/.test(t) ? '.docx' : t === 'application/msword' ? '.doc' : '';
+    n += ext;
+  }
+  return n || 'documento';
+}
+async function _docObtenerBlobActual(d){
+  if (window._docPrevBlob && window._docPrevBlob.d === d && window._docPrevBlob.blob) return window._docPrevBlob.blob;
+  if (d.driveFileId) {
+    const token = await driveGetAccessToken();
+    if (!token) throw new Error('Drive no conectado');
+    const resp = await fetch('https://www.googleapis.com/drive/v3/files/'+d.driveFileId+'?alt=media',{headers:{Authorization:'Bearer '+token}});
+    if (!resp.ok) throw new Error('Drive '+resp.status);
+    return await resp.blob();
+  }
+  if (d.r2path && typeof window.descargarR2 === 'function') return await window.descargarR2(d.r2path, d.bucket || 'placas');
+  if (d.dataURL || d.base64) { const res = await fetch(d.dataURL || d.base64); return await res.blob(); }
+  return null;
+}
 async function _pVerDocDescargar(){
   const ctx = window._docPreviewCtx;
   if (!ctx || !ctx.d) return;
   const d = ctx.d;
+  const btn = document.getElementById('docPreviewBtnDescargar');
+  const txtOrig = btn ? btn.innerHTML : '';
   try {
-    let blob;
-    if (d.driveFileId) {
-      const token = await driveGetAccessToken();
-      if (!token) { toast('Drive no conectado', 'err'); return; }
-      const resp = await fetch('https://www.googleapis.com/drive/v3/files/'+d.driveFileId+'?alt=media',{headers:{Authorization:'Bearer '+token}});
-      if (!resp.ok) throw new Error('Drive '+resp.status);
-      blob = await resp.blob();
-    } else if (d.r2path && typeof window.descargarR2 === 'function') {
-      blob = await window.descargarR2(d.r2path, d.bucket || 'placas');
-    } else if (d.dataURL || d.base64) {
-      const res = await fetch(d.dataURL || d.base64);
-      blob = await res.blob();
-    }
-    if (blob) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = d.nombre; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-    }
-  } catch(e) { toast('Error al descargar', 'err'); }
+    if (btn) { btn.disabled = true; btn.innerHTML = '⏳ Descargando…'; }
+    const blob = await _docObtenerBlobActual(d);
+    if (!blob) throw new Error('Sin archivo');
+    const nombre = _docNombreDescarga(d);
+    const file = (typeof File === 'function') ? new File([blob], nombre, { type: blob.type || d.tipo || 'application/octet-stream' }) : blob;
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url; a.download = nombre; a.style.display = 'none';
+    document.body.appendChild(a);   // algunos navegadores (Brave/Firefox) ignoran el clic si el enlace no está en la página
+    a.click();
+    setTimeout(function(){ a.remove(); URL.revokeObjectURL(url); }, 4000);
+    if (typeof toast === 'function') toast('⭳ Descargado: ' + nombre, 'ok');
+  } catch(e) {
+    console.error('[Descargar documento]', e);
+    if (typeof toast === 'function') toast('Error al descargar: ' + ((e && e.message) || e), 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = txtOrig; }
+  }
+}
+function _pVerDocImprimir(){
+  const ctx = window._docPreviewCtx;
+  if (!ctx || !ctx.d) return;
+  const ifr = document.getElementById('docPreviewIframe');
+  if (ifr && ifr.contentWindow) { try { ifr.contentWindow.focus(); ifr.contentWindow.print(); return; } catch(e){} }
+  const img = document.getElementById('docPreviewImg');
+  if (img) {
+    const w = window.open('', '_blank');
+    if (!w) { if (typeof toast === 'function') toast('Permite ventanas emergentes para imprimir', 'err'); return; }
+    w.document.write('<html><head><title>' + escHTML(_docNombreDescarga(ctx.d)) + '</title></head><body style="margin:0;text-align:center;"><img src="' + img.src + '" style="max-width:100%;" onload="window.print()"></body></html>');
+    w.document.close();
+  }
 }
 
 function backupLocal(tipo, datos) {

@@ -2340,7 +2340,9 @@ function renderPend(){
             enviadoFechaHtml = _pendFEnv[2]+'-'+(_pendMesesEnv[parseInt(_pendFEnv[1],10)-1]||'')+'-'+_pendFEnv[0];
           }
         }
-      } else if(_esAdminPend){
+      } else {
+        // A petición expresa (oct-2026): el botón ✈ Enviar ya no es solo del
+        // administrador — cualquier empleado puede marcar el pendiente como enviado.
         enviarBtnHtml = `<span onclick="event.stopPropagation();_pendMarcarEnviado(${idx})" title="Marcar como enviado (lo verán todos)" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:6px 13px;border-radius:20px;background:#0c447c;color:#fff;cursor:pointer;">✈ Enviar</span>`;
       }
     }

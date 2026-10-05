@@ -4,5 +4,5 @@ window.LEX_PUBLIC_CONFIG = Object.freeze({
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpybXBhd2lnanVmZ3N1YW1xZmx2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MTQ2NjgsImV4cCI6MjA5NDE5MDY2OH0.rRV6vbNImhyAxfFPsje5QgEg6M35bojX2vDlLaTb3K4',
   storageBucket: 'lex-files',
   workerUrl: 'https://lex-mexico-worker.fcolex0.workers.dev',
-  googleOAuthRedirectUri: 'https://lexmexico423-dotcom.github.io/lex-mexico/'
+  googleOAuthRedirectUri: 'https://lex-mexico.fcolex0.workers.dev/' // antes GitHub Pages (ya no existe)
 });

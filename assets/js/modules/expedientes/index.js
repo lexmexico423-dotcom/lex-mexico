@@ -2137,7 +2137,7 @@ async function pPlacasAdjuntar(event){
   let agregados = 0, rechazados = 0;
   let pendientes = files.length;
   const nombre = document.getElementById('pPlacasNombre')?.value.trim() || 'sin_nombre';
-  const nombreSafe = nombre.replace(/[^a-zA-Z0-9 _\-]/g,'_').substring(0,50);
+  const nombreSafe = (typeof _placasCarpetaNombre === 'function') ? _placasCarpetaNombre((typeof _pPlacasState !== 'undefined' && _pPlacasState && _pPlacasState.reciboFolio) || null, nombre) : nombre.replace(/[^a-zA-Z0-9 _\-]/g,'_').substring(0,50); // una carpeta por folio (NOMBRE - fecha)
   toast('Subiendo '+pendientes+' archivo(s) a Drive...','ok');
   // Obtener token y carpeta Drive una sola vez para todos los archivos
   let driveToken = '', carpetaClienteId = '';

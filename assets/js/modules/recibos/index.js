@@ -199,7 +199,21 @@ async function sincronizarFolio(forzarSB){
         const resultado = [];
         claves.forEach(function(k) {
           if (mapaSB[k]) {
-            resultado.push(mapaSB[k]); // SB tiene esta versión → usar SB
+            // FIX (oct-2026, folio 121): si ESTA pestaña ligó archivos al
+            // Expediente Digital que Supabase todavía no tiene, se conservan
+            // (unión por driveFileId) y se vuelven a subir — antes la versión
+            // de Supabase los borraba de la memoria y el archivo "desaparecía".
+            var _sbR = mapaSB[k], _locR = mapaLocal[k];
+            if (_locR && Array.isArray(_locR.expDigitalDocumentosPlacas) && _locR.expDigitalDocumentosPlacas.length && typeof _expDigFusionarDocs === 'function') {
+              var _antesN = (_sbR.expDigitalDocumentosPlacas || []).length;
+              var _fus = _expDigFusionarDocs(_sbR.expDigitalDocumentosPlacas || [], _locR.expDigitalDocumentosPlacas);
+              if (_fus.length > _antesN) {
+                _sbR.expDigitalDocumentosPlacas = _fus;
+                if (!_sbR.expDigital && _locR.expDigital) _sbR.expDigital = _locR.expDigital;
+                _docsExpLocalesConservados = true;
+              }
+            }
+            resultado.push(_sbR); // SB tiene esta versión → usar SB
           } else {
             resultado.push(mapaLocal[k]); // solo local la tiene → conservar
             console.warn('[merge recibos] versión solo en local conservada:', k);
@@ -228,6 +242,7 @@ async function sincronizarFolio(forzarSB){
         });
         return _ordenado;
       }
+      var _docsExpLocalesConservados = false;
       const recibosFinales = _mergeRecibos(sbRecibos, recibosActuales);
       // Purgar tombstones superados por recibos revividos para que este cliente
       // deje de re-subirlos y todos converjan a su eliminación definitiva.
@@ -247,7 +262,7 @@ async function sincronizarFolio(forzarSB){
       const _sbFiltCount    = sbRecibos.filter(function(r){ return !_esTombstone(r); }).length;
       const _hayTombsNuevos = _tombstonesFinales.length > _sbTombs.length;
       const _hayTombsPurgados = _tombstonesFinales.length < _tombstones.length;
-      if (recibosFinales.length > _sbFiltCount || _hayTombsNuevos || _hayTombsPurgados) {
+      if (recibosFinales.length > _sbFiltCount || _hayTombsNuevos || _hayTombsPurgados || _docsExpLocalesConservados) {
         console.warn('[merge recibos] re-subiendo — recibos extra:', recibosFinales.length - _sbFiltCount, '| tombstones nuevos:', _tombstonesFinales.length - _sbTombs.length, '| purgados:', _tombstones.length - _tombstonesFinales.length);
         setTimeout(function(){ if(typeof actualizarArchivoControl==='function') actualizarArchivoControl().catch(function(e){ console.warn('re-upload recibos:', e); }); }, 800);
       }
@@ -10442,7 +10457,38 @@ function abrirExpDigitalVehiculo(recibo) {
 async function _expDigIntentarReconstruirDesdeDrive() {
   var r = _expDigState.recibo;
   if (!r) return;
-  if (_expDigDocsArray(false).length) return; // ya hay algo registrado, no hace falta
+  // FIX (oct-2026, folio 121 · "Placas Oaxaca Sr. Feliciano"): un archivo
+  // subido desde OTRA computadora podía no verse aquí si su registro aún no
+  // llegaba a esta pestaña. Como cada folio ya tiene su propia carpeta en
+  // Drive, se revisa esa carpeta cada vez que se abre el expediente y se
+  // agregan los archivos que falten (solo agrega, nunca quita).
+  if (_expDigDocsArray(false).length) {
+    try {
+      var _pendS = _expDigPendienteActual();
+      var _fid = _pendS ? _pendS.expDigitalDriveFolderId
+                        : (r.expDigital && r.expDigital.carpetaPorFolio ? r.expDigital.driveFolderId : '');
+      if (!_fid) return;
+      var _tk = await driveGetAccessToken();
+      if (!_tk) return;
+      var _enDrive = await _sbConTimeout(_expDigListarCarpetaDrive(_fid, _tk), 15000, 'Listar carpeta Drive');
+      var _act = _expDigDocsArray(false);
+      var _ids = {};
+      _act.forEach(function(d){ if (d && d.driveFileId) _ids[d.driveFileId] = 1; });
+      var _nuevos = (_enDrive || []).filter(function(f){ return f && f.id && !_ids[f.id] && f.mimeType !== 'application/vnd.google-apps.folder'; })
+        .map(function(f){ return { nombre: f.name, tipo: f.mimeType, driveFileId: f.id }; });
+      if (!_nuevos.length) return;
+      if (_pendS) {
+        _pendS.documentos = _expDigFusionarDocs(_pendS.documentos || [], _nuevos);
+      } else {
+        _expDigGuardarDocsEnFolio(r.folio, _nuevos, {});
+      }
+      if (typeof save === 'function') save();
+      if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
+      _expDigRenderArchivos();
+      if (typeof toast === 'function') toast('📂 Se agregaron ' + _nuevos.length + ' archivo(s) que estaban en Drive', 'ok');
+    } catch(eS) { console.warn('[ExpDig] no se pudo sincronizar con Drive:', eS); }
+    return;
+  }
   // Con pendiente de Placas activo los documentos viven en el pendiente — no tocar.
   if (_expDigPendienteActual()) return;
   // FIX (oct-2026, folio 121): antes solo se intentaba si el recibo ya tenía

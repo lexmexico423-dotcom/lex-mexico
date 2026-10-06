@@ -4374,7 +4374,18 @@ async function ejecutarTramiteCancelado(){
 async function confirmarCancelacion(){
   const recibo = reciboEnConsulta;
   if(!recibo) return;
-  if(esPeriodoCerrado(recibo.fecha || recibo.fecha_recibo, recibo.hora || recibo.hora_recibo || '00:00')){
+  // FIX (oct-2026, folio 25A): antes se revisaba la fecha ORIGINAL del recibo
+  // (p. ej. febrero) contra los cortes de caja — como cualquier folio anterior
+  // al último corte cae en un periodo cerrado, NINGÚN folio viejo se podía
+  // cancelar. Lo que se registra ahora es la cancelación, con fecha de HOY (o
+  // la fecha RETRO elegida), y eso es lo único que debe estar fuera de un
+  // periodo cerrado. El recibo original y sus movimientos no se modifican.
+  const _retroCanChk = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
+  const _fechaCanChk = _retroCanChk ? window._reciboRetroactivoFechaPersonalizada
+    : (typeof fechaCDMX_ISO === 'function' ? fechaCDMX_ISO() : new Date().toISOString().slice(0,10));
+  const _horaCanChk  = _retroCanChk ? (window._reciboRetroactivoHoraPersonalizada || '00:00')
+    : (typeof horaCDMX_HHMM === 'function' ? horaCDMX_HHMM() : new Date().toTimeString().slice(0,5));
+  if(esPeriodoCerrado(_fechaCanChk, _horaCanChk)){
     toast(_msgPeriodoCerrado(), 'err'); return;
   }
   const motivo = document.getElementById('cancelacion-motivo').value.trim();
@@ -4394,8 +4405,8 @@ async function confirmarCancelacion(){
   // Capturar desde el DOM antes de cerrar el modal (cerrarConsulta limpia globals)
   const _conceptoInterno = (document.getElementById('cancelacion-concepto-interno')?.value || '').trim();
   const _retroCanConf = !!(window._reciboRetroactivoActivo && window._reciboRetroactivoFechaPersonalizada);
-  const _fechaCanConf = _retroCanConf ? window._reciboRetroactivoFechaPersonalizada : new Date().toISOString().slice(0,10);
-  const _horaCanConf  = _retroCanConf ? (window._reciboRetroactivoHoraPersonalizada || '00:00') : new Date().toTimeString().slice(0,5);
+  const _fechaCanConf = _fechaCanChk;
+  const _horaCanConf  = _horaCanChk;
   if(!appData.historialPagos) appData.historialPagos = {};
   if(!appData.historialPagos[recibo.folio]) appData.historialPagos[recibo.folio] = [];
   appData.historialPagos[recibo.folio].push({

@@ -1045,6 +1045,8 @@ function abrirDetallesCarpeta(idx){
         <div id="mCarpDetBox" style="width:100%;min-height:220px;border:2px solid #d4b870;border-radius:10px;padding:16px 18px;font-family:sans-serif;font-size:0.92rem;line-height:1.7;color:#1a1008;background:#fdf8e8;box-sizing:border-box;"></div>
       </div>
       <div style="padding:14px 24px 20px;border-top:1.5px solid #ecdfa8;background:linear-gradient(135deg,#fdfaf4,#f7f0dc);border-radius:0 0 14px 14px;display:flex;justify-content:flex-end;gap:10px;">
+        <button id="mCarpDetBtnImprimir" type="button" style="margin-right:auto;background:none;border:1.5px solid #d4b870;border-radius:10px;padding:10px 16px;cursor:pointer;font-family:monospace;font-size:0.66rem;color:#8c6518;font-weight:700;">🖨️ Imprimir</button>
+        <button id="mCarpDetBtnEliminar" type="button" style="background:none;border:1.5px solid #e0a0a0;border-radius:10px;padding:10px 16px;cursor:pointer;font-family:monospace;font-size:0.66rem;color:#a32d2d;font-weight:700;">🗑️ Eliminar</button>
         <button onclick="cerrar('mCarpDetalles')" style="background:none;border:1.5px solid #d4b870;border-radius:10px;padding:10px 22px;cursor:pointer;font-family:monospace;font-size:0.68rem;letter-spacing:0.08em;text-transform:uppercase;color:#8c6518;font-weight:700;">Cancelar</button>
         <button id="mCarpDetBtnGuardar" style="background:linear-gradient(135deg,#8c6518,#c8952a,#e8c060);border:none;border-radius:10px;padding:10px 28px;cursor:pointer;font-family:monospace;font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;color:#fff;font-weight:700;">💾 Guardar</button>
       </div>
@@ -1062,6 +1064,16 @@ function abrirDetallesCarpeta(idx){
     const idxLive = D.carpetas.indexOf(c);
     cerrar('mCarpDetalles');
     abrirCarpeta(idxLive >= 0 ? idxLive : idx);
+  };
+  // Imprimir / Eliminar (antes en el menú ☰ de la tabla, que se quitó).
+  const _btnImpD = document.getElementById('mCarpDetBtnImprimir');
+  if (_btnImpD) _btnImpD.onclick = function(){ const i2 = D.carpetas.indexOf(c); if (typeof imprimirCarpeta === 'function') imprimirCarpeta(i2 >= 0 ? i2 : idx); };
+  const _btnElimD = document.getElementById('mCarpDetBtnEliminar');
+  if (_btnElimD) _btnElimD.onclick = function(){
+    const i2 = D.carpetas.indexOf(c);
+    cerrar('mCarpDetalles');
+    abrirCarpeta(i2 >= 0 ? i2 : idx);
+    setTimeout(function(){ const b = document.getElementById('kBtnElim'); if (b) b.click(); }, 200);
   };
   // ── Encabezado a dos columnas: izquierda = identificación (número,
   // estatus, fecha); derecha = cliente y trámite (tipo + subtipo fundidos

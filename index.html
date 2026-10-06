@@ -15482,6 +15482,7 @@ Recibo original im…</td>
           </div>
           <!-- X de cierre en la esquina (18/ago/2026) — misma función que
                "← Expedientes", como atajo rápido para cerrar la ficha. -->
+          <button id="mexp-btn-mas" onclick="_juToggleMasOpciones()" title="Leyes del juicio, datos del expediente, duplicados, asistente IA y eliminar expediente" style="flex-shrink:0;padding:6px 12px;border-radius:6px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);font-size:.74rem;cursor:pointer;">⋯ Más opciones</button>
           <button onclick="cerrarModalExpediente()" title="Cerrar y volver a Expedientes" aria-label="Cerrar" style="background:none;border:none;font-size:1.2rem;line-height:1;cursor:pointer;color:var(--muted);padding:4px 8px;border-radius:6px;flex-shrink:0;">✕</button>
         </div>
 
@@ -15489,9 +15490,14 @@ Recibo original im…</td>
              (Leyes del Juicio / Eliminar expedientes), todas en una misma
              línea y del mismo alto (18/ago/2026). Las tarjetas las llena
              _juRenderDatosDuros(); los botones son estáticos. -->
-        <div style="display:flex;align-items:stretch;gap:10px;padding:10px 20px;border-bottom:1px solid var(--border-l);flex-shrink:0;flex-wrap:wrap;">
+        <!-- Diseño simple (oct-2026): resumen en 4 tarjetas + "¿Qué quieres hacer?" (lo llena _juRenderFichaSimple) -->
+        <div id="mexp-ficha-simple" style="flex-shrink:0;border-bottom:1px solid var(--border-l);"></div>
+        <!-- "⋯ Más opciones": datos del expediente, leyes, duplicados, asistente IA y eliminar (oculto hasta que se pide) -->
+        <div id="mexp-fila-mas" style="display:none;align-items:stretch;gap:10px;padding:10px 20px;border-bottom:1px solid var(--border-l);flex-shrink:0;flex-wrap:wrap;background:var(--surface2);">
           <div id="mexp-datos-cards" style="display:flex;gap:10px;flex-wrap:wrap;flex:1;min-width:0;"></div>
           <div style="display:flex;align-items:stretch;gap:8px;flex-shrink:0;">
+            <button onclick="_juTab('2');_juToggleMasOpciones(false);" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:1px solid var(--border-l);background:var(--surface);font-size:0.72rem;color:var(--ink);cursor:pointer;font-weight:600;">✨ Asistente IA</button>
+            <button onclick="_acuerdosBuscarDuplicados()" style="display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:1px solid var(--border-l);background:var(--surface);font-size:0.72rem;color:var(--ink);cursor:pointer;font-weight:600;">🧹 Acuerdos duplicados</button>
             <!-- LEYES DEL CASO -->
             <button id="btn-leyes-caso" onclick="abrirModalLeyes()" style="display:flex;align-items:center;gap:7px;padding:8px 13px;border-radius:8px;border:1px solid var(--border-l);background:var(--surface2);font-size:0.72rem;color:var(--ink);cursor:pointer;font-weight:600;font-family:&#39;JetBrains Mono&#39;,monospace;transition:all 0.15s;box-sizing:border-box;">
               📚 Leyes del Juicio <span id="mexp-ley-count" style="background:var(--azul-l);color:var(--azul);font-size:0.6rem;padding:1px 7px;border-radius:10px;font-weight:700;">0</span>
@@ -15518,7 +15524,7 @@ Recibo original im…</td>
              a la vez, cada uno con su propio botón de cumplimiento. Los 3
              contadores viejos se conservan ocultos (no se borran del DOM)
              porque otras partes del código siguen escribiéndoles su valor. -->
-        <div style="display:flex;align-items:stretch;border-bottom:1px solid var(--border-l);flex-shrink:0;max-height:130px;">
+        <div id="mexp-aviso-wrap" style="display:none;align-items:stretch;border-bottom:1px solid var(--border-l);flex-shrink:0;max-height:160px;">
           <div id="mexp-aviso-termino-slot" style="flex:1;min-width:0;display:flex;flex-direction:column;overflow-y:auto;"></div>
         </div>
         <div style="display:none;">
@@ -15535,7 +15541,7 @@ Recibo original im…</td>
             <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border-l);flex-shrink:0;">
               <span style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);font-weight:700;">📂 Acuerdos en Drive</span>
               <div style="display:flex;align-items:center;gap:6px;">
-                <button onclick="_acuerdosBuscarDuplicados()" title="Buscar y eliminar acuerdos duplicados" style="display:flex;align-items:center;gap:4px;padding:4px 9px;border-radius:20px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);font-size:0.6rem;cursor:pointer;font-weight:700;">🧹 Duplicados</button>
+                <button onclick="_acuerdosBuscarDuplicados()" title="Buscar y eliminar acuerdos duplicados" style="display:none;align-items:center;gap:4px;padding:4px 9px;border-radius:20px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);font-size:0.6rem;cursor:pointer;font-weight:700;">🧹 Duplicados</button>
                 <label style="display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;border:1px solid var(--border-l);background:var(--gold-bg);color:var(--gold-d);font-size:0.62rem;cursor:pointer;font-weight:700;" title="Subir acuerdo PDF a Drive">
                   ＋ Subir
                   <input type="file" id="acuerdo-file-input" accept="application/pdf" multiple="" style="display:none;" onchange="subirAcuerdoDrive(this)">
@@ -17484,7 +17490,7 @@ Recibo original im…</td>
 <script src="assets/js/modules/contabilidad/index.js?v=20261002c"></script>
 <script src="assets/js/modules/clientes/index.js?v=20260927c"></script>
 <script src="assets/js/modules/directorio/index.js?v=20260904d"></script>
-<script src="assets/js/modules/expedientes/index.js?v=20261004a"></script>
+<script src="assets/js/modules/expedientes/index.js?v=20261006a"></script>
 <script src="assets/js/modules/documentos/index.js?v=20261005b"></script>
 <script src="assets/js/modules/integraciones/index.js?v=20260904d"></script>
 <script src="assets/js/modules/administracion/index.js?v=20261005a"></script>

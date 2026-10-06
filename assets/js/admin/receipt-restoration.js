@@ -8199,6 +8199,9 @@ function sincronizarPendientesPlacas() {
         _pendExist.fechaResolucion = '';
         creados++;
       }
+      // Si el pendiente perdió (o nunca tuvo) los archivos que ya están
+      // ligados al recibo, recuperarlos (caso folio 121).
+      if (typeof _placasHeredarDocsDelRecibo === 'function' && _placasHeredarDocsDelRecibo(_pendExist)) creados++;
       return;
     }
     // No recrear si ya fue liquidado/eliminado (lista negra en localStorage)
@@ -8238,6 +8241,10 @@ function sincronizarPendientesPlacas() {
       marca: marca,   clase: clase,
       documentos: []
     });
+    // El pendiente nuevo hereda los archivos que el recibo ya tenía en su
+    // Expediente Digital (p. ej. un folio que estaba liquidado y volvió a
+    // tener saldo al agregarle un concepto).
+    if (typeof _placasHeredarDocsDelRecibo === 'function') _placasHeredarDocsDelRecibo(D.pendientes[0]);
     creados++;
     console.log('[LEX] Pendiente de placas creado automáticamente para recibo #' + folio);
   });

@@ -1299,6 +1299,8 @@ async function guardarCarpeta(){
     reciboOficial:($('kReciboOficial')||{value:''}).value.trim(),
     estadoArchivo: eiK>=0?(D.carpetas[eiK].estadoArchivo||''):'',
     prioridad: eiK>=0?(D.carpetas[eiK].prioridad||''):'',
+    // Ubicación física (gaveta/caja) — se conserva al editar la carpeta.
+    ubicacion: (eiK>=0 && D.carpetas[eiK].ubicacion) ? D.carpetas[eiK].ubicacion : undefined,
     totalPactado: eiK>=0?(D.carpetas[eiK].totalPactado||0):0,
     tipoTramite,
     // fechaCreacion se conserva de la carpeta original al editar (o se rellena

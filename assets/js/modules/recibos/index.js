@@ -10021,6 +10021,35 @@ function _expDigGuardarDocsEnFolio(folio, docs, extra){
   });
   return cambio;
 }
+// Al revés que el respaldo de arriba: cuando un folio vuelve a tener saldo y
+// se (re)crea su pendiente de Placas, el pendiente nace con la lista vacía y
+// el Expediente Digital pasaba a leer esa lista vacía — los archivos que ya
+// estaban ligados al recibo "desaparecían" (caso real: folio 121, oct-2026,
+// tras agregar un concepto desde Gestionar Recibo). Esta función copia al
+// pendiente los archivos y la carpeta que ya tiene el recibo (solo agrega).
+function _placasHeredarDocsDelRecibo(p){
+  try {
+    if(!p || !p.reciboVinculadoFolio || typeof appData === 'undefined' || !Array.isArray(appData.recibos)) return false;
+    var docs = [], carpeta = '';
+    appData.recibos.forEach(function(rv){
+      if(!rv || rv.esComplemento || Number(rv.folio) !== Number(p.reciboVinculadoFolio)) return;
+      docs = docs.concat(rv.expDigitalDocumentosPlacas || []);
+      if(!carpeta && rv.expDigital && rv.expDigital.driveFolderId) carpeta = rv.expDigital.driveFolderId;
+    });
+    var cambio = false;
+    if(docs.length){
+      var antes = (p.documentos || []).length;
+      p.documentos = _expDigFusionarDocs(p.documentos || [], docs);
+      if(p.documentos.length !== antes) cambio = true;
+    }
+    if(carpeta && !p.expDigitalDriveFolderId){ p.expDigitalDriveFolderId = carpeta; cambio = true; }
+    if(cambio && (p.documentos || []).some(function(d){ return d && d.driveFileId; }) && p.estatusGestion !== 'enviado'){
+      p.estatusGestion = 'vinculado';
+    }
+    if(cambio){ p.fechaMod = new Date().toISOString(); console.log('[Placas] Pendiente del folio #' + p.reciboVinculadoFolio + ' recuperó los archivos del Expediente Digital del recibo'); }
+    return cambio;
+  } catch(e){ console.warn('[Placas] _placasHeredarDocsDelRecibo:', e); return false; }
+}
 function _placasPreservarDocsEnRecibo(p){
   try {
     if(!p || !p.reciboVinculadoFolio) return false;
@@ -10438,6 +10467,11 @@ function abrirExpDigitalVehiculo(recibo) {
       : (recibo.folio + (recibo.letra||'A'));
     partes.push('Folio #' + folStr);
     infoEl.textContent = partes.join('  ·  ');
+  }
+  if (_expDigState.pendiente && typeof _placasHeredarDocsDelRecibo === 'function' && _placasHeredarDocsDelRecibo(_expDigState.pendiente)) {
+    if (typeof save === 'function') save();
+    if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
+    if (typeof renderPend === 'function') try { renderPend(); } catch(e){}
   }
   _expDigRenderStatus();
   _expDigRenderArchivos();

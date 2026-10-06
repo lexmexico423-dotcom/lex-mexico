@@ -818,6 +818,7 @@ function renderCarp(){
           <th style="${thStyle}white-space:nowrap;padding-left:16px;">EXP.</th>
           <th style="${thStyle}">NOMBRE</th>
           <th style="${thStyle}white-space:nowrap;">TIPO DE TRÁMITE</th>
+          <th style="${thStyle}text-align:center;">UBICACIÓN</th>
           <th style="${thStyle}text-align:center;">ESTATUS</th>
           <th style="${thStyle}text-align:center;padding-right:14px;"></th>
         </tr>
@@ -840,17 +841,116 @@ function renderCarp(){
             </td>
             <td style="${tdStyle}font-weight:600;white-space:nowrap;color:#1a0f02;">${esc(c.cliente||'—')}</td>
             <td style="${tdStyle}font-family:monospace;font-size:0.67rem;color:#6a4a10;white-space:nowrap;">${esc(tipoTexto)}</td>
+            <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation();_carpEditarUbicacion(${idx})" title="Clic para indicar dónde está archivada">${_carpUbicacionChip(c)}</td>
             <td style="${tdStyle}text-align:center;">${estatusCell(c.estatus)}</td>
             <td style="${tdStyle}text-align:center;white-space:nowrap;padding-right:14px;" onclick="event.stopPropagation()">
-              <button onclick="abrirDetallesCarpeta(${idx})" title="Detalles: qué contiene esta carpeta" class="carp-action-btn" style="width:auto;padding:0 10px;font-size:0.62rem;font-family:monospace;font-weight:700;letter-spacing:0.02em;">📋 Detalles</button>
-              <button onclick="abrirCarpeta(${idx})" title="Editar" class="carp-action-btn">✏️</button>
-              <button onclick="abrirMenuCarpeta(event,${idx})" title="Más opciones" class="carp-action-btn">☰</button>
+              <span style="display:inline-flex;border:1.5px solid rgba(200,149,42,0.35);border-radius:7px;overflow:hidden;">
+                <button onclick="abrirDetallesCarpeta(${idx})" title="Detalles: qué contiene, imprimir o eliminar" style="background:none;border:none;padding:5px 11px;cursor:pointer;font-size:0.62rem;font-family:monospace;font-weight:700;color:#b07820;">📋 Detalles</button>
+                <button onclick="abrirCarpeta(${idx})" title="Editar" style="background:none;border:none;border-left:1.5px solid rgba(200,149,42,0.35);padding:5px 9px;cursor:pointer;font-size:0.78rem;">✏️</button>
+              </span>
             </td>
           </tr>`;
         }).join('')}
       </tbody>
     </table>
     </div>`;
+}
+
+// ── Ubicación física de la carpeta (oct-2026) ─────────────────────────────
+// Cada carpeta está en UNA gaveta o en UNA caja (son lugares distintos). El
+// número se escribe a mano porque las gavetas y cajas van aumentando.
+// Se guarda en c.ubicacion = { tipo:'gaveta'|'caja', num:'2' }.
+function _carpUbicacionChip(c){
+  var u = c && c.ubicacion;
+  if (u && u.tipo && String(u.num || '').trim()) {
+    var esCaja = u.tipo === 'caja';
+    return '<span style="display:inline-block;cursor:pointer;padding:3px 10px;border-radius:6px;font-size:0.68rem;font-weight:700;white-space:nowrap;'
+      + (esCaja ? 'background:#faeeda;color:#633806;border:1px solid #e0b870;' : 'background:#e6f1fb;color:#0c447c;border:1px solid #a8c8ec;') + '">'
+      + (esCaja ? '📦 Caja ' : '🗄 Gaveta ') + esc(String(u.num).trim()) + '</span>';
+  }
+  return '<span style="display:inline-block;cursor:pointer;padding:3px 10px;border-radius:6px;font-size:0.64rem;color:#9a7a3a;border:1px dashed #c8952a;white-space:nowrap;">＋ Asignar lugar</span>';
+}
+function _carpUltimoNumUbic(tipo){
+  var max = 0;
+  (D.carpetas || []).forEach(function(c){
+    var u = c && c.ubicacion;
+    if (u && u.tipo === tipo) { var n = parseInt(String(u.num || '').replace(/\D/g, ''), 10); if (n > max) max = n; }
+  });
+  return max;
+}
+function _carpEditarUbicacion(idx){
+  var c = D.carpetas && D.carpetas[idx];
+  if (!c) return;
+  var modal = document.getElementById('mCarpUbic');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-ov';
+    modal.id = 'mCarpUbic';
+    modal.innerHTML = '<div class="modal" style="max-width:380px;width:92vw;">'
+      + '<div class="modal-hdr"><h3 id="mCarpUbicTit" style="font-size:0.9rem;">¿Dónde está la carpeta?</h3><button class="modal-x" onclick="cerrar(\'mCarpUbic\')">✕</button></div>'
+      + '<div class="modal-body" style="padding:16px 18px;">'
+      +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">'
+      +     '<button type="button" id="mCarpUbicGav" onclick="_carpUbicTipo(\'gaveta\')" style="padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:700;">🗄 Gaveta</button>'
+      +     '<button type="button" id="mCarpUbicCaja" onclick="_carpUbicTipo(\'caja\')" style="padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:700;">📦 Caja</button>'
+      +   '</div>'
+      +   '<label id="mCarpUbicLbl" style="display:block;font-size:0.72rem;color:var(--muted);margin-bottom:4px;">Número</label>'
+      +   '<input type="text" inputmode="numeric" id="mCarpUbicNum" placeholder="Ej. 3" style="width:100%;padding:9px 12px;border:1.5px solid #c8952a;border-radius:6px;font-size:1rem;box-sizing:border-box;" onkeydown="if(event.key===\'Enter\')_carpGuardarUbicacion()">'
+      +   '<div id="mCarpUbicHint" style="font-size:0.66rem;color:var(--muted);margin-top:5px;"></div>'
+      +   '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:16px;">'
+      +     '<button type="button" class="btn btn-ghost" onclick="_carpQuitarUbicacion()" style="font-size:0.72rem;">Quitar ubicación</button>'
+      +     '<div style="display:flex;gap:8px;"><button type="button" class="btn btn-ghost" onclick="cerrar(\'mCarpUbic\')">Cancelar</button>'
+      +     '<button type="button" class="btn btn-primary" onclick="_carpGuardarUbicacion()">Guardar</button></div>'
+      +   '</div>'
+      + '</div></div>';
+    document.body.appendChild(modal);
+  }
+  modal.dataset.idx = idx;
+  document.getElementById('mCarpUbicTit').textContent = '¿Dónde está la ' + (c.num || 'carpeta') + '?';
+  var u = c.ubicacion || {};
+  _carpUbicTipo(u.tipo === 'caja' ? 'caja' : 'gaveta');
+  var inp = document.getElementById('mCarpUbicNum');
+  inp.value = u.num || '';
+  modal.classList.add('show');
+  setTimeout(function(){ inp.focus(); inp.select(); }, 100);
+}
+function _carpUbicTipo(tipo){
+  var modal = document.getElementById('mCarpUbic'); if (!modal) return;
+  modal.dataset.tipo = tipo;
+  var on = 'border:2px solid #0c447c;background:#e6f1fb;color:#0c447c;';
+  var onCaja = 'border:2px solid #8a5a10;background:#faeeda;color:#633806;';
+  var off = 'border:1.5px solid #d8ceb8;background:#fff;color:#5a4a30;';
+  var g = document.getElementById('mCarpUbicGav'), k = document.getElementById('mCarpUbicCaja');
+  var base = 'padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:700;';
+  if (g) g.style.cssText = base + (tipo === 'gaveta' ? on : off);
+  if (k) k.style.cssText = base + (tipo === 'caja' ? onCaja : off);
+  var lbl = document.getElementById('mCarpUbicLbl'); if (lbl) lbl.textContent = tipo === 'caja' ? 'Número de caja' : 'Número de gaveta';
+  var ult = _carpUltimoNumUbic(tipo);
+  var hint = document.getElementById('mCarpUbicHint');
+  if (hint) hint.textContent = ult ? ('La ' + (tipo === 'caja' ? 'caja' : 'gaveta') + ' más alta registrada es la ' + ult + '.') : '';
+}
+function _carpGuardarUbicacion(){
+  var modal = document.getElementById('mCarpUbic'); if (!modal) return;
+  var c = D.carpetas[parseInt(modal.dataset.idx, 10)]; if (!c) return;
+  var num = String((document.getElementById('mCarpUbicNum') || {}).value || '').trim();
+  if (!num) { if (typeof toast === 'function') toast('Escribe el número', 'err'); return; }
+  c.ubicacion = { tipo: modal.dataset.tipo === 'caja' ? 'caja' : 'gaveta', num: num };
+  c.fechaModificacion = new Date().toISOString();
+  cerrar('mCarpUbic');
+  try { renderCarp(); } catch(e){}
+  try { save(); } catch(e){}
+  try { if (typeof saveCarpetas === 'function') saveCarpetas(); } catch(e){}
+  if (typeof toast === 'function') toast('✓ ' + c.num + ' en ' + (c.ubicacion.tipo === 'caja' ? 'Caja ' : 'Gaveta ') + num);
+}
+function _carpQuitarUbicacion(){
+  var modal = document.getElementById('mCarpUbic'); if (!modal) return;
+  var c = D.carpetas[parseInt(modal.dataset.idx, 10)]; if (!c) return;
+  delete c.ubicacion;
+  c.fechaModificacion = new Date().toISOString();
+  cerrar('mCarpUbic');
+  try { renderCarp(); } catch(e){}
+  try { save(); } catch(e){}
+  try { if (typeof saveCarpetas === 'function') saveCarpetas(); } catch(e){}
+  if (typeof toast === 'function') toast('Ubicación quitada');
 }
 
 function _juTerminosAbiertos(j){

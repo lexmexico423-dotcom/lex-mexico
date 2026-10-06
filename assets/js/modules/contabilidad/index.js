@@ -886,9 +886,9 @@ function _carpEditarUbicacion(idx){
     modal = document.createElement('div');
     modal.className = 'modal-ov';
     modal.id = 'mCarpUbic';
-    modal.innerHTML = '<div class="modal" style="max-width:380px;width:92vw;">'
+    modal.innerHTML = '<div class="modal" style="max-width:520px;width:94vw;overflow:visible;">'
       + '<div class="modal-hdr"><h3 id="mCarpUbicTit" style="font-size:0.9rem;">¿Dónde está la carpeta?</h3><button class="modal-x" onclick="cerrar(\'mCarpUbic\')">✕</button></div>'
-      + '<div class="modal-body" style="padding:16px 18px;">'
+      + '<div class="modal-body" style="padding:18px 22px;overflow:visible;">'
       +   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">'
       +     '<button type="button" id="mCarpUbicGav" onclick="_carpUbicTipo(\'gaveta\')" style="padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:700;">🗄 Gaveta</button>'
       +     '<button type="button" id="mCarpUbicCaja" onclick="_carpUbicTipo(\'caja\')" style="padding:10px;border-radius:8px;cursor:pointer;font-size:0.85rem;font-weight:700;">📦 Caja</button>'
@@ -896,9 +896,9 @@ function _carpEditarUbicacion(idx){
       +   '<label id="mCarpUbicLbl" style="display:block;font-size:0.72rem;color:var(--muted);margin-bottom:4px;">Número</label>'
       +   '<input type="text" inputmode="numeric" id="mCarpUbicNum" placeholder="Ej. 3" style="width:100%;padding:9px 12px;border:1.5px solid #c8952a;border-radius:6px;font-size:1rem;box-sizing:border-box;" onkeydown="if(event.key===\'Enter\')_carpGuardarUbicacion()">'
       +   '<div id="mCarpUbicHint" style="font-size:0.66rem;color:var(--muted);margin-top:5px;"></div>'
-      +   '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:16px;">'
+      +   '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:18px;">'
       +     '<button type="button" class="btn btn-ghost" onclick="_carpQuitarUbicacion()" style="font-size:0.72rem;">Quitar ubicación</button>'
-      +     '<div style="display:flex;gap:8px;"><button type="button" class="btn btn-ghost" onclick="cerrar(\'mCarpUbic\')">Cancelar</button>'
+      +     '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-left:auto;"><button type="button" class="btn btn-ghost" onclick="cerrar(\'mCarpUbic\')">Cancelar</button>'
       +     '<button type="button" class="btn btn-primary" onclick="_carpGuardarUbicacion()">Guardar</button></div>'
       +   '</div>'
       + '</div></div>';

@@ -203,81 +203,114 @@ async function guardarAcuerdosDrive(juicioId, lista) {
 function renderAcuerdosDrive(lista) {
   const cont = document.getElementById('mexp-r2-lista');
   if (!cont) return;
+  lista = Array.isArray(lista) ? lista : [];
+  window._juAcuerdosLista = lista;
   // Actualizar KPI
   const kpi = document.getElementById('mexp-stat-docs');
   if (kpi) kpi.textContent = lista.filter(a => a.estado !== 'procesando').length;
 
+  const idxJ = window._mexpIdxActual;
+  const j = (typeof D !== 'undefined' && D.juicios) ? D.juicios[idxJ] : null;
+  const meta = j ? _juMeta(j) : {};
+
+  // ¿Requiere acción? (y no está marcado como atendido)
+  const info = lista.map(ac => {
+    const k = _juClaveAcuerdo(ac);
+    const m = meta[k] || {};
+    const pide = _juAcuerdoPideAccion(ac);
+    return { ac, k, m, pide, pendiente: pide && !m.atendido };
+  });
+  const nPend = info.filter(x => x.pendiente).length;
+  // Se guarda en el expediente para mostrar el aviso en la lista de juicios
+  // (los acuerdos viven en el caché de cada computadora; este número sí viaja).
+  if (j && j.acuerdosPendientesAccion !== nPend && lista.length) {
+    j.acuerdosPendientesAccion = nPend;
+    j.updatedAt = Date.now();
+    if (typeof saveJuicios === 'function') try { saveJuicios(); } catch(e){}
+  }
+  try { if (typeof _juRenderFichaSimple === 'function' && idxJ != null) _juRenderFichaSimple(idxJ); } catch(e){}
+  try { if (typeof _juRenderPestanas === 'function' && idxJ != null) { const b = document.getElementById('mexp-pestanas'); if (b) _juRenderPestanas(idxJ); } } catch(e){}
+
   if (!lista.length) {
-    cont.innerHTML = '<div style="padding:20px 10px;text-align:center;color:var(--muted);font-size:0.72rem;line-height:1.6;">Sin acuerdos subidos.<br>Arrastra un PDF o usa <strong>＋ Subir</strong>.</div>';
+    cont.innerHTML = '<div style="padding:24px 10px;text-align:center;color:var(--muted);font-size:0.76rem;line-height:1.6;">Sin acuerdos subidos todavía.<br>Usa <strong>📄 Subir acuerdo</strong> o arrastra el PDF aquí.</div>';
     return;
   }
+
+  // Filtros: Todos · Requieren acción · Este mes
+  const mesActual = new Date().toISOString().slice(0,7);
+  const nMes = lista.filter(a => String(a.fechaAcuerdo || a.fechaSubida || '').slice(0,7) === mesActual).length;
+  const filtro = window._juAcFiltro || 'todos';
+  const chip = (k, lbl, on, colorOn) => '<button onclick="_juFiltroAcuerdos(\'' + k + '\')" style="border-radius:16px;padding:4px 12px;font-size:.7rem;cursor:pointer;font-family:inherit;'
+    + (on ? 'background:' + colorOn + ';color:#fff;border:1px solid ' + colorOn + ';font-weight:700;' : 'background:var(--surface);color:var(--muted);border:1px solid var(--border-l);') + '">' + lbl + '</button>';
+  const barra = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">'
+    + chip('todos', 'Todos (' + lista.length + ')', filtro === 'todos', 'var(--gold-d)')
+    + chip('accion', '⚠ Requieren acción (' + nPend + ')', filtro === 'accion', '#b06a00')
+    + chip('mes', 'Este mes (' + nMes + ')', filtro === 'mes', 'var(--gold-d)')
+    + '</div>';
+
+  let vis = info;
+  if (filtro === 'accion') vis = info.filter(x => x.pendiente);
+  else if (filtro === 'mes') vis = info.filter(x => String(x.ac.fechaAcuerdo || x.ac.fechaSubida || '').slice(0,7) === mesActual);
   // Ordenar: más reciente arriba, sin fecha al final
-  const sorted = [...lista].sort((a,b) => {
-    const fa = a.fechaAcuerdo || a.fechaSubida || '';
-    const fb = b.fechaAcuerdo || b.fechaSubida || '';
-    if (!fa && !fb) return 0;
-    if (!fa) return 1;
-    if (!fb) return -1;
+  vis = vis.slice().sort((a,b) => {
+    const fa = a.ac.fechaAcuerdo || a.ac.fechaSubida || '';
+    const fb = b.ac.fechaAcuerdo || b.ac.fechaSubida || '';
+    if (!fa && !fb) return 0; if (!fa) return 1; if (!fb) return -1;
     return fb.localeCompare(fa);
   });
 
-  // Helper: formatear fecha a "15/MAY/26"
-  function _fmtFechaBadge(iso) {
-    if (!iso) return '';
-    var m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
-    return m ? m[3]+'/'+m[2]+'/'+m[1] : iso;
+  cont.innerHTML = barra;
+  if (!vis.length) {
+    cont.insertAdjacentHTML('beforeend', '<div style="padding:18px 10px;text-align:center;color:var(--muted);font-size:0.74rem;">' + (filtro === 'accion' ? '✓ No hay acuerdos pendientes de atender.' : 'No hay acuerdos en este filtro.') + '</div>');
+    return;
   }
+  const _fmtBadge = (iso) => { const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? m[3]+'/'+m[2]+'/'+m[1] : ''; };
 
-  cont.innerHTML = '';
-  sorted.forEach(ac => {
-    const tipo = ACUERDO_TIPOS[ac.tipo] || ACUERDO_TIPOS.otro;
+  vis.forEach(({ ac, k, m, pide, pendiente }) => {
+    const tipo = (typeof ACUERDO_TIPOS !== 'undefined' && (ACUERDO_TIPOS[ac.tipo] || ACUERDO_TIPOS.otro)) || { label: 'Otro', bg: '#eee', color: '#555' };
+    const f = ac.fechaAcuerdo || ac.fechaSubida || '';
+    const fm = String(f).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const dia = fm ? parseInt(fm[3],10) : '—';
+    const mesAnio = fm ? (_JU_MESES[parseInt(fm[2],10)-1] + ' ' + fm[1]) : 'sin fecha';
+    const titulo = _juTituloAcuerdo(ac);
+    const resumen = _juResumenAcuerdo(ac, titulo);
+    const kEsc = String(k).replace(/'/g, "\\'");
+
+    let chipAccion = '';
+    if (m.atendido) chipAccion = '<span onclick="event.stopPropagation();_juDesmarcarAtendido(\'' + kEsc + '\')" title="Clic para quitar la marca" style="cursor:pointer;font-size:.62rem;padding:2px 8px;border-radius:10px;background:var(--verde-l);color:var(--verde-d);font-weight:700;">✓ Atendido' + (m.atendido.por ? ' por ' + _juEsc(m.atendido.por) : '') + '</span>';
+    else if (pendiente) chipAccion = '<span style="font-size:.62rem;padding:2px 8px;border-radius:10px;background:#fdeccc;color:#8a4a00;font-weight:700;">⚠ Requiere acción</span>';
+    const estadoChip = ac.estado === 'procesando'
+      ? '<span style="font-size:.6rem;padding:2px 7px;border-radius:4px;background:#FAEEDA;color:#633806;">⏳ IA procesando</span>'
+      : ac.estado === 'error_drive' ? '<span style="font-size:.6rem;padding:2px 7px;border-radius:4px;background:#FCEBEB;color:#A32D2D;">⚠ Sin Drive</span>' : '';
+    const notifFmt = ac.fechaNotificacion ? _fmtBadge(ac.fechaNotificacion) : '';
+    const notifBadge = '<span id="notif-badge-' + ac.id + '" onclick="event.stopPropagation();_editarNotifAcuerdo(\'' + ac.id + '\')" title="' + (notifFmt ? 'Editar fecha de notificación' : 'Registrar fecha de notificación') + '" style="font-size:.6rem;padding:2px 8px;border-radius:4px;cursor:pointer;'
+      + (notifFmt ? 'background:#ddeeff;color:#1a4a8a;font-weight:700;">🔔 Notificado ' + notifFmt : 'border:1px dashed #aac4e0;color:#4a7aaa;">+ Fecha de notificación') + '</span>';
+    const subido = m.subidoPor ? 'Subido por ' + _juEsc(m.subidoPor) + (m.subidoFecha ? ' · ' + _juFechaLarga(m.subidoFecha) : '')
+                 : (ac.fechaSubida ? 'Subido el ' + _juFechaLarga(ac.fechaSubida) : '');
+
     const card = document.createElement('div');
-    card.style.cssText = 'border:1px solid var(--border-l);border-radius:7px;padding:8px 10px;margin-bottom:6px;cursor:pointer;transition:background 0.12s;position:relative;';
-    card.onmouseover = () => card.style.background = 'var(--surface2)';
-    card.onmouseleave = () => card.style.background = '';
-
-    const badgeEstado = ac.estado === 'procesando'
-      ? `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:#FAEEDA;color:#633806;display:inline-flex;align-items:center;gap:4px;"><span style="display:inline-block;width:8px;height:8px;border:1.5px solid #BA7517;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;"></span>IA procesando</span>`
-      : ac.estado === 'error_drive'
-      ? `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:#FCEBEB;color:#A32D2D;">⚠ Sin Drive</span>`
-      : `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:#EAF3DE;color:#27500A;">Listo</span>`;
-    const badgeTipo = `<span style="font-size:0.6rem;padding:2px 7px;border-radius:4px;background:${tipo.bg};color:${tipo.color};font-weight:600;">${tipo.label}</span>`;
-
-    // Fecha del acuerdo en formato "15/MAY/26" para el nombre
-    const fechaAcuerdoBadge = _fmtFechaBadge(ac.fechaAcuerdo);
-    const nombreConFecha = fechaAcuerdoBadge
-      ? `<span style="color:var(--gold-d);font-family:'JetBrains Mono',monospace;font-size:0.68rem;font-weight:700;margin-right:5px;">${fechaAcuerdoBadge}</span>${escHTML(ac.nombre || ac.archivo)}`
-      : escHTML(ac.nombre || ac.archivo);
-
-    // Descripción — 4 líneas completas (respeta saltos de línea de la IA)
-    const _descRow = ac.descripcion
-      ? `<div style="font-size:0.62rem;color:var(--muted);margin-top:3px;line-height:1.5;white-space:pre-line;word-break:break-word;">${escHTML(ac.descripcion)}</div>`
-      : '';
-
-    // Badge de notificación: si ya tiene fecha muestra "NOTIFICACIÓN 15/MAY/26", si no muestra "+ Notificación" clickeable
-    const notifFmt = ac.fechaNotificacion ? _fmtFechaBadge(ac.fechaNotificacion) : '';
-    const notifBadgeId = 'notif-badge-' + ac.id;
-    const notifInputId = 'notif-input-' + ac.id;
-    const notifBadge = notifFmt
-      ? `<span id="${notifBadgeId}" onclick="event.stopPropagation();_editarNotifAcuerdo('${ac.id}')" title="Editar fecha de notificación" style="font-size:0.6rem;padding:2px 8px;border-radius:4px;background:#ddeeff;color:#1a4a8a;font-weight:700;cursor:pointer;font-family:'JetBrains Mono',monospace;">🔔 NOTIFICACIÓN ${notifFmt}</span>`
-      : `<span id="${notifBadgeId}" onclick="event.stopPropagation();_editarNotifAcuerdo('${ac.id}')" title="Registrar fecha de notificación" style="font-size:0.6rem;padding:2px 8px;border-radius:4px;border:1px dashed #aac4e0;color:#4a7aaa;cursor:pointer;background:transparent;">+ Notificación</span>`;
-
-    card.innerHTML = `
-      <div style="display:flex;align-items:flex-start;gap:6px;">
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:0.72rem;font-weight:600;color:var(--ink);line-height:1.35;">${nombreConFecha}</div>
-          ${_descRow}
-        </div>
-        <span onclick="event.stopPropagation();verAcuerdoPDF('${ac.driveFileId}','${encodeURIComponent(ac.nombre||ac.archivo)}')" title="Ver PDF original" style="font-size:1.1rem;cursor:pointer;color:var(--muted);flex-shrink:0;padding-top:1px;">👁</span>
-        <span onclick="event.stopPropagation();eliminarAcuerdoDrive('${ac.id}')" title="Eliminar acuerdo" style="font-size:1rem;cursor:pointer;color:var(--muted);flex-shrink:0;padding-top:1px;">🗑</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:5px;margin-top:6px;flex-wrap:wrap;">
-        ${badgeTipo}
-        ${badgeEstado}
-        ${notifBadge}
-      </div>`;
-
-    card.onclick = () => verResumenAcuerdoModal(ac);
+    card.style.cssText = 'display:flex;gap:12px;align-items:flex-start;border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;'
+      + (pendiente ? 'background:#fff8e8;border:1.5px solid #e0a040;' : 'background:var(--surface);border:1px solid var(--border-l);');
+    card.innerHTML =
+        '<div style="text-align:center;min-width:52px;border-right:1px solid var(--border-l);padding-right:10px;">'
+      +   '<div style="font-size:1.15rem;font-weight:700;color:var(--ink);line-height:1.1;">' + dia + '</div>'
+      +   '<div style="font-size:.62rem;color:var(--muted);">' + mesAnio + '</div></div>'
+      + '<div style="flex:1;min-width:0;">'
+      +   '<div style="font-size:.82rem;font-weight:700;color:var(--ink);line-height:1.35;">' + _juEsc(titulo) + '</div>'
+      +   (resumen ? '<div style="font-size:.72rem;color:var(--muted);margin-top:3px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + _juEsc(resumen) + '</div>' : '')
+      +   '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:6px;">'
+      +     '<span style="font-size:.6rem;padding:2px 7px;border-radius:4px;background:' + tipo.bg + ';color:' + tipo.color + ';font-weight:600;">' + _juEsc(tipo.label) + '</span>'
+      +     chipAccion + estadoChip + notifBadge
+      +   '</div>'
+      +   (subido ? '<div style="font-size:.62rem;color:var(--muted);margin-top:5px;opacity:.85;">' + subido + '</div>' : '')
+      + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:5px;flex-shrink:0;align-items:stretch;">'
+      +   '<button onclick="event.stopPropagation();verAcuerdoPDF(\'' + ac.driveFileId + '\',\'' + encodeURIComponent(ac.nombre || ac.archivo || '') + '\')" style="background:#1a4a8a;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:.7rem;cursor:pointer;">👁 Ver</button>'
+      +   '<button onclick="event.stopPropagation();_juTerminoDesdeAcuerdo(\'' + kEsc + '\')" style="background:var(--surface);color:var(--gold-d);border:1px solid var(--gold);border-radius:6px;padding:5px 10px;font-size:.7rem;cursor:pointer;">⏰ Término</button>'
+      +   (pendiente ? '<button onclick="event.stopPropagation();_juMarcarAtendido(\'' + kEsc + '\')" style="background:var(--surface);color:var(--verde-d);border:1px solid var(--verde-d);border-radius:6px;padding:5px 10px;font-size:.7rem;cursor:pointer;">✓ Atendido</button>' : '')
+      +   '<button onclick="event.stopPropagation();eliminarAcuerdoDrive(\'' + ac.id + '\')" title="Eliminar acuerdo" style="background:none;border:none;color:var(--muted);font-size:.85rem;cursor:pointer;padding:2px;">🗑</button>'
+      + '</div>';
+    card.onclick = () => { if (typeof verResumenAcuerdoModal === 'function') verResumenAcuerdoModal(ac); };
     cont.appendChild(card);
   });
 }
@@ -563,6 +596,8 @@ Responde ÚNICAMENTE con un JSON válido, sin markdown ni texto extra:
       const idx = lista.findIndex(a => a.id === tmpId);
       const acFinal = { id: tmpId, archivo: file.name, nombre: nombreMostrar, nombreLargo: nombreIA, descripcion: descripcionIA, tipo: tipoIA, estado: driveFileId ? 'listo' : 'error_drive', fechaSubida: new Date().toISOString().slice(0,10), fechaAcuerdo: fechaIA, resumen: resumenIA, driveFileId, sha256: fileSha256 };
       if (idx >= 0) lista[idx] = acFinal; else lista.push(acFinal);
+      // Quién lo subió (se guarda en el expediente para que lo vean todos).
+      try { if (typeof _juRegistrarSubidoPor === 'function' && driveFileId) _juRegistrarSubidoPor(acFinal); } catch(eSP){}
 
       // 5) Agregar al historial cronológico automáticamente
       await agregarEntradaHistorialDesdeAcuerdo(jId, acFinal);
@@ -1321,7 +1356,9 @@ function _juRenderListaTabla(lista, el){
       + '<td style="padding:9px 10px;"><span style="width:9px;height:9px;border-radius:50%;display:inline-block;background:'+col+';"></span></td>'
       // cliente / asunto
       + '<td style="padding:9px 10px;"><div style="font-weight:700;color:var(--ink);">'+esc2(j.cliente||'—')+'</div>'
-        + '<div style="font-family:monospace;font-size:.66rem;color:var(--muted);">'+esc2(j.tipo||'')+'</div></td>'
+        + '<div style="font-family:monospace;font-size:.66rem;color:var(--muted);">'+esc2(j.tipo||'')+'</div>'
+        + ((j.acuerdosPendientesAccion > 0) ? '<span style="display:inline-block;margin-top:4px;font-size:.6rem;background:#fdeccc;color:#8a4a00;border-radius:10px;padding:1px 8px;font-weight:700;">⚠ '+j.acuerdosPendientesAccion+' requiere'+(j.acuerdosPendientesAccion===1?'':'n')+' acción</span>' : '')
+        + '</td>'
       // expediente / juzgado
       + '<td style="padding:9px 10px;"><div style="font-family:monospace;font-size:.72rem;">'+esc2(j.expediente||'—')+'</div>'
         + '<div style="font-family:monospace;font-size:.6rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:170px;">'+esc2(j.juzgado||'')+'</div></td>'
@@ -2552,6 +2589,13 @@ function fichaGuardarNotas(){
 function abrirDetalle(idx){
   jdetIdx = idx;
   _mexpIdx = idx;
+  // Diseño simple (oct-2026): cada expediente abre en "Acuerdos", con todos
+  // los filtros en "Todos" y el menú de "Más opciones" cerrado.
+  window._mexpIdxActual = idx;
+  window._juTabActiva = '0';
+  window._juAcFiltro = 'todos';
+  window._juAcuerdosLista = [];
+  try { _juToggleMasOpciones(false); var _avw = document.getElementById('mexp-aviso-wrap'); if (_avw) _avw.style.display = 'none'; } catch(e){}
   const j = D.juicios[idx];
   if(!j) return;
 
@@ -2621,6 +2665,7 @@ function abrirDetalle(idx){
   try{ _juRenderPestanas(idx); }catch(e){ console.warn('[Juicios] pestañas:', e); }
   try{ _juRenderNotas(idx); }catch(e){ console.warn('[Juicios] notas:', e); }
   try{ _juRenderDocRel(idx); }catch(e){ console.warn('[Juicios] documentos relacionados:', e); }
+  try{ _juRenderFichaSimple(idx); }catch(e){ console.warn('[Juicios] ficha simple:', e); }
 
   // Limpiar chat IA
   $('mexp-ia-chat').innerHTML = '';
@@ -2669,6 +2714,8 @@ function _juRenderAvisoTermino(j, idx){
   if(!modal || !j) return;
   const slot = document.getElementById('mexp-aviso-termino-slot');
   if(!slot) return;
+  // Mantener al día la tarjeta "Términos por vencer" de la ficha simple.
+  setTimeout(function(){ try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(idx); } catch(e){} }, 0);
   const esc2 = (s) => (typeof esc === 'function' ? esc(s == null ? '' : s) : String(s == null ? '' : s));
   const lista = _juTerminosPropiosAbiertos(j);
   if(!lista.length){
@@ -2789,22 +2836,28 @@ function _juRenderPestanas(idx){
     barra.id = 'mexp-pestanas';
     cuerpo.parentNode.insertBefore(barra, cuerpo);
   }
-  const activa = window._juTabActiva || 'todo';
+  // Oct-2026 (diseño simple): 4 pestañas — Acuerdos · Etapas del juicio ·
+  // Notas · Documentos. "Todo" (3 columnas a la vez) se quitó porque
+  // confundía; el Asistente IA se abre con "💬 Explicar al cliente" o desde
+  // "⋯ Más opciones" y solo entonces aparece como quinta pestaña.
+  let activa = window._juTabActiva || '0';
+  if(activa === 'todo') activa = window._juTabActiva = '0';
+  const nAc = (window._juAcuerdosLista || []).filter(a => a && a.estado !== 'procesando').length;
+  const nNotas = ((typeof D !== 'undefined' && D.pendientes) || []).filter(p => typeof p.juicioVinculadoIdx === 'number' && p.juicioVinculadoIdx === idx && !p.resuelto).length;
   const defs = [
-    ['todo','▦ Todo'], ['0','📁 Acuerdos'], ['1','⚖ Flujo del procedimiento'], ['2','✨ Análisis IA'], ['3','📝 Notas y Recordatorios'], ['4','📌 Documentos']
+    ['0', '📄 Acuerdos' + (nAc ? ' (' + nAc + ')' : '')],
+    ['1', '⚖ Etapas del juicio'],
+    ['3', '📝 Notas' + (nNotas ? ' (' + nNotas + ')' : '')],
+    ['4', '📌 Documentos']
   ];
-  barra.style.cssText = 'display:flex;gap:9px;padding:12px 20px;background:var(--surface2);'
-    + 'border-bottom:1.5px solid var(--border-l);flex-shrink:0;flex-wrap:wrap;';
+  if(activa === '2') defs.push(['2', '✨ Asistente IA']);
+  barra.style.cssText = 'display:flex;gap:4px;padding:0 20px;background:var(--surface);'
+    + 'border-bottom:1px solid var(--border-l);flex-shrink:0;flex-wrap:wrap;';
   barra.innerHTML = defs.map(([k, lbl]) => {
-    const on = activa===k;
-    return '<button type="button" onclick="_juTab(\''+k+'\')" '
-      + (on ? '' : 'onmouseover="this.style.borderColor=\'var(--gold)\';this.style.color=\'var(--gold-d)\';" onmouseout="this.style.borderColor=\'var(--border-l)\';this.style.color=\'var(--ink)\';" ')
-      + 'style="padding:8px 16px;font-family:monospace;font-size:.68rem;cursor:pointer;'
-      + 'border-radius:20px;border:1.5px solid '+(on?'var(--gold-d)':'var(--border-l)')+';'
-      + 'background:'+(on?'linear-gradient(135deg,var(--gold),var(--gold-d))':'var(--surface)')+';'
-      + 'color:'+(on?'#fff':'var(--ink)')+';'
-      + 'box-shadow:'+(on?'0 3px 8px rgba(140,101,24,0.35)':'0 1px 2px rgba(0,0,0,0.04)')+';'
-      + 'transition:all .15s;letter-spacing:0.02em;'+(on?'font-weight:700;':'font-weight:600;')+'">'+lbl+'</button>';
+    const on = activa === k;
+    return '<button type="button" onclick="_juTab(\''+k+'\')" style="padding:9px 14px;font-size:.78rem;cursor:pointer;background:none;border:none;'
+      + 'border-bottom:3px solid ' + (on ? 'var(--gold)' : 'transparent') + ';'
+      + 'color:' + (on ? 'var(--gold-d)' : 'var(--muted)') + ';font-weight:' + (on ? '700' : '500') + ';font-family:inherit;">' + lbl + '</button>';
   }).join('');
   _juAplicarTab();
 }
@@ -2813,7 +2866,7 @@ function _juAplicarTab(){
   const cuerpo = document.getElementById('mexp-cuerpo');
   if(!cuerpo) return;
   const cols = Array.from(cuerpo.children).filter(c => c.nodeType === 1);
-  const activa = window._juTabActiva || 'todo';
+  const activa = window._juTabActiva || '0';
   if(activa === 'todo'){
     cuerpo.style.gridTemplateColumns = 'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)';
     // "Todo" solo muestra las 3 columnas originales (Acuerdos, Flujo, Análisis
@@ -2825,6 +2878,236 @@ function _juAplicarTab(){
     cuerpo.style.gridTemplateColumns = 'minmax(0,1fr)';
     cols.forEach((c, i) => { c.style.display = (i === n) ? 'flex' : 'none'; });
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// FICHA DEL JUICIO — DISEÑO SIMPLE (oct-2026, a petición expresa: la ficha
+// anterior, con 3 columnas a la vez y 6 pestañas, resultaba confusa para las
+// empleadas). Arriba: 4 tarjetas de resumen (Etapa · Términos · Último
+// acuerdo · Pago) y 4 acciones grandes. Debajo: 4 pestañas (Acuerdos ·
+// Etapas · Notas · Documentos). Lo poco usado vive en "⋯ Más opciones".
+// Se reutilizan TODOS los paneles y funciones existentes (subir acuerdo,
+// términos con calculadora de días hábiles, notas, IA…); aquí solo cambia
+// la presentación y se agregan: filtros, "✓ Atendido", "Subido por" y el
+// término precargado desde un acuerdo.
+// ══════════════════════════════════════════════════════════════════════
+var _JU_MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function _juFechaLarga(iso){
+  var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? (parseInt(m[3],10) + ' ' + _JU_MESES[parseInt(m[2],10)-1] + ' ' + m[1]) : '';
+}
+function _juEsc(s){ return (typeof esc === 'function') ? esc(s == null ? '' : s) : String(s == null ? '' : s); }
+function _juUsuarioActual(){
+  try { if (typeof empleadoActual !== 'undefined' && empleadoActual) return empleadoActual.nombre || empleadoActual.email || ''; } catch(e){}
+  return '';
+}
+function _juMeta(j){ if (!j.acuerdosMeta || typeof j.acuerdosMeta !== 'object') j.acuerdosMeta = {}; return j.acuerdosMeta; }
+function _juClaveAcuerdo(ac){ return (ac && (ac.driveFileId || ac.id)) || ''; }
+
+// Título legible del acuerdo: el nombre corto si trae palabras separadas; si
+// viene todo junto (p. ej. "AUTOEXHIBICIONATESTADOS"), la primera línea del
+// resumen que hizo la IA.
+function _juTituloAcuerdo(ac){
+  var base = String((ac && (ac.nombre || ac.archivo)) || '').replace(/\.pdf$/i,'').replace(/^\d{2}[-\/]\d{2}[-\/]\d{2,4}\s*/,'').trim();
+  var desc = String((ac && (ac.descripcion || ac.resumen)) || '').trim();
+  if (base && /\s/.test(base)) {
+    var chicas = ['a','al','de','del','la','las','el','los','y','e','o','en','por','para','con','sin','su','sus'];
+    return base.split(/\s+/).map(function(w, i){
+      var lw = w.toLowerCase();
+      if (i > 0 && chicas.indexOf(lw) >= 0) return lw;
+      if (/^[A-ZÁÉÍÓÚÑ]{2,4}$/.test(w) && chicas.indexOf(lw) < 0 && !/^(AUTO|ACTA|ALTA|BAJA|PAGO|CITA|VISTA)$/.test(w)) return w; // siglas: DIF, IMSS, SAT…
+      return lw.charAt(0).toUpperCase() + lw.slice(1);
+    }).join(' ');
+  }
+  if (desc) {
+    var l1 = desc.split(/\n/)[0].trim();
+    return l1.length > 95 ? l1.slice(0, 92).replace(/\s+\S*$/, '') + '…' : l1;
+  }
+  return base || 'Acuerdo';
+}
+function _juResumenAcuerdo(ac, titulo){
+  var desc = String((ac && (ac.descripcion || ac.resumen)) || '').trim();
+  if (!desc) return '';
+  var lineas = desc.split(/\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+  // Si el título ya es la primera línea, el resumen empieza en la segunda.
+  if (titulo && lineas.length && lineas[0].indexOf(titulo.replace(/…$/,'')) === 0) {
+    if (lineas.length > 1) lineas.shift();
+    else if (!/…$/.test(titulo)) return '';
+  }
+  return lineas.join(' ');
+}
+var _JU_RE_ACCION = /(se\s+(le\s+)?requiere|requiere\s+a\s|apercib|se\s+previene|prevenci[oó]n|desahog|deber[aá]n?\s|plazo|t[eé]rmino\s+de\s|dentro\s+de(l)?\s|\b\d+\s*(d[ií]as|horas)\b|se\s+da\s+vista|d[eé]se\s+vista)/i;
+function _juAcuerdoPideAccion(ac){
+  if (!ac || ac.estado === 'procesando') return false;
+  return _JU_RE_ACCION.test(String(ac.descripcion || '') + ' ' + String(ac.resumen || ''));
+}
+
+// Guarda quién subió cada acuerdo (se llama al terminar la subida).
+function _juRegistrarSubidoPor(ac){
+  try {
+    var idx = (typeof jdetIdx !== 'undefined' && jdetIdx >= 0) ? jdetIdx : _mexpIdx;
+    var j = D.juicios && D.juicios[idx];
+    var k = _juClaveAcuerdo(ac);
+    if (!j || !k) return;
+    var m = _juMeta(j);
+    m[k] = Object.assign({}, m[k] || {}, { subidoPor: _juUsuarioActual(), subidoFecha: (typeof _hoyReal === 'function' ? _hoyReal() : new Date().toISOString().slice(0,10)) });
+    j.updatedAt = Date.now();
+    if (typeof saveJuicios === 'function') saveJuicios();
+  } catch(e){ console.warn('[Juicios] subidoPor:', e); }
+}
+
+function _juMarcarAtendido(clave){
+  var idx = window._mexpIdxActual; var j = D.juicios && D.juicios[idx];
+  if (!j || !clave) return;
+  var m = _juMeta(j);
+  var hoyISO = (typeof _hoyReal === 'function') ? _hoyReal() : new Date().toISOString().slice(0,10);
+  m[clave] = Object.assign({}, m[clave] || {}, { atendido: { por: _juUsuarioActual(), fecha: hoyISO } });
+  j.updatedAt = Date.now();
+  if (typeof saveJuicios === 'function') saveJuicios();
+  renderAcuerdosDrive(window._juAcuerdosLista || []);
+  if (typeof toast === 'function') toast('✓ Marcado como atendido');
+}
+function _juDesmarcarAtendido(clave){
+  var idx = window._mexpIdxActual; var j = D.juicios && D.juicios[idx];
+  if (!j || !clave) return;
+  var m = _juMeta(j);
+  if (!m[clave] || !m[clave].atendido) return;
+  if (!confirm('¿Quitar la marca de "Atendido" a este acuerdo?')) return;
+  delete m[clave].atendido;
+  j.updatedAt = Date.now();
+  if (typeof saveJuicios === 'function') saveJuicios();
+  renderAcuerdosDrive(window._juAcuerdosLista || []);
+}
+function _juFiltroAcuerdos(f){ window._juAcFiltro = f; renderAcuerdosDrive(window._juAcuerdosLista || []); }
+
+// Abre la ventana de término (la de siempre, con la calculadora de días
+// hábiles que ya descuenta fines de semana y días inhábiles) con el motivo,
+// la fecha de notificación y la nota ya escritos desde el acuerdo.
+function _juTerminoDesdeAcuerdo(clave){
+  var ac = (window._juAcuerdosLista || []).find(function(a){ return _juClaveAcuerdo(a) === clave; });
+  if (!ac || typeof abrirNuevoTermino !== 'function') { if (typeof abrirNuevoTermino === 'function') abrirNuevoTermino(); return; }
+  abrirNuevoTermino();
+  try {
+    var titulo = _juTituloAcuerdo(ac);
+    var pide = _juAcuerdoPideAccion(ac);
+    var set = function(id, v){ var el = document.getElementById(id); if (el) el.value = v; };
+    var tipoEl = document.getElementById('trTipo');
+    if (tipoEl) {
+      var opts = Array.from(tipoEl.options || []).map(function(o){ return o.value; });
+      var pref = ['Término','Termino','Requerimiento','Plazo'].find(function(v){ return opts.indexOf(v) >= 0; });
+      if (pref) tipoEl.value = pref;
+    }
+    set('trDesc', (pide ? 'Cumplir: ' : '') + titulo);
+    set('trNota', 'Desde el acuerdo del ' + (_juFechaLarga(ac.fechaAcuerdo) || 'expediente') + (ac.descripcion ? ' — ' + String(ac.descripcion).split('\n')[0] : ''));
+    set('trNotif', ac.fechaNotificacion || ac.fechaAcuerdo || '');
+    if (pide) {
+      var cat = document.getElementById('trPlazoCat');
+      if (cat) {
+        var o = Array.from(cat.options || []).find(function(op){ return /cumplir requerimiento/i.test(op.textContent || op.value); });
+        if (o) { cat.value = o.value; if (typeof cat.onchange === 'function') try { cat.onchange(); } catch(e){} }
+      }
+    }
+    var dEl = document.getElementById('trDias'); if (dEl) setTimeout(function(){ try { dEl.focus(); dEl.select(); } catch(e){} }, 150);
+    if (typeof _juRecalcularVenc === 'function') _juRecalcularVenc();
+  } catch(e){ console.warn('[Juicios] término desde acuerdo:', e); }
+}
+
+function _juExplicarCliente(){
+  _juTab('2');
+  try { if (typeof preguntaRapidaIA === 'function') preguntaRapidaIA('resumen-cliente'); } catch(e){ console.warn('[Juicios] explicar al cliente:', e); }
+}
+function _juSubirAcuerdoAccion(){
+  _juTab('0');
+  var inp = document.getElementById('acuerdo-file-input');
+  if (inp) inp.click();
+}
+function _juToggleMasOpciones(forzar){
+  var fila = document.getElementById('mexp-fila-mas');
+  var btn = document.getElementById('mexp-btn-mas');
+  if (!fila) return;
+  var abrir = (typeof forzar === 'boolean') ? forzar : (fila.style.display === 'none');
+  fila.style.display = abrir ? 'flex' : 'none';
+  if (btn) btn.textContent = abrir ? '✕ Ocultar opciones' : '⋯ Más opciones';
+}
+function _juToggleTerminos(){
+  var w = document.getElementById('mexp-aviso-wrap');
+  if (!w) return;
+  w.style.display = (w.style.display === 'none') ? 'flex' : 'none';
+}
+
+function _juRenderFichaSimple(idx){
+  var cont = document.getElementById('mexp-ficha-simple');
+  var j = D.juicios && D.juicios[idx];
+  if (!cont || !j) return;
+  var tile = function(onclick, fondo, borde, etiqueta, colorEt, cuerpo){
+    return '<div onclick="' + onclick + '" style="cursor:pointer;background:' + fondo + ';border:1px solid ' + borde + ';border-radius:10px;padding:10px 12px;min-width:0;">'
+      + '<div style="font-size:.66rem;color:' + colorEt + ';">' + etiqueta + '</div>' + cuerpo + '</div>';
+  };
+  // 1) Etapa
+  var etapaTxt = 'Sin definir', pct = 0;
+  if (Array.isArray(j.flujoProcedimiento) && j.flujoProcedimiento.length) {
+    var tot = j.flujoProcedimiento.length;
+    if (typeof j.flujoEtapaActual === 'number' && j.flujoProcedimiento[j.flujoEtapaActual]) {
+      etapaTxt = (j.flujoEtapaActual + 1) + ' de ' + tot + ' · ' + (j.flujoProcedimiento[j.flujoEtapaActual].etapa || '');
+      pct = Math.round((j.flujoEtapaActual + 1) / tot * 100);
+    } else { etapaTxt = 'Sin marcar · ' + tot + ' etapas'; }
+  } else if (j.etapa) { etapaTxt = j.etapa; }
+  var tEtapa = tile("_juTab('1')", 'var(--surface)', 'var(--border-l)', 'Etapa actual', 'var(--muted)',
+    '<div style="font-size:.82rem;font-weight:700;color:var(--ink);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + _juEsc(etapaTxt) + '">' + _juEsc(etapaTxt) + '</div>'
+    + '<div style="height:6px;background:var(--border-l);border-radius:3px;margin-top:8px;"><div style="width:' + pct + '%;height:6px;background:var(--gold);border-radius:3px;"></div></div>');
+  // 2) Términos
+  var terms = (typeof _juTerminosPropiosAbiertos === 'function') ? _juTerminosPropiosAbiertos(j) : [];
+  var tTerm;
+  if (!terms.length) {
+    tTerm = tile('_juToggleTerminos()', 'var(--verde-l)', 'rgba(26,122,58,0.3)', 'Términos por vencer', 'var(--verde-d)',
+      '<div style="font-size:.82rem;font-weight:700;color:var(--verde-d);margin-top:2px;">✓ Ninguno pendiente</div>');
+  } else {
+    var minD = null;
+    terms.forEach(function(t){ var e = (typeof _juEstadoTermino === 'function') ? _juEstadoTermino(t) : null; if (e && e.dias !== null && (minD === null || e.dias < minD)) minD = e.dias; });
+    var txt = minD === null ? '' : (minD < 0 ? 'vencido hace ' + (-minD) + ' día' + (minD === -1 ? '' : 's') : minD === 0 ? 'vence hoy' : 'vence en ' + minD + ' día' + (minD === 1 ? '' : 's'));
+    var urge = minD !== null && minD <= 3;
+    tTerm = tile('_juToggleTerminos()', urge ? 'var(--rojo-l)' : 'var(--amarillo-l)', urge ? 'rgba(192,22,26,0.35)' : 'rgba(154,96,16,0.3)',
+      'Términos por vencer · <u>ver</u>', urge ? 'var(--rojo)' : 'var(--amarillo)',
+      '<div style="font-size:.82rem;font-weight:700;color:' + (urge ? 'var(--rojo)' : 'var(--amarillo)') + ';margin-top:2px;">' + terms.length + (txt ? ' · ' + txt : '') + '</div>');
+  }
+  // 3) Último acuerdo
+  var lista = (window._juAcuerdosLista || []).filter(function(a){ return a && a.estado !== 'procesando'; });
+  var ult = lista.slice().sort(function(a,b){ return String(b.fechaAcuerdo || b.fechaSubida || '').localeCompare(String(a.fechaAcuerdo || a.fechaSubida || '')); })[0];
+  var tUlt = tile("_juTab('0')", 'var(--surface)', 'var(--border-l)', 'Último acuerdo', 'var(--muted)',
+    ult ? '<div style="font-size:.82rem;font-weight:700;color:var(--ink);margin-top:2px;">' + _juEsc(_juFechaLarga(ult.fechaAcuerdo || ult.fechaSubida) || '—') + '</div>'
+        + '<div style="font-size:.7rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _juEsc(_juTituloAcuerdo(ult)) + '</div>'
+        : '<div style="font-size:.82rem;color:var(--muted);margin-top:2px;">Sin acuerdos todavía</div>');
+  // 4) Pago del cliente
+  var folios = (typeof _juFoliosRecibo === 'function') ? _juFoliosRecibo(j) : (j.folioRecibo ? [j.folioRecibo] : []);
+  var tPago;
+  if (!folios.length) {
+    tPago = tile('abrirGestionReciboJuicio(' + idx + ')', 'var(--surface)', 'var(--border-l)', 'Pago del cliente', 'var(--muted)',
+      '<div style="font-size:.82rem;color:var(--muted);margin-top:2px;">Sin folio · <u>vincular</u></div>');
+  } else {
+    var f = folios[0], estadoTxt = '', colorP = 'var(--ink)';
+    try {
+      var ec = (typeof _calcularEstadoCuenta === 'function') ? _calcularEstadoCuenta(Number(f)) : null;
+      if (ec && ec.totales) {
+        if (ec.totales.cancelado) { estadoTxt = 'Cancelado'; colorP = 'var(--rojo)'; }
+        else if ((parseFloat(ec.totales.adeudo) || 0) > 0.005) { estadoTxt = 'Debe $' + (typeof fmt === 'function' ? fmt(ec.totales.adeudo) : ec.totales.adeudo); colorP = 'var(--rojo)'; }
+        else { estadoTxt = ec.abierto ? 'Sin adeudo por ahora' : 'Liquidado'; colorP = 'var(--verde-d)'; }
+      }
+    } catch(e){}
+    tPago = tile('abrirFichaDesdeContab(' + f + ')', 'var(--surface)', 'var(--border-l)', 'Pago del cliente' + (folios.length > 1 ? ' (' + folios.length + ' folios)' : ''), 'var(--muted)',
+      '<div style="font-size:.82rem;font-weight:700;color:' + colorP + ';margin-top:2px;">Folio #' + (typeof folioFormato === 'function' ? folioFormato(f) : f) + (estadoTxt ? ' · ' + estadoTxt : '') + '</div>');
+  }
+  var btnP = 'border-radius:8px;padding:10px;text-align:center;font-size:.8rem;font-weight:600;cursor:pointer;font-family:inherit;';
+  cont.innerHTML =
+      '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:12px 20px 8px;">' + tEtapa + tTerm + tUlt + tPago + '</div>'
+    + '<div style="padding:4px 20px 12px;">'
+    +   '<div style="font-size:.62rem;font-weight:700;color:var(--gold-d);letter-spacing:.06em;margin-bottom:6px;">¿QUÉ QUIERES HACER?</div>'
+    +   '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;">'
+    +     '<button onclick="_juSubirAcuerdoAccion()" style="' + btnP + 'background:#1a4a8a;color:#fff;border:none;">📄 Subir acuerdo</button>'
+    +     '<button onclick="abrirNuevoTermino()" style="' + btnP + 'background:var(--surface);color:#1a4a8a;border:1.5px solid #1a4a8a;">⏰ Agregar término</button>'
+    +     '<button onclick="_juNuevaNota(' + idx + ')" style="' + btnP + 'background:var(--surface);color:#1a4a8a;border:1.5px solid #1a4a8a;">📝 Agregar nota</button>'
+    +     '<button onclick="_juExplicarCliente()" style="' + btnP + 'background:var(--surface);color:var(--verde-d);border:1.5px solid var(--verde-d);">💬 Explicar al cliente</button>'
+    +   '</div>'
+    + '</div>';
 }
 
 function _juRenderNotas(idx){

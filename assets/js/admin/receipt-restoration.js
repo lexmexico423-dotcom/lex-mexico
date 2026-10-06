@@ -9442,12 +9442,98 @@ function _mpeRenderBody(estado, supIdx) {
       </div>
     </div>`;
 
+  // ── DISEÑO POR PASOS (oct-2026, a petición expresa: el panel anterior
+  // resultaba confuso para las empleadas). 1) ¿El vehículo es…? 2) ¿Qué
+  // trámite? 3) Todo lo que necesitas, en una sola lista numerada con botones
+  // iguales. El modo de edición del administrador conserva sus controles.
+  const _supDesc = { 'Nacional':'Fabricado o vendido en México', 'Legalizado':'Extranjero con pedimento', 'Sin pedimento':'Extranjero sin pedimento' };
+  const _subIco  = { 'Alta':'🚗', 'Cambio de propietario':'🔄', 'Renovación de tarjeta':'🪪', 'Reemplacamiento':'🔁', 'Baja':'⛔' };
+  const _sel = function(on){ return on ? 'border:2px solid #c8951a;background:#fdf1d8;' : 'border:1.5px solid #d8ceb8;background:#fff;'; };
+  const _paso = function(t){ return '<div style="font-size:0.74rem;font-weight:700;color:#8a5a10;letter-spacing:0.04em;margin:0 0 8px;">' + t + '</div>'; };
+  let _nPaso = 0;
+  let paso1 = '';
+  if (cfg.supuestos.length > 1) {
+    _nPaso++;
+    paso1 = '<div>' + _paso('PASO ' + _nPaso + ' · ¿El vehículo es…?')
+      + '<div style="display:grid;grid-template-columns:repeat(' + cfg.supuestos.length + ',minmax(0,1fr));gap:10px;">'
+      + cfg.supuestos.map(function(s, i){
+          const on = i === supIdx;
+          return '<button onclick="_mpeCambiarSup(\'' + estado + '\',' + i + ')" style="' + _sel(on) + 'border-radius:10px;padding:10px 12px;text-align:left;cursor:pointer;font-family:inherit;">'
+            + '<div style="font-size:0.85rem;font-weight:' + (on ? 700 : 500) + ';color:' + (on ? '#7a4a00' : '#5a4a30') + ';">' + (on ? '● ' : '○ ') + s + '</div>'
+            + '<div style="font-size:0.7rem;color:#8a7a5a;margin-top:2px;">' + (_supDesc[s] || '') + '</div></button>';
+        }).join('')
+      + '</div></div>';
+  }
+  let paso2 = '';
+  if (subTabs.length > 1) {
+    _nPaso++;
+    const cols = Math.min(4, subTabs.length);
+    paso2 = '<div>' + _paso('PASO ' + _nPaso + ' · ¿Qué trámite va a hacer?')
+      + '<div style="display:grid;grid-template-columns:repeat(' + cols + ',minmax(0,1fr));gap:8px;">'
+      + subTabs.map(function(st, si){
+          const on = si === subIdx;
+          return '<button onclick="_mpeCambiarSubTab(' + si + ')" style="' + _sel(on) + 'border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;font-family:inherit;font-size:0.8rem;font-weight:' + (on ? 700 : 500) + ';color:' + (on ? '#7a4a00' : '#5a4a30') + ';line-height:1.35;">'
+            + '<div style="font-size:1.15rem;">' + (_subIco[st] || '📄') + '</div>' + st + '</button>';
+        }).join('')
+      + '</div></div>';
+  }
+  _nPaso++;
+  const _resumenSel = [subTabs[subIdx] || '', sup, cfg.label].filter(Boolean).join(' · ');
+  const paso3Titulo = _paso('PASO ' + _nPaso + ' · Todo lo que necesitas para: <span style="color:#2a1c08;">' + _resumenSel + '</span>');
+
+  let paso3;
+  if (isAdmin) {
+    // Administrador editando: se conservan los controles de edición de siempre.
+    paso3 = '<div>' + paso3Titulo + '<div style="display:flex;flex-direction:column;gap:12px;">' + b1 + b2 + b3 + '</div></div>';
+  } else {
+    const _btnVer = function(onclick){ return '<button onclick="' + onclick + '" style="background:#1a4a8a;color:#fff;border:none;border-radius:6px;padding:7px 13px;font-size:0.72rem;font-weight:600;cursor:pointer;white-space:nowrap;">👁 Ver</button>'; };
+    const _btnDesc = function(onclick){ return '<button onclick="' + onclick + '" style="background:#fff;color:#1a4a8a;border:1.5px solid #1a4a8a;border-radius:6px;padding:6px 11px;font-size:0.72rem;font-weight:600;cursor:pointer;white-space:nowrap;">⭳ Descargar</button>'; };
+    const _noDisp = '<span style="font-size:0.7rem;color:#b0a080;font-style:italic;white-space:nowrap;">Aún no disponible</span>';
+    const _fila = function(num, ico, titulo, sub, acciones, ultima){
+      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px;' + (ultima ? '' : 'border-bottom:1px solid #efe4c4;') + '">'
+        + '<div style="font-size:1.35rem;flex-shrink:0;">' + ico + '</div>'
+        + '<div style="flex:1;min-width:0;"><div style="font-size:0.84rem;font-weight:600;color:#2a1c08;">' + num + '. ' + titulo + '</div>'
+        + '<div style="font-size:0.7rem;color:#7a6840;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + sub + '</div></div>'
+        + '<div style="display:flex;gap:6px;flex-shrink:0;align-items:center;">' + acciones + '</div></div>';
+    };
+    const _esc = function(t){ return String(t || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'"); };
+    const filas = [];
+    filas.push(_fila(1, '📋', 'Instrucciones del trámite', 'Qué pedir al cliente y cómo hacerlo',
+      instHasFile ? _btnVer("_mpePDFVisorData('" + estado + "','" + supSlug + "','" + subSlug + "','" + instTipo + "','" + _esc(instPdfName || 'Instrucciones') + "')") : _noDisp));
+    filas.push(_fila(2, '📂', 'Ejemplo de expediente armado', 'Cómo debe quedar el expediente completo',
+      pdfHasFile ? _btnVer("_mpePDFVisorData('" + estado + "','" + supSlug + "','" + subSlug + "','" + pdfTipo + "','" + _esc(pdfName || 'Expediente') + "')") : _noDisp));
+    if (!recLista.length) {
+      filas.push(_fila(3, '📥', 'Formatos para imprimir', 'Todavía no hay formatos para este trámite', _noDisp));
+    } else {
+      recLista.forEach(function(r, ri){
+        const recTipo = 'rec_' + ri + '.pdf';
+        const archivoReal = metaCache[recTipo] || '';
+        const ext = archivoReal.split('.').pop().toLowerCase();
+        const puedeVer = !!archivoReal && (ext === 'pdf' || ext === 'doc' || ext === 'docx');
+        const nombreDesc = _esc(archivoReal || r);
+        const acciones = (puedeVer ? _btnVer("_mpeRecVerDoc('" + estado + "','" + supSlug + "','" + subSlug + "','" + recTipo + "',this)") : '')
+          + _btnDesc("_mpeRecForzarDescarga('" + estado + "','" + supSlug + "','" + subSlug + "','" + recTipo + "','" + nombreDesc + "',this)");
+        filas.push(_fila(3 + ri, '📥', r, 'Formato para imprimir', acciones));
+      });
+    }
+    // marcar la última fila sin borde
+    filas[filas.length - 1] = filas[filas.length - 1].replace('border-bottom:1px solid #efe4c4;', '');
+    paso3 = '<div>' + paso3Titulo + '<div style="border:1px solid #e8d898;border-radius:10px;overflow:hidden;background:#fff;">' + filas.join('') + '</div></div>';
+  }
+
+  // Pie: en modo lectura solo una línea discreta; el botón para editar
+  // únicamente lo ve el administrador.
+  const pie = isAdmin ? '' :
+    '<div style="border-top:1px solid #efe4c4;padding-top:9px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-size:0.7rem;color:#8a7a5a;">'
+    + '<span>🔒 Modo lectura</span>'
+    + (_esAdminEmail ? '<button onclick="_mpeReactivarAdmin()" style="background:transparent;border:1px solid #c8951a;border-radius:6px;color:#8a5a10;font-size:0.7rem;font-weight:600;padding:5px 12px;cursor:pointer;">✏️ Editar contenido</button>' : '')
+    + '</div>';
+
   const bodyEl = document.getElementById('mpe-body');
   bodyEl.innerHTML = '';
-  // Insertar sub-pestañas DENTRO del body antes de los bloques
   const wrapper = document.createElement('div');
-  wrapper.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
-  wrapper.innerHTML = loginBanner + (subTabs.length > 1 ? `<div style="background:#fafaf6;border:1px solid #e8e0d0;border-radius:10px;overflow:hidden;">${subTabsHTML.replace(/^\s*<div[^>]*>|<\/div>\s*$/g,'')}</div>` : '') + b1 + b2 + b3;
+  wrapper.style.cssText = 'display:flex;flex-direction:column;gap:16px;';
+  wrapper.innerHTML = (isAdmin ? loginBanner : '') + paso1 + paso2 + paso3 + pie;
   bodyEl.appendChild(wrapper);
 }
 
@@ -9456,6 +9542,9 @@ function _mpeRenderBody(estado, supIdx) {
 function _mpeRenderTabs(estado, supActivo) {
   const cfg = _MPE_CONFIG[estado];
   const cont = document.getElementById('mpe-supuesto-tabs');
+  // Oct-2026: las opciones Nacional / Legalizado ahora son el PASO 1 dentro
+  // del panel (con su explicación); el encabezado ya no las repite.
+  if (cont) { cont.innerHTML = ''; return; }
   cont.innerHTML = cfg.supuestos.map((s, i) =>
     `<button onclick="_mpeCambiarSup('${estado}',${i})" style="border:2px solid ${i===supActivo?'#c8951a':'rgba(200,149,42,0.35)'};border-radius:20px;padding:5px 15px;font-size:0.68rem;font-weight:700;letter-spacing:0.03em;color:${i===supActivo?'#fff':'rgba(200,149,42,0.8)'};background:${i===supActivo?'#c8951a':'transparent'};cursor:pointer;transition:all .15s;">${s}</button>`
   ).join('');
@@ -9562,8 +9651,14 @@ function _mpeRecDescargar(keyOrUrl, nombre) {
 function abrirPanelEstado(estado, btn) {
   _mpeEstado = estado;
   _mpeSupuesto = 0;
+  // A petición expresa (oct-2026): el panel SIEMPRE abre en modo lectura,
+  // también para el administrador. Para editar se usa el botón
+  // "🔑 Activar modo administrador" (no pide contraseña otra vez).
+  _mpeAdminActivo = false;
+  _mpeAdminOff = true;
+  _mpeCambiosPendientes = false;
   const cfg = _MPE_CONFIG[estado];
-  document.getElementById('mpe-title').textContent = '📍 ' + cfg.label;
+  document.getElementById('mpe-title').textContent = '🚗 Trámites de placas · ' + cfg.label;
   _mpeRenderTabs(estado, 0);
   _mpeRenderBody(estado, 0);        // render inmediato con caché
   _mpePrefetchR2(estado, 0, 0);     // cargar R2 en fondo

@@ -229,6 +229,15 @@ function renderAcuerdosDrive(lista) {
     j.updatedAt = Date.now();
     if (typeof saveJuicios === 'function') try { saveJuicios(); } catch(e){}
   }
+  try {
+    if (j && Array.isArray(j.historial) && lista.some(a => a && a.md5)) {
+      const fPorId = {};
+      lista.forEach(a => { if (a && a.driveFileId && a.md5 && a.fechaAcuerdo && _juFechaValida(a.fechaAcuerdo, j)) fPorId[a.driveFileId] = a.fechaAcuerdo; });
+      let cambio = false;
+      j.historial.forEach(h => { if (h && h.driveFileId && fPorId[h.driveFileId] && h.fecha !== fPorId[h.driveFileId]) { h.fecha = fPorId[h.driveFileId]; cambio = true; } });
+      if (cambio) { j.updatedAt = Date.now(); if (typeof saveJuicios === 'function') try { saveJuicios(); } catch(e){} if (typeof syncEstadoSupabaseDebounced === 'function') try { syncEstadoSupabaseDebounced(); } catch(e){} }
+    }
+  } catch(eH){}
   try { if (typeof _juRenderFichaSimple === 'function' && idxJ != null) _juRenderFichaSimple(idxJ); } catch(e){}
   try { if (typeof _juRenderPestanas === 'function' && idxJ != null) { const b = document.getElementById('mexp-pestanas'); if (b) _juRenderPestanas(idxJ); } } catch(e){}
 
@@ -3098,7 +3107,9 @@ function _juRenderFichaSimple(idx){
   var etapaTxt = 'Sin definir', pct = 0;
   if (Array.isArray(j.flujoProcedimiento) && j.flujoProcedimiento.length) {
     var tot = j.flujoProcedimiento.length;
-    if (typeof j.flujoEtapaActual === 'number' && j.flujoProcedimiento[j.flujoEtapaActual]) {
+    if (typeof _flujoEstaCompleto === 'function' && !_flujoEstaCompleto(j.flujoProcedimiento)) {
+      etapaTxt = '⚠ Flujo incompleto — hay que regenerarlo';
+    } else if (typeof j.flujoEtapaActual === 'number' && j.flujoProcedimiento[j.flujoEtapaActual]) {
       etapaTxt = (j.flujoEtapaActual + 1) + ' de ' + tot + ' · ' + (j.flujoProcedimiento[j.flujoEtapaActual].etapa || '');
       pct = Math.round((j.flujoEtapaActual + 1) / tot * 100);
     } else { etapaTxt = 'Sin marcar · ' + tot + ' etapas'; }
@@ -3228,7 +3239,10 @@ function _juReFechaLetra(){
   var mes = '(' + Object.keys(_JU_MESES_NOMBRE).join('|') + ')';
   var anio = '(\\d{4}|DOS MIL(?: (?:Y|[A-Z]+)){0,3}|LA PRESENTE ANUALIDAD|(?:ESTE|EL|DEL) (?:PRESENTE )?ANO(?: EN CURSO)?|PRESENTE ANO)';
   // "doce de junio de dos mil veinticinco" · "a los treinta y un días del mes de enero de…"
-  _JU_RE_FECHA_LETRA = new RegExp('\\b' + dia + '\\s+(?:DIAS?\\s+DEL\\s+MES\\s+)?(?:DE\\s+)?' + mes + '\\s+(?:DE|DEL)\\s+(?:ANO\\s+)?' + anio, 'g');
+  // Ruido del OCR que a veces queda ENTRE "DE" y el año (encabezados de
+  // página: "Exp. 10/2025", "Resolución: 101", "F. 589, 605").
+  var ruido = '(?:(?:EXP(?:EDIENTE)?|RESOLUCION|FOJAS?|F|R)\\.?\\s*:?\\s*\\d[\\d\\/.\\-]*(?:\\s*,\\s*\\d[\\d\\/.\\-]*)*\\.?\\s+)?';
+  _JU_RE_FECHA_LETRA = new RegExp('\\b' + dia + '\\s+(?:DIAS?\\s+DEL\\s+MES\\s+)?(?:DE\\s+)?' + mes + '\\s+(?:DE|DEL)\\s+' + ruido + '(?:ANO\\s+)?' + anio, 'g');
   return _JU_RE_FECHA_LETRA;
 }
 
@@ -3249,7 +3263,7 @@ function _juFechasEnTexto(texto){
     var iso2 = _juIsoValido(aa, parseInt(m[2], 10), parseInt(m[1], 10));
     if (iso2) out.push({ iso: iso2, relativo: false, pos: m.index, txt: m[0], numerica: true });
   }
-  return out.sort(function(x, y){ return x.pos - y.pos; }).map(function(f){ f.antes = t.slice(Math.max(0, f.pos - 60), f.pos); return f; });
+  return out.sort(function(x, y){ return x.pos - y.pos; }).map(function(f){ f.antes = t.slice(Math.max(0, f.pos - 90), f.pos); return f; });
 }
 
 function _juHoyISO(){
@@ -3286,12 +3300,13 @@ function _juFechaDesdeTexto(texto, j){
   var fechas = _juFechasEnTexto(texto).filter(function(f){ return f.iso && _juFechaValida(f.iso, j); });
   if (!fechas.length) return null;
   var TRAMO = 1500;
-  var reEncabezado = /(?:[,;:.]\s*A(?:\s+LOS?)?|\bHORAS?\b[^.]{0,50}?\bDEL?(?:\s+DIA)?|\bA\s+LOS?)\s*$/;
+  var reEncabezado = /(?:[,;:.]\s*A(?:\s+LOS?)?|\bSIENDO\b[^.]{0,70}?\bHORAS?\b[^.]{0,50}?\bDEL?(?:\s+DIA)?|\bA\s+LOS?)\s*$/;
+  var reProgramada = /\b(?:SENALA\w*|FIJA\w*|PROGRAMA\w*|CITA\w*|DIFIERE\w*|REPROGRAMA\w*)\b[^.]{0,70}$/;
   var enc = fechas.filter(function(f){ return f.pos < TRAMO && !f.numerica && reEncabezado.test(f.antes); });
   if (enc.length) return { iso: enc[0].iso, fuente: 'encabezado', txt: enc[0].txt };
   var pie = fechas.filter(function(f){ return /(?:CORRESPONDIENTES?\s+AL?\s+(?:AUTO|ACUERDO|PROVEIDO|ACTA)\s+DE\s+FECHA|(?:AUTO|ACUERDO|PROVEIDO)\s+DE\s+FECHA)\s*$/.test(f.antes); });
   if (pie.length) return { iso: pie[pie.length - 1].iso, fuente: 'pie', txt: pie[pie.length - 1].txt };
-  var ini = fechas.filter(function(f){ return f.pos < TRAMO; });
+  var ini = fechas.filter(function(f){ return f.pos < TRAMO && !reProgramada.test(f.antes); });
   if (ini.length) return { iso: ini[0].iso, fuente: 'inicio', txt: ini[0].txt };
   return null;
 }
@@ -3314,9 +3329,10 @@ function _juFechaDesdeNombre(nombre){
 function _juResolverFechaAcuerdo(opts){
   var j = opts && opts.juicio;
   var porTexto = opts && opts.texto ? _juFechaDesdeTexto(opts.texto, j) : null;
-  if (porTexto) return { iso: porTexto.iso, fuente: 'texto', revisar: false };
+  if (porTexto && porTexto.fuente !== 'inicio') return { iso: porTexto.iso, fuente: 'texto', revisar: false };
   var ia = opts && opts.fechaIA;
   if (ia && _juFechaValida(ia, j)) return { iso: ia, fuente: 'ia', revisar: false };
+  if (porTexto) return { iso: porTexto.iso, fuente: 'texto-debil', revisar: true };
   var porNombre = _juFechaDesdeNombre(opts && opts.nombreArchivo);
   if (porNombre && _juFechaValida(porNombre, j)) return { iso: porNombre, fuente: 'nombre', revisar: true };
   return { iso: (ia && /^\d{4}-\d{2}-\d{2}$/.test(ia)) ? ia : _juHoyISO(), fuente: 'ninguna', revisar: true };
@@ -3531,8 +3547,9 @@ async function _juRevisarAcuerdos(){
       try { var r2 = await _r2CargarResumen(copias[c].driveFileId); texto = (r2 && r2.ocrTexto) || ''; } catch(e){}
     }
     var porTexto = texto ? _juFechaDesdeTexto(texto, j) : null;
-    if (porTexto && porTexto.iso !== ac.fechaAcuerdo) cambiosFecha.push({ ac: ac, de: ac.fechaAcuerdo || '', a: porTexto.iso, txt: porTexto.txt || '' });
-    else if (!porTexto && !_juFechaValida(ac.fechaAcuerdo, j)) revisar.push(ac);
+    var fuerte = porTexto && porTexto.fuente !== 'inicio';
+    if (fuerte && porTexto.iso !== ac.fechaAcuerdo) cambiosFecha.push({ ac: ac, de: ac.fechaAcuerdo || '', a: porTexto.iso, txt: porTexto.txt || '' });
+    else if (!fuerte && (!_juFechaValida(ac.fechaAcuerdo, j) || (porTexto && porTexto.iso !== ac.fechaAcuerdo))) revisar.push(ac);
   }
 
   // 3) Línea de tiempo interna con las fechas ya corregidas
@@ -4751,7 +4768,7 @@ function _flujoRender(etapas, leyNombre) {
 
   const detectarBtn = `<button id="flujo-detectar-btn" onclick="_flujoDetectarEtapa()" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid var(--gold);background:var(--gold-bg);color:var(--gold-d);font-size:0.62rem;font-weight:700;cursor:pointer;font-family:'JetBrains Mono',monospace;">🔮 Detectar etapa según documentos</button>`;
 
-  const razon = (actual >= 0 && j && j.flujoEtapaActualRazon)
+  const razon = (actual >= 0 && j && j.flujoEtapaActualRazon && _flujoEstaCompleto(etapas))
     ? `<div style="font-size:0.6rem;color:var(--gold-d);background:var(--gold-bg);border:1px solid var(--border-l);border-radius:var(--radius-sm);padding:6px 9px;margin:2px 0 8px;line-height:1.45;">🔮 ${escHTML(j.flujoEtapaActualRazon)}</div>`
     : (actual < 0
       ? `<div style="font-size:0.6rem;color:var(--muted);padding:2px 0 8px;line-height:1.4;">Pulsa <strong>Detectar etapa</strong> para que la IA infiera el punto del juicio según los documentos cargados, o márcala manualmente al abrir una etapa.</div>`

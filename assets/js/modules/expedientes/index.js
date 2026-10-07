@@ -4817,6 +4817,7 @@ function _flujoRender(etapas, leyNombre) {
           <div style="flex:1;min-width:0;">
             <div style="font-size:0.74rem;font-weight:${esActual?'800':'700'};color:${noAplica?'var(--muted)':tituloColor};line-height:1.35;">${escHTML(et.etapa)}</div>
             ${noAplica ? `<div style="font-size:0.6rem;color:var(--muted);margin-top:2px;">No se dio en este juicio${evidTxt ? ' · ' + escHTML(evidTxt) : ''}</div>`
+              : (estIA && estIA.estado === 'parcial' && evidTxt) ? `<div style="font-size:0.6rem;color:#8a4a00;margin-top:2px;line-height:1.35;">◐ ${escHTML(evidTxt)}</div>`
               : (evidTxt && (esCumplida || esActual) ? `<div style="font-size:0.6rem;color:${esActual ? 'var(--gold-d)' : 'var(--verde-d,#1a7a3a)'};margin-top:2px;line-height:1.35;">${esActual ? '◷ ' : '✓ '}${escHTML(evidTxt)}</div>` : '')}
           </div>
           ${badgeActual}
@@ -4926,6 +4927,7 @@ function _flujoNormEstado(e){
   if (/^CUMPLID|^CONCLUID|^REALIZAD|^TERMINAD/.test(s)) return 'cumplida';
   if (/^EN_CURSO|^EN_PROCESO|^ACTUAL|^EN_TRAMITE/.test(s)) return 'en_curso';
   if (/^NO_APLICA|^N\/A|^NA$|^OMITID/.test(s)) return 'no_aplica';
+  if (/^PARCIAL/.test(s)) return 'parcial';
   return 'pendiente';
 }
 function _flujoEsEtapaSentencia(et){
@@ -4976,6 +4978,56 @@ async function _flujoIARazonar(prompt, maxTokens){
   return await _iaLlamar(prompt, maxTokens, 0.1, 'procesal');
 }
 
+// Ajuste con REGLAS FIJAS sobre lo que dijo la IA (oct-2026). Caso real: la
+// IA marcó "11. Sentencia… y resolución de controversias del convenio" como
+// cumplida por la sentencia de divorcio del 20-05-2025 y puso el juicio en
+// "13. Ejecución", aunque en 2026 el juez seguía recibiendo periciales y
+// requiriendo al DIF (las cláusulas del convenio siguen en pruebas). También
+// marcó "8. Audiencia preliminar" como que "no se dio", cuando hay un acta.
+//  1) Una etapa que la IA da por "no se dio" se marca cumplida si algún
+//     documento la menciona por nombre (ej. "AUDIENCIA PRELIMINAR").
+//  2) Si DESPUÉS de la sentencia se siguen desahogando pruebas (periciales,
+//     valoraciones, estudios, informes…), la sentencia solo fue parcial: la
+//     etapa actual es la de pruebas y todo lo posterior queda pendiente.
+var _FLUJO_RE_PRUEBAS = /PRUEBA|PERICIA|PERITO|VALORACION|PSICOLOG|SOCIOECONOMICO|DESAHOG|DICTAMEN|TESTIMONIAL|CONFESIONAL|TRABAJADOR SOCIAL|TERAPIA|INFORME/;
+var _FLUJO_STOP = { CONTRA:1, PARA:1, ENTRE:1, SOBRE:1, DESDE:1, HASTA:1, ESTE:1, ESTA:1, DEL:1, LAS:1, LOS:1, UNA:1 };
+function _flujoFechaDeTexto(s){
+  var t = String(s || ''), m = t.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return m[0];
+  m = t.match(/(\d{2})[\/\-](\d{2})[\/\-](\d{4})/);
+  return m ? m[3] + '-' + m[2] + '-' + m[1] : '';
+}
+function _flujoAjustarPorDocumentos(etapas, estados, docs){
+  var notas = [];
+  var D2 = (docs || []).map(function(d){ var t = _juNormTexto(d.txt || ''); return { f: d.f || '', t: t, c: t.replace(/[^A-Z0-9]/g, '') }; });
+  // 1) "No se dio" pero hay documento que la nombra
+  (etapas || []).forEach(function(et, i){
+    if (!estados[i] || estados[i].estado !== 'no_aplica') return;
+    var pal = _juNormTexto(String(et.etapa || '').replace(/^\s*\d+\s*[\.\)\-:]\s*/, '')).split(/[^A-Z]+/).filter(function(w){ return w.length >= 4 && !_FLUJO_STOP[w]; });
+    if (pal.length < 2) return;
+    var clave = pal[0] + pal[1];
+    var doc = D2.find(function(d){ return d.c.indexOf(clave) >= 0; });
+    if (doc) { estados[i].estado = 'cumplida'; estados[i].evidencia = (doc.f ? doc.f + ' · ' : '') + 'documento: ' + pal[0].toLowerCase() + ' ' + pal[1].toLowerCase(); notas.push('etapa ' + (i + 1) + ' sí se dio'); }
+  });
+  // 2) Pruebas posteriores a la sentencia → sentencia parcial
+  var S = -1;
+  for (var s = 0; s < etapas.length; s++) if (_flujoEsEtapaSentencia(etapas[s])) { S = s; break; }
+  if (S >= 0 && estados[S] && estados[S].estado === 'cumplida') {
+    var fSent = _flujoFechaDeTexto(estados[S].evidencia);
+    var posteriores = D2.filter(function(d){ return d.f && (!fSent || d.f > fSent) && _FLUJO_RE_PRUEBAS.test(d.t); });
+    var P = -1;
+    for (var p = S - 1; p >= 0; p--) if (/PRUEBA|ALEGATO/.test(_juNormTexto(etapas[p].etapa))) { P = p; break; }
+    if (fSent && posteriores.length && P >= 0) {
+      var ult = posteriores[posteriores.length - 1];
+      estados[S] = { estado: 'parcial', evidencia: 'Dictada el ' + fSent + ' en parte (divorcio); falta resolver lo que sigue en pruebas' };
+      estados[P] = { estado: 'en_curso', evidencia: 'siguen las pruebas · último: ' + ult.f };
+      for (var q = P + 1; q < etapas.length; q++) if (q !== S && estados[q].estado !== 'no_aplica') estados[q] = { estado: 'pendiente', evidencia: '' };
+      notas.push('después de la sentencia (' + fSent + ') siguen las pruebas (' + posteriores.length + ' documento(s), el último del ' + ult.f + ')');
+    }
+  }
+  return notas;
+}
+
 async function _flujoDetectarEtapa() {
   const j = D.juicios && D.juicios[_mexpIdx];
   const etapas = window._flujoEtapasActual || [];
@@ -4991,7 +5043,7 @@ async function _flujoDetectarEtapa() {
   const _sobran = {};
   _acuerdosAgruparDuplicados(acuerdos, j).forEach(g => g.slice(1).forEach(x => { _sobran[x.driveFileId || x.id] = true; }));
   const _docs = acuerdos.filter(a => a && a.estado !== 'procesando' && a.estado !== 'error' && !_sobran[a.driveFileId || a.id])
-    .map(a => ({ f: a.fechaAcuerdo || a.fechaSubida || '', t: _juTituloAcuerdo(a), d: (a.descripcion || a.resumen || '').replace(/\s+/g, ' ').trim() }));
+    .map(a => ({ f: a.fechaAcuerdo || a.fechaSubida || '', t: _juTituloAcuerdo(a), d: (a.descripcion || a.resumen || '').replace(/\s+/g, ' ').trim(), n: (a.nombre || '') + ' ' + (a.archivo || '') }));
   const _conArchivo = {}; acuerdos.forEach(a => { if (a && a.driveFileId) _conArchivo[a.driveFileId] = true; });
   (j.historial || []).forEach(h => {
     if (!h || !h.texto) return;
@@ -5036,14 +5088,26 @@ Responde ÚNICAMENTE en JSON válido, sin markdown ni texto extra, con TODAS las
     const clean = (raw || '').replace(/```json|```/g, '').trim();
     const m = clean.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(m ? m[0] : clean);
-    const calc = _flujoCalcularEtapaActual(etapas, Array.isArray(parsed.etapas) ? parsed.etapas : [], parsed.actual != null ? parsed.actual : parsed.numero);
+    let calc = _flujoCalcularEtapaActual(etapas, Array.isArray(parsed.etapas) ? parsed.etapas : [], parsed.actual != null ? parsed.actual : parsed.numero);
+    // Reglas fijas sobre lo que dijo la IA (ver _flujoAjustarPorDocumentos)
+    let notasAjuste = [];
+    if (Array.isArray(parsed.etapas) && parsed.etapas.length) {
+      const estAj = calc.estados.map(x => Object.assign({}, x));
+      notasAjuste = _flujoAjustarPorDocumentos(etapas, estAj, _docs.map(x => ({ f: x.f, txt: x.t + ' ' + (x.n || '') + ' ' + x.d })));
+      if (notasAjuste.length) {
+        const re = _flujoCalcularEtapaActual(etapas, estAj.map((x, i) => ({ n: i + 1, estado: x.estado, evidencia: x.evidencia })), null);
+        re.estados.forEach((x, i) => { if (estAj[i].estado === 'parcial') x.estado = 'parcial'; });
+        calc = re;
+      }
+    }
     if (!(calc.idx >= 0)) throw new Error('La IA no devolvió el estado de las etapas');
     const n = calc.idx + 1;
     j.flujoEtapaActual = calc.idx;
     j.flujoEstados = calc.estados;
     let razon = (parsed.razon || '').toString().slice(0, 300);
     const nIA = parseInt(parsed.actual, 10);
-    if (Number.isFinite(nIA) && nIA !== n) razon = 'Etapa ' + n + ' según el estado de cada etapa (la IA sugería la ' + nIA + ', que no corresponde). ' + razon;
+    if (notasAjuste.length) razon = 'Etapa ' + n + ': ' + notasAjuste.join('; ') + '.' + (Number.isFinite(nIA) && nIA !== n ? ' (La IA sugería la ' + nIA + ', corregido con los documentos.)' : '');
+    else if (Number.isFinite(nIA) && nIA !== n) razon = 'Etapa ' + n + ' según el estado de cada etapa (la IA sugería la ' + nIA + ', que no corresponde). ' + razon;
     j.flujoEtapaActualRazon = razon.slice(0, 360);
     j.updatedAt = Date.now();
     try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e) {}

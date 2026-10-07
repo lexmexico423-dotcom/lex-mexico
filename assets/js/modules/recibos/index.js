@@ -645,6 +645,9 @@ async function sincronizarFolio(forzarSB){
           });
           const _soloLocalesAdeudos = _localAdeudos.filter(function(a){ return a && a.id && !_sbAdeudosIds.has(a.id); });
           D.adeudosSinRecibo = [..._fusionadasAdeudos, ..._soloLocalesAdeudos];
+          // Si la pantalla de Adeudos está abierta, mostrar de inmediato lo
+          // que capturaron en otra computadora.
+          try { const _pa = document.getElementById('panel-adeudos-sin-recibo'); if (_pa && _pa.classList.contains('active') && typeof renderAdeudosLista === 'function') renderAdeudosLista(); } catch(e){}
         })();
         // Estos dos son listas de folios (strings) que se agregan/quitan desde
         // varias funciones admin — se unen local+SB (en vez de sobreescribir)

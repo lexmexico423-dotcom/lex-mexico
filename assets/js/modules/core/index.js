@@ -2552,39 +2552,52 @@ function _prRenderGastos(pr) {
 
 function _prEliminarGasto(prId, idx) {
   const pr = _prById(prId);
-  if (!pr || !pr.gastos) return;
+  if (!pr || !pr.gastos || !pr.gastos[idx]) return;
+  const g = pr.gastos[idx];
+  if (!confirm('¿Quitar el gasto «' + (g.concepto || g.descripcion || 'gasto') + '» de ' + _prFmt(g.monto) + '?')) return;
   pr.gastos.splice(idx, 1);
+  _prTocar(pr);
   _prGuardar();
   _prRenderGastos(pr);
+  _prActualizarTotalesForm(prId);
 }
 
 function _prImprimirEstadoCuenta(prId) {
-  const pr = _prById(prId);
+  // Si el formulario está abierto, primero se guardan los cambios (antes, en
+  // un pre-recibo nuevo sin guardar, el botón no hacía nada).
+  const pr = document.getElementById('pr-f-nombre')
+    ? _prGuardarFormulario(prId, true, { silencioso: true, quedarse: true })
+    : _prById(prId);
   if (!pr) return;
   const totalGastos = _prTotalGastos(pr);
-  const hoy = new Date().toLocaleDateString('es-MX', { day:'2-digit', month:'long', year:'numeric' });
+  const hon = parseFloat(pr.honorarios) || 0;
+  const hoy = new Date().toLocaleDateString('es-MX', { day:'2-digit', month:'long', year:'numeric', timeZone:'America/Mexico_City' });
+  const j = _prJuicioDe(pr);
   const gastosHtml = (pr.gastos||[]).length
-    ? (pr.gastos||[]).map(g => `<tr><td style="padding:5px 8px;">${g.descripcion}</td><td style="padding:5px 8px;">${g.fecha||'—'}</td><td style="padding:5px 8px;text-align:right;">$${parseFloat(g.monto).toLocaleString('es-MX',{minimumFractionDigits:2})}</td></tr>`).join('')
+    ? (pr.gastos||[]).map(g => `<tr><td style="padding:5px 8px;">${escHTML(g.concepto||'—')}${g.descripcion ? `<div style="font-size:0.72rem;color:#777;">${escHTML(g.descripcion)}</div>` : ''}</td><td style="padding:5px 8px;white-space:nowrap;">${escHTML(g.fecha||'—')}</td><td style="padding:5px 8px;text-align:right;white-space:nowrap;">${_prFmt(g.monto)}</td></tr>`).join('')
     : '<tr><td colspan="3" style="padding:8px;text-align:center;color:#999;">Sin gastos registrados</td></tr>';
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Estado de Cuenta</title>
-  <style>body{font-family:serif;max-width:600px;margin:30px auto;color:#1a1008;}h1{font-size:1rem;text-align:center;letter-spacing:0.2em;text-transform:uppercase;color:#8c6518;}table{width:100%;border-collapse:collapse;font-size:0.85rem;}th{background:#f5edd0;padding:6px 8px;text-align:left;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;}tr:nth-child(even){background:#fdfaf4;}.total{text-align:right;font-weight:bold;font-size:1rem;color:#8c6518;margin-top:10px;}.note{font-size:0.7rem;color:#999;margin-top:20px;text-align:center;border-top:1px solid #e0d5b0;padding-top:10px;}</style>
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Estado de Cuenta — ${escHTML(pr.nombre)}</title>
+  <style>body{font-family:serif;max-width:600px;margin:30px auto;color:#1a1008;}h1{font-size:1rem;text-align:center;letter-spacing:0.2em;text-transform:uppercase;color:#8c6518;}table{width:100%;border-collapse:collapse;font-size:0.85rem;}th{background:#f5edd0;padding:6px 8px;text-align:left;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;}tbody tr:nth-child(even){background:#fdfaf4;}.total{text-align:right;font-weight:bold;font-size:1rem;color:#8c6518;margin:6px 0;}.note{font-size:0.7rem;color:#999;margin-top:20px;text-align:center;border-top:1px solid #e0d5b0;padding-top:10px;}</style>
   </head><body>
   <h1>LEX-MÉXICO · Despacho Jurídico</h1>
   <p style="text-align:center;font-size:0.8rem;color:#666;">Estado de cuenta preliminar — ${hoy}</p>
   <hr style="border-color:#e0d5b0;">
-  <table><tr><td style="padding:4px 0;"><strong>Cliente:</strong></td><td>${escHTML(pr.nombre)}</td></tr>
+  <table><tr><td style="padding:4px 0;width:110px;"><strong>Cliente:</strong></td><td>${escHTML(pr.nombre)}</td></tr>
+  ${pr.telefono ? `<tr><td style="padding:4px 0;"><strong>Teléfono:</strong></td><td>${escHTML(pr.telefono)}</td></tr>` : ''}
   <tr><td style="padding:4px 0;"><strong>Trámite:</strong></td><td>${escHTML(pr.concepto)}</td></tr>
-  <tr><td style="padding:4px 0;"><strong>Inicio:</strong></td><td>${pr.fechaInicio||'—'}</td></tr>
-  ${pr.honorarios ? `<tr><td style="padding:4px 0;"><strong>Honorarios:</strong></td><td>$${parseFloat(pr.honorarios).toLocaleString('es-MX',{minimumFractionDigits:2})}</td></tr>` : ''}</table>
-  <br><table><thead><tr><th>Descripción</th><th>Fecha</th><th>Monto</th></tr></thead><tbody>${gastosHtml}</tbody></table>
-  <p class="total">Total gastos acumulados: $${totalGastos.toLocaleString('es-MX',{minimumFractionDigits:2})}</p>
-  <p class="total">Total de la deuda: $${(totalGastos + (parseFloat(pr.honorarios)||0)).toLocaleString('es-MX',{minimumFractionDigits:2})}</p>
+  ${j ? `<tr><td style="padding:4px 0;"><strong>Expediente:</strong></td><td>${escHTML(_prJuicioEtiqueta(j))}</td></tr>` : ''}
+  <tr><td style="padding:4px 0;"><strong>Inicio:</strong></td><td>${escHTML(pr.fechaInicio||'—')}</td></tr></table>
+  <br><table><thead><tr><th>Gasto</th><th>Fecha</th><th style="text-align:right;">Monto</th></tr></thead><tbody>${gastosHtml}</tbody></table>
+  <p class="total" style="margin-top:12px;">Gastos: ${_prFmt(totalGastos)}</p>
+  <p class="total">Honorarios: ${_prFmt(hon)}</p>
+  <p class="total" style="font-size:1.1rem;border-top:1px solid #e0d5b0;padding-top:6px;">Total a cubrir: ${_prFmt(totalGastos + hon)}</p>
   <p class="note">Este documento es informativo y no constituye un recibo oficial.<br>LEX-MÉXICO · Santiago Juxtlahuaca, Oaxaca · 953 128 7511</p>
   </body></html>`;
 
   const win = window.open('', '_blank');
-  if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 400); }
+  if (!win) { if (typeof toast === 'function') toast('⚠ El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio e inténtalo de nuevo.', 'err'); return; }
+  win.document.write(html); win.document.close(); setTimeout(() => { try { win.print(); } catch(e){} }, 400);
 }
 
 function cerrarModalEscrito(){

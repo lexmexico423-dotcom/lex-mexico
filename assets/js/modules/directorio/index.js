@@ -361,63 +361,69 @@ function _prAbrirFormulario(id) {
   const pr = esNuevo ? {
     id: 'PR-' + Date.now(),
     nombre: '', telefono: '', concepto: '', honorarios: '',
-    fechaInicio: new Date().toISOString().slice(0,10),
-    estado: 'iniciado', notas: '', gastos: [], juicioId: null
+    fechaInicio: _prHoy(),
+    estado: 'iniciado', notas: '', gastos: [], juicioRef: null
   } : _prById(id);
   if (!pr) return;
 
   const wrap = document.getElementById('pr-panel-contenido');
   if (!wrap) return;
 
-  // Juicios disponibles para vincular
-  const juiciosOpts = (D.juicios || []).map((j, i) =>
-    `<option value="${i}" ${pr.juicioId == i ? 'selected' : ''}>${escHTML(j.cliente || j.nombre || 'Juicio ' + (i+1))}</option>`
-  ).join('');
+  // Juicios disponibles para vincular (por ID, no por posición)
+  const jVinc = _prJuicioDe(pr);
+  const juiciosOpts = (D.juicios || []).map((j, i) => {
+    const val = j.id || ('idx:' + i);
+    const sel = jVinc && jVinc === j;
+    return `<option value="${escHTML(String(val))}" ${sel ? 'selected' : ''}>${escHTML(_prJuicioEtiqueta(j))}</option>`;
+  }).join('');
+  const _lbl = 'font-size:0.6rem;color:var(--muted);display:block;margin-bottom:3px;font-family:\'JetBrains Mono\',monospace;text-transform:uppercase;letter-spacing:0.08em;';
+  const _inp = 'width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.76rem;background:var(--surface2);color:var(--ink);';
 
   wrap.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
       <button onclick="_prVolverLista()" style="font-size:0.68rem;padding:4px 10px;border:1px solid var(--border-l);border-radius:5px;background:none;color:var(--muted);cursor:pointer;">← Volver</button>
       <span style="font-size:0.8rem;font-weight:700;color:var(--ink);">${esNuevo ? 'Nuevo Pre-Recibo' : 'Editar Pre-Recibo'}</span>
+      ${!esNuevo && pr.fechaInicio ? `<span style="font-size:0.62rem;color:var(--muted);">· iniciado el ${escHTML(pr.fechaInicio)}</span>` : ''}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
       <div>
-        <label style="font-size:0.6rem;color:var(--muted);display:block;margin-bottom:3px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Nombre del cliente *</label>
-        <input id="pr-f-nombre" type="text" value="${escHTML(pr.nombre)}" placeholder="Nombre completo" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.76rem;background:var(--surface2);color:var(--ink);">
+        <label style="${_lbl}">Nombre del cliente *</label>
+        <input id="pr-f-nombre" type="text" value="${escHTML(pr.nombre)}" placeholder="Nombre completo" style="${_inp}">
       </div>
       <div>
-        <label style="font-size:0.6rem;color:var(--muted);display:block;margin-bottom:3px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Teléfono</label>
-        <input id="pr-f-tel" type="text" value="${escHTML(pr.telefono)}" placeholder="000-000-0000" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.76rem;background:var(--surface2);color:var(--ink);">
+        <label style="${_lbl}">Teléfono</label>
+        <input id="pr-f-tel" type="tel" inputmode="numeric" value="${escHTML(pr.telefono)}" placeholder="000-000-0000" oninput="if(typeof formatTelefono==='function')formatTelefono(this)" style="${_inp}">
       </div>
     </div>
     <div style="margin-bottom:10px;">
-      <label style="font-size:0.6rem;color:var(--muted);display:block;margin-bottom:3px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Concepto del trámite *</label>
-      <input id="pr-f-concepto" type="text" value="${escHTML(pr.concepto)}" placeholder="Descripción del servicio" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.76rem;background:var(--surface2);color:var(--ink);">
+      <label style="${_lbl}">Concepto del trámite *</label>
+      <input id="pr-f-concepto" type="text" value="${escHTML(pr.concepto)}" placeholder="Descripción del servicio" style="${_inp}">
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px;">
       <div>
-        <label style="font-size:0.6rem;color:var(--muted);display:block;margin-bottom:3px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Honorarios estimados</label>
-        <input id="pr-f-honorarios" type="number" value="${pr.honorarios||''}" placeholder="$0.00" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.76rem;background:var(--surface2);color:var(--ink);">
+        <label style="${_lbl}">Honorarios estimados</label>
+        <input id="pr-f-honorarios" type="number" min="0" step="0.01" value="${pr.honorarios||''}" placeholder="$0.00" oninput="_prActualizarTotalesForm('${pr.id}')" style="${_inp}">
       </div>
       <div>
-        <label style="font-size:0.6rem;color:var(--muted);display:block;margin-bottom:3px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Estado</label>
-        <select id="pr-f-estado" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.76rem;background:var(--surface2);color:var(--ink);">
+        <label style="${_lbl}">Estado</label>
+        <select id="pr-f-estado" style="${_inp}">
           <option value="iniciado" ${pr.estado==='iniciado'?'selected':''}>Iniciado</option>
           <option value="proceso" ${pr.estado==='proceso'?'selected':''}>En proceso</option>
           <option value="listo" ${pr.estado==='listo'?'selected':''}>Listo para cobrar</option>
         </select>
       </div>
       <div>
-        <label style="font-size:0.6rem;color:var(--muted);display:block;margin-bottom:3px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Vincular a juicio</label>
-        <select id="pr-f-juicio" style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.76rem;background:var(--surface2);color:var(--ink);">
+        <label style="${_lbl}">Vincular a juicio</label>
+        <select id="pr-f-juicio" style="${_inp}">
           <option value="">— Sin juicio —</option>
           ${juiciosOpts}
         </select>
       </div>
     </div>
     <div style="margin-bottom:12px;">
-      <label style="font-size:0.6rem;color:var(--muted);display:block;margin-bottom:3px;font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.08em;">Notas internas (no aparecen en el recibo)</label>
-      <textarea id="pr-f-notas" rows="5" placeholder="Observaciones, pendientes, seguimientos..." style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-l);border-radius:6px;font-size:0.72rem;background:var(--surface2);color:var(--ink);resize:none;font-family:sans-serif;">${escHTML(pr.notas||'')}</textarea>
+      <label style="${_lbl}">Notas internas (no aparecen en el recibo)</label>
+      <textarea id="pr-f-notas" rows="5" placeholder="Observaciones, pendientes, seguimientos..." style="${_inp}font-size:0.72rem;resize:none;font-family:sans-serif;">${escHTML(pr.notas||'')}</textarea>
     </div>
 
     <!-- GASTOS -->
@@ -432,69 +438,69 @@ function _prAbrirFormulario(id) {
 
     <div style="display:flex;gap:8px;align-items:center;">
       <button onclick="_prGuardarFormulario('${pr.id}', ${esNuevo})" style="flex:1;padding:9px;border-radius:6px;border:1.5px solid var(--gold);background:rgba(200,149,42,0.08);color:var(--gold-d);font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;">💾 Guardar</button>
-      <button onclick="_prImprimirEstadoCuenta('${pr.id}')" style="flex:1;padding:9px;border-radius:6px;border:1px solid var(--border-l);background:none;color:var(--muted);font-size:0.72rem;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;">🖨 Estado de cuenta</button>
-      <button onclick="_prConvertirARecibo('${pr.id}')" style="flex:1;padding:9px;border-radius:6px;border:1.5px solid #2a7a3a;background:none;color:#4dca6a;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;">✓ Convertir a Recibo</button>
+      <button onclick="_prImprimirEstadoCuenta('${pr.id}')" title="Guarda los cambios y abre el estado de cuenta" style="flex:1;padding:9px;border-radius:6px;border:1px solid var(--border-l);background:none;color:var(--muted);font-size:0.72rem;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;">🖨 Estado de cuenta</button>
+      <button onclick="_prConvertirARecibo('${pr.id}')" title="Guarda los cambios y pasa los datos a un recibo nuevo" style="flex:1;padding:9px;border-radius:6px;border:1.5px solid #2a7a3a;background:none;color:#4dca6a;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:'JetBrains Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;">✓ Convertir a Recibo</button>
       ${!esNuevo ? `<button onclick="_prEliminar('${pr.id}')" style="padding:9px 12px;border-radius:6px;border:1px solid rgba(192,22,26,0.3);background:none;color:var(--rojo);font-size:0.72rem;cursor:pointer;" title="Eliminar pre-recibo">🗑</button>` : ''}
     </div>`;
 
   // Renderizar gastos existentes
   _prRenderGastos(pr);
+  _prActualizarTotalesForm(pr.id);
+  if (esNuevo) setTimeout(() => { const n = document.getElementById('pr-f-nombre'); if (n) n.focus(); }, 30);
 }
 
-function _prGuardarFormulario(prId, esNuevo) {
-  // esNuevo puede llegar como string 'true'/'false' desde onclick HTML
-  const _esNuevo = esNuevo === true || esNuevo === 'true';
-  const nombre    = (document.getElementById('pr-f-nombre')    || {}).value || '';
-  const telefono  = (document.getElementById('pr-f-tel')       || {}).value || '';
-  const concepto  = (document.getElementById('pr-f-concepto')  || {}).value || '';
-  const honorarios= (document.getElementById('pr-f-honorarios')|| {}).value || '';
-  const estado    = (document.getElementById('pr-f-estado')    || {}).value || 'iniciado';
-  const notas     = (document.getElementById('pr-f-notas')     || {}).value || '';
-  const juicioIdx = (document.getElementById('pr-f-juicio')    || {}).value;
+// Totales en vivo mientras se escribe (aunque el pre-recibo aún no se guarde)
+function _prActualizarTotalesForm(prId) {
+  const totEl = document.getElementById('pr-gastos-total-' + prId);
+  if (!totEl) return;
+  const pr = _prById(prId) || { gastos: [] };
+  const inpH = document.getElementById('pr-f-honorarios');
+  const hon = inpH ? (parseFloat(inpH.value) || 0) : (parseFloat(pr.honorarios) || 0);
+  const gastos = _prTotalGastos(pr);
+  totEl.innerHTML = (gastos > 0 || hon > 0)
+    ? (gastos > 0 ? 'Gastos: <strong style="color:var(--ink);">' + _prFmt(gastos) + '</strong> &nbsp;·&nbsp; ' : '')
+      + (hon > 0 ? 'Honorarios: <strong style="color:var(--ink);">' + _prFmt(hon) + '</strong> &nbsp;·&nbsp; ' : '')
+      + 'Total a cobrar: <strong style="color:var(--gold-d);">' + _prFmt(gastos + hon) + '</strong>'
+    : '';
+}
 
-  if (!nombre.trim()) { if(typeof toast==='function') toast('⚠ El nombre es obligatorio', 'err'); return; }
-  if (!concepto.trim()) { if(typeof toast==='function') toast('⚠ El concepto es obligatorio', 'err'); return; }
+function _prGuardarFormulario(prId, esNuevo, opts) {
+  // Lee el formulario, valida y crea/actualiza el pre-recibo. Devuelve el
+  // pre-recibo guardado (o null si falta algo). opts.silencioso = sin aviso;
+  // opts.quedarse = no regresar a la lista (para Estado de cuenta / Convertir
+  // / Agregar gasto, que antes no hacían nada si el pre-recibo era nuevo).
+  opts = opts || {};
+  const val = (id) => ((document.getElementById(id) || {}).value || '');
+  const nombre    = val('pr-f-nombre').trim();
+  const telefono  = val('pr-f-tel').trim();
+  const concepto  = val('pr-f-concepto').trim();
+  const honTxt    = val('pr-f-honorarios').trim();
+  const estado    = val('pr-f-estado') || 'iniciado';
+  const notas     = val('pr-f-notas').trim();
+  const juicioRef = val('pr-f-juicio');
+
+  const _foco = (id) => { const el = document.getElementById(id); if (el) { el.style.borderColor = 'var(--rojo)'; el.focus(); setTimeout(() => { el.style.borderColor = ''; }, 2500); } };
+  if (!nombre)   { if(typeof toast==='function') toast('⚠ El nombre del cliente es obligatorio', 'err'); _foco('pr-f-nombre'); return null; }
+  if (!concepto) { if(typeof toast==='function') toast('⚠ El concepto del trámite es obligatorio', 'err'); _foco('pr-f-concepto'); return null; }
+  const hon = honTxt === '' ? 0 : parseFloat(honTxt);
+  if (isNaN(hon) || hon < 0) { if(typeof toast==='function') toast('⚠ Los honorarios deben ser una cantidad válida (0 o más)', 'err'); _foco('pr-f-honorarios'); return null; }
 
   if (!Array.isArray(D.preRecibos)) D.preRecibos = [];
-
-  // Buscar si ya existe (puede existir si se guardaron gastos antes)
-  const existente = _prById(prId);
-
-  if (_esNuevo && !existente) {
-    // Crear nuevo
-    const nuevo = {
-      id: prId,
-      nombre: nombre.trim(), telefono: telefono.trim(),
-      concepto: concepto.trim(), honorarios: parseFloat(honorarios) || 0,
-      estado, notas: notas.trim(),
-      juicioId: juicioIdx !== '' ? parseInt(juicioIdx) : null,
-      fechaInicio: new Date().toISOString().slice(0,10),
-      gastos: [], convertido: false
-    };
-    D.preRecibos.push(nuevo);
-  } else if (existente) {
-    // Actualizar existente (edición o nuevo con gastos ya agregados)
-    existente.nombre     = nombre.trim();
-    existente.telefono   = telefono.trim();
-    existente.concepto   = concepto.trim();
-    existente.honorarios = parseFloat(honorarios) || 0;
-    existente.estado     = estado;
-    existente.notas      = notas.trim();
-    existente.juicioId   = juicioIdx !== '' ? parseInt(juicioIdx) : null;
-  } else {
-    // Fallback: crear con los datos aunque sea "edición" sin encontrar el ID
-    const nuevo = {
-      id: prId,
-      nombre: nombre.trim(), telefono: telefono.trim(),
-      concepto: concepto.trim(), honorarios: parseFloat(honorarios) || 0,
-      estado, notas: notas.trim(),
-      juicioId: juicioIdx !== '' ? parseInt(juicioIdx) : null,
-      fechaInicio: new Date().toISOString().slice(0,10),
-      gastos: [], convertido: false
-    };
-    D.preRecibos.push(nuevo);
+  let pr = _prById(prId);
+  if (!pr) {
+    pr = { id: prId, fechaInicio: _prHoy(), gastos: [], convertido: false };
+    D.preRecibos.push(pr);
   }
+  pr.nombre = nombre; pr.telefono = telefono; pr.concepto = concepto;
+  pr.honorarios = Math.round(hon * 100) / 100;
+  pr.estado = estado; pr.notas = notas;
+  pr.juicioRef = juicioRef ? (juicioRef.indexOf('idx:') === 0 ? null : juicioRef) : null;
+  pr.juicioId = (juicioRef && juicioRef.indexOf('idx:') === 0) ? parseInt(juicioRef.slice(4), 10) : null;
+  pr.eliminado = false;
+  if (!Array.isArray(pr.gastos)) pr.gastos = [];
+  _prTocar(pr);
   _prGuardar();
-  if(typeof toast==='function') toast('✓ Pre-Recibo guardado', 'ok');
-  _prRenderLista();
+  if (!opts.silencioso && typeof toast === 'function') toast('✓ Pre-Recibo guardado', 'ok');
+  if (!opts.quedarse) _prRenderLista();
+  return pr;
 }

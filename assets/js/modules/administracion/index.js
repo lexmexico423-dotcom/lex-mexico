@@ -8291,7 +8291,7 @@ async function _juExtraerDatosAcuerdo(texto){
   try {
     const jF = D.juicios[typeof _mexpIdx !== 'undefined' && _mexpIdx >= 0 ? _mexpIdx : jdetIdx];
     const fT = _juFechaDesdeTexto(texto, jF);
-    if (fT) datos.fechaAcuerdo = fT.iso;
+    if (fT && fT.fuente !== 'inicio') datos.fechaAcuerdo = fT.iso;
     else if (datos.fechaAcuerdo && !_juFechaValida(datos.fechaAcuerdo, jF)) datos.fechaAcuerdo = '';
   } catch(eF){}
   return datos;

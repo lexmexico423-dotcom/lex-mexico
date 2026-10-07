@@ -658,18 +658,24 @@ async function sincronizarFolio(forzarSB){
         // (se generó su recibo con folio) pero la copia de Supabase todavía no llegó
         // a reflejar esa conversión (push aún no confirmado), NO revertirlo — si no,
         // el pre-recibo "revive" en el panel de pendientes aunque ya tenga folio real.
+        // Oct-2026: por cada pre-recibo gana la copia modificada MÁS RECIENTE
+        // (fechaMod). Antes ganaba siempre Supabase: se perdían gastos
+        // capturados entre sincronizaciones y los eliminados "revivían".
+        // "convertido" nunca se revierte (ya tiene folio real).
         const _sbPreRecibos = data.data.preRecibos || [];
         const _localPreRecibos = Array.isArray(D.preRecibos) ? D.preRecibos : [];
-        const _mapaLocalPR = {};
-        _localPreRecibos.forEach(function(p){ if(p && p.id) _mapaLocalPR[p.id] = p; });
-        const _sbIds = new Set(_sbPreRecibos.map(p => p.id));
-        const _fusionadosSB = _sbPreRecibos.map(function(p){
-          const _loc = _mapaLocalPR[p.id];
-          if (_loc && _loc.convertido && !p.convertido) return _loc;
-          return p;
+        const _prMapa = {}, _prOrden = [];
+        _sbPreRecibos.concat(_localPreRecibos).forEach(function(p){
+          if (!p || !p.id) return;
+          const prev = _prMapa[p.id];
+          if (!prev) { _prMapa[p.id] = p; _prOrden.push(p.id); return; }
+          let gana = ((p.fechaMod || 0) > (prev.fechaMod || 0)) ? p : prev;
+          if ((prev.convertido || p.convertido) && !gana.convertido) {
+            gana = Object.assign({}, gana, { convertido: true, folioRecibo: prev.folioRecibo || p.folioRecibo });
+          }
+          _prMapa[p.id] = gana;
         });
-        const _soloLocales = _localPreRecibos.filter(p => !_sbIds.has(p.id));
-        D.preRecibos = [..._fusionadosSB, ..._soloLocales];
+        D.preRecibos = _prOrden.map(function(id){ return _prMapa[id]; });
         // Catálogo de leyes del despacho — compartido entre todos los dispositivos
         if (Array.isArray(data.data.leyes) && data.data.leyes.length) {
           D.leyes = data.data.leyes;
@@ -10662,6 +10668,30 @@ function cerrarFichaFolio(){
   }
 }
 
+// ── Pre-Recibos: utilidades (oct-2026) ──
+function _prHoy() {
+  try { if (typeof fechaCDMX_ISO === 'function') return fechaCDMX_ISO(); } catch(e){}
+  return new Date().toISOString().slice(0,10);
+}
+// Cada cambio lleva su sello de tiempo: al sincronizar entre computadoras
+// gana la versión MÁS RECIENTE (antes ganaba siempre la de Supabase y se
+// podían perder gastos recién capturados, o "revivir" uno eliminado).
+function _prTocar(pr) { if (pr) pr.fechaMod = Date.now(); return pr; }
+// Juicio vinculado por su ID (antes se guardaba la POSICIÓN en la lista de
+// juicios, que cambia al agregar o borrar juicios → quedaba ligado a otro).
+function _prJuicioDe(pr) {
+  if (!pr) return null;
+  const js = (typeof D !== 'undefined' && D.juicios) || [];
+  if (pr.juicioRef) return js.find(j => j && j.id === pr.juicioRef) || null;
+  if (typeof pr.juicioId === 'number' && js[pr.juicioId]) return js[pr.juicioId];
+  return null;
+}
+function _prJuicioEtiqueta(j) {
+  if (!j) return '';
+  return (j.cliente || j.nombre || 'Juicio') + (j.expediente ? ' · Exp. ' + j.expediente : '') + (j.tipo ? ' · ' + j.tipo : '');
+}
+function _prFmt(n) { return '$' + (parseFloat(n) || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
 function _prR2Path() {
   return (window.SB_DESPACHO_ID || 'despacho') + '/pre_recibos/data.json';
 }
@@ -10729,7 +10759,7 @@ function _prRenderLista() {
   const el = document.getElementById('pr-panel-contenido');
   const badge = document.getElementById('pr-badge-count');
   if (!el) return;
-  const lista = _prGetAll().filter(p => !p.convertido);
+  const lista = _prGetAll().filter(p => p && !p.convertido && !p.eliminado);
   if (badge) badge.textContent = lista.length + (lista.length === 1 ? ' pendiente' : ' pendientes');
 
   if (!lista.length) {
@@ -10737,35 +10767,37 @@ function _prRenderLista() {
     return;
   }
 
-  // Ordenar: listos primero, luego por antigüedad desc
+  // Ordenar: listos primero, luego los más antiguos (los que más urge cobrar)
   const ordenados = [...lista].sort((a, b) => {
     if (a.estado === 'listo' && b.estado !== 'listo') return -1;
     if (b.estado === 'listo' && a.estado !== 'listo') return 1;
-    return new Date(b.fechaInicio) - new Date(a.fechaInicio);
+    return String(a.fechaInicio || '').localeCompare(String(b.fechaInicio || ''));
   });
 
   el.innerHTML = ordenados.map(pr => {
     const est = _prEstadoColor(pr);
     const totalGastos = _prTotalGastos(pr);
-    const iniciales = (pr.nombre || '?').split(' ').slice(0,2).map(w => w[0]).join('').toUpperCase();
+    const iniciales = (pr.nombre || '?').trim().split(/\s+/).slice(0,2).map(w => w[0] || '').join('').toUpperCase() || '?';
     const nGastos = (pr.gastos || []).length;
     const estadoLabel = pr.estado === 'proceso' ? 'En proceso' : pr.estado === 'listo' ? 'Listo' : 'Iniciado';
+    const j = _prJuicioDe(pr);
     return `<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--border-l);border-radius:8px;margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;" onmouseover="this.style.borderColor='var(--gold)'" onmouseout="this.style.borderColor='var(--border-l)'" onclick="_prAbrirFormulario('${pr.id}')">
-      <div style="width:36px;height:36px;border-radius:50%;background:${est.bg};display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:${est.color};flex-shrink:0;">${iniciales}</div>
+      <div style="width:36px;height:36px;border-radius:50%;background:${est.bg};display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:${est.color};flex-shrink:0;">${escHTML(iniciales)}</div>
       <div style="flex:1;min-width:0;">
-        <div style="font-size:0.8rem;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(pr.nombre)}</div>
+        <div style="font-size:0.8rem;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(pr.nombre || '(sin nombre)')}</div>
         <div style="font-size:0.65rem;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHTML(pr.concepto || '—')}</div>
         <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">
           <span style="font-size:0.58rem;padding:1px 7px;border-radius:10px;background:${est.bg};color:${est.color};">${est.label}</span>
           <span style="font-size:0.58rem;padding:1px 7px;border-radius:10px;background:var(--surface2);color:var(--muted);">${nGastos} ${nGastos===1?'gasto':'gastos'}</span>
           ${pr.estado ? `<span style="font-size:0.58rem;padding:1px 7px;border-radius:10px;background:rgba(26,74,138,0.08);color:var(--azul);">${estadoLabel}</span>` : ''}
+          ${j ? `<span style="font-size:0.58rem;padding:1px 7px;border-radius:10px;background:var(--gold-bg);color:var(--gold-d);">⚖ ${escHTML(j.expediente ? 'Exp. ' + j.expediente : (j.tipo || 'Juicio'))}</span>` : ''}
         </div>
       </div>
       <div style="text-align:right;flex-shrink:0;">
-        <div style="font-size:0.78rem;font-weight:700;color:var(--gold-d);font-family:'JetBrains Mono',monospace;">$${(totalGastos + (parseFloat(pr.honorarios)||0)).toLocaleString('es-MX',{minimumFractionDigits:2})}</div>
-        <div style="font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">Deuda total</div>
-        ${totalGastos > 0 ? `<div style="font-size:0.6rem;color:var(--muted);">Gastos $${totalGastos.toLocaleString('es-MX',{minimumFractionDigits:2})}</div>` : ''}
-        ${pr.honorarios ? `<div style="font-size:0.6rem;color:var(--muted);">Hon. $${parseFloat(pr.honorarios).toLocaleString('es-MX',{minimumFractionDigits:2})}</div>` : ''}
+        <div style="font-size:0.78rem;font-weight:700;color:var(--gold-d);font-family:'JetBrains Mono',monospace;">${_prFmt(totalGastos + (parseFloat(pr.honorarios)||0))}</div>
+        <div style="font-size:0.55rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">Total a cobrar</div>
+        ${totalGastos > 0 ? `<div style="font-size:0.6rem;color:var(--muted);">Gastos ${_prFmt(totalGastos)}</div>` : ''}
+        ${parseFloat(pr.honorarios) > 0 ? `<div style="font-size:0.6rem;color:var(--muted);">Hon. ${_prFmt(pr.honorarios)}</div>` : ''}
       </div>
       <button onclick="event.stopPropagation();_prConvertirARecibo('${pr.id}')" style="padding:6px 12px;border-radius:5px;border:1.5px solid #2a7a3a;background:none;color:#4dca6a;font-size:0.62rem;font-family:'JetBrains Mono',monospace;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;white-space:nowrap;font-weight:700;" title="Convertir a recibo oficial">Cobrar</button>
     </div>`;
@@ -10775,53 +10807,73 @@ function _prRenderLista() {
 function _prAgregarGastoUI(prId) {
   const el = document.getElementById('pr-gastos-lista-' + prId);
   if (!el) return;
-  // Crear fila de entrada
+  // Una sola fila de captura a la vez (antes, dos clics creaban dos filas con
+  // los mismos campos y el ✓ de la segunda guardaba los datos de la primera).
+  const ya = document.getElementById('pr-ng-concepto');
+  if (ya) { ya.focus(); return; }
   const row = document.createElement('div');
+  row.id = 'pr-ng-fila';
   row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(200,149,42,0.06);border:1px dashed var(--gold);border-radius:6px;';
   row.innerHTML = `
-    <input id="pr-ng-concepto" type="text" placeholder="Concepto" style="flex:1;padding:5px 8px;border:1px solid var(--border-l);border-radius:4px;font-size:0.7rem;background:var(--surface);color:var(--ink);">
+    <input id="pr-ng-concepto" type="text" placeholder="Concepto *" style="flex:1;padding:5px 8px;border:1px solid var(--border-l);border-radius:4px;font-size:0.7rem;background:var(--surface);color:var(--ink);">
     <input id="pr-ng-desc" type="text" placeholder="Descripción (opcional)" style="flex:1.5;padding:5px 8px;border:1px solid var(--border-l);border-radius:4px;font-size:0.7rem;background:var(--surface);color:var(--ink);">
-    <input id="pr-ng-fecha" type="date" value="${new Date().toISOString().slice(0,10)}" style="width:120px;padding:5px 8px;border:1px solid var(--border-l);border-radius:4px;font-size:0.7rem;background:var(--surface);color:var(--ink);">
-    <input id="pr-ng-monto" type="number" placeholder="$0.00" onfocus="this.select()" style="width:90px;padding:5px 8px;border:1px solid var(--border-l);border-radius:4px;font-size:0.7rem;background:var(--surface);color:var(--ink);">
-    <button onclick="_prConfirmarGasto('${prId}')" style="padding:5px 10px;border-radius:4px;border:1px solid #2a7a3a;background:none;color:#4dca6a;font-size:0.7rem;cursor:pointer;font-weight:700;">✓</button>
-    <button onclick="this.parentNode.remove()" style="padding:5px 8px;border-radius:4px;border:1px solid var(--border-l);background:none;color:var(--muted);font-size:0.7rem;cursor:pointer;">✕</button>`;
+    <input id="pr-ng-fecha" type="date" value="${_prHoy()}" style="width:120px;padding:5px 8px;border:1px solid var(--border-l);border-radius:4px;font-size:0.7rem;background:var(--surface);color:var(--ink);">
+    <input id="pr-ng-monto" type="number" min="0" step="0.01" placeholder="$0.00 *" onfocus="this.select()" style="width:90px;padding:5px 8px;border:1px solid var(--border-l);border-radius:4px;font-size:0.7rem;background:var(--surface);color:var(--ink);">
+    <button onclick="_prConfirmarGasto('${prId}')" title="Agregar (Enter)" style="padding:5px 10px;border-radius:4px;border:1px solid #2a7a3a;background:none;color:#4dca6a;font-size:0.7rem;cursor:pointer;font-weight:700;">✓</button>
+    <button onclick="this.parentNode.remove()" title="Cancelar (Esc)" style="padding:5px 8px;border-radius:4px;border:1px solid var(--border-l);background:none;color:var(--muted);font-size:0.7rem;cursor:pointer;">✕</button>`;
+  row.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); _prConfirmarGasto(prId); }
+    else if (e.key === 'Escape') { e.preventDefault(); row.remove(); }
+  });
   el.appendChild(row);
-  document.getElementById('pr-ng-desc').focus();
+  document.getElementById('pr-ng-concepto').focus();
 }
 
 function _prConfirmarGasto(prId) {
-  const concepto = (document.getElementById('pr-ng-concepto') || {}).value || '';
-  const desc     = (document.getElementById('pr-ng-desc')     || {}).value || '';
-  const fecha    = (document.getElementById('pr-ng-fecha')    || {}).value || '';
-  const monto    = parseFloat((document.getElementById('pr-ng-monto') || {}).value) || 0;
-  if (!concepto.trim() || monto <= 0) { if(typeof toast==='function') toast('⚠ Ingresa concepto y monto', 'err'); return; }
+  const concepto = ((document.getElementById('pr-ng-concepto') || {}).value || '').trim();
+  const desc     = ((document.getElementById('pr-ng-desc')     || {}).value || '').trim();
+  const fecha    = (document.getElementById('pr-ng-fecha')    || {}).value || _prHoy();
+  const monto    = Math.round((parseFloat((document.getElementById('pr-ng-monto') || {}).value) || 0) * 100) / 100;
+  if (!concepto || monto <= 0) { if(typeof toast==='function') toast('⚠ Escribe el concepto y un monto mayor a $0', 'err'); return; }
   let pr = _prById(prId);
   if (!pr) {
-    if (!Array.isArray(D.preRecibos)) D.preRecibos = [];
-    pr = { id: prId, nombre: '', telefono: '', concepto: '', honorarios: 0,
-           estado: 'iniciado', notas: '', juicioId: null,
-           fechaInicio: new Date().toISOString().slice(0,10),
-           gastos: [], convertido: false };
-    D.preRecibos.push(pr);
+    // Pre-recibo nuevo todavía sin guardar: se guarda primero con los datos
+    // del formulario (antes quedaba un pre-recibo "(sin nombre)" en la lista
+    // si el usuario se regresaba sin pulsar Guardar).
+    pr = _prGuardarFormulario(prId, true, { silencioso: true, quedarse: true });
+    if (!pr) { if(typeof toast==='function') toast('⚠ Antes de agregar gastos escribe el nombre del cliente y el concepto', 'err'); return; }
   }
   if (!Array.isArray(pr.gastos)) pr.gastos = [];
-  pr.gastos.push({ concepto: concepto.trim(), descripcion: desc.trim(), fecha, monto });
+  pr.gastos.push({ concepto, descripcion: desc, fecha, monto });
+  _prTocar(pr);
   _prGuardar();
   _prRenderGastos(pr);
+  _prActualizarTotalesForm(prId);
   if(typeof toast==='function') toast('✓ Gasto agregado', 'ok');
 }
 
 function _prEliminar(prId) {
-  if (!confirm('¿Eliminar este pre-recibo? Esta acción no se puede deshacer.')) return;
-  D.preRecibos = (D.preRecibos || []).filter(p => p.id !== prId);
+  const pr = _prById(prId);
+  if (!pr) return;
+  if (!confirm('¿Eliminar el pre-recibo de «' + (pr.nombre || 'sin nombre') + '»?')) return;
+  // Se marca como eliminado (con su sello de tiempo) en vez de borrarlo de la
+  // lista: así la eliminación también llega a las otras computadoras. Antes,
+  // al borrarlo de la lista, la sincronización lo volvía a traer.
+  pr.eliminado = true;
+  _prTocar(pr);
   _prGuardar();
   if(typeof toast==='function') toast('Pre-Recibo eliminado', 'ok');
   _prRenderLista();
 }
 
 function _prConvertirARecibo(prId) {
-  const pr = _prById(prId);
+  // Desde el formulario: primero se guardan los cambios (antes, en un
+  // pre-recibo nuevo sin guardar, el botón no hacía nada).
+  const pr = document.getElementById('pr-f-nombre')
+    ? _prGuardarFormulario(prId, true, { silencioso: true, quedarse: true })
+    : _prById(prId);
   if (!pr) return;
+  if (pr.convertido) { if (typeof toast === 'function') toast('Este pre-recibo ya se cobró' + (pr.folioRecibo ? ' (folio ' + pr.folioRecibo + ')' : ''), 'err'); return; }
   // Ir al panel de nuevo recibo (ir() limpia el formulario al entrar)
   if (typeof ir === 'function') ir('nuevo-recibo');
   // Esperar a que el panel de nuevo recibo esté listo y pre-llenar con selectores reales

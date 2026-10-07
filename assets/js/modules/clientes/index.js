@@ -1164,42 +1164,9 @@ function iniciarTramiteDesdeCliente(){
 }
 
 async function _acuerdosBuscarDuplicados() {
-  const jId = window._jdetId;
-  if (!jId) { if (typeof toast === 'function') toast('⚠ Abre un expediente primero', 'err'); return; }
-  if (typeof toast === 'function') toast('🔍 Revisando duplicados…', 'ok');
-  const juicioActivo = D.juicios && D.juicios[typeof jdetIdx !== 'undefined' ? jdetIdx : _mexpIdx];
-  const nombreCarpetaJuicio = (juicioActivo ? (juicioActivo.nombre || juicioActivo.cliente || 'Juicio') + ' - Exp.' + (juicioActivo.expediente || juicioActivo.num || jId) : 'Juicio-' + jId).replace(/[<>:"/\\|?*]/g,'_');
-  const lista = await _acuerdosListarDriveFresco(jId, nombreCarpetaJuicio);
-  const grupos = _acuerdosAgruparDuplicados(lista);
-  if (!grupos.length) { if (typeof toast === 'function') toast('✓ No se encontraron duplicados', 'ok'); return; }
-  const totalExtra = grupos.reduce((s,g) => s + g.length - 1, 0);
-  const detalle = grupos.map(g => '• ' + (g[0].nombre || g[0].archivo) + ' (' + g.length + ' copias)').join('\n');
-  const ok = await confirmarBonito({
-    titulo: 'Duplicados encontrados',
-    mensaje: 'Se encontraron ' + totalExtra + ' archivo(s) duplicado(s):\n\n' + detalle + '\n\nSe conservará la copia más reciente de cada uno y se eliminarán las demás (de Drive y de la lista). Esta acción no se puede deshacer.',
-    btnSi: 'Sí, eliminar duplicados',
-    btnNo: 'Cancelar',
-    peligro: true
-  });
-  if (!ok) return;
-  let listaLimpia = lista.slice();
-  const token = await driveGetAccessToken();
-  for (const grupo of grupos) {
-    const sobrantes = grupo.slice(1); // el primero (más reciente) se conserva
-    for (const sobra of sobrantes) {
-      if (sobra.driveFileId && token) {
-        try {
-          await fetch('https://www.googleapis.com/drive/v3/files/' + sobra.driveFileId, {
-            method: 'DELETE', headers: { Authorization: 'Bearer ' + token }
-          });
-        } catch(e) { console.warn('[Acuerdos] No se pudo eliminar duplicado de Drive:', e); }
-      }
-      listaLimpia = listaLimpia.filter(a => a.id !== sobra.id);
-    }
-  }
-  try { localStorage.setItem('lex_acuerdos_'+jId, JSON.stringify(listaLimpia)); } catch(e){}
-  renderAcuerdosDrive(listaLimpia);
-  if (typeof toast === 'function') toast('🗑 ' + totalExtra + ' duplicado(s) eliminado(s)', 'ok');
+  // Oct-2026: reemplazado por la revisión completa (copias por huella de
+  // Drive, fechas leídas del texto y línea de tiempo) — ver _juRevisarAcuerdos.
+  return _juRevisarAcuerdos();
 }
 
 function clickSrv(s){

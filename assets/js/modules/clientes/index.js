@@ -2147,6 +2147,7 @@ async function guardarReciboInterno() {
         if (_prOrigen) {
           _prOrigen.convertido = true;
           _prOrigen.folioRecibo = folio;
+          _prOrigen.fechaMod = Date.now();
           if (typeof _prGuardar === 'function') _prGuardar();
         }
       } catch(e) { console.warn('[PreRecibo] marcar convertido:', e); }

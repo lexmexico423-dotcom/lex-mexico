@@ -2758,6 +2758,7 @@ function _juFijarEtapaFlujo(idx, i){
   if(typeof saveJuicios === 'function') saveJuicios();
   try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){}
   _juRenderEtapas(j, idx);
+  try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(idx); } catch(e){}
   if(typeof renderJuicios === 'function') renderJuicios();
   // Si el panel "Flujo del Procedimiento" está abierto para este mismo
   // expediente, refrescarlo también para que no se desincronice.
@@ -4708,6 +4709,7 @@ ${_formato}`;
       // 5). Se limpia aquí para no mostrar información obsoleta/engañosa.
       j.flujoEtapaActual = null;
       j.flujoEtapaActualRazon = '';
+      j.flujoEstados = null;
       try { saveJuicios(); } catch(e) {}
       // Antes esto era "disparar y olvidar" (syncEstadoSupabaseDebounced sin
       // esperar su resultado): si el usuario recargaba la página justo después
@@ -4732,6 +4734,7 @@ ${_formato}`;
     window._flujoLeyTextoCompleto = leyTexto || '';
     window._flujoTipoJuicioActual = tipoJuicio;
     _flujoRender(etapas, ley.nombre);
+    try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(_mexpIdx); } catch(e){}
     if (typeof toast === 'function') {
       if (!_flujoEstaCompleto(etapas)) {
         toast('⚠ El flujo podría estar incompleto: termina en «' + String(etapas[etapas.length - 1].etapa || '') + '» y no llega a la sentencia. Intenta «Generar Flujo» de nuevo.', 'err');
@@ -4783,10 +4786,16 @@ function _flujoRender(etapas, leyNombre) {
       // Estado por etapa actual manual: cumplida (<actual) / en curso (=actual) / pendiente (>actual)
       const esCumplida = actual >= 0 && i < actual;
       const esActual = actual >= 0 && i === actual;
+      // Estado calificado por "Detectar etapa" (con el documento que lo prueba)
+      const estIA = (j && Array.isArray(j.flujoEstados) && j.flujoEstados.length === etapas.length) ? j.flujoEstados[i] : null;
+      const noAplica = !esActual && estIA && estIA.estado === 'no_aplica';
+      const evidTxt = estIA && estIA.evidencia ? estIA.evidencia : '';
 
       let borde, fondo, colorNum, contenido;
       if (esActual) {
         borde = 'var(--gold)'; fondo = 'var(--gold)'; colorNum = '#fff'; contenido = (i + 1);
+      } else if (noAplica) {
+        borde = 'var(--border-l)'; fondo = 'var(--surface2)'; colorNum = 'var(--muted)'; contenido = '–';
       } else if (esCumplida) {
         borde = 'var(--verde)'; fondo = 'var(--verde-l)'; colorNum = 'var(--verde)'; contenido = '✓';
       } else {
@@ -4805,7 +4814,11 @@ function _flujoRender(etapas, leyNombre) {
           ${i < etapas.length - 1 ? `<div style="width:2px;flex:1;background:${esCumplida?'var(--verde)':'var(--border-l)'};min-height:14px;margin-top:3px;"></div>` : ''}
         </div>
         <div style="flex:1;min-width:0;display:flex;align-items:center;gap:6px;padding:1px 0;">
-          <div style="flex:1;font-size:0.74rem;font-weight:${esActual?'800':'700'};color:${tituloColor};line-height:1.35;">${escHTML(et.etapa)}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:0.74rem;font-weight:${esActual?'800':'700'};color:${noAplica?'var(--muted)':tituloColor};line-height:1.35;">${escHTML(et.etapa)}</div>
+            ${noAplica ? `<div style="font-size:0.6rem;color:var(--muted);margin-top:2px;">No se dio en este juicio${evidTxt ? ' · ' + escHTML(evidTxt) : ''}</div>`
+              : (evidTxt && (esCumplida || esActual) ? `<div style="font-size:0.6rem;color:${esActual ? 'var(--gold-d)' : 'var(--verde-d,#1a7a3a)'};margin-top:2px;line-height:1.35;">${esActual ? '◷ ' : '✓ '}${escHTML(evidTxt)}</div>` : '')}
+          </div>
           ${badgeActual}
         </div>
       </div>`;
@@ -4887,10 +4900,80 @@ function _flujoMarcarEtapaActual(i) {
   // cuando el expediente ya tiene flujo generado — refrescarla para que no
   // se desincronice de lo que se acaba de marcar aquí.
   try { if (typeof _juRenderEtapas === 'function') _juRenderEtapas(j, _mexpIdx); } catch(e){}
+  try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(_mexpIdx); } catch(e){}
   try { if (typeof renderJuicios === 'function') renderJuicios(); } catch(e){}
   if (typeof toast === 'function') {
     toast(j.flujoEtapaActual === null ? 'Marca de etapa actual retirada' : '📍 Etapa actual actualizada', 'ok');
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// DETECTAR ETAPA (oct-2026, v2). Caso real: con el flujo ya completo, la IA
+// puso el divorcio de Cristina Bazante en "12. Recursos contra la sentencia"
+// porque vio un AMPARO (que era contra la guarda y custodia provisional) y
+// porque la sentencia de divorcio ya se había dictado — pero las cláusulas
+// del convenio (guarda, convivencias, alimentos) siguen en pruebas: en mayo
+// de 2026 el juez todavía recibía periciales y requería al DIF.
+// Ahora la IA califica CADA etapa (cumplida / en curso / pendiente / no
+// aplica, con el documento que lo demuestra) y la etapa actual se calcula
+// con reglas fijas:
+//   • no se puede estar después de la sentencia si la etapa de sentencia no
+//     está cumplida (recursos y ejecución requieren sentencia);
+//   • manda la etapa "en curso"; si no hay, la primera sin cumplir.
+// ══════════════════════════════════════════════════════════════════════
+function _flujoNormEstado(e){
+  var s = _juNormTexto(e).replace(/\s+/g, '_');
+  if (/^CUMPLID|^CONCLUID|^REALIZAD|^TERMINAD/.test(s)) return 'cumplida';
+  if (/^EN_CURSO|^EN_PROCESO|^ACTUAL|^EN_TRAMITE/.test(s)) return 'en_curso';
+  if (/^NO_APLICA|^N\/A|^NA$|^OMITID/.test(s)) return 'no_aplica';
+  return 'pendiente';
+}
+function _flujoEsEtapaSentencia(et){
+  var t = _juNormTexto((et && et.etapa) || '');
+  return /SENTENCIA|RESOLUCION DEFINITIVA|FALLO/.test(t) && !/RECURSO|APELACION|AMPARO|EJECUCION|CUMPLIMIENTO DE LA SENTENCIA/.test(t);
+}
+// Devuelve { idx, estados } — idx = índice (0..n-1) de la etapa actual.
+function _flujoCalcularEtapaActual(etapas, estadosIA, numeroIA){
+  var n = (etapas || []).length;
+  var estados = [];
+  for (var i = 0; i < n; i++) {
+    var e = (estadosIA || []).find(function(x){ return x && parseInt(x.n, 10) === i + 1; }) || (estadosIA || [])[i] || {};
+    estados.push({ estado: _flujoNormEstado(e.estado || ''), evidencia: String(e.evidencia || '').trim().slice(0, 160) });
+  }
+  if (!n) return { idx: -1, estados: estados };
+  var hayEstados = (estadosIA || []).length > 0;
+  // Tope: sin sentencia cumplida no se puede estar en recursos/ejecución.
+  var tope = n - 1;
+  for (var s = 0; s < n; s++) {
+    if (_flujoEsEtapaSentencia(etapas[s])) {
+      // La sentencia solo cuenta como dictada si la IA cita el documento.
+      if (hayEstados && estados[s].estado === 'cumplida' && !estados[s].evidencia) estados[s].estado = 'pendiente';
+      if (hayEstados && estados[s].estado !== 'cumplida') tope = s;
+      break;
+    }
+  }
+  if (!hayEstados) {
+    var k = parseInt(numeroIA, 10);
+    return { idx: Number.isFinite(k) ? Math.max(0, Math.min(tope, k - 1)) : -1, estados: estados };
+  }
+  // Etapa "en curso" más avanzada dentro del tope
+  var enCurso = -1;
+  for (var a = 0; a <= tope; a++) if (estados[a].estado === 'en_curso') enCurso = a;
+  if (enCurso >= 0) return { idx: enCurso, estados: estados };
+  // Si no hay: la primera etapa sin cumplir después de la última cumplida
+  var ultCumplida = -1;
+  for (var b = 0; b <= tope; b++) if (estados[b].estado === 'cumplida') ultCumplida = b;
+  for (var c = ultCumplida + 1; c <= tope; c++) if (estados[c].estado !== 'no_aplica') return { idx: c, estados: estados };
+  return { idx: tope, estados: estados };
+}
+
+// Motor de IA para razonar: Gemini (si hay key) → Cloudflare contexto largo → Groq.
+async function _flujoIARazonar(prompt, maxTokens){
+  try { if (typeof ocrModGetKey === 'function' && ocrModGetKey() && typeof _geminiGenerarTexto === 'function') return await _geminiGenerarTexto(prompt, Math.max(maxTokens, 4096), 0.1); }
+  catch(e){ console.warn('[Flujo] Gemini no respondió al detectar etapa:', e.message); }
+  try { if (typeof _cfaiGetAccountId === 'function' && _cfaiGetAccountId() && _cfaiGetToken() && typeof _cfaiLlamarContextoLargo === 'function') return await _cfaiLlamarContextoLargo(prompt, maxTokens, 0.1, 'procesal'); }
+  catch(e){ console.warn('[Flujo] Cloudflare no respondió al detectar etapa:', e.message); }
+  return await _iaLlamar(prompt, maxTokens, 0.1, 'procesal');
 }
 
 async function _flujoDetectarEtapa() {
@@ -4923,38 +5006,51 @@ async function _flujoDetectarEtapa() {
   const btn = document.getElementById('flujo-detectar-btn');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.innerHTML = '<span style="display:inline-block;width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:-1px;margin-right:6px;"></span>Analizando documentos…'; }
 
-  const listaEtapas = etapas.map((e, i) => (i + 1) + '. ' + (e.etapa || '')).join('\n');
-  const prompt = `Eres un abogado litigante mexicano experto. Con base en el FLUJO del procedimiento y los DOCUMENTOS del expediente (en orden cronológico; hoy es ${_juHoyISO()}), determina en qué ETAPA se encuentra ACTUALMENTE el juicio.
+  const listaEtapas = etapas.map((e, i) => (i + 1) + '. ' + String(e.etapa || '').replace(/^\s*\d+\s*[\.\)\-:]\s*/, '') + (e.descripcion ? ' — ' + String(e.descripcion).replace(/\s+/g, ' ').slice(0, 220) : '')).join('\n');
+  const prompt = `Eres un abogado litigante mexicano experto. Analiza el FLUJO del procedimiento y los DOCUMENTOS del expediente (en orden cronológico; hoy es ${_juHoyISO()}) y califica el ESTADO de CADA etapa.
 
-REGLAS:
-- Manda el documento MÁS RECIENTE y procesalmente más avanzado; los anteriores solo dan contexto.
-- Si ya se dictó la sentencia o resolución principal (por ejemplo, la que decreta el divorcio) y los documentos posteriores tratan de convenio, incidentes, pruebas sobre el convenio, guarda y custodia, convivencias, recursos o amparo, la etapa actual es la que corresponde a ESOS actos posteriores — nunca una etapa inicial (demanda, prevención, admisión).
-- Si ninguna etapa coincide exactamente, elige la más cercana POSTERIOR al último acto realizado.
+ESTADOS POSIBLES:
+- "cumplida": la etapa YA OCURRIÓ por completo. Las etapas anteriores a un acto que sí ocurrió también se consideran cumplidas aunque no haya documento (si ya hubo audiencia, la demanda ya se presentó y se admitió).
+- "no_aplica": etapa eventual que no se dio en este juicio (por ejemplo, una prevención que nunca se ordenó).
+- "en_curso": la etapa ya empezó pero todavía no termina.
+- "pendiente": todavía no ocurre.
+
+REGLAS IMPORTANTES:
+- Una etapa con varios actos solo está "cumplida" si TODOS ocurrieron. Ejemplo: "sentencia de divorcio y resolución de las controversias del convenio" NO está cumplida si el divorcio ya se decretó pero los puntos del convenio (alimentos, guarda y custodia, convivencias, bienes) siguen en litigio.
+- Mientras el juez siga ordenando o recibiendo pruebas, periciales, valoraciones psicológicas, estudios socioeconómicos, informes, terapias o requerimientos para integrar pruebas, la etapa de pruebas sigue "en_curso", aunque ya se haya celebrado una audiencia de pruebas.
+- Una audiencia SEÑALADA a futuro no significa que ya se celebró.
+- Un AMPARO o recurso contra un auto intermedio (medidas provisionales, guarda y custodia provisional, admisión o desechamiento de pruebas, multas) NO pone al juicio en la etapa de recursos contra la sentencia: el juicio principal sigue en la etapa en que estaba. Solo cuenta como recurso contra la sentencia si se impugna la sentencia definitiva.
+- En "evidencia" cita la fecha y el documento que lo demuestra. No supongas actos que ningún documento menciona.
 
 FLUJO (etapas):
 ${listaEtapas}
 
-DOCUMENTOS DEL EXPEDIENTE (con fecha si está disponible):
+DOCUMENTOS DEL EXPEDIENTE:
 ${docsLineas.join('\n')}
 
-Responde ÚNICAMENTE en JSON válido, sin markdown ni texto extra:
-{"numero": N, "razon": "explicación breve (1-2 frases) citando el documento clave que define la etapa"}
-donde N es el número de la etapa actual, entre 1 y ${etapas.length}.`;
+Responde ÚNICAMENTE en JSON válido, sin markdown ni texto extra, con TODAS las ${etapas.length} etapas:
+{"etapas":[{"n":1,"estado":"cumplida","evidencia":"20-05-2025 · documento que lo demuestra (o vacío)"}],"actual":N,"razon":"1-2 frases: en qué etapa está el juicio y qué falta para pasar a la siguiente"}`;
 
   try {
-    const raw = await _iaLlamar(prompt, 600, 0.1, 'procesal');
+    const raw = await _flujoIARazonar(prompt, 3000);
     const clean = (raw || '').replace(/```json|```/g, '').trim();
     const m = clean.match(/\{[\s\S]*\}/);
     const parsed = JSON.parse(m ? m[0] : clean);
-    let n = parseInt(parsed.numero, 10);
-    if (!Number.isFinite(n)) throw new Error('La IA no devolvió un número de etapa');
-    n = Math.max(1, Math.min(etapas.length, n));
-    j.flujoEtapaActual = n - 1;
-    j.flujoEtapaActualRazon = (parsed.razon || '').toString().slice(0, 240);
+    const calc = _flujoCalcularEtapaActual(etapas, Array.isArray(parsed.etapas) ? parsed.etapas : [], parsed.actual != null ? parsed.actual : parsed.numero);
+    if (!(calc.idx >= 0)) throw new Error('La IA no devolvió el estado de las etapas');
+    const n = calc.idx + 1;
+    j.flujoEtapaActual = calc.idx;
+    j.flujoEstados = calc.estados;
+    let razon = (parsed.razon || '').toString().slice(0, 300);
+    const nIA = parseInt(parsed.actual, 10);
+    if (Number.isFinite(nIA) && nIA !== n) razon = 'Etapa ' + n + ' según el estado de cada etapa (la IA sugería la ' + nIA + ', que no corresponde). ' + razon;
+    j.flujoEtapaActualRazon = razon.slice(0, 360);
+    j.updatedAt = Date.now();
     try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e) {}
     try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e) {}
     _flujoRender(window._flujoEtapasActual, window._flujoLeyActual);
     try { if (typeof _juRenderEtapas === 'function') _juRenderEtapas(j, _mexpIdx); } catch(e){}
+    try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(_mexpIdx); } catch(e){}
     try { if (typeof renderJuicios === 'function') renderJuicios(); } catch(e){}
     if (typeof toast === 'function') toast('🔮 Etapa detectada: ' + (etapas[n - 1].etapa || ('Etapa ' + n)), 'ok');
   } catch(e) {

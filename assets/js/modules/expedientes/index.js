@@ -77,7 +77,7 @@ async function driveBuscarCarpetaId(token, nombre, parentId) {
 async function driveListarArchivosCarpeta(token, carpetaId) {
   const q = "'"+carpetaId+"' in parents and mimeType='application/pdf' and trashed=false";
   try {
-    const r = await fetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&fields=files(id,name,description,createdTime)&orderBy=name+desc&pageSize=200', {headers:{Authorization:'Bearer '+token}});
+    const r = await fetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&fields=files(id,name,description,createdTime,md5Checksum,size)&orderBy=name+desc&pageSize=200', {headers:{Authorization:'Bearer '+token}});
     if (!r.ok) return [];
     const d = await r.json();
     return d.files || [];
@@ -103,6 +103,7 @@ function _parsearArchivoAcuerdoDrive(f) {
     descripcion: desc,
     tipo: 'otro', estado: 'listo',
     fechaAcuerdo, fechaSubida: (f.createdTime||'').slice(0,10),
+    md5: f.md5Checksum || '', tam: f.size ? parseInt(f.size, 10) : 0,
     resumen: '', sha256: ''  // resumen siempre vacío al parsear; se restaura del caché local
   };
 }
@@ -259,7 +260,22 @@ function renderAcuerdosDrive(lista) {
     return fb.localeCompare(fa);
   });
 
-  cont.innerHTML = barra;
+  // Aviso (oct-2026): copias repetidas o fechas dudosas → botón para repararlo.
+  let avisoRep = '';
+  try {
+    const gRep = _acuerdosAgruparDuplicados(lista.filter(a => a && a.md5), j);
+    const nSobran = gRep.reduce((s, g) => s + g.length - 1, 0);
+    const nFechaMal = info.filter(x => x.ac.estado !== 'procesando' && (x.m.fechaRevisar || !x.ac.fechaAcuerdo || !_juFechaValida(x.ac.fechaAcuerdo, j))).length;
+    if (nSobran || nFechaMal) {
+      const partes = [];
+      if (nSobran) partes.push('<b>' + nSobran + '</b> copia' + (nSobran === 1 ? '' : 's') + ' repetida' + (nSobran === 1 ? '' : 's'));
+      if (nFechaMal) partes.push('<b>' + nFechaMal + '</b> fecha' + (nFechaMal === 1 ? '' : 's') + ' por revisar');
+      avisoRep = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff8e8;border:1.5px solid #e0a040;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:.74rem;color:#7a4a00;">'
+        + '<span style="flex:1;min-width:180px;">⚠ En estos acuerdos hay ' + partes.join(' y ') + '.</span>'
+        + '<button onclick="_juRevisarAcuerdos()" style="background:#b06a00;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:.72rem;font-weight:700;cursor:pointer;">🛠 Revisar y reparar</button></div>';
+    }
+  } catch(eAv){}
+  cont.innerHTML = avisoRep + barra;
   if (!vis.length) {
     cont.insertAdjacentHTML('beforeend', '<div style="padding:18px 10px;text-align:center;color:var(--muted);font-size:0.74rem;">' + (filtro === 'accion' ? '✓ No hay acuerdos pendientes de atender.' : 'No hay acuerdos en este filtro.') + '</div>');
     return;
@@ -282,7 +298,10 @@ function renderAcuerdosDrive(lista) {
     const estadoChip = ac.estado === 'procesando'
       ? '<span style="font-size:.6rem;padding:2px 7px;border-radius:4px;background:#FAEEDA;color:#633806;">⏳ IA procesando</span>'
       : ac.estado === 'error_drive' ? '<span style="font-size:.6rem;padding:2px 7px;border-radius:4px;background:#FCEBEB;color:#A32D2D;">⚠ Sin Drive</span>' : '';
-    const notifFmt = ac.fechaNotificacion ? _fmtBadge(ac.fechaNotificacion) : '';
+    const fNotif = ac.fechaNotificacion || m.fechaNotificacion || '';
+    const notifFmt = fNotif ? _fmtBadge(fNotif) : '';
+    const fechaMal = ac.estado !== 'procesando' && (m.fechaRevisar || !ac.fechaAcuerdo || !_juFechaValida(ac.fechaAcuerdo, j));
+    const fechaChip = fechaMal ? '<span onclick="event.stopPropagation();_juEditarFechaAcuerdo(\'' + kEsc + '\')" title="La fecha no parece correcta — clic para cambiarla" style="cursor:pointer;font-size:.62rem;padding:2px 8px;border-radius:10px;background:#fdeccc;color:#8a4a00;font-weight:700;">📅 Revisa la fecha</span>' : '';
     const notifBadge = '<span id="notif-badge-' + ac.id + '" onclick="event.stopPropagation();_editarNotifAcuerdo(\'' + ac.id + '\')" title="' + (notifFmt ? 'Editar fecha de notificación' : 'Registrar fecha de notificación') + '" style="font-size:.6rem;padding:2px 8px;border-radius:4px;cursor:pointer;'
       + (notifFmt ? 'background:#ddeeff;color:#1a4a8a;font-weight:700;">🔔 Notificado ' + notifFmt : 'border:1px dashed #aac4e0;color:#4a7aaa;">+ Fecha de notificación') + '</span>';
     const subido = m.subidoPor ? 'Subido por ' + _juEsc(m.subidoPor) + (m.subidoFecha ? ' · ' + _juFechaLarga(m.subidoFecha) : '')
@@ -292,15 +311,15 @@ function renderAcuerdosDrive(lista) {
     card.style.cssText = 'display:flex;gap:12px;align-items:flex-start;border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;'
       + (pendiente ? 'background:#fff8e8;border:1.5px solid #e0a040;' : 'background:var(--surface);border:1px solid var(--border-l);');
     card.innerHTML =
-        '<div style="text-align:center;min-width:52px;border-right:1px solid var(--border-l);padding-right:10px;">'
-      +   '<div style="font-size:1.15rem;font-weight:700;color:var(--ink);line-height:1.1;">' + dia + '</div>'
-      +   '<div style="font-size:.62rem;color:var(--muted);">' + mesAnio + '</div></div>'
+        '<div onclick="event.stopPropagation();_juEditarFechaAcuerdo(\'' + kEsc + '\')" title="Fecha del acuerdo — clic para cambiarla" style="cursor:pointer;text-align:center;min-width:52px;border-right:1px solid var(--border-l);padding-right:10px;">'
+      +   '<div style="font-size:1.15rem;font-weight:700;color:' + (fechaMal ? '#a32d2d' : 'var(--ink)') + ';line-height:1.1;">' + dia + '</div>'
+      +   '<div style="font-size:.62rem;color:' + (fechaMal ? '#a32d2d' : 'var(--muted)') + ';">' + mesAnio + '</div></div>'
       + '<div style="flex:1;min-width:0;">'
       +   '<div style="font-size:.82rem;font-weight:700;color:var(--ink);line-height:1.35;">' + _juEsc(titulo) + '</div>'
       +   (resumen ? '<div style="font-size:.72rem;color:var(--muted);margin-top:3px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + _juEsc(resumen) + '</div>' : '')
       +   '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:6px;">'
       +     '<span style="font-size:.6rem;padding:2px 7px;border-radius:4px;background:' + tipo.bg + ';color:' + tipo.color + ';font-weight:600;">' + _juEsc(tipo.label) + '</span>'
-      +     chipAccion + estadoChip + notifBadge
+      +     chipAccion + fechaChip + estadoChip + notifBadge
       +   '</div>'
       +   (subido ? '<div style="font-size:.62rem;color:var(--muted);margin-top:5px;opacity:.85;">' + subido + '</div>' : '')
       + '</div>'
@@ -346,6 +365,11 @@ function _editarNotifAcuerdo(acuerdoId) {
     const val = inp.value;
     ac.fechaNotificacion = val || '';
     try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){}
+    try {
+      const jj = D.juicios[window._mexpIdxActual];
+      if (jj) { const mm = _juMeta(jj), kk = ac.driveFileId || ac.id; mm[kk] = mm[kk] || {}; mm[kk].fechaNotificacion = val || ''; jj.updatedAt = Date.now();
+        if (typeof saveJuicios === 'function') saveJuicios(); if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); }
+    } catch(e){}
     // Re-renderizar para reflejar el cambio
     renderAcuerdosDrive(lista);
   }
@@ -364,7 +388,7 @@ async function eliminarAcuerdoDrive(acuerdoId) {
   if (!ac) return;
   const ok = await confirmarBonito({
     titulo: 'Eliminar acuerdo',
-    mensaje: '¿Eliminar «' + (ac.nombre || ac.archivo || 'este acuerdo') + '»?\n\nSe borrará también el PDF en Drive. Esta acción no se puede deshacer.',
+    mensaje: '¿Eliminar «' + (ac.nombre || ac.archivo || 'este acuerdo') + '»?\n\nEl PDF se moverá a la papelera de Drive (se puede recuperar durante 30 días).',
     btnSi: 'Sí, eliminar',
     btnNo: 'Cancelar',
     peligro: true
@@ -374,29 +398,26 @@ async function eliminarAcuerdoDrive(acuerdoId) {
     try {
       const token = await driveGetAccessToken();
       if (token) {
-        await fetch('https://www.googleapis.com/drive/v3/files/' + ac.driveFileId, {
-          method: 'DELETE', headers: { Authorization: 'Bearer ' + token }
-        });
+        await _juDrivePatch(token, ac.driveFileId, { trashed: true });
       }
     } catch(e) { console.warn('[Acuerdos] No se pudo eliminar de Drive:', e); }
   }
   lista = lista.filter(a => a.id != acuerdoId);
   try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){}
+  // También se quita de la línea de tiempo interna y de sus marcas — antes
+  // quedaban "huérfanos" y la IA los seguía contando al detectar la etapa.
+  try {
+    const jj = D.juicios[window._mexpIdxActual != null ? window._mexpIdxActual : _mexpIdx];
+    if (jj && ac.driveFileId) {
+      if (Array.isArray(jj.historial)) jj.historial = jj.historial.filter(h => !(h && h.driveFileId === ac.driveFileId));
+      if (jj.acuerdosMeta) delete jj.acuerdosMeta[ac.driveFileId];
+      jj.updatedAt = Date.now();
+      if (typeof saveJuicios === 'function') saveJuicios();
+      if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
+    }
+  } catch(e){}
   renderAcuerdosDrive(lista);
   if (typeof toast === 'function') toast('🗑 Acuerdo eliminado', 'ok');
-}
-
-function _acuerdosAgruparDuplicados(lista) {
-  const grupos = {};
-  (lista || []).forEach(ac => {
-    if (!ac || ac.estado === 'procesando' || ac.estado === 'error') return;
-    const clave = ac.sha256 ? 'sha:' + ac.sha256 : ((ac.archivo || '').trim() ? 'nombre:' + ac.archivo.trim().toLowerCase() : '');
-    if (!clave) return;
-    (grupos[clave] = grupos[clave] || []).push(ac);
-  });
-  return Object.values(grupos)
-    .filter(g => g.length > 1)
-    .map(g => [...g].sort((a,b) => (b.fechaSubida||'').localeCompare(a.fechaSubida||'')));
 }
 
 async function subirAcuerdoDrive(input) {
@@ -449,21 +470,26 @@ async function subirAcuerdoDriveFiles(files) {
       // recién listados de Drive (no del caché local) pueden no tener
       // sha256 todavía, así que el hash solo no basta para detectarlos.
       let fileSha256 = '';
+      let fileMd5 = '';
       try {
         const arrBuf = await file.arrayBuffer();
         const hashBuf = await crypto.subtle.digest('SHA-256', arrBuf);
         fileSha256 = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
+        // Huella MD5 = la misma que Drive calcula de cada archivo. Solo se
+        // calcula si ya hay otro PDF del MISMO tamaño (si no, no puede ser copia).
+        if (lista.some(a => a.id !== tmpId && a.tam && a.tam === file.size)) { try { fileMd5 = _juMD5(arrBuf); } catch(eMd5){} }
         const nombreNorm = (file.name || '').trim().toLowerCase();
-        const yaExiste = lista.some(a =>
+        const existente = lista.find(a =>
           a.id !== tmpId && a.estado !== 'error' && (
+            (fileMd5 && a.md5 && a.md5 === fileMd5) ||
             (a.sha256 && a.sha256 === fileSha256) ||
             (nombreNorm && (a.archivo || '').trim().toLowerCase() === nombreNorm)
           )
         );
-        if (yaExiste) {
+        if (existente) {
           lista = lista.filter(a => a.id !== tmpId);
           renderAcuerdosDrive(lista);
-          if (typeof toast === 'function') toast('⚠ Este archivo ya existe en los acuerdos de este expediente', 'err');
+          if (typeof toast === 'function') toast('⚠ Este PDF ya está en el expediente: «' + (_juFechaLarga(existente.fechaAcuerdo) ? _juFechaLarga(existente.fechaAcuerdo) + ' · ' : '') + _juTituloAcuerdo(existente) + '». No se volvió a subir.', 'err');
           continue;
         }
       } catch(e) { console.warn('[Acuerdos] No se pudo calcular SHA-256:', e); }
@@ -487,9 +513,10 @@ async function subirAcuerdoDriveFiles(files) {
       let fechaIA = new Date().toISOString().slice(0,10);
       let resumenIA = '';
       let descripcionIA = '';
+      let fechaIALeida = '';   // la fecha que dijo la IA (vacía si no dijo ninguna)
 
       const _promptAcuerdo = `Eres un abogado litigante mexicano. Del siguiente texto de un acuerdo o documento judicial mexicano, extrae:
-(a) la fecha del acuerdo en formato DD-MM-AAAA,
+(a) la fecha en que se DICTÓ el acuerdo, en formato DD-MM-AAAA. Está al INICIO del documento ("EN [lugar], A [día] DE [mes] DE [año]" o "siendo las … horas del [día] de [mes] de [año]") y casi siempre viene escrita con letra: "DOCE DE JUNIO DE DOS MIL VEINTICINCO" = 12-06-2025. NO uses números de expediente, oficio, despacho o resolución (como "03/2026" o "10/2025") como si fueran fechas,
 (b) un nombre de archivo corto y descriptivo en MAYUSCULAS sin acentos ni caracteres especiales (max 40 chars),
 (c) una descripción clara en español de EXACTAMENTE 4 líneas (aprox. 4 frases breves) que resuman qué resuelve u ordena el documento, plazos relevantes y a quién afecta. Sé concreto y útil.
 (d) el tipo: uno de auto|sentencia|notificacion|acuerdo|requerimiento|otro.
@@ -506,8 +533,8 @@ Responde ÚNICAMENTE con un JSON válido, sin markdown ni texto extra:
         if (parsed.tipo && ACUERDO_TIPOS[parsed.tipo]) tipoIA = parsed.tipo;
         if (parsed.fecha) {
           if (/^\d{2}-\d{2}-\d{4}$/.test(parsed.fecha)) {
-            const [dd,mm,aaaa] = parsed.fecha.split('-'); fechaIA = aaaa+'-'+mm+'-'+dd;
-          } else if (/^\d{4}-\d{2}-\d{2}$/.test(parsed.fecha)) { fechaIA = parsed.fecha; }
+            const [dd,mm,aaaa] = parsed.fecha.split('-'); fechaIA = aaaa+'-'+mm+'-'+dd; fechaIALeida = fechaIA;
+          } else if (/^\d{4}-\d{2}-\d{2}$/.test(parsed.fecha)) { fechaIA = parsed.fecha; fechaIALeida = fechaIA; }
         }
       }
 
@@ -547,6 +574,14 @@ Responde ÚNICAMENTE con un JSON válido, sin markdown ni texto extra:
           console.warn('[Acuerdos] Sin texto OCR y sin Cloudflare Workers AI configurado — no se pudo analizar.');
         }
       }
+
+      // Fecha final del acuerdo (oct-2026): primero la que trae el TEXTO del
+      // documento (escrita con letra al inicio), luego la de la IA; ambas se
+      // validan contra el año del expediente y el día de hoy. Caso real: la
+      // IA leyó "DOCE DE JUNIO DE DOS MIL VEINTICINCO" como 12-06-2023.
+      const _resFecha = _juResolverFechaAcuerdo({ juicio: juicioActivoUpload, texto: textoOCR, fechaIA: fechaIALeida, nombreArchivo: file.name });
+      if (_resFecha.fuente === 'texto' && fechaIALeida && fechaIALeida !== _resFecha.iso) console.info('[Acuerdos] Fecha corregida con el texto del acuerdo:', fechaIALeida, '→', _resFecha.iso);
+      fechaIA = _resFecha.iso;
 
       // Nombre del archivo en Drive: DD-MM-AAAA NOMBRE.pdf; la tarjeta muestra solo NOMBRE
       const [_anioAc, _mesAc, _diaAc] = fechaIA.split('-');
@@ -594,10 +629,12 @@ Responde ÚNICAMENTE con un JSON válido, sin markdown ni texto extra:
 
       // 5) Actualizar lista: reemplazar placeholder
       const idx = lista.findIndex(a => a.id === tmpId);
-      const acFinal = { id: tmpId, archivo: file.name, nombre: nombreMostrar, nombreLargo: nombreIA, descripcion: descripcionIA, tipo: tipoIA, estado: driveFileId ? 'listo' : 'error_drive', fechaSubida: new Date().toISOString().slice(0,10), fechaAcuerdo: fechaIA, resumen: resumenIA, driveFileId, sha256: fileSha256 };
+      const acFinal = { md5: fileMd5 || '', tam: file.size, fechaRevisar: !!_resFecha.revisar, id: tmpId, archivo: file.name, nombre: nombreMostrar, nombreLargo: nombreIA, descripcion: descripcionIA, tipo: tipoIA, estado: driveFileId ? 'listo' : 'error_drive', fechaSubida: new Date().toISOString().slice(0,10), fechaAcuerdo: fechaIA, resumen: resumenIA, driveFileId, sha256: fileSha256 };
       if (idx >= 0) lista[idx] = acFinal; else lista.push(acFinal);
       // Quién lo subió (se guarda en el expediente para que lo vean todos).
       try { if (typeof _juRegistrarSubidoPor === 'function' && driveFileId) _juRegistrarSubidoPor(acFinal); } catch(eSP){}
+      // Sin una fecha confiable → queda marcada "⚠ Revisa la fecha" (para todos).
+      if (_resFecha.revisar && driveFileId && juicioActivoUpload) { try { const _mF = _juMeta(juicioActivoUpload); (_mF[driveFileId] = _mF[driveFileId] || {}).fechaRevisar = true; } catch(eFR){} }
 
       // 5) Agregar al historial cronológico automáticamente
       await agregarEntradaHistorialDesdeAcuerdo(jId, acFinal);
@@ -664,7 +701,9 @@ async function agregarEntradaHistorialDesdeAcuerdo(juicioId, ac) {
       const j = D.juicios[idxJuicio];
       if (!Array.isArray(j.historial)) j.historial = [];
       // Evitar duplicados por nombre del acuerdo
-      const yaTiene = j.historial.some(function(h){ return h.texto === ac.nombre; });
+      // Mismo archivo de Drive = misma entrada (antes se comparaba solo el
+      // nombre y se repetían entradas de un mismo acuerdo con otro nombre).
+      const yaTiene = j.historial.some(function(h){ return h && ((ac.driveFileId && h.driveFileId === ac.driveFileId) || (h.texto === ac.nombre && h.fecha === (ac.fechaAcuerdo || h.fecha))); });
       if (!yaTiene) {
         j.historial.push({
           id: 'HJ-ACU-' + Date.now(),
@@ -3122,6 +3161,562 @@ function _juRenderFichaSimple(idx){
     + '</div>';
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// FECHAS DE ACUERDOS — lectura determinista (oct-2026). Caso real: la IA
+// leyó "TRECE HORAS DEL DOCE DE JUNIO DE DOS MIL VEINTICINCO" como
+// 12-06-2023, y "despacho 03/2026" como 01-03-2026. Los acuerdos mexicanos
+// casi siempre traen su fecha escrita CON LETRA al inicio ("EN SANTIAGO
+// JUXTLAHUACA, OAXACA; A VEINTITRÉS DE JUNIO DE DOS MIL VEINTICINCO" o
+// "siendo las trece horas del doce de junio de dos mil veinticinco"), así
+// que primero se busca ahí con reglas fijas; la IA queda como respaldo y,
+// en cualquier caso, la fecha se valida contra el año del expediente y
+// contra el día de hoy (no puede ser futura ni años antes del juicio).
+// ══════════════════════════════════════════════════════════════════════
+var _JU_MESES_NOMBRE = { ENERO:1, FEBRERO:2, MARZO:3, ABRIL:4, MAYO:5, JUNIO:6, JULIO:7, AGOSTO:8, SEPTIEMBRE:9, SETIEMBRE:9, OCTUBRE:10, NOVIEMBRE:11, DICIEMBRE:12 };
+var _JU_MESES_CORTO = { ENE:1, FEB:2, MAR:3, ABR:4, MAY:5, JUN:6, JUL:7, AGO:8, SEP:9, SET:9, OCT:10, NOV:11, DIC:12 };
+var _JU_UNIDADES = { CERO:0, UN:1, UNO:1, PRIMERO:1, DOS:2, TRES:3, CUATRO:4, CINCO:5, SEIS:6, SIETE:7, OCHO:8, NUEVE:9,
+  DIEZ:10, ONCE:11, DOCE:12, TRECE:13, CATORCE:14, QUINCE:15, DIECISEIS:16, DIECISIETE:17, DIECIOCHO:18, DIECINUEVE:19,
+  VEINTE:20, VEINTIUN:21, VEINTIUNO:21, VEINTIDOS:22, VEINTITRES:23, VEINTICUATRO:24, VEINTICINCO:25, VEINTISEIS:26,
+  VEINTISIETE:27, VEINTIOCHO:28, VEINTINUEVE:29, TREINTA:30, CUARENTA:40, CINCUENTA:50, SESENTA:60, SETENTA:70, OCHENTA:80, NOVENTA:90 };
+
+function _juNormTexto(s){
+  return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toUpperCase().replace(/[“”"'`´]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// "VEINTITRES" → 23 · "TREINTA Y UNO" → 31 · "DIEZ Y SEIS" → 16 · "12" → 12
+function _juNumeroPalabras(palabras){
+  var w = (Array.isArray(palabras) ? palabras : String(palabras || '').trim().split(/\s+/)).filter(Boolean);
+  if (!w.length) return null;
+  if (w.length === 1 && /^\d{1,2}$/.test(w[0])) return parseInt(w[0], 10);
+  if (w.length === 1) return Object.prototype.hasOwnProperty.call(_JU_UNIDADES, w[0]) ? _JU_UNIDADES[w[0]] : null;
+  if (w.length === 3 && w[1] === 'Y') {
+    var a = _JU_UNIDADES[w[0]], b = _JU_UNIDADES[w[2]];
+    if (a != null && b != null && a >= 10 && a % 10 === 0 && b >= 1 && b <= 9) return a + b;
+  }
+  return null;
+}
+
+// "DOS MIL VEINTICINCO" → 2025 · "DOS MIL" → 2000 · "2025" → 2025
+function _juAnioPalabras(txt){
+  var t = String(txt || '').trim();
+  if (/^\d{4}$/.test(t)) return parseInt(t, 10);
+  var m = t.match(/^DOS MIL\b\s*(.*)$/);
+  if (!m) return null;
+  var resto = m[1].trim().split(/\s+/).filter(Boolean);
+  // Se toma el prefijo más largo que sea un número válido ("VEINTICINCO FECHA…" → 25)
+  for (var k = Math.min(3, resto.length); k >= 1; k--) {
+    var n = _juNumeroPalabras(resto.slice(0, k));
+    if (n != null && n >= 1 && n <= 99) return 2000 + n;
+  }
+  return 2000;
+}
+
+function _juIsoValido(a, m, d){
+  if (!(a >= 1900 && a <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31)) return '';
+  var f = new Date(Date.UTC(a, m - 1, d));
+  if (f.getUTCMonth() !== m - 1 || f.getUTCDate() !== d) return '';
+  return a + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+}
+
+var _JU_RE_FECHA_LETRA = null;
+function _juReFechaLetra(){
+  if (_JU_RE_FECHA_LETRA) return _JU_RE_FECHA_LETRA;
+  var dias = Object.keys(_JU_UNIDADES).filter(function(k){ var v = _JU_UNIDADES[k]; return v >= 1 && v <= 31; })
+    .sort(function(a, b){ return b.length - a.length; }).join('|');
+  var dia = '(\\d{1,2}|(?:DIEZ|VEINTE) Y (?:UNO|UN|DOS|TRES|CUATRO|CINCO|SEIS|SIETE|OCHO|NUEVE)|TREINTA Y UNO?|' + dias + ')';
+  var mes = '(' + Object.keys(_JU_MESES_NOMBRE).join('|') + ')';
+  var anio = '(\\d{4}|DOS MIL(?: (?:Y|[A-Z]+)){0,3}|LA PRESENTE ANUALIDAD|(?:ESTE|EL|DEL) (?:PRESENTE )?ANO(?: EN CURSO)?|PRESENTE ANO)';
+  // "doce de junio de dos mil veinticinco" · "a los treinta y un días del mes de enero de…"
+  _JU_RE_FECHA_LETRA = new RegExp('\\b' + dia + '\\s+(?:DIAS?\\s+DEL\\s+MES\\s+)?(?:DE\\s+)?' + mes + '\\s+(?:DE|DEL)\\s+(?:ANO\\s+)?' + anio, 'g');
+  return _JU_RE_FECHA_LETRA;
+}
+
+// Todas las fechas que aparecen en un texto (con letra o con número).
+function _juFechasEnTexto(texto){
+  var t = _juNormTexto(texto), out = [], m;
+  var re = _juReFechaLetra(); re.lastIndex = 0;
+  while ((m = re.exec(t))) {
+    var d = _juNumeroPalabras(m[1]), mes = _JU_MESES_NOMBRE[m[2]];
+    var relativo = /ANUALIDAD|ANO/.test(m[3]);
+    var a = relativo ? null : _juAnioPalabras(m[3]);
+    var iso = (a && d) ? _juIsoValido(a, mes, d) : '';
+    out.push({ iso: iso, relativo: relativo, mes: mes, dia: d, pos: m.index, txt: m[0] });
+  }
+  var reNum = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4}|\d{2})\b/g;
+  while ((m = reNum.exec(t))) {
+    var aa = parseInt(m[3], 10); if (m[3].length === 2) aa += 2000;
+    var iso2 = _juIsoValido(aa, parseInt(m[2], 10), parseInt(m[1], 10));
+    if (iso2) out.push({ iso: iso2, relativo: false, pos: m.index, txt: m[0], numerica: true });
+  }
+  return out.sort(function(x, y){ return x.pos - y.pos; }).map(function(f){ f.antes = t.slice(Math.max(0, f.pos - 60), f.pos); return f; });
+}
+
+function _juHoyISO(){
+  try { if (typeof fechaCDMX_ISO === 'function') return fechaCDMX_ISO(); } catch(e){}
+  return new Date().toISOString().slice(0, 10);
+}
+
+// Año del expediente ("10/2025" → 2025); null si no se puede saber.
+function _juAnioExpediente(j){
+  var s = String((j && (j.expediente || j.num)) || '');
+  var m = s.match(/(?:^|[^\d])((?:19|20)\d{2})(?!\d)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+// ¿Es creíble esta fecha para un acuerdo de este expediente?
+function _juFechaValida(iso, j){
+  var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m || !_juIsoValido(+m[1], +m[2], +m[3])) return false;
+  var hoy = _juHoyISO();
+  var manana = new Date(Date.parse(hoy + 'T12:00:00Z') + 2 * 86400000).toISOString().slice(0, 10);
+  if (iso > manana) return false;                       // no puede ser futura
+  var anioExp = _juAnioExpediente(j);
+  if (anioExp && +m[1] < anioExp - 1) return false;      // años antes de iniciar el juicio
+  if (+m[1] < 2000) return false;
+  return true;
+}
+
+// Fecha en que se DICTÓ el acuerdo, leída del texto. Devuelve
+// { iso, fuente } o null. Prioridad:
+//  1) Encabezado "…, A <fecha>" / "…HORAS DEL <fecha>" en el primer tramo.
+//  2) "auto de fecha <fecha>" del pie de firmas.
+//  3) Primera fecha completa del primer tramo.
+function _juFechaDesdeTexto(texto, j){
+  var fechas = _juFechasEnTexto(texto).filter(function(f){ return f.iso && _juFechaValida(f.iso, j); });
+  if (!fechas.length) return null;
+  var TRAMO = 1500;
+  var reEncabezado = /(?:[,;:.]\s*A(?:\s+LOS?)?|\bHORAS?\b[^.]{0,50}?\bDEL?(?:\s+DIA)?|\bA\s+LOS?)\s*$/;
+  var enc = fechas.filter(function(f){ return f.pos < TRAMO && !f.numerica && reEncabezado.test(f.antes); });
+  if (enc.length) return { iso: enc[0].iso, fuente: 'encabezado', txt: enc[0].txt };
+  var pie = fechas.filter(function(f){ return /(?:CORRESPONDIENTES?\s+AL?\s+(?:AUTO|ACUERDO|PROVEIDO|ACTA)\s+DE\s+FECHA|(?:AUTO|ACUERDO|PROVEIDO)\s+DE\s+FECHA)\s*$/.test(f.antes); });
+  if (pie.length) return { iso: pie[pie.length - 1].iso, fuente: 'pie', txt: pie[pie.length - 1].txt };
+  var ini = fechas.filter(function(f){ return f.pos < TRAMO; });
+  if (ini.length) return { iso: ini[0].iso, fuente: 'inicio', txt: ini[0].txt };
+  return null;
+}
+
+// Fecha escrita en el NOMBRE del archivo original ("D23-06-2025 …",
+// "Notificacion 22-09-25", "22 ENE 2026 …", "… 15 may 26"). Solo se usa
+// como último recurso: a veces es la fecha de NOTIFICACIÓN, no del acuerdo.
+function _juFechaDesdeNombre(nombre){
+  var t = _juNormTexto(String(nombre || '').replace(/\.pdf$/i, '')).replace(/_/g, ' ');
+  var m = t.match(/(?:^|[^\d])(\d{1,2})[\-\/.](\d{1,2})[\-\/.](\d{4}|\d{2})(?!\d)/);
+  if (m) { var a = +m[3]; if (m[3].length === 2) a += 2000; var iso = _juIsoValido(a, +m[2], +m[1]); if (iso) return iso; }
+  m = t.match(/(?:^|[^\d])(\d{1,2})[\s\-\/]+(ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|SET|OCT|NOV|DIC)[A-Z]*[\s\-\/]+(\d{4}|\d{2})(?!\d)/);
+  if (m) { var a2 = +m[3]; if (m[3].length === 2) a2 += 2000; var iso2 = _juIsoValido(a2, _JU_MESES_CORTO[m[2]], +m[1]); if (iso2) return iso2; }
+  return '';
+}
+
+// Decide la fecha final de un acuerdo combinando texto, IA y nombre.
+// Devuelve { iso, fuente, revisar } — revisar=true cuando ninguna fuente
+// dio una fecha creíble (se muestra "⚠ Revisa la fecha" en la tarjeta).
+function _juResolverFechaAcuerdo(opts){
+  var j = opts && opts.juicio;
+  var porTexto = opts && opts.texto ? _juFechaDesdeTexto(opts.texto, j) : null;
+  if (porTexto) return { iso: porTexto.iso, fuente: 'texto', revisar: false };
+  var ia = opts && opts.fechaIA;
+  if (ia && _juFechaValida(ia, j)) return { iso: ia, fuente: 'ia', revisar: false };
+  var porNombre = _juFechaDesdeNombre(opts && opts.nombreArchivo);
+  if (porNombre && _juFechaValida(porNombre, j)) return { iso: porNombre, fuente: 'nombre', revisar: true };
+  return { iso: (ia && /^\d{4}-\d{2}-\d{2}$/.test(ia)) ? ia : _juHoyISO(), fuente: 'ninguna', revisar: true };
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ACUERDOS REPETIDOS (oct-2026). Caso real: 17 archivos en Drive y solo 10
+// documentos distintos — el mismo PDF subido 2 o 3 veces con nombres
+// distintos (la IA le pone un nombre nuevo cada vez). El buscador anterior
+// comparaba SHA-256 (que no existe en los archivos listados desde Drive) o
+// el nombre del archivo, así que no encontraba nada. Ahora se usa la huella
+// MD5 que Drive calcula de cada archivo (md5Checksum): mismo contenido =
+// misma huella, sin importar el nombre.
+// ══════════════════════════════════════════════════════════════════════
+var _JU_MD5_K = (function(){ var k = []; for (var i = 0; i < 64; i++) k[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) >>> 0; return k; })();
+var _JU_MD5_S = [7,12,17,22,7,12,17,22,7,12,17,22,7,12,17,22,5,9,14,20,5,9,14,20,5,9,14,20,5,9,14,20,4,11,16,23,4,11,16,23,4,11,16,23,4,11,16,23,6,10,15,21,6,10,15,21,6,10,15,21,6,10,15,21];
+// MD5 del archivo (igual al md5Checksum de Drive) — para saber ANTES de
+// subirlo si ese PDF ya está en el expediente.
+function _juMD5(buffer){
+  var bytes = new Uint8Array(buffer), n = bytes.length;
+  var nBloques = ((n + 8) >>> 6) + 1, M = new Uint32Array(nBloques * 16), i;
+  for (i = 0; i < n; i++) M[i >>> 2] |= bytes[i] << ((i & 3) << 3);
+  M[n >>> 2] |= 0x80 << ((n & 3) << 3);
+  M[nBloques * 16 - 2] = (n * 8) >>> 0;
+  M[nBloques * 16 - 1] = Math.floor(n / 0x20000000) >>> 0;
+  var a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+  for (var blq = 0; blq < nBloques; blq++) {
+    var base = blq * 16, A = a0, B = b0, C = c0, Dd = d0, F, g;
+    for (i = 0; i < 64; i++) {
+      if (i < 16) { F = (B & C) | (~B & Dd); g = i; }
+      else if (i < 32) { F = (Dd & B) | (~Dd & C); g = (5 * i + 1) & 15; }
+      else if (i < 48) { F = B ^ C ^ Dd; g = (3 * i + 5) & 15; }
+      else { F = C ^ (B | ~Dd); g = (7 * i) & 15; }
+      F = ((F >>> 0) + A + _JU_MD5_K[i] + M[base + g]) >>> 0;
+      A = Dd; Dd = C; C = B;
+      B = (B + ((F << _JU_MD5_S[i]) | (F >>> (32 - _JU_MD5_S[i])))) >>> 0;
+    }
+    a0 = (a0 + A) >>> 0; b0 = (b0 + B) >>> 0; c0 = (c0 + C) >>> 0; d0 = (d0 + Dd) >>> 0;
+  }
+  return [a0, b0, c0, d0].map(function(w){
+    var s = ''; for (var k = 0; k < 4; k++) s += ((w >>> (k * 8)) & 255).toString(16).padStart(2, '0'); return s;
+  }).join('');
+}
+
+function _juCarpetaDriveNombre(j, jId){
+  return (j ? (j.nombre || j.cliente || 'Juicio') + ' - Exp.' + (j.expediente || j.num || jId) : 'Juicio-' + jId).replace(/[<>:"/\\|?*]/g, '_');
+}
+
+// Orden para decidir qué copia se CONSERVA: fecha creíble, marcas del
+// equipo (atendido / notificación), descripción, y la subida más reciente.
+function _acuerdosPuntajeConservar(ac, j){
+  var meta = (j && j.acuerdosMeta && j.acuerdosMeta[ac.driveFileId || ac.id]) || {};
+  var p = 0;
+  if (ac.fechaAcuerdo && _juFechaValida(ac.fechaAcuerdo, j)) p += 8;
+  if (meta.atendido) p += 2;
+  if (ac.fechaNotificacion || meta.fechaNotificacion) p += 2;
+  if (ac.descripcion || ac.resumen) p += 1;
+  return p;
+}
+
+function _acuerdosAgruparDuplicados(lista, j){
+  if (j === undefined) { try { j = D.juicios[typeof jdetIdx !== 'undefined' && jdetIdx >= 0 ? jdetIdx : _mexpIdx]; } catch(e){ j = null; } }
+  var grupos = {};
+  (lista || []).forEach(function(ac){
+    if (!ac || ac.estado === 'procesando' || ac.estado === 'error') return;
+    // 1º huella de Drive (md5) · 2º SHA-256 local · 3º nombre original (solo
+    // para registros viejos del caché que todavía no traen huella).
+    var clave = ac.md5 ? 'md5:' + ac.md5 : (ac.sha256 ? 'sha:' + ac.sha256 : ((ac.archivo || '').trim() ? 'nombre:' + ac.archivo.trim().toLowerCase() : ''));
+    if (!clave) return;
+    (grupos[clave] = grupos[clave] || []).push(ac);
+  });
+  return Object.keys(grupos).map(function(k){ return grupos[k]; })
+    .filter(function(g){ return g.length > 1; })
+    .map(function(g){
+      return g.slice().sort(function(a, b){
+        var d = _acuerdosPuntajeConservar(b, j) - _acuerdosPuntajeConservar(a, j);
+        if (d) return d;
+        return String(b.fechaSubida || '').localeCompare(String(a.fechaSubida || ''));
+      });
+    });
+}
+
+// Línea de tiempo interna (j.historial) a partir de los acuerdos que SÍ
+// existen en Drive: una entrada por archivo, con su fecha corregida. Se
+// conservan intactas las notas capturadas a mano (id "HJ-<número>") y las
+// entradas que no son de tipo acuerdo.
+function _juHistorialReconstruido(j, acuerdos){
+  var hist = Array.isArray(j && j.historial) ? j.historial : [];
+  var porId = {}; (acuerdos || []).forEach(function(a){ if (a && a.driveFileId) porId[a.driveFileId] = a; });
+  var vistos = {}, out = [];
+  hist.forEach(function(h){
+    if (!h) return;
+    var auto = /^HJ-(ACU|OCR|MIG)-/.test(String(h.id || ''));
+    if (h.tipo !== 'acuerdo' || !auto) {
+      if (h.driveFileId && porId[h.driveFileId]) vistos[h.driveFileId] = true;
+      out.push(h); return;
+    }
+    var id = h.driveFileId || '';
+    if (id && porId[id] && !vistos[id]) {
+      vistos[id] = true;
+      out.push(Object.assign({}, h, { fecha: porId[id].fechaAcuerdo || h.fecha }));
+    }
+    // Lo demás (copias repetidas, archivos que ya no existen en Drive y
+    // registros viejos sin archivo) se quita — queda en j.historialRespaldo.
+  });
+  (acuerdos || []).forEach(function(a, n){
+    if (!a || !a.driveFileId || vistos[a.driveFileId]) return;
+    vistos[a.driveFileId] = true;
+    out.push({ id: 'HJ-ACU-' + Date.now() + '-' + n, fecha: a.fechaAcuerdo || a.fechaSubida || '', tipo: 'acuerdo',
+      texto: a.nombre || a.archivo || 'Acuerdo', detalle: a.descripcion || a.resumen || '', driveFileId: a.driveFileId, r2path: '' });
+  });
+  return out.sort(function(x, y){ return String(x.fecha || '').localeCompare(String(y.fecha || '')); });
+}
+
+function _juNombreConFecha(archivo, iso){
+  var m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return archivo;
+  var resto = String(archivo || 'ACUERDO.pdf').replace(/^\d{2}-\d{2}-\d{4}\s+/, '').replace(/^\d{2}-[A-Z]{3}-\d{2}\s+/, '');
+  if (!/\.pdf$/i.test(resto)) resto += '.pdf';
+  return m[3] + '-' + m[2] + '-' + m[1] + ' ' + resto;
+}
+
+async function _juDrivePatch(token, fileId, cuerpo){
+  var r = await fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,name,trashed', {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo)
+  });
+  if (!r.ok) { var t = ''; try { t = await r.text(); } catch(e){} throw new Error('Drive HTTP ' + r.status + ' ' + t.slice(0, 80)); }
+  return r.json();
+}
+
+// Ventana de confirmación con el detalle de TODO lo que se va a cambiar.
+function _juDialogoReparacion(plan){
+  return new Promise(function(resolve){
+    var esc = _juEsc;
+    var linea = function(ac){ return '<b>' + esc(_juFechaLarga(ac.fechaAcuerdo) || 'sin fecha') + '</b> · ' + esc(_juTituloAcuerdo(ac)); };
+    var h = '';
+    if (plan.grupos.length) {
+      h += '<div style="font-size:.8rem;font-weight:700;color:var(--ink);margin:4px 0 4px;">1. Copias repetidas · ' + plan.quitar.length + ' archivo(s) sobran</div>'
+        + '<div style="font-size:.7rem;color:var(--muted);margin-bottom:8px;line-height:1.5;">Es el mismo PDF subido más de una vez. Se conserva una copia y las demás se mandan a la <b>papelera de Drive</b> (se pueden recuperar durante 30 días).</div>';
+      plan.grupos.forEach(function(g){
+        h += '<div style="border:1px solid var(--border-l);border-radius:8px;padding:8px 10px;margin-bottom:6px;background:var(--surface);font-size:.72rem;line-height:1.55;">'
+          + '<div style="color:var(--verde-d);">✓ Se conserva: ' + linea(g[0]) + '</div>'
+          + g.slice(1).map(function(x){ return '<div style="color:#a32d2d;">🗑 A la papelera: ' + linea(x) + (x.fechaSubida ? ' <span style="color:var(--muted);">(subido el ' + esc(_juFechaLarga(x.fechaSubida)) + ')</span>' : '') + '</div>'; }).join('')
+          + '</div>';
+      });
+    }
+    if (plan.cambiosFecha.length) {
+      h += '<div style="font-size:.8rem;font-weight:700;color:var(--ink);margin:12px 0 4px;">' + (plan.grupos.length ? '2' : '1') + '. Fechas corregidas · ' + plan.cambiosFecha.length + '</div>'
+        + '<div style="font-size:.7rem;color:var(--muted);margin-bottom:8px;">Leídas del propio texto del acuerdo. También se corrige el nombre del archivo en Drive.</div>';
+      plan.cambiosFecha.forEach(function(c){
+        h += '<div style="border:1px solid var(--border-l);border-radius:8px;padding:8px 10px;margin-bottom:6px;background:var(--surface);font-size:.72rem;line-height:1.55;">'
+          + '<div><span style="text-decoration:line-through;color:#a32d2d;">' + esc(_juFechaLarga(c.de) || 'sin fecha') + '</span> → <b style="color:var(--verde-d);">' + esc(_juFechaLarga(c.a)) + '</b> · ' + esc(_juTituloAcuerdo(c.ac)) + '</div>'
+          + (c.txt ? '<div style="color:var(--muted);font-style:italic;">El documento dice: «…' + esc(c.txt.toLowerCase()) + '…»</div>' : '')
+          + '</div>';
+      });
+    }
+    if (plan.revisar.length) {
+      h += '<div style="font-size:.8rem;font-weight:700;color:var(--ink);margin:12px 0 4px;">⚠ Fechas que debes revisar a mano · ' + plan.revisar.length + '</div>'
+        + '<div style="font-size:.7rem;color:var(--muted);margin-bottom:6px;">No hay texto guardado para confirmarlas. Quedarán marcadas; da clic en la fecha de la tarjeta para cambiarla.</div>'
+        + plan.revisar.map(function(ac){ return '<div style="font-size:.72rem;padding:2px 0;">• ' + linea(ac) + '</div>'; }).join('');
+    }
+    if (plan.histAntes !== plan.histDespues) {
+      h += '<div style="font-size:.7rem;color:var(--muted);margin-top:12px;border-top:1px dashed var(--border-l);padding-top:8px;">Línea de tiempo interna (la que usa la IA para detectar la etapa): ' + plan.histAntes + ' → ' + plan.histDespues + ' registros, sin repetidos. Se guarda un respaldo de la anterior.</div>';
+    }
+    var ov = document.createElement('div');
+    ov.id = 'ju-reparar-ov';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(12,9,5,.72);z-index:99990;display:flex;align-items:center;justify-content:center;padding:18px;';
+    ov.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--border-l);border-radius:12px;width:640px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;box-shadow:var(--shadow-lg);overflow:hidden;">'
+      + '<div style="padding:14px 18px;border-bottom:1px solid var(--border-l);background:var(--gold-bg);"><div style="font-size:.95rem;font-weight:700;color:var(--ink);">🛠 Revisar y reparar acuerdos</div>'
+      + '<div style="font-size:.7rem;color:var(--muted);margin-top:2px;">' + esc(plan.titulo) + ' · ' + plan.total + ' archivo(s) en Drive → quedarán ' + plan.quedan + '</div></div>'
+      + '<div style="padding:12px 18px;overflow-y:auto;flex:1;">' + h + '</div>'
+      + '<div style="padding:12px 18px;border-top:1px solid var(--border-l);display:flex;gap:8px;justify-content:flex-end;background:var(--surface);">'
+      + '<button type="button" data-r="0" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);font-size:.78rem;cursor:pointer;">Cancelar</button>'
+      + '<button type="button" data-r="1" style="padding:8px 16px;border-radius:8px;border:none;background:var(--verde-d,#1a7a3a);color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;">✓ Aplicar cambios</button>'
+      + '</div></div>';
+    var fin = function(v){ try { ov.remove(); } catch(e){} resolve(v); };
+    ov.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('button[data-r]'); if (b) fin(b.getAttribute('data-r') === '1'); else if (e.target === ov) fin(false); });
+    document.body.appendChild(ov);
+  });
+}
+
+// 🛠 Revisa TODO el expediente de una vez: copias repetidas, fechas mal
+// leídas y la línea de tiempo interna. Muestra el detalle y solo aplica si
+// el usuario confirma. Reemplaza al antiguo "🧹 Acuerdos duplicados".
+async function _juRevisarAcuerdos(){
+  var jId = window._jdetId;
+  var idx = (typeof jdetIdx !== 'undefined' && jdetIdx >= 0) ? jdetIdx : _mexpIdx;
+  var j = D.juicios && D.juicios[idx];
+  if (!jId || !j) { if (typeof toast === 'function') toast('⚠ Abre un expediente primero', 'err'); return; }
+  var token = null;
+  try { token = await driveGetAccessToken(); } catch(e){}
+  if (!token) { if (typeof toast === 'function') toast('⚠ Conecta Google Drive (Panel Admin) para revisar los acuerdos', 'err'); return; }
+  if (typeof toast === 'function') toast('🔍 Revisando acuerdos en Drive…', 'ok');
+  var lista = await _acuerdosListarDriveFresco(jId, _juCarpetaDriveNombre(j, jId));
+  if (!lista.some(function(a){ return a && a.md5; })) { if (typeof toast === 'function') toast('⚠ No se pudo leer la carpeta de acuerdos en Drive', 'err'); return; }
+
+  // 1) Copias repetidas
+  var grupos = _acuerdosAgruparDuplicados(lista, j);
+  var quitar = [], grupoDe = {};
+  grupos.forEach(function(g){ g.forEach(function(x){ grupoDe[x.driveFileId] = g; }); g.slice(1).forEach(function(x){ quitar.push(x); }); });
+  var idsQuitar = {}; quitar.forEach(function(x){ idsQuitar[x.driveFileId] = true; });
+  var quedan = lista.filter(function(a){ return !idsQuitar[a.driveFileId]; });
+
+  // 2) Fechas: se leen del texto guardado (R2) de cada acuerdo — o de
+  // cualquiera de sus copias, que es el mismo documento.
+  var cambiosFecha = [], revisar = [];
+  for (var i = 0; i < quedan.length; i++) {
+    var ac = quedan[i];
+    if (i % 3 === 0 && typeof toast === 'function') toast('📖 Leyendo fechas ' + (i + 1) + ' de ' + quedan.length + '…', 'ok');
+    var copias = grupoDe[ac.driveFileId] || [ac], texto = '';
+    for (var c = 0; c < copias.length && !texto; c++) {
+      try { var r2 = await _r2CargarResumen(copias[c].driveFileId); texto = (r2 && r2.ocrTexto) || ''; } catch(e){}
+    }
+    var porTexto = texto ? _juFechaDesdeTexto(texto, j) : null;
+    if (porTexto && porTexto.iso !== ac.fechaAcuerdo) cambiosFecha.push({ ac: ac, de: ac.fechaAcuerdo || '', a: porTexto.iso, txt: porTexto.txt || '' });
+    else if (!porTexto && !_juFechaValida(ac.fechaAcuerdo, j)) revisar.push(ac);
+  }
+
+  // 3) Línea de tiempo interna con las fechas ya corregidas
+  var nuevaFecha = {}; cambiosFecha.forEach(function(x){ nuevaFecha[x.ac.driveFileId] = x.a; });
+  var quedanCorr = quedan.map(function(a){ return nuevaFecha[a.driveFileId] ? Object.assign({}, a, { fechaAcuerdo: nuevaFecha[a.driveFileId] }) : a; });
+  var histAntes = (j.historial || []).length;
+  var histNuevo = _juHistorialReconstruido(j, quedanCorr);
+
+  if (!quitar.length && !cambiosFecha.length && !revisar.length && histAntes === histNuevo.length) {
+    if (typeof toast === 'function') toast('✓ Todo en orden: sin copias repetidas y con fechas correctas', 'ok');
+    return;
+  }
+  var ok = await _juDialogoReparacion({
+    titulo: (j.cliente || j.nombre || '') + (j.expediente ? ' · Exp. ' + j.expediente : ''),
+    total: lista.length, quedan: quedan.length, grupos: grupos, quitar: quitar,
+    cambiosFecha: cambiosFecha, revisar: revisar, histAntes: histAntes, histDespues: histNuevo.length
+  });
+  if (!ok) return;
+
+  // 4) Aplicar
+  var meta = _juMeta(j), errores = [], nPapelera = 0, nFechas = 0;
+  for (var q = 0; q < quitar.length; q++) {
+    var sobra = quitar[q], conserva = (grupoDe[sobra.driveFileId] || [])[0];
+    try { await _juDrivePatch(token, sobra.driveFileId, { trashed: true }); nPapelera++; }
+    catch(e){ errores.push('Papelera ' + (sobra.archivo || sobra.driveFileId) + ': ' + e.message); idsQuitar[sobra.driveFileId] = false; continue; }
+    // Lo que el equipo ya había marcado en la copia que se quita pasa a la que se queda.
+    var mq = meta[sobra.driveFileId];
+    if (mq && conserva) {
+      var mc = meta[conserva.driveFileId] = meta[conserva.driveFileId] || {};
+      ['atendido', 'subidoPor', 'subidoFecha', 'fechaNotificacion'].forEach(function(campo){ if (mq[campo] && !mc[campo]) mc[campo] = mq[campo]; });
+    }
+    if (sobra.fechaNotificacion && conserva && !conserva.fechaNotificacion) conserva.fechaNotificacion = sobra.fechaNotificacion;
+    delete meta[sobra.driveFileId];
+  }
+  for (var f = 0; f < cambiosFecha.length; f++) {
+    var cf = cambiosFecha[f], nombreNuevo = _juNombreConFecha(cf.ac.archivo, cf.a);
+    try {
+      if (nombreNuevo !== cf.ac.archivo) await _juDrivePatch(token, cf.ac.driveFileId, { name: nombreNuevo });
+      cf.ac.archivo = nombreNuevo; cf.ac.fechaAcuerdo = cf.a; nFechas++;
+      if (meta[cf.ac.driveFileId]) delete meta[cf.ac.driveFileId].fechaRevisar;
+    } catch(e){ errores.push('Fecha ' + (cf.ac.archivo || '') + ': ' + e.message); }
+  }
+  revisar.forEach(function(ac){ (meta[ac.driveFileId] = meta[ac.driveFileId] || {}).fechaRevisar = true; });
+
+  var listaFinal = lista.filter(function(a){ return !idsQuitar[a.driveFileId]; });
+  var resp = Array.isArray(j.historialRespaldos) ? j.historialRespaldos : [];
+  resp.unshift({ fecha: new Date().toISOString(), entradas: (j.historial || []).slice() });
+  j.historialRespaldos = resp.slice(0, 3);
+  j.historial = _juHistorialReconstruido(j, listaFinal);
+  j.updatedAt = Date.now();
+  try { localStorage.setItem('lex_acuerdos_' + jId, JSON.stringify(listaFinal)); } catch(e){}
+  try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){}
+  try { if (typeof syncEstadoSupabase === 'function') await syncEstadoSupabase(); else if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){ console.warn('[Acuerdos] sync reparación:', e); }
+  renderAcuerdosDrive(listaFinal);
+  try { if (typeof renderHistorialModal === 'function') renderHistorialModal(); } catch(e){}
+  try { if (typeof renderJuicios === 'function') renderJuicios(); } catch(e){}
+  if (typeof toast === 'function') toast('✓ Listo: ' + nPapelera + ' copia(s) a la papelera · ' + nFechas + ' fecha(s) corregida(s)' + (errores.length ? ' · ⚠ ' + errores.length + ' aviso(s)' : ''), errores.length ? 'err' : 'ok');
+  if (errores.length) console.warn('[Acuerdos] reparación con avisos:', errores);
+}
+
+// Cambiar a mano la fecha de un acuerdo (clic en la fecha de la tarjeta).
+// Corrige también el nombre del archivo en Drive y la línea de tiempo.
+function _juEditarFechaAcuerdo(k){
+  var ac = (window._juAcuerdosLista || []).find(function(a){ return _juClaveAcuerdo(a) === k; });
+  if (!ac) return;
+  var prev = document.getElementById('ju-fecha-ov'); if (prev) prev.remove();
+  var ov = document.createElement('div');
+  ov.id = 'ju-fecha-ov';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(12,9,5,.6);z-index:99990;display:flex;align-items:center;justify-content:center;padding:18px;';
+  ov.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--border-l);border-radius:12px;width:380px;max-width:100%;padding:16px 18px;box-shadow:var(--shadow-lg);">'
+    + '<div style="font-size:.9rem;font-weight:700;color:var(--ink);">📅 Fecha del acuerdo</div>'
+    + '<div style="font-size:.72rem;color:var(--muted);margin:3px 0 10px;line-height:1.45;">' + _juEsc(_juTituloAcuerdo(ac)) + '<br>Pon la fecha en que se <b>dictó</b> el acuerdo (la que aparece al inicio del documento).</div>'
+    + '<input type="date" id="ju-fecha-inp" value="' + _juEsc(ac.fechaAcuerdo || '') + '" style="width:100%;padding:8px 10px;border:1px solid var(--border-l);border-radius:8px;font-size:.85rem;background:var(--surface);color:var(--ink);">'
+    + '<div id="ju-fecha-err" style="font-size:.68rem;color:#a32d2d;min-height:16px;margin-top:4px;"></div>'
+    + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">'
+    + '<button type="button" data-r="0" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);font-size:.76rem;cursor:pointer;">Cancelar</button>'
+    + '<button type="button" data-r="1" style="padding:7px 14px;border-radius:8px;border:none;background:var(--gold-d);color:#fff;font-size:.76rem;font-weight:700;cursor:pointer;">Guardar</button></div></div>';
+  document.body.appendChild(ov);
+  var cerrarOv = function(){ try { ov.remove(); } catch(e){} };
+  ov.addEventListener('click', async function(e){
+    var b = e.target.closest && e.target.closest('button[data-r]');
+    if (!b) { if (e.target === ov) cerrarOv(); return; }
+    if (b.getAttribute('data-r') !== '1') { cerrarOv(); return; }
+    var iso = document.getElementById('ju-fecha-inp').value;
+    var j = D.juicios[window._mexpIdxActual];
+    if (!_juFechaValida(iso, j)) { document.getElementById('ju-fecha-err').textContent = 'Esa fecha no es posible para este expediente (futura o anterior al juicio).'; return; }
+    b.disabled = true; b.textContent = 'Guardando…';
+    try { await _juAplicarFechaAcuerdo(ac, iso); cerrarOv(); }
+    catch(err){ b.disabled = false; b.textContent = 'Guardar'; document.getElementById('ju-fecha-err').textContent = 'No se pudo guardar: ' + err.message; }
+  });
+  setTimeout(function(){ var i = document.getElementById('ju-fecha-inp'); if (i) i.focus(); }, 50);
+}
+
+async function _juAplicarFechaAcuerdo(ac, iso){
+  var jId = window._jdetId, j = D.juicios[window._mexpIdxActual];
+  if (ac.driveFileId) {
+    var token = await driveGetAccessToken();
+    if (!token) throw new Error('sin conexión con Drive');
+    // El nombre actual se toma de Drive (en el caché local, un acuerdo recién
+    // subido guarda el nombre ORIGINAL del PDF, no el "DD-MM-AAAA NOMBRE.pdf").
+    var nombreActual = ac.archivo;
+    try {
+      var rN = await fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(ac.driveFileId) + '?fields=name', { headers: { Authorization: 'Bearer ' + token } });
+      if (rN.ok) { var dN = await rN.json(); if (dN && dN.name) nombreActual = dN.name; }
+    } catch(e){}
+    var nombreNuevo = _juNombreConFecha(nombreActual, iso);
+    if (nombreNuevo !== nombreActual) await _juDrivePatch(token, ac.driveFileId, { name: nombreNuevo });
+    ac.archivo = nombreNuevo;
+  }
+  ac.fechaAcuerdo = iso; ac.fechaRevisar = false;
+  var lista = [];
+  try { lista = JSON.parse(localStorage.getItem('lex_acuerdos_' + jId) || '[]'); } catch(e){}
+  var k = _juClaveAcuerdo(ac);
+  lista.forEach(function(a){ if (_juClaveAcuerdo(a) === k) { a.fechaAcuerdo = iso; a.archivo = ac.archivo; a.fechaRevisar = false; } });
+  try { localStorage.setItem('lex_acuerdos_' + jId, JSON.stringify(lista)); } catch(e){}
+  if (j) {
+    var m = _juMeta(j); if (m[k]) delete m[k].fechaRevisar;
+    (j.historial || []).forEach(function(h){ if (h && ac.driveFileId && h.driveFileId === ac.driveFileId) h.fecha = iso; });
+    j.updatedAt = Date.now();
+    try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){}
+    try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){}
+  }
+  renderAcuerdosDrive(lista.length ? lista : window._juAcuerdosLista);
+  if (typeof toast === 'function') toast('📅 Fecha actualizada: ' + _juFechaLarga(iso), 'ok');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// FLUJO COMPLETO (oct-2026). Caso real: el flujo de un divorcio incausado
+// se guardó con solo 5 etapas ("1. Presentación de la demanda…" a "5.
+// Admisión de la demanda") — la respuesta de la IA se cortó (o, con Groq,
+// solo vio las primeras páginas del capítulo) y como eran 5 no saltó el
+// aviso de "< 5 etapas". Con eso la "etapa actual" nunca podía ser la real
+// (el juicio ya iba en pruebas, guarda y custodia y amparo). Ahora se
+// comprueba que el flujo llegue a la sentencia y, si no, se pide a la IA
+// SOLO lo que falta y se une.
+// ══════════════════════════════════════════════════════════════════════
+function _flujoEstaCompleto(etapas){
+  if (!Array.isArray(etapas) || etapas.length < 6) return false;
+  var mitad = etapas.slice(Math.floor(etapas.length / 2));
+  var txt = mitad.map(function(e){ return _juNormTexto((e && e.etapa || '') + ' ' + (e && e.descripcion || '')); }).join(' ');
+  return /SENTENCIA|RESOLUCION DEFINITIVA|FALLO|EJECUCION|EJECUTORIA|APELACION|RECURSO/.test(txt);
+}
+function _flujoNormEtapa(s){ return _juNormTexto(String(s || '').replace(/^\s*\d+\s*[\.\)\-:]\s*/, '')); }
+function _flujoUnirEtapas(base, nuevas){
+  var vistos = {}; (base || []).forEach(function(e){ vistos[_flujoNormEtapa(e && e.etapa)] = true; });
+  return (base || []).concat((nuevas || []).filter(function(e){
+    if (!e || !e.etapa) return false;
+    var k = _flujoNormEtapa(e.etapa); if (vistos[k]) return false; vistos[k] = true; return true;
+  }));
+}
+function _flujoRenumerar(etapas){
+  return (etapas || []).filter(function(e){ return e && e.etapa; }).map(function(e, i){
+    return Object.assign({}, e, { etapa: (i + 1) + '. ' + String(e.etapa).replace(/^\s*\d+\s*[\.\)\-:]\s*/, '').trim() });
+  });
+}
+// Ventana del texto de la ley a partir del último artículo ya citado (para
+// que Groq, que solo admite un extracto chico, lea la parte que falta).
+function _flujoVentanaLey(texto, etapas, n){
+  var maxArt = 0;
+  (etapas || []).forEach(function(e){ String(e && e.articulos || '').replace(/\d{1,4}/g, function(m){ var v = parseInt(m, 10); if (v > maxArt && v < 3000) maxArt = v; return m; }); });
+  var ini = 0;
+  if (maxArt) { var m = new RegExp('ART[IÍ]CULO\\s+' + maxArt + '\\b', 'i').exec(texto || ''); if (m) ini = Math.max(0, m.index - 200); }
+  return String(texto || '').slice(ini, ini + n);
+}
+async function _flujoCompletarEtapas(etapas, o){
+  var lista = etapas.map(function(e, i){ return (i + 1) + '. ' + String(e.etapa || '').replace(/^\s*\d+\s*[\.\)\-:]\s*/, ''); }).join('\n');
+  var ultima = etapas.length ? String(etapas[etapas.length - 1].etapa || '') : '';
+  var formato = '[{"etapa":"Nombre de la etapa","descripcion":"Qué ocurre","articulos":"Artículo(s)","plazo":"Plazo o \'no especificado en la ley\'","documentos":"Documentos","recursos":"Recursos","riesgo":"Consecuencia de no atenderlo"}]';
+  var instr = 'Ya se generaron estas etapas del procedimiento "' + o.tipoJuicio + '" (' + o.leyNombre + '):\n' + lista
+    + '\n\nEl flujo está INCOMPLETO. Genera SOLO las etapas que FALTAN después de «' + ultima + '», en orden cronológico, hasta concluir el juicio: '
+    + 'audiencias, pruebas, alegatos, sentencia o resolución definitiva, recursos (apelación, amparo) y ejecución o cumplimiento. '
+    + 'Si en este tipo de juicio el procedimiento continúa después de la resolución principal (por ejemplo, en divorcio incausado: la controversia o el incidente sobre los puntos del convenio que no se aceptaron — alimentos, guarda y custodia, convivencias, bienes), inclúyelo como etapas propias. '
+    + 'No repitas las etapas ya listadas. Máximo 2 frases cortas por campo.\n'
+    + 'Responde ÚNICAMENTE con un array JSON válido, sin markdown ni backticks. Formato:\n' + formato;
+  var conTexto = function(t){ return 'Texto de la ley "' + o.leyNombre + '":\n"""\n' + t + '\n"""\nBásate EXCLUSIVAMENTE en ese texto; si un dato no aparece, escribe "no especificado en la ley".\n\n' + instr; };
+  var txt = null;
+  if (o.leyTexto && o.geminiOk) { try { txt = await _geminiGenerarTexto(conTexto(o.leyTexto), 12000, 0.1); } catch(e){ txt = null; } }
+  if (!txt && o.leyTexto && o.cfOk) { try { txt = await _cfaiLlamarContextoLargo(conTexto(o.leyTexto), 6000, 0.1, 'procesal'); } catch(e){ txt = null; } }
+  if (!txt && o.leyTexto) { try { txt = await _iaLlamar(conTexto(_flujoVentanaLey(o.leyTexto, etapas, 4500)), 6000, 0.1, 'procesal'); } catch(e){ txt = null; } }
+  if (!txt) txt = await _iaLlamar('Eres un abogado litigante mexicano experto. No tienes el texto de la ley a la vista: cita un artículo solo si estás seguro y, si dudas de un plazo, escribe "verificar en la ley".\n\n' + instr, 6000, 0.1, 'procesal');
+  var nuevas = _flujoRepararYParsear(txt);
+  return Array.isArray(nuevas) ? nuevas : [];
+}
+
 function _juRenderNotas(idx){
   const cont = document.getElementById('mexp-notas-lista');
   if(!cont) return;
@@ -3975,7 +4570,8 @@ REGLAS ESTRICTAS:
 - NO uses conocimiento externo ni de memoria. Cada plazo, artículo y regla debe provenir del texto de arriba.
 - Copia los PLAZOS y NÚMEROS DE ARTÍCULO tal como aparecen en el documento. Si un dato no aparece en el texto, escribe "no especificado en la ley"; NUNCA lo inventes.
 - En "articulos" cita el/los artículo(s) exactos del documento que fundamentan cada etapa.
-- SÉ LO MÁS GRANULAR POSIBLE: cada acto procesal distinto (cada auto, resolución, notificación, requerimiento, prevención, vista a una autoridad, plazo o trámite regulado por su propio artículo) debe ser SU PROPIA etapa, en vez de agrupar varios actos procesales distintos bajo un título genérico. Por ejemplo, "Notificación y emplazamiento" casi siempre son DOS actos con artículos y plazos distintos — sepáralos; igual "Audiencia preliminar" puede incluir varias actuaciones (conciliación, depuración procesal, fijación de la litis) que la ley regule por separado. Si el capítulo contempla 12, 15 o más actos procesales distintos, genera 12, 15 o más etapas — no lo resumas a un puñado de fases genéricas.
+- El flujo DEBE estar COMPLETO: desde la presentación de la demanda hasta la sentencia o resolución definitiva, los recursos (apelación, amparo) y la ejecución o cumplimiento. Si en este tipo de juicio el procedimiento continúa después de la resolución principal (por ejemplo, en divorcio incausado: la controversia o el incidente sobre los puntos del convenio que no se aceptaron — alimentos, guarda y custodia, convivencias, bienes), inclúyelo como etapas propias. Escribe cada campo en máximo 2 frases cortas para que la respuesta completa quepa; máximo 22 etapas.
+- SÉ GRANULAR: cada acto procesal distinto (cada auto, resolución, notificación, requerimiento, prevención, vista a una autoridad, plazo o trámite regulado por su propio artículo) debe ser SU PROPIA etapa, en vez de agrupar varios actos procesales distintos bajo un título genérico. Por ejemplo, "Notificación y emplazamiento" casi siempre son DOS actos con artículos y plazos distintos — sepáralos; igual "Audiencia preliminar" puede incluir varias actuaciones (conciliación, depuración procesal, fijación de la litis) que la ley regule por separado. Si el capítulo contempla 12, 15 o más actos procesales distintos, genera 12, 15 o más etapas — no lo resumas a un puñado de fases genéricas.
 
 Responde ÚNICAMENTE con un array JSON válido, sin markdown ni backticks. Formato:
 ${_formato}
@@ -4067,6 +4663,17 @@ ${_formato}`;
     let etapas;
     try {
       etapas = _flujoRepararYParsear(txt);
+      // ¿Llega hasta la sentencia? Si se cortó, se pide SOLO lo que falta.
+      for (let _intento = 0; _intento < 2 && Array.isArray(etapas) && etapas.length && !_flujoEstaCompleto(etapas); _intento++) {
+        _setLoad('El flujo quedó corto (termina en «' + escHTML(String(etapas[etapas.length - 1].etapa || '')) + '»); completando las etapas finales…');
+        try {
+          const _faltan = await _flujoCompletarEtapas(etapas, { leyNombre: ley.nombre, tipoJuicio, leyTexto, geminiOk: _geminiDisponible, cfOk: _usarContextoLargo });
+          const _antes = etapas.length;
+          etapas = _flujoUnirEtapas(etapas, _faltan);
+          if (etapas.length === _antes) break;
+        } catch (eComp) { console.warn('[Flujo] No se pudo completar el flujo:', eComp.message); break; }
+      }
+      if (Array.isArray(etapas)) etapas = _flujoRenumerar(etapas);
     } catch (eParse) {
       registrarError('Flujo · leer respuesta de la IA', eParse, { muestra: String(txt==null?'':txt).slice(0, 400) });
       throw new Error('La IA no devolvió un JSON válido. Intenta de nuevo.');
@@ -4109,7 +4716,9 @@ ${_formato}`;
     window._flujoTipoJuicioActual = tipoJuicio;
     _flujoRender(etapas, ley.nombre);
     if (typeof toast === 'function') {
-      if (leyTexto && etapas.length < 5) {
+      if (!_flujoEstaCompleto(etapas)) {
+        toast('⚠ El flujo podría estar incompleto: termina en «' + String(etapas[etapas.length - 1].etapa || '') + '» y no llega a la sentencia. Intenta «Generar Flujo» de nuevo.', 'err');
+      } else if (leyTexto && etapas.length < 5) {
         // Un procedimiento civil típico rara vez tiene menos de 5 etapas —
         // si salieron menos, lo más probable es que la respuesta de la IA se
         // haya cortado a la mitad (ver _flujoRepararYParsear). Avisar en vez
@@ -4149,6 +4758,7 @@ function _flujoRender(etapas, leyNombre) {
       : '');
 
   lista.innerHTML =
+    ((Array.isArray(etapas) && etapas.length && !_flujoEstaCompleto(etapas)) ? `<div style="font-size:0.66rem;color:#7a4a00;background:#fff8e8;border:1.5px solid #e0a040;border-radius:8px;padding:8px 10px;margin:4px 0 8px;line-height:1.5;">⚠ Este flujo está <b>incompleto</b>: termina en «${escHTML(String(etapas[etapas.length - 1].etapa || ''))}» y no llega a la sentencia, por eso la etapa actual no puede ser la correcta. ${(typeof esAdministrador === 'function' && esAdministrador()) ? 'Pulsa <b>⚙ Generar Flujo</b> para regenerarlo completo.' : 'Pide al administrador que lo regenere (⚙ Generar Flujo).'}</div>` : '') +
     (leyNombre ? `<div style="font-size:0.58rem;color:var(--muted);padding:4px 0 4px;font-style:italic;">Ley base: ${escHTML(leyNombre)}${(j && j.flujoGrounded) ? ' · <span style="font-style:normal;color:var(--verde);font-weight:600;">📚 leído del texto de la ley</span>' : ''}</div>` : '') +
     `<div style="padding:2px 0 8px;">${detectarBtn}</div>` +
     razon +
@@ -4271,27 +4881,38 @@ async function _flujoDetectarEtapa() {
   const etapas = window._flujoEtapasActual || [];
   if (!j || !etapas.length) { if (typeof toast === 'function') toast('⚠ Primero genera el flujo del procedimiento', 'err'); return; }
 
-  // Reunir documentos del expediente: acuerdos + historial
+  if (!_flujoEstaCompleto(etapas)) { if (typeof toast === 'function') toast('⚠ El flujo está incompleto (no llega a la sentencia). Regenéralo primero con ⚙ Generar Flujo.', 'err'); return; }
+  // Documentos (oct-2026): acuerdos de Drive SIN copias repetidas y en orden
+  // cronológico, más las notas capturadas a mano. Antes también se mandaban
+  // los registros repetidos/huérfanos de la línea de tiempo y la IA se confundía.
   let acuerdos = [];
   try { acuerdos = JSON.parse(localStorage.getItem('lex_acuerdos_' + (window._jdetId || '')) || '[]'); } catch(e) {}
-  const docsLineas = [];
-  acuerdos.filter(a => a.estado !== 'procesando' && a.estado !== 'error').forEach(a => {
-    const f = a.fechaAcuerdo || a.fechaSubida || '';
-    const d = (a.descripcion || a.resumen || '').replace(/\s+/g, ' ').trim();
-    docsLineas.push(`- ${f ? '[' + f + '] ' : ''}${a.nombre || a.archivo || 'documento'}${d ? ': ' + d : ''}`);
+  if (!acuerdos.length && Array.isArray(window._juAcuerdosLista)) acuerdos = window._juAcuerdosLista;
+  const _sobran = {};
+  _acuerdosAgruparDuplicados(acuerdos, j).forEach(g => g.slice(1).forEach(x => { _sobran[x.driveFileId || x.id] = true; }));
+  const _docs = acuerdos.filter(a => a && a.estado !== 'procesando' && a.estado !== 'error' && !_sobran[a.driveFileId || a.id])
+    .map(a => ({ f: a.fechaAcuerdo || a.fechaSubida || '', t: _juTituloAcuerdo(a), d: (a.descripcion || a.resumen || '').replace(/\s+/g, ' ').trim() }));
+  const _conArchivo = {}; acuerdos.forEach(a => { if (a && a.driveFileId) _conArchivo[a.driveFileId] = true; });
+  (j.historial || []).forEach(h => {
+    if (!h || !h.texto) return;
+    if (h.driveFileId && _conArchivo[h.driveFileId]) return;                              // ya va en la lista de acuerdos
+    if (h.tipo === 'acuerdo' && /^HJ-(ACU|OCR|MIG)-/.test(String(h.id || ''))) return;   // registro automático viejo o huérfano
+    _docs.push({ f: h.fecha || '', t: h.texto, d: (h.detalle || '').replace(/\s+/g, ' ').trim() });
   });
-  if (Array.isArray(j.historial)) {
-    j.historial.forEach(h => {
-      if (h && h.texto) docsLineas.push(`- ${h.fecha ? '[' + h.fecha + '] ' : ''}${h.texto}${h.detalle ? ': ' + h.detalle : ''}`);
-    });
-  }
+  _docs.sort((a, b) => String(a.f).localeCompare(String(b.f)));
+  const docsLineas = _docs.map(x => `- ${x.f ? '[' + x.f + '] ' : ''}${x.t}${x.d ? ': ' + x.d.slice(0, 400) : ''}`);
   if (!docsLineas.length) { if (typeof toast === 'function') toast('⚠ No hay documentos cargados para inferir la etapa', 'err'); return; }
 
   const btn = document.getElementById('flujo-detectar-btn');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.innerHTML = '<span style="display:inline-block;width:11px;height:11px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:-1px;margin-right:6px;"></span>Analizando documentos…'; }
 
   const listaEtapas = etapas.map((e, i) => (i + 1) + '. ' + (e.etapa || '')).join('\n');
-  const prompt = `Eres un abogado litigante mexicano experto. Con base en el FLUJO del procedimiento y los DOCUMENTOS ya cargados en el expediente, determina en qué ETAPA se encuentra ACTUALMENTE el juicio (la etapa correspondiente al documento procesalmente más avanzado).
+  const prompt = `Eres un abogado litigante mexicano experto. Con base en el FLUJO del procedimiento y los DOCUMENTOS del expediente (en orden cronológico; hoy es ${_juHoyISO()}), determina en qué ETAPA se encuentra ACTUALMENTE el juicio.
+
+REGLAS:
+- Manda el documento MÁS RECIENTE y procesalmente más avanzado; los anteriores solo dan contexto.
+- Si ya se dictó la sentencia o resolución principal (por ejemplo, la que decreta el divorcio) y los documentos posteriores tratan de convenio, incidentes, pruebas sobre el convenio, guarda y custodia, convivencias, recursos o amparo, la etapa actual es la que corresponde a ESOS actos posteriores — nunca una etapa inicial (demanda, prevención, admisión).
+- Si ninguna etapa coincide exactamente, elige la más cercana POSTERIOR al último acto realizado.
 
 FLUJO (etapas):
 ${listaEtapas}

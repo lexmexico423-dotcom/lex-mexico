@@ -8283,8 +8283,18 @@ async function _juExtraerDatosAcuerdo(texto){
     .replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
   const i = limpio.indexOf('{'), f = limpio.lastIndexOf('}');
   if(i >= 0 && f > i) limpio = limpio.slice(i, f + 1);
-  try{ return JSON.parse(limpio); }
+  let datos;
+  try{ datos = JSON.parse(limpio); }
   catch(e){ console.warn('[Juicios IA] respuesta no interpretable:', resp); return null; }
+  // La fecha del acuerdo se toma del texto (escrita con letra) si se puede;
+  // si la IA dio una fecha imposible para el expediente, se deja vacía.
+  try {
+    const jF = D.juicios[typeof _mexpIdx !== 'undefined' && _mexpIdx >= 0 ? _mexpIdx : jdetIdx];
+    const fT = _juFechaDesdeTexto(texto, jF);
+    if (fT) datos.fechaAcuerdo = fT.iso;
+    else if (datos.fechaAcuerdo && !_juFechaValida(datos.fechaAcuerdo, jF)) datos.fechaAcuerdo = '';
+  } catch(eF){}
+  return datos;
 }
 
 function _leyesInicializarBtnAdmin() {

@@ -13412,19 +13412,46 @@ function _adeudoTotal(a){
   return (a.conceptos||[]).reduce(function(s,c){ return s + (parseFloat(c.monto)||0); }, 0);
 }
 
+// ── Utilidades (oct-2026) ──
+function _adeudoHoy(){
+  try { if (typeof fechaCDMX_ISO === 'function') return fechaCDMX_ISO(); } catch(e){}
+  return new Date().toISOString().slice(0,10);
+}
+// Fecha en hora de Ciudad de México (antes se mostraba la fecha UTC: un
+// adeudo capturado después de las 6 pm salía con la fecha del día siguiente).
+function _adeudoFechaLocal(iso){
+  if(!iso) return '';
+  const s = String(iso);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if(isNaN(d.getTime())) return s.slice(0,10);
+  try { return d.toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }); } catch(e){ return s.slice(0,10); }
+}
+function _adeudoFmt(n){ return '$' + (typeof fmt === 'function' ? fmt(n) : (parseFloat(n)||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})); }
+function _adeudoNorm(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/\s+/g,' ').trim(); }
+function _adeudoUsuario(){
+  return (typeof empleadoActual !== 'undefined' && empleadoActual) ? (empleadoActual.nombre || empleadoActual.email || '') : (typeof NOMBRE_TITULAR !== 'undefined' ? NOMBRE_TITULAR : '');
+}
+function _adeudoGuardarYSincronizar(){
+  if(typeof save === 'function') save();
+  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+}
+
 function renderAdeudosLista(){
   const cont = document.getElementById('adeudosLista');
   if(!cont) return;
   const ACOL = '#c8781a'; // naranja — color de tema de "Adeudos sin Recibo"
-  const q = (document.getElementById('adeudosBuscar')?.value || '').toLowerCase().trim();
-  const todos = Array.isArray(D.adeudosSinRecibo) ? D.adeudosSinRecibo : [];
-  let lista = todos.filter(function(a){ return a && (_adeudosVerCobrados ? a.estado==='cobrado' : a.estado!=='cobrado'); });
-  if(q) lista = lista.filter(function(a){ return (a.cliente||'').toLowerCase().includes(q); });
-  // N° de ficha — posición entre los adeudos ACTIVOS (no cobrados), ordenados
-  // por antigüedad (el más viejo = 1). Igual que en Pendientes, se recalcula
-  // solo en cada render; los cobrados no muestran número.
+  const q = _adeudoNorm(document.getElementById('adeudosBuscar')?.value || '');
+  // Los eliminados se conservan marcados (eliminado:true) para que el borrado
+  // llegue a todas las computadoras — nunca se muestran.
+  const todos = (Array.isArray(D.adeudosSinRecibo) ? D.adeudosSinRecibo : []).filter(function(a){ return a && !a.eliminado; });
+  let lista = todos.filter(function(a){ return _adeudosVerCobrados ? a.estado==='cobrado' : a.estado!=='cobrado'; });
+  // Busca por cliente y también por la descripción de los conceptos
+  if(q) lista = lista.filter(function(a){
+    return _adeudoNorm(a.cliente).includes(q) || (a.conceptos||[]).some(function(c){ return _adeudoNorm(c.descripcion).includes(q); });
+  });
   const _adeudosNumMapa = (function(){
-    const activos = todos.filter(function(x){ return x && x.estado !== 'cobrado'; });
+    const activos = todos.filter(function(x){ return x.estado !== 'cobrado'; });
     const orden = activos.slice().sort(function(a,b){
       const ka=a.fechaCreacion||'', kb=b.fechaCreacion||'';
       return ka<kb?-1:ka>kb?1:0;
@@ -13433,16 +13460,24 @@ function renderAdeudosLista(){
     orden.forEach(function(x,pos){ mapa.set(x, pos+1); });
     return mapa;
   })();
-  lista = lista.slice().sort(function(a,b){ return (b.fechaCreacion||'').localeCompare(a.fechaCreacion||''); });
+  lista = lista.slice().sort(function(a,b){
+    const ka = _adeudosVerCobrados ? (a.fechaResolucion||'') : (a.fechaCreacion||'');
+    const kb = _adeudosVerCobrados ? (b.fechaResolucion||'') : (b.fechaCreacion||'');
+    return kb.localeCompare(ka);
+  });
   const contador = document.getElementById('adeudosContador');
   if(contador) contador.textContent = lista.length;
   if(!lista.length){
     cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;">'
-      + (_adeudosVerCobrados ? 'No hay adeudos cobrados todavía.' : 'No hay adeudos pendientes.')
+      + (q ? 'Ningún adeudo coincide con la búsqueda.' : (_adeudosVerCobrados ? 'No hay adeudos cobrados todavía.' : 'No hay adeudos pendientes.'))
       + '</div>';
     return;
   }
-  cont.innerHTML = lista.map(function(a){
+  const totalLista = lista.reduce(function(s,a){ return s + _adeudoTotal(a); }, 0);
+  const resumen = '<div style="display:flex;justify-content:flex-end;align-items:baseline;gap:8px;margin:0 2px 10px;font-size:0.74rem;color:var(--muted);">'
+    + (_adeudosVerCobrados ? 'Total cobrado en esta lista:' : 'Total por cobrar:')
+    + ' <strong style="font-family:monospace;font-size:0.95rem;color:'+ACOL+';">'+_adeudoFmt(totalLista)+'</strong></div>';
+  cont.innerHTML = resumen + lista.map(function(a){
     const cobrado = a.estado === 'cobrado';
     const numFicha = cobrado ? '' : (_adeudosNumMapa.get(a)||'');
     const badge = cobrado
@@ -13456,21 +13491,21 @@ function renderAdeudosLista(){
     const conceptos = (a.conceptos||[]);
     const conceptosHtml = conceptos.map(function(c){
       return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.76rem;color:var(--ink);padding:2px 0;">'
-        + '<span>'+esc(c.descripcion||'(sin descripción)')+(c.fecha?' <span style="color:var(--muted);">· '+esc(c.fecha.slice(0,10))+'</span>':'')+'</span>'
-        + '<span style="white-space:nowrap;font-family:monospace;">$'+(typeof fmt==='function'?fmt(c.monto):(parseFloat(c.monto)||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}))+'</span>'
+        + '<span>'+esc(c.descripcion||'(sin descripción)')+(c.fecha?' <span style="color:var(--muted);">· '+esc(String(c.fecha).slice(0,10))+'</span>':'')+'</span>'
+        + '<span style="white-space:nowrap;font-family:monospace;">'+_adeudoFmt(c.monto)+'</span>'
         + '</div>';
     }).join('');
     const totalHtml = conceptos.length >= 2
       ? '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.78rem;font-weight:700;border-top:1px solid rgba(200,149,42,0.25);margin-top:4px;padding-top:4px;">'
-        + '<span>TOTAL</span><span style="font-family:monospace;">$'+(typeof fmt==='function'?fmt(_adeudoTotal(a)):_adeudoTotal(a).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}))+'</span></div>'
+        + '<span>TOTAL</span><span style="font-family:monospace;">'+_adeudoFmt(_adeudoTotal(a))+'</span></div>'
       : '';
     const acciones = cobrado
       ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
-        + '<div style="font-size:0.62rem;color:var(--muted);">Cobrado: '+esc((a.fechaResolucion||'').slice(0,10))+'</div>'
+        + '<div style="font-size:0.62rem;color:var(--muted);">Cobrado: '+esc(_adeudoFechaLocal(a.fechaResolucion))+(a.cobradoPor?' · '+esc(a.cobradoPor):'')+'</div>'
         + '<button onclick="reabrirAdeudo(\''+a.id+'\')" style="background:none;border:1px solid var(--border-l);color:var(--muted);font-size:0.66rem;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;">↩ REABRIR</button>'
         + '</div>'
       : '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
-        + '<div style="font-size:0.62rem;color:var(--muted);">'+esc(a.creadoPor||'')+' · '+esc((a.fechaCreacion||'').slice(0,10))+'</div>'
+        + '<div style="font-size:0.62rem;color:var(--muted);">'+esc(a.creadoPor||'')+' · '+esc(_adeudoFechaLocal(a.fechaCreacion))+'</div>'
         + '<div style="display:flex;gap:6px;">'
         + '<button onclick="marcarAdeudoCobrado(\''+a.id+'\')" title="Marcar como cobrado" style="background:#fff3e6;color:'+ACOL+';font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">✓ MARCAR COBRADO</button>'
         + '<button onclick="abrirEditarAdeudo(\''+a.id+'\')" style="background:#e6f1fb;color:#185fa5;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">EDITAR</button>'
@@ -13516,10 +13551,11 @@ function agregarConceptoAdeudo(){
   row.setAttribute('data-cid', id);
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
   row.innerHTML = '<input type="text" class="ac-desc" placeholder="Descripción" style="flex:2;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
-    + '<input type="date" class="ac-fecha" style="flex:1;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
-    + '<input type="number" class="ac-monto" placeholder="Monto" step="0.01" style="width:90px;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+    + '<input type="date" class="ac-fecha" value="'+_adeudoHoy()+'" style="flex:1;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+    + '<input type="number" class="ac-monto" placeholder="Monto" step="0.01" min="0" style="width:90px;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
     + '<button type="button" onclick="quitarConceptoAdeudo(this)" style="background:none;border:none;color:var(--rojo,#b91c1c);font-size:1rem;cursor:pointer;padding:2px 6px;">✕</button>';
   cont.appendChild(row);
+  const d = row.querySelector('.ac-desc'); if(d) setTimeout(function(){ d.focus(); }, 30);
 }
 
 function quitarConceptoAdeudo(btn){
@@ -13555,14 +13591,21 @@ function abrirEditarAdeudo(id){
 }
 
 function _leerConceptosAdeudoForm(){
+  // Devuelve la lista de conceptos; si alguna fila está incompleta marca el
+  // campo en rojo y deja el error en _leerConceptosAdeudoForm.error.
+  _leerConceptosAdeudoForm.error = '';
   const rows = document.querySelectorAll('#adeudoConceptosLista .adeudo-concepto-row');
   const out = [];
   rows.forEach(function(row){
-    const desc = row.querySelector('.ac-desc')?.value.trim() || '';
+    const elD = row.querySelector('.ac-desc'), elM = row.querySelector('.ac-monto');
+    const desc = elD ? elD.value.trim() : '';
     const fecha = row.querySelector('.ac-fecha')?.value || '';
-    const montoRaw = row.querySelector('.ac-monto')?.value || '';
-    const monto = parseFloat(montoRaw) || 0;
-    if(!desc && !monto) return;
+    const montoRaw = elM ? elM.value.trim() : '';
+    const monto = Math.round((parseFloat(montoRaw) || 0) * 100) / 100;
+    if(elD) elD.style.borderColor = ''; if(elM) elM.style.borderColor = '';
+    if(!desc && !montoRaw) return;   // fila vacía: se ignora
+    if(!desc){ if(elD) elD.style.borderColor = 'var(--rojo,#b91c1c)'; _leerConceptosAdeudoForm.error = _leerConceptosAdeudoForm.error || 'Falta la descripción de un concepto'; return; }
+    if(!(monto > 0)){ if(elM) elM.style.borderColor = 'var(--rojo,#b91c1c)'; _leerConceptosAdeudoForm.error = _leerConceptosAdeudoForm.error || 'El monto de «' + desc + '» debe ser mayor a $0'; return; }
     let cid = row.getAttribute('data-cid');
     if(!cid) cid = 'C-' + Date.now() + '-' + (_adeudoConceptoSeq++);
     out.push({ id: cid, descripcion: desc, fecha: fecha, monto: monto });
@@ -13570,53 +13613,80 @@ function _leerConceptosAdeudoForm(){
   return out;
 }
 
-function guardarAdeudo(){
+async function guardarAdeudo(){
   const cliente = document.getElementById('adeudoCliente')?.value.trim() || '';
-  if(!cliente){ if(typeof toast==='function') toast('El nombre del cliente es obligatorio','err'); return; }
+  if(!cliente){ if(typeof toast==='function') toast('El nombre del cliente es obligatorio','err'); document.getElementById('adeudoCliente')?.focus(); return; }
   const conceptos = _leerConceptosAdeudoForm();
+  if(_leerConceptosAdeudoForm.error){ if(typeof toast==='function') toast('⚠ ' + _leerConceptosAdeudoForm.error,'err'); return; }
   if(!conceptos.length){ if(typeof toast==='function') toast('Agrega al menos un concepto','err'); return; }
   if(!Array.isArray(D.adeudosSinRecibo)) D.adeudosSinRecibo = [];
+  const ahora = new Date().toISOString();
   if(_adeudoEdId){
     const adeudo = D.adeudosSinRecibo.find(function(x){ return x && x.id === _adeudoEdId; });
     if(adeudo){
-      adeudo.cliente = cliente; adeudo.conceptos = conceptos; adeudo.fechaMod = new Date().toISOString();
+      adeudo.cliente = cliente; adeudo.conceptos = conceptos; adeudo.fechaMod = ahora;
     }
   } else {
-    D.adeudosSinRecibo.unshift({
-      id: 'AR-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
-      cliente: cliente, conceptos: conceptos, estado: 'pendiente',
-      creadoPor: (typeof empleadoActual !== 'undefined' && empleadoActual) ? empleadoActual.nombre : (typeof NOMBRE_TITULAR !== 'undefined' ? NOMBRE_TITULAR : ''),
-      fechaCreacion: new Date().toISOString(), fechaResolucion: '',
-      fechaMod: new Date().toISOString()
-    });
+    // ¿Ese cliente ya tiene un adeudo pendiente? Se ofrece sumar los
+    // conceptos a la MISMA ficha en vez de abrir otra (antes quedaban dos
+    // fichas del mismo cliente y era fácil cobrar solo una).
+    const existente = D.adeudosSinRecibo.find(function(x){ return x && !x.eliminado && x.estado !== 'cobrado' && _adeudoNorm(x.cliente) === _adeudoNorm(cliente); });
+    let unir = false;
+    if(existente){
+      const msg = cliente.toUpperCase() + ' ya tiene un adeudo pendiente de ' + _adeudoFmt(_adeudoTotal(existente)) + '.\n\n¿Agregar estos conceptos a ese mismo adeudo?';
+      unir = (typeof confirmarBonito === 'function')
+        ? await confirmarBonito({ titulo: 'Cliente con adeudo pendiente', mensaje: msg, btnSi: 'Sí, agregar a su adeudo', btnNo: 'No, crear otro' })
+        : confirm(msg);
+    }
+    if(existente && unir){
+      existente.conceptos = (existente.conceptos || []).concat(conceptos);
+      existente.fechaMod = ahora;
+    } else {
+      D.adeudosSinRecibo.unshift({
+        id: 'AR-' + Date.now() + '-' + Math.random().toString(36).slice(2,7),
+        cliente: cliente, conceptos: conceptos, estado: 'pendiente',
+        creadoPor: _adeudoUsuario(),
+        fechaCreacion: ahora, fechaResolucion: '',
+        fechaMod: ahora
+      });
+    }
   }
   cerrar('mAdeudoEditar');
-  if(typeof save === 'function') save();
-  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  _adeudoGuardarYSincronizar();
   if(typeof toast==='function') toast('✅ Adeudo guardado — sincronizando...');
   renderAdeudosLista();
 }
 
-function marcarAdeudoCobrado(id){
+async function marcarAdeudoCobrado(id){
   const adeudo = (D.adeudosSinRecibo||[]).find(function(x){ return x && x.id === id; });
   if(!adeudo) return;
+  // Confirmación (antes bastaba un clic en el círculo para darlo por cobrado)
+  const msg = '¿Confirmas que ' + String(adeudo.cliente||'el cliente').toUpperCase() + ' ya pagó ' + _adeudoFmt(_adeudoTotal(adeudo)) + '?';
+  const ok = (typeof confirmarBonito === 'function')
+    ? await confirmarBonito({ titulo: 'Marcar como cobrado', mensaje: msg, btnSi: 'Sí, ya pagó', btnNo: 'Cancelar' })
+    : confirm(msg);
+  if(!ok) return;
   adeudo.estado = 'cobrado';
   adeudo.fechaResolucion = new Date().toISOString();
+  adeudo.cobradoPor = _adeudoUsuario();
   adeudo.fechaMod = new Date().toISOString();
-  if(typeof save === 'function') save();
-  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  _adeudoGuardarYSincronizar();
   if(typeof toast==='function') toast('✅ Adeudo marcado como cobrado');
   renderAdeudosLista();
 }
 
-function reabrirAdeudo(id){
+async function reabrirAdeudo(id){
   const adeudo = (D.adeudosSinRecibo||[]).find(function(x){ return x && x.id === id; });
   if(!adeudo) return;
+  const ok = (typeof confirmarBonito === 'function')
+    ? await confirmarBonito({ titulo: 'Reabrir adeudo', mensaje: '¿Regresar el adeudo de ' + String(adeudo.cliente||'').toUpperCase() + ' a pendiente?', btnSi: 'Sí, reabrir', btnNo: 'Cancelar' })
+    : confirm('¿Regresar este adeudo a pendiente?');
+  if(!ok) return;
   adeudo.estado = 'pendiente';
   adeudo.fechaResolucion = '';
+  delete adeudo.cobradoPor;
   adeudo.fechaMod = new Date().toISOString();
-  if(typeof save === 'function') save();
-  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  _adeudoGuardarYSincronizar();
   if(typeof toast==='function') toast('↩ Adeudo reabierto como pendiente');
   renderAdeudosLista();
 }
@@ -13626,10 +13696,14 @@ function eliminarAdeudo(){
   const adeudo = (D.adeudosSinRecibo||[]).find(function(x){ return x && x.id === _adeudoEdId; });
   if(!adeudo) return;
   if(!confirm('¿Eliminar definitivamente el adeudo de "'+adeudo.cliente+'"?')) return;
-  D.adeudosSinRecibo = (D.adeudosSinRecibo||[]).filter(function(x){ return x && x.id !== _adeudoEdId; });
+  // Se marca como eliminado en vez de quitarlo de la lista: al sincronizar,
+  // la copia de Supabase lo volvía a traer y el adeudo "revivía". Con la
+  // marca (y su fechaMod) el borrado llega a todas las computadoras.
+  adeudo.eliminado = true;
+  adeudo.eliminadoPor = _adeudoUsuario();
+  adeudo.fechaMod = new Date().toISOString();
   cerrar('mAdeudoEditar');
-  if(typeof save === 'function') save();
-  if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(e){ if(typeof registrarError==='function') registrarError('Promise catch vacio', e); });
+  _adeudoGuardarYSincronizar();
   if(typeof toast==='function') toast('🗑 Adeudo eliminado');
   renderAdeudosLista();
 }

@@ -274,7 +274,7 @@ function renderAcuerdosDrive(lista) {
   try {
     const gRep = _acuerdosAgruparDuplicados(lista.filter(a => a && a.md5), j);
     const nSobran = gRep.reduce((s, g) => s + g.length - 1, 0);
-    const nFechaMal = info.filter(x => x.ac.estado !== 'procesando' && (x.m.fechaRevisar || !x.ac.fechaAcuerdo || !_juFechaValida(x.ac.fechaAcuerdo, j))).length;
+    const nFechaMal = info.filter(x => x.ac.estado !== 'procesando' && _juFechaPorRevisar(x.ac, x.m, j)).length;
     if (nSobran || nFechaMal) {
       const partes = [];
       if (nSobran) partes.push('<b>' + nSobran + '</b> copia' + (nSobran === 1 ? '' : 's') + ' repetida' + (nSobran === 1 ? '' : 's'));
@@ -310,7 +310,7 @@ function renderAcuerdosDrive(lista) {
       : ac.estado === 'error_drive' ? '<span style="font-size:.6rem;padding:2px 7px;border-radius:4px;background:#FCEBEB;color:#A32D2D;">⚠ Sin Drive</span>' : '';
     const fNotif = ac.fechaNotificacion || m.fechaNotificacion || '';
     const notifFmt = fNotif ? _fmtBadge(fNotif) : '';
-    const fechaMal = ac.estado !== 'procesando' && (m.fechaRevisar || !ac.fechaAcuerdo || !_juFechaValida(ac.fechaAcuerdo, j));
+    const fechaMal = ac.estado !== 'procesando' && _juFechaPorRevisar(ac, m, j);
     const fechaChip = fechaMal ? '<span onclick="event.stopPropagation();_juEditarFechaAcuerdo(\'' + kEsc + '\')" title="La fecha no parece correcta — clic para cambiarla" style="cursor:pointer;font-size:.62rem;padding:2px 8px;border-radius:10px;background:#fdeccc;color:#8a4a00;font-weight:700;">📅 Revisa la fecha</span>' : '';
     const notifBadge = '<span id="notif-badge-' + ac.id + '" onclick="event.stopPropagation();_editarNotifAcuerdo(\'' + ac.id + '\')" title="' + (notifFmt ? 'Editar fecha de notificación' : 'Registrar fecha de notificación') + '" style="font-size:.6rem;padding:2px 8px;border-radius:4px;cursor:pointer;'
       + (notifFmt ? 'background:#ddeeff;color:#1a4a8a;font-weight:700;">🔔 Notificado ' + notifFmt : 'border:1px dashed #aac4e0;color:#4a7aaa;">+ Fecha de notificación') + '</span>';
@@ -3552,8 +3552,8 @@ function _juDialogoReparacion(plan){
     }
     if (plan.revisar.length) {
       h += '<div style="font-size:.8rem;font-weight:700;color:var(--ink);margin:12px 0 4px;">⚠ Fechas que debes revisar a mano · ' + plan.revisar.length + '</div>'
-        + '<div style="font-size:.7rem;color:var(--muted);margin-bottom:6px;">No hay texto guardado para confirmarlas. Quedarán marcadas; da clic en la fecha de la tarjeta para cambiarla.</div>'
-        + plan.revisar.map(function(ac){ return '<div style="font-size:.72rem;padding:2px 0;">• ' + linea(ac) + '</div>'; }).join('');
+        + '<div style="font-size:.7rem;color:var(--muted);margin-bottom:6px;line-height:1.5;">No se pudieron confirmar con el texto del documento. Ábrelo con 👁 Ver y, si la fecha es la correcta, pulsa <b>✓ Es correcta</b> (ya no se volverá a pedir). Si está mal, cámbiala dando clic en la fecha de la tarjeta.</div>'
+        + plan.revisar.map(function(ac){ return '<div style="display:flex;align-items:center;gap:8px;font-size:.72rem;padding:4px 0;border-bottom:1px dashed var(--border-l);"><span style="flex:1;">• ' + linea(ac) + '</span><button type="button" data-confirmar="' + esc(ac.driveFileId) + '" style="flex-shrink:0;background:var(--verde-l,#eaf3de);color:var(--verde-d,#1a7a3a);border:1px solid var(--verde-d,#1a7a3a);border-radius:6px;padding:3px 10px;font-size:.68rem;font-weight:700;cursor:pointer;">✓ Es correcta</button></div>'; }).join('');
     }
     if (plan.histAntes !== plan.histDespues) {
       h += '<div style="font-size:.7rem;color:var(--muted);margin-top:12px;border-top:1px dashed var(--border-l);padding-top:8px;">Línea de tiempo interna (la que usa la IA para detectar la etapa): ' + plan.histAntes + ' → ' + plan.histDespues + ' registros, sin repetidos. Se guarda un respaldo de la anterior.</div>';
@@ -3570,7 +3570,17 @@ function _juDialogoReparacion(plan){
       + '<button type="button" data-r="1" style="padding:8px 16px;border-radius:8px;border:none;background:var(--verde-d,#1a7a3a);color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;">✓ Aplicar cambios</button>'
       + '</div></div>';
     var fin = function(v){ try { ov.remove(); } catch(e){} resolve(v); };
-    ov.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('button[data-r]'); if (b) fin(b.getAttribute('data-r') === '1'); else if (e.target === ov) fin(false); });
+    ov.addEventListener('click', function(e){
+      var bc = e.target.closest && e.target.closest('button[data-confirmar]');
+      if (bc) {
+        var idC = bc.getAttribute('data-confirmar');
+        var acC = (plan.revisar || []).find(function(a){ return a.driveFileId === idC; });
+        if (acC) { _juConfirmarFecha(acC); plan.revisar = plan.revisar.filter(function(a){ return a !== acC; }); }
+        bc.outerHTML = '<span style="flex-shrink:0;color:var(--verde-d,#1a7a3a);font-weight:700;font-size:.68rem;">✓ Confirmada</span>';
+        return;
+      }
+      var b = e.target.closest && e.target.closest('button[data-r]'); if (b) fin(b.getAttribute('data-r') === '1'); else if (e.target === ov) fin(false);
+    });
     document.body.appendChild(ov);
   });
 }
@@ -3652,6 +3662,28 @@ async function _juAvisoParcialesFondo(lista){
     + '<button onclick="_juRevisarAcuerdos()" style="background:#b06a00;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:.72rem;font-weight:700;cursor:pointer;">🛠 Revisar y reparar</button></div>';
 }
 
+// ¿La fecha de este acuerdo necesita revisión? (no si alguien ya la confirmó)
+function _juFechaPorRevisar(ac, m, j){
+  m = m || {};
+  if (!ac.fechaAcuerdo || !_juFechaValida(ac.fechaAcuerdo, j)) return true;
+  if (m.fechaConfirmada && m.fechaConfirmada === ac.fechaAcuerdo) return false;
+  return !!m.fechaRevisar;
+}
+// Marca la fecha como revisada por una persona (se guarda en el expediente)
+function _juConfirmarFecha(ac){
+  var j = D.juicios[window._mexpIdxActual];
+  if (!j || !ac) return;
+  var k = _juClaveAcuerdo(ac), m = _juMeta(j);
+  m[k] = m[k] || {};
+  m[k].fechaConfirmada = ac.fechaAcuerdo;
+  m[k].fechaConfirmadaPor = (typeof _juUsuarioActual === 'function') ? _juUsuarioActual() : '';
+  delete m[k].fechaRevisar;
+  j.updatedAt = Date.now();
+  try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){}
+  try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){}
+  try { renderAcuerdosDrive(window._juAcuerdosLista || []); } catch(e){}
+}
+
 async function _juRevisarAcuerdos(){
   var jId = window._jdetId;
   var idx = (typeof jdetIdx !== 'undefined' && jdetIdx >= 0) ? jdetIdx : _mexpIdx;
@@ -3682,7 +3714,7 @@ async function _juRevisarAcuerdos(){
 
   // 2) Fechas: se leen del texto guardado (R2) de cada acuerdo — o de
   // cualquiera de sus copias, que es el mismo documento.
-  var cambiosFecha = [], revisar = [];
+  var cambiosFecha = [], revisar = [], limpiarMarca = [];
   for (var i = 0; i < quedan.length; i++) {
     var ac = quedan[i];
     if (i % 3 === 0 && typeof toast === 'function') toast('📖 Leyendo fechas ' + (i + 1) + ' de ' + quedan.length + '…', 'ok');
@@ -3692,8 +3724,11 @@ async function _juRevisarAcuerdos(){
     }
     var porTexto = texto ? _juFechaDesdeTexto(texto, j) : null;
     var fuerte = porTexto && porTexto.fuente !== 'inicio';
-    if (fuerte && porTexto.iso !== ac.fechaAcuerdo) cambiosFecha.push({ ac: ac, de: ac.fechaAcuerdo || '', a: porTexto.iso, txt: porTexto.txt || '' });
-    else if (!fuerte && (!_juFechaValida(ac.fechaAcuerdo, j) || (porTexto && porTexto.iso !== ac.fechaAcuerdo))) revisar.push(ac);
+    var mAc = (j.acuerdosMeta || {})[ac.driveFileId] || {};
+    var confirmada = mAc.fechaConfirmada && mAc.fechaConfirmada === ac.fechaAcuerdo;
+    if (fuerte && porTexto.iso !== ac.fechaAcuerdo && !confirmada) cambiosFecha.push({ ac: ac, de: ac.fechaAcuerdo || '', a: porTexto.iso, txt: porTexto.txt || '' });
+    else if (fuerte && porTexto.iso === ac.fechaAcuerdo) { if (mAc.fechaRevisar) limpiarMarca.push(ac); }   // el texto confirma la fecha
+    else if (!confirmada && (!_juFechaValida(ac.fechaAcuerdo, j) || mAc.fechaRevisar)) revisar.push(ac);
   }
 
   // 3) Línea de tiempo interna con las fechas ya corregidas
@@ -3703,6 +3738,13 @@ async function _juRevisarAcuerdos(){
   var histNuevo = _juHistorialReconstruido(j, quedanCorr);
 
   if (!quitar.length && !cambiosFecha.length && !revisar.length && histAntes === histNuevo.length) {
+    if (limpiarMarca.length) {
+      var mL = _juMeta(j); limpiarMarca.forEach(function(ac){ if (mL[ac.driveFileId]) delete mL[ac.driveFileId].fechaRevisar; });
+      j.updatedAt = Date.now();
+      try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){}
+      try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){}
+      renderAcuerdosDrive(lista);
+    }
     if (typeof toast === 'function') toast('✓ Todo en orden: sin copias repetidas y con fechas correctas', 'ok');
     return;
   }
@@ -3736,7 +3778,8 @@ async function _juRevisarAcuerdos(){
       if (meta[cf.ac.driveFileId]) delete meta[cf.ac.driveFileId].fechaRevisar;
     } catch(e){ errores.push('Fecha ' + (cf.ac.archivo || '') + ': ' + e.message); }
   }
-  revisar.forEach(function(ac){ (meta[ac.driveFileId] = meta[ac.driveFileId] || {}).fechaRevisar = true; });
+  revisar.forEach(function(ac){ var mr = meta[ac.driveFileId] = meta[ac.driveFileId] || {}; if (!(mr.fechaConfirmada && mr.fechaConfirmada === ac.fechaAcuerdo)) mr.fechaRevisar = true; });
+  limpiarMarca.forEach(function(ac){ if (meta[ac.driveFileId]) delete meta[ac.driveFileId].fechaRevisar; });
 
   var listaFinal = lista.filter(function(a){ return !idsQuitar[a.driveFileId]; });
   var resp = Array.isArray(j.historialRespaldos) ? j.historialRespaldos : [];
@@ -3765,7 +3808,7 @@ function _juEditarFechaAcuerdo(k){
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(12,9,5,.6);z-index:99990;display:flex;align-items:center;justify-content:center;padding:18px;';
   ov.innerHTML = '<div style="background:var(--surface2);border:1px solid var(--border-l);border-radius:12px;width:380px;max-width:100%;padding:16px 18px;box-shadow:var(--shadow-lg);">'
     + '<div style="font-size:.9rem;font-weight:700;color:var(--ink);">📅 Fecha del acuerdo</div>'
-    + '<div style="font-size:.72rem;color:var(--muted);margin:3px 0 10px;line-height:1.45;">' + _juEsc(_juTituloAcuerdo(ac)) + '<br>Pon la fecha en que se <b>dictó</b> el acuerdo (la que aparece al inicio del documento).</div>'
+    + '<div style="font-size:.72rem;color:var(--muted);margin:3px 0 10px;line-height:1.45;">' + _juEsc(_juTituloAcuerdo(ac)) + '<br>Pon la fecha en que se <b>dictó</b> el acuerdo (la que aparece al inicio del documento). Si la que aparece ya es la correcta, solo pulsa <b>Guardar</b> y ya no se volverá a pedir.</div>'
     + '<input type="date" id="ju-fecha-inp" value="' + _juEsc(ac.fechaAcuerdo || '') + '" style="width:100%;padding:8px 10px;border:1px solid var(--border-l);border-radius:8px;font-size:.85rem;background:var(--surface);color:var(--ink);">'
     + '<div id="ju-fecha-err" style="font-size:.68rem;color:#a32d2d;min-height:16px;margin-top:4px;"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">'
@@ -3810,7 +3853,8 @@ async function _juAplicarFechaAcuerdo(ac, iso){
   lista.forEach(function(a){ if (_juClaveAcuerdo(a) === k) { a.fechaAcuerdo = iso; a.archivo = ac.archivo; a.fechaRevisar = false; } });
   try { localStorage.setItem('lex_acuerdos_' + jId, JSON.stringify(lista)); } catch(e){}
   if (j) {
-    var m = _juMeta(j); if (m[k]) delete m[k].fechaRevisar;
+    var m = _juMeta(j); m[k] = m[k] || {}; delete m[k].fechaRevisar;
+    m[k].fechaConfirmada = iso; m[k].fechaConfirmadaPor = (typeof _juUsuarioActual === 'function') ? _juUsuarioActual() : '';
     (j.historial || []).forEach(function(h){ if (h && ac.driveFileId && h.driveFileId === ac.driveFileId) h.fecha = iso; });
     j.updatedAt = Date.now();
     try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){}

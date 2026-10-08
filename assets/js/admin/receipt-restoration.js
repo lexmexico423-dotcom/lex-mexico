@@ -9649,12 +9649,16 @@ function _mpeLayoutAmplio(estado, supIdx, subIdx, supSlug, subSlug, info, linksH
         + '<div style="font-size:0.64rem;color:#8a7a5a;margin-top:4px;">Precio sugerido por el despacho — confírmalo antes de cobrar.</div>';
     }
   }
-  var bBot = function(id, txt, extra){
+  // Botones grandes y de color (a petición: "hazlos en botones visibles")
+  var bBot = function(id, txt, color, colorOsc, extra){
     var on = vista === id;
-    return '<button onclick="_mpeVer(\'' + (on ? 'lista' : id) + '\')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;' + (on ? 'border:2px solid #c8951a;background:#fdf1d8;color:#7a4a00;font-weight:700;' : 'border:1.5px solid #d8ceb8;background:#fff;color:#5a4a30;font-weight:500;') + 'border-radius:9px;padding:8px;font-size:0.78rem;cursor:pointer;font-family:inherit;">' + txt
-      + (extra ? '<span style="font-size:0.68rem;font-family:monospace;font-weight:700;color:#1a7a3a;">' + extra + '</span>' : '') + '</button>';
+    return '<button onclick="_mpeVer(\'' + (on ? 'lista' : id) + '\')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;'
+      + 'background:' + (on ? colorOsc : color) + ';color:#fff;border:none;border-radius:10px;padding:11px 8px;font-size:0.86rem;font-weight:700;cursor:pointer;font-family:inherit;'
+      + 'box-shadow:0 2px 6px rgba(0,0,0,0.18);letter-spacing:0.01em;' + (on ? 'outline:3px solid #f2c96b;outline-offset:1px;' : '') + '">'
+      + (on ? '← ' : '') + txt
+      + (extra ? '<span style="font-size:0.74rem;font-family:monospace;font-weight:700;background:rgba(255,255,255,0.22);border-radius:6px;padding:1px 8px;">' + extra + '</span>' : '') + '</button>';
   };
-  der += '<div style="display:flex;gap:6px;margin-top:10px;">' + bBot('pas', '🧭 Cómo armarlo') + bBot('cos', '💲 Precio sugerido', totCos > 0 ? _mpeMoney(totCos) : '') + '</div>';
+  der += '<div style="display:flex;gap:8px;margin-top:12px;">' + bBot('pas', '🧭 Cómo armarlo', '#1a4a8a', '#0c2f5e') + bBot('cos', '💲 Precio sugerido', '#1a7a3a', '#0f5226', totCos > 0 ? _mpeMoney(totCos) : '') + '</div>';
 
   return '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px;align-items:start;">'
     + '<div>' + izq + '</div>'

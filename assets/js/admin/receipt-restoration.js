@@ -9265,6 +9265,257 @@ function _mpeCheckAdmin() {
   return !_mpeAdminOff;
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// REQUISITOS A LA VISTA (oct-2026, a petición expresa: "más práctico, no
+// estar abriendo los PDF de los requisitos"). La IA lee UNA vez el PDF de
+// instrucciones de cada trámite y lo convierte en listas: Requisitos (para
+// ir palomeando), Pasos y Costos sugeridos. El administrador puede editar
+// todo. Se guarda en el meta.json del trámite en R2 (clave _info), así lo
+// ven igual todas las computadoras.
+// ══════════════════════════════════════════════════════════════════════
+window._mpeChecks = window._mpeChecks || {};
+window._mpeTabInfo = window._mpeTabInfo || 'req';
+window._mpeExtrayendo = window._mpeExtrayendo || {};
+
+function _mpeEscH(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function _mpeMoney(n){ var v = parseFloat(n); return isNaN(v) ? '' : '$' + v.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function _mpeSlugs(estado, supIdx, subIdx){
+  var cfg = _MPE_CONFIG[estado]; if (!cfg) return null;
+  var sup = cfg.supuestos[supIdx] || cfg.supuestos[0];
+  var subTabs = cfg.subTabs || [];
+  var sub = subTabs[Math.min(subIdx, subTabs.length - 1)] || '';
+  var sl = function(t){ return String(t).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''); };
+  return { cfg: cfg, sup: sup, sub: sub, supSlug: sl(sup), subSlug: sl(sub) || 'general' };
+}
+function _mpeMetaDe(estado, supSlug, subSlug){ return _mpeCache[estado + '_' + supSlug + '_' + subSlug + '_meta'] || null; }
+function _mpeUsuario(){ return (typeof empleadoActual !== 'undefined' && empleadoActual) ? (empleadoActual.nombre || empleadoActual.email || '') : ''; }
+
+async function _mpeGuardarMeta(estado, supSlug, subSlug, meta){
+  _mpeCache[estado + '_' + supSlug + '_' + subSlug + '_meta'] = meta;
+  if (!window.subirR2 || !window.SB_DESPACHO_ID) throw new Error('sin conexión con el almacenamiento');
+  var blob = new Blob([JSON.stringify(meta)], { type: 'application/json' });
+  var file = new File([blob], 'meta.json', { type: 'application/json' });
+  var ok = await window.subirR2(file, _mpePath(estado, supSlug, subSlug, 'meta.json'), 'placas');
+  if (ok === false) throw new Error('no se pudo guardar');
+}
+
+// La IA lee el PDF de instrucciones y devuelve {requisitos, pasos, costos, avisos}
+async function _mpeExtraerInfoDePDF(estado, supSlug, subSlug, etiqueta){
+  var dataUrl = await _mpeR2Descargar(estado, supSlug, subSlug, 'inst.pdf');
+  if (!dataUrl) throw new Error('este trámite no tiene PDF de instrucciones');
+  var blob = await (await fetch(dataUrl)).blob();
+  var file = new File([blob], 'instrucciones.pdf', { type: 'application/pdf' });
+  var ocr = (typeof _ocrExtraerTexto === 'function') ? await _ocrExtraerTexto(file, function(){}) : null;
+  var texto = (ocr && ocr.texto) ? String(ocr.texto).slice(0, 30000) : '';
+  if (!texto.trim()) throw new Error('no se pudo leer el texto del PDF');
+  var prompt = 'Eres asistente de un despacho que tramita placas vehiculares en México. Este es el texto del documento de INSTRUCCIONES del trámite "' + etiqueta + '":\n"""\n' + texto + '\n"""\n'
+    + 'Conviértelo en información práctica para que una empleada atienda al cliente sin abrir el PDF. Usa SOLO lo que dice el documento (no inventes nada).\n'
+    + 'Responde ÚNICAMENTE con JSON válido, sin markdown:\n'
+    + '{"requisitos":[{"texto":"documento o requisito que debe traer el cliente, corto","detalle":"aclaración breve: original/copia, cuántas, vigencia (o vacío)"}],'
+    + '"pasos":["paso 1 del trámite, corto","paso 2"],'
+    + '"costos":[{"concepto":"concepto de cobro","monto":número o null,"nota":"aclaración breve o vacío"}],'
+    + '"avisos":["advertencia importante, corta"]}\n'
+    + 'Si el documento no menciona costos, deja "costos" vacío. Montos como número sin signo de pesos.';
+  var raw = await _iaLlamar(prompt, 3000, 0.1, 'analisis');
+  return _mpeNormalizarInfo(raw);
+}
+function _mpeNormalizarInfo(raw){
+  var limpio = String(raw || '').replace(/```json|```/g, '').trim();
+  var i = limpio.indexOf('{'), f = limpio.lastIndexOf('}');
+  var d = JSON.parse(i >= 0 && f > i ? limpio.slice(i, f + 1) : limpio);
+  var lim = function(s, n){ return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().slice(0, n || 220); };
+  return {
+    requisitos: (Array.isArray(d.requisitos) ? d.requisitos : []).map(function(r){ return typeof r === 'string' ? { texto: lim(r), detalle: '' } : { texto: lim(r && r.texto), detalle: lim(r && r.detalle) }; }).filter(function(r){ return r.texto; }),
+    pasos: (Array.isArray(d.pasos) ? d.pasos : []).map(function(p){ return lim(typeof p === 'string' ? p : (p && p.texto)); }).filter(Boolean),
+    costos: (Array.isArray(d.costos) ? d.costos : []).map(function(c){ var m = parseFloat(c && c.monto); return { concepto: lim(c && c.concepto, 120), monto: isNaN(m) ? null : Math.round(m * 100) / 100, nota: lim(c && c.nota, 160) }; }).filter(function(c){ return c.concepto; }),
+    avisos: (Array.isArray(d.avisos) ? d.avisos : []).map(function(a){ return lim(a); }).filter(Boolean)
+  };
+}
+
+// Lectura automática: cuando el ADMINISTRADOR abre un trámite que tiene PDF
+// de instrucciones pero todavía no tiene la información, la IA lo lee y la
+// guarda (después la puede corregir en "Editar contenido").
+async function _mpeAutoExtraer(estado, supSlug, subSlug, etiqueta){
+  var k = estado + '_' + supSlug + '_' + subSlug;
+  if (window._mpeExtrayendo[k]) return;
+  window._mpeExtrayendo[k] = true;
+  try {
+    var info = await _mpeExtraerInfoDePDF(estado, supSlug, subSlug, etiqueta);
+    var meta = Object.assign({}, _mpeMetaDe(estado, supSlug, subSlug) || {});
+    if (meta._info) { delete window._mpeExtrayendo[k]; return; }
+    info.fuente = 'ia'; info.actualizado = new Date().toISOString(); info.por = 'IA (leído del PDF)';
+    meta._info = info;
+    await _mpeGuardarMeta(estado, supSlug, subSlug, meta);
+    delete window._mpeExtrayendo[k];
+    if (typeof toast === 'function') toast('✨ Requisitos de "' + etiqueta + '" leídos del PDF', 'ok');
+  } catch(e) {
+    console.warn('[Placas] leer requisitos del PDF:', e && e.message);
+    window._mpeExtrayendo[k] = 'error';
+  }
+  if (_mpeEstado === estado) _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+}
+
+// Leer TODOS los trámites de todos los estados de una vez (botón del admin)
+async function _mpeLeerTodosLosPDF(){
+  if (!confirm('La IA va a leer los PDF de instrucciones de TODOS los trámites que todavía no tienen sus requisitos capturados. Puede tardar unos minutos. ¿Continuar?')) return;
+  var hechos = 0, sinPdf = 0, errores = 0, yaTenian = 0;
+  for (var estado in _MPE_CONFIG) {
+    var cfg = _MPE_CONFIG[estado];
+    for (var si = 0; si < cfg.supuestos.length; si++) for (var ti = 0; ti < (cfg.subTabs || []).length; ti++) {
+      var s = _mpeSlugs(estado, si, ti);
+      var etiqueta = s.sub + ' · ' + s.sup + ' · ' + cfg.label;
+      try {
+        var metaKey = estado + '_' + s.supSlug + '_' + s.subSlug + '_meta';
+        if (!_mpeCache[metaKey]) {
+          try { var b = await window.descargarR2(_mpePath(estado, s.supSlug, s.subSlug, 'meta.json'), 'placas'); if (b) _mpeCache[metaKey] = JSON.parse(await b.text()); } catch(e){}
+        }
+        var meta = _mpeCache[metaKey] || {};
+        if (meta._info) { yaTenian++; continue; }
+        if (!meta['inst.pdf']) { sinPdf++; continue; }
+        if (typeof toast === 'function') toast('✨ Leyendo ' + etiqueta + '…', 'ok');
+        var info = await _mpeExtraerInfoDePDF(estado, s.supSlug, s.subSlug, etiqueta);
+        info.fuente = 'ia'; info.actualizado = new Date().toISOString(); info.por = 'IA (leído del PDF)';
+        meta = Object.assign({}, meta, { _info: info });
+        await _mpeGuardarMeta(estado, s.supSlug, s.subSlug, meta);
+        hechos++;
+      } catch(e) { errores++; console.warn('[Placas] ' + etiqueta + ':', e && e.message); }
+    }
+  }
+  alert('LECTURA TERMINADA\n\n✅ Trámites leídos: ' + hechos + '\n📋 Ya tenían requisitos: ' + yaTenian + '\n📄 Sin PDF de instrucciones: ' + sinPdf + (errores ? '\n⚠ Con error: ' + errores : ''));
+  if (_mpeEstado) _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+}
+
+// ── Vista para las empleadas: pestañas Requisitos · Pasos · Costos ──
+function _mpeInfoHTML(estado, supSlug, subSlug, info){
+  var k = estado + '_' + supSlug + '_' + subSlug;
+  var checks = window._mpeChecks[k] = window._mpeChecks[k] || {};
+  var reqs = info.requisitos || [], pasos = info.pasos || [], costos = info.costos || [];
+  var tab = window._mpeTabInfo || 'req';
+  if (tab === 'cos' && !costos.length) tab = 'req';
+  var tabBtn = function(id, txt){ var on = tab === id; return '<button onclick="_mpeTabInfo=\'' + id + '\';_mpeRenderBody(_mpeEstado,_mpeSupuesto)" style="background:none;border:none;border-bottom:3px solid ' + (on ? '#c8951a' : 'transparent') + ';padding:8px 12px;font-size:0.78rem;font-weight:' + (on ? 700 : 500) + ';color:' + (on ? '#7a4a00' : '#8a7a5a') + ';cursor:pointer;font-family:inherit;">' + txt + '</button>'; };
+  var h = '';
+  if ((info.avisos || []).length) {
+    h += '<div style="background:#fff8e8;border:1px solid #e8c878;border-radius:8px;padding:8px 12px;margin:8px 0 4px;font-size:0.74rem;color:#7a4a00;line-height:1.5;">'
+      + info.avisos.map(function(a){ return '⚠ ' + _mpeEscH(a); }).join('<br>') + '</div>';
+  }
+  h += '<div style="display:flex;gap:2px;border-bottom:1px solid #efe4c4;margin-bottom:8px;flex-wrap:wrap;">'
+    + tabBtn('req', '📋 Requisitos (' + reqs.length + ')')
+    + tabBtn('pas', '🧭 Pasos (' + pasos.length + ')')
+    + (costos.length ? tabBtn('cos', '💲 Costos sugeridos') : '')
+    + '</div>';
+  if (tab === 'req') {
+    if (!reqs.length) h += '<div style="font-size:0.74rem;color:#a09070;font-style:italic;padding:8px 2px;">Sin requisitos capturados.</div>';
+    var listos = 0;
+    h += reqs.map(function(r, i){
+      var ok = !!checks[i]; if (ok) listos++;
+      return '<div onclick="_mpeToggleReq(\'' + k + '\',' + i + ')" style="display:flex;align-items:flex-start;gap:10px;padding:8px 4px;border-bottom:1px dashed #efe4c4;cursor:pointer;">'
+        + '<div style="width:18px;height:18px;border-radius:4px;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;' + (ok ? 'background:#1a7a3a;border:1.5px solid #1a7a3a;' : 'border:1.5px solid #b4a27a;background:#fff;') + '">' + (ok ? '✓' : '') + '</div>'
+        + '<div style="flex:1;min-width:0;"><div style="font-size:0.82rem;color:' + (ok ? '#7a7a70' : '#2a1c08') + ';' + (ok ? 'text-decoration:line-through;' : '') + '">' + _mpeEscH(r.texto) + '</div>'
+        + (r.detalle ? '<div style="font-size:0.68rem;color:#8a7a5a;margin-top:1px;">' + _mpeEscH(r.detalle) + '</div>' : '') + '</div></div>';
+    }).join('');
+    if (reqs.length) h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:0.72rem;">'
+      + '<span style="font-weight:700;color:' + (listos === reqs.length ? '#1a7a3a' : '#8a5a10') + ';">' + (listos === reqs.length ? '✓ Completo: el cliente entregó todo' : listos + ' de ' + reqs.length + ' listos · faltan ' + (reqs.length - listos)) + '</span>'
+      + (listos ? '<button onclick="_mpeReiniciarReq(\'' + k + '\')" style="background:none;border:none;color:#8a7a5a;text-decoration:underline;font-size:0.7rem;cursor:pointer;">Reiniciar</button>' : '') + '</div>';
+  } else if (tab === 'pas') {
+    h += pasos.length ? '<ol style="margin:4px 0 0 18px;padding:0;font-size:0.8rem;color:#2a1c08;line-height:1.7;">' + pasos.map(function(p){ return '<li>' + _mpeEscH(p) + '</li>'; }).join('') + '</ol>'
+      : '<div style="font-size:0.74rem;color:#a09070;font-style:italic;padding:8px 2px;">Sin pasos capturados.</div>';
+  } else {
+    var tot = 0, todosConMonto = true;
+    h += '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">' + costos.map(function(c){
+      if (c.monto == null) todosConMonto = false; else tot += parseFloat(c.monto) || 0;
+      return '<tr style="border-bottom:1px dashed #efe4c4;"><td style="padding:7px 2px;color:#2a1c08;">' + _mpeEscH(c.concepto) + (c.nota ? '<div style="font-size:0.68rem;color:#8a7a5a;">' + _mpeEscH(c.nota) + '</div>' : '') + '</td>'
+        + '<td style="padding:7px 2px;text-align:right;font-family:monospace;white-space:nowrap;color:#2a1c08;">' + (c.monto != null ? _mpeMoney(c.monto) : '—') + '</td></tr>';
+    }).join('') + '</table>'
+      + (costos.length > 1 ? '<div style="text-align:right;font-weight:700;font-size:0.84rem;color:#7a4a00;margin-top:6px;">Total sugerido: <span style="font-family:monospace;">' + _mpeMoney(tot) + '</span>' + (todosConMonto ? '' : ' <span style="font-weight:400;font-size:0.68rem;color:#8a7a5a;">(sin contar los que no tienen monto)</span>') + '</div>' : '')
+      + '<div style="font-size:0.66rem;color:#8a7a5a;margin-top:4px;">Costos sugeridos por el despacho — confírmalos antes de cobrar.</div>';
+  }
+  h += '<div style="font-size:0.62rem;color:#b0a080;margin-top:8px;">' + (info.fuente === 'ia' ? '✨ Leído del PDF por la IA' : '✏️ Capturado por el administrador') + (info.actualizado ? ' · ' + String(info.actualizado).slice(0, 10) : '') + '</div>';
+  return '<div style="border:1px solid #e8d898;border-radius:10px;background:#fff;padding:2px 14px 10px;">' + h + '</div>';
+}
+function _mpeToggleReq(k, i){ var c = window._mpeChecks[k] = window._mpeChecks[k] || {}; c[i] = !c[i]; _mpeRenderBody(_mpeEstado, _mpeSupuesto); }
+function _mpeReiniciarReq(k){ window._mpeChecks[k] = {}; _mpeRenderBody(_mpeEstado, _mpeSupuesto); }
+
+// ── Editor del administrador ──
+function _mpeFilaCosto(c){
+  c = c || {};
+  var inp = 'border:1px solid #d8ceb0;border-radius:5px;padding:5px 7px;font-size:0.74rem;background:#fffef8;color:#2a1c08;min-width:0;';
+  return '<div class="mpe-ed-costo" style="display:flex;gap:6px;margin-bottom:5px;align-items:center;">'
+    + '<input class="c-con" value="' + _mpeEscH(c.concepto || '') + '" placeholder="Concepto (ej. Honorarios)" style="' + inp + 'flex:2;">'
+    + '<input class="c-mon" type="number" min="0" step="0.01" value="' + (c.monto != null ? c.monto : '') + '" placeholder="$" style="' + inp + 'width:95px;">'
+    + '<input class="c-not" value="' + _mpeEscH(c.nota || '') + '" placeholder="Nota (opcional)" style="' + inp + 'flex:2;">'
+    + '<button type="button" onclick="this.parentNode.remove()" style="border:1px solid #e24b4a;border-radius:5px;padding:3px 8px;font-size:0.7rem;color:#a33;background:#fff8f8;cursor:pointer;">✕</button></div>';
+}
+function _mpeInfoEditorHTML(estado, supSlug, subSlug, info, instHasFile, etiqueta){
+  var k = estado + '_' + supSlug + '_' + subSlug;
+  var borrador = (window._mpeBorradorInfo && window._mpeBorradorInfo.k === k) ? window._mpeBorradorInfo.info : null;
+  info = borrador || info || { requisitos: [], pasos: [], costos: [], avisos: [] };
+  var ta = 'width:100%;box-sizing:border-box;border:1px solid #d8ceb0;border-radius:6px;padding:7px 9px;font-size:0.76rem;font-family:inherit;color:#2a1c08;background:#fffef8;resize:vertical;';
+  var lbl = function(t, s){ return '<div style="font-size:0.7rem;font-weight:700;color:#7a4a00;margin:10px 0 3px;">' + t + (s ? ' <span style="font-weight:400;color:#8a7a5a;">' + s + '</span>' : '') + '</div>'; };
+  var reqTxt = (info.requisitos || []).map(function(r){ return r.texto + (r.detalle ? ' | ' + r.detalle : ''); }).join('\n');
+  var costosRows = (info.costos && info.costos.length ? info.costos : [{}]).map(function(c){ return _mpeFilaCosto(c); }).join('');
+  var leyendo = window._mpeExtrayendo[k] === true;
+  var etq = String(etiqueta).replace(/'/g, '');
+  return '<div id="mpe-info-editor" data-estado="' + estado + '" data-sup="' + supSlug + '" data-sub="' + subSlug + '">'
+    + '<div style="font-size:0.7rem;color:#8a7a5a;line-height:1.5;">Esto es lo que ven las empleadas sin abrir el PDF. '
+    + (borrador ? '<b style="color:#7a4a00;">Recién leído del PDF: revisa y pulsa Guardar.</b>' : (info.fuente === 'ia' ? 'Lo leyó la IA del PDF: revísalo y corrige lo necesario.' : '')) + '</div>'
+    + lbl('📋 Requisitos', 'uno por renglón · para aclarar: Requisito | aclaración')
+    + '<textarea id="mpe-ed-req" rows="7" style="' + ta + '" placeholder="Factura original | y 2 copias">' + _mpeEscH(reqTxt) + '</textarea>'
+    + lbl('🧭 Pasos', 'uno por renglón, en orden')
+    + '<textarea id="mpe-ed-pas" rows="5" style="' + ta + '">' + _mpeEscH((info.pasos || []).join('\n')) + '</textarea>'
+    + lbl('💲 Costos sugeridos', 'concepto · monto · nota')
+    + '<div id="mpe-ed-costos">' + costosRows + '</div>'
+    + '<button type="button" onclick="document.getElementById(\'mpe-ed-costos\').insertAdjacentHTML(\'beforeend\', _mpeFilaCosto({}))" style="border:1px dashed #c8951a;border-radius:6px;padding:4px 12px;font-size:0.7rem;color:#7a4a00;background:#fef3d8;cursor:pointer;margin-top:4px;">＋ Agregar costo</button>'
+    + lbl('⚠ Avisos importantes', 'opcional, uno por renglón')
+    + '<textarea id="mpe-ed-avi" rows="2" style="' + ta + '">' + _mpeEscH((info.avisos || []).join('\n')) + '</textarea>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">'
+    + '<button type="button" onclick="_mpeGuardarInfo()" style="background:#2a7a4a;border:none;border-radius:7px;color:#fff;font-size:0.74rem;font-weight:700;padding:7px 16px;cursor:pointer;">💾 Guardar requisitos y costos</button>'
+    + (instHasFile ? '<button type="button" ' + (leyendo ? 'disabled' : '') + ' onclick="_mpeReleerPDF(\'' + etq + '\')" style="background:#fef3d8;border:1px solid #c8951a;border-radius:7px;color:#7a4a00;font-size:0.72rem;font-weight:700;padding:6px 13px;cursor:pointer;">' + (leyendo ? '⏳ Leyendo el PDF…' : '✨ Leer del PDF con IA') + '</button>' : '<span style="font-size:0.68rem;color:#a09070;">Adjunta abajo el PDF de instrucciones para que la IA lo lea.</span>')
+    + '</div></div>';
+}
+function _mpeLeerEditor(){
+  var lines = function(id){ return ((document.getElementById(id) || {}).value || '').split('\n').map(function(s){ return s.trim(); }).filter(Boolean); };
+  return {
+    requisitos: lines('mpe-ed-req').map(function(l){ var p = l.split('|'); return { texto: p[0].trim(), detalle: p.slice(1).join('|').trim() }; }).filter(function(r){ return r.texto; }),
+    pasos: lines('mpe-ed-pas'),
+    costos: Array.prototype.map.call(document.querySelectorAll('#mpe-ed-costos .mpe-ed-costo'), function(row){
+      var m = parseFloat(row.querySelector('.c-mon').value);
+      return { concepto: row.querySelector('.c-con').value.trim(), monto: isNaN(m) ? null : Math.round(m * 100) / 100, nota: row.querySelector('.c-not').value.trim() };
+    }).filter(function(c){ return c.concepto; }),
+    avisos: lines('mpe-ed-avi')
+  };
+}
+async function _mpeGuardarInfo(){
+  var ed = document.getElementById('mpe-info-editor'); if (!ed) return;
+  var estado = ed.getAttribute('data-estado'), supSlug = ed.getAttribute('data-sup'), subSlug = ed.getAttribute('data-sub');
+  var info = _mpeLeerEditor();
+  if (info.costos.some(function(c){ return c.monto != null && c.monto < 0; })) { if (typeof toast === 'function') toast('⚠ Los montos no pueden ser negativos', 'err'); return; }
+  info.fuente = 'admin'; info.actualizado = new Date().toISOString(); info.por = _mpeUsuario();
+  var meta = Object.assign({}, _mpeMetaDe(estado, supSlug, subSlug) || {}, { _info: info });
+  try {
+    await _mpeGuardarMeta(estado, supSlug, subSlug, meta);
+    window._mpeBorradorInfo = null;
+    if (typeof toast === 'function') toast('✅ Requisitos y costos guardados — ya los ven todos', 'ok');
+    _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+  } catch(e) { if (typeof toast === 'function') toast('⚠ No se pudo guardar: ' + (e && e.message), 'err'); }
+}
+async function _mpeReleerPDF(etiqueta){
+  var ed = document.getElementById('mpe-info-editor'); if (!ed) return;
+  var estado = ed.getAttribute('data-estado'), supSlug = ed.getAttribute('data-sup'), subSlug = ed.getAttribute('data-sub');
+  var k = estado + '_' + supSlug + '_' + subSlug;
+  window._mpeExtrayendo[k] = true; _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+  try {
+    var info = await _mpeExtraerInfoDePDF(estado, supSlug, subSlug, etiqueta);
+    info.fuente = 'ia';
+    // Se muestra en el editor SIN guardar: el administrador revisa y pulsa Guardar
+    window._mpeBorradorInfo = { k: k, info: info };
+    if (typeof toast === 'function') toast('✨ Leído del PDF — revisa y pulsa «Guardar requisitos y costos»', 'ok');
+  } catch(e) {
+    if (typeof toast === 'function') toast('⚠ No se pudo leer el PDF: ' + (e && e.message), 'err');
+  }
+  delete window._mpeExtrayendo[k];
+  _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+}
+
 function _mpeRenderBody(estado, supIdx) {
   const cfg = _MPE_CONFIG[estado];
   if (!cfg) return;
@@ -9291,6 +9542,8 @@ function _mpeRenderBody(estado, supIdx) {
     (() => { try { return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${instTipo}`) || null; } catch(e){ return null; } })();
   const metaKey      = `${estado}_${supSlug}_${subSlug}_meta`;
   const metaCache    = _mpeCache[metaKey] || {};
+  const infoTram     = metaCache._info || null;
+  const metaCargada  = !!_mpeCache[metaKey];
   const instPdfName  = metaKey && metaCache[instTipo] ? metaCache[instTipo] :
     (() => { try { return localStorage.getItem(`mpe_${estado}_${supSlug}_${subSlug}_${instTipo}_name`) || ''; } catch(e){ return ''; } })();
   const instHasFile  = !!(instPdfData || instPdfName);
@@ -9437,6 +9690,7 @@ function _mpeRenderBody(estado, supIdx) {
     <div style="background:#f0faf4;border:1px solid #b8e0c8;border-radius:10px;padding:9px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
       <span style="font-size:0.72rem;color:#2a7a4a;font-weight:600;">✅ Modo administrador activo</span>
       <div style="display:flex;gap:8px;align-items:center;">
+        <button onclick="_mpeLeerTodosLosPDF()" title="La IA lee los PDF de instrucciones de todos los trámites que aún no tienen requisitos" style="background:#fef3d8;border:1px solid #c8951a;border-radius:7px;color:#7a4a00;font-size:0.72rem;font-weight:700;padding:6px 12px;cursor:pointer;">✨ Leer todos los PDF</button>
         <button id="mpe-btn-guardar" onclick="_mpeGuardarCambios()" style="background:#2a7a4a;border:none;border-radius:7px;color:#fff;font-size:0.72rem;font-weight:700;padding:6px 16px;cursor:pointer;">💾 Guardar cambios</button>
         <button onclick="_mpeCerrarAdminConAviso()" style="background:transparent;border:1px solid #b8e0c8;border-radius:6px;color:#2a7a4a;font-size:0.68rem;padding:5px 12px;cursor:pointer;">Ver en modo lectura</button>
       </div>
@@ -9484,7 +9738,9 @@ function _mpeRenderBody(estado, supIdx) {
   let paso3;
   if (isAdmin) {
     // Administrador editando: se conservan los controles de edición de siempre.
-    paso3 = '<div>' + paso3Titulo + '<div style="display:flex;flex-direction:column;gap:12px;">' + b1 + b2 + b3 + '</div></div>';
+    const _etqTram = [subTabs[subIdx] || '', sup, cfg.label].filter(Boolean).join(' · ');
+    const b0 = _mpeBloque('Requisitos, pasos y costos sugeridos (lo que ven las empleadas)', '#2a7a4a', '✅', _mpeInfoEditorHTML(estado, supSlug, subSlug, infoTram, instHasFile, _etqTram));
+    paso3 = '<div>' + paso3Titulo + '<div style="display:flex;flex-direction:column;gap:12px;">' + b0 + b1 + b2 + b3 + '</div></div>';
   } else {
     const _btnVer = function(onclick){ return '<button onclick="' + onclick + '" style="background:#1a4a8a;color:#fff;border:none;border-radius:6px;padding:7px 13px;font-size:0.72rem;font-weight:600;cursor:pointer;white-space:nowrap;">👁 Ver</button>'; };
     const _btnDesc = function(onclick){ return '<button onclick="' + onclick + '" style="background:#fff;color:#1a4a8a;border:1.5px solid #1a4a8a;border-radius:6px;padding:6px 11px;font-size:0.72rem;font-weight:600;cursor:pointer;white-space:nowrap;">⭳ Descargar</button>'; };
@@ -9498,7 +9754,7 @@ function _mpeRenderBody(estado, supIdx) {
     };
     const _esc = function(t){ return String(t || '').replace(/\\/g,'\\\\').replace(/'/g, "\\'"); };
     const filas = [];
-    filas.push(_fila(1, '📋', 'Instrucciones del trámite', 'Qué pedir al cliente y cómo hacerlo',
+    filas.push(_fila(1, '📋', infoTram ? 'PDF original de instrucciones' : 'Instrucciones del trámite', infoTram ? 'Por si necesitas ver el documento completo' : 'Qué pedir al cliente y cómo hacerlo',
       instHasFile ? _btnVer("_mpePDFVisorData('" + estado + "','" + supSlug + "','" + subSlug + "','" + instTipo + "','" + _esc(instPdfName || 'Instrucciones') + "')") : _noDisp));
     filas.push(_fila(2, '📂', 'Ejemplo de expediente armado', 'Cómo debe quedar el expediente completo',
       pdfHasFile ? _btnVer("_mpePDFVisorData('" + estado + "','" + supSlug + "','" + subSlug + "','" + pdfTipo + "','" + _esc(pdfName || 'Expediente') + "')") : _noDisp));
@@ -9518,7 +9774,23 @@ function _mpeRenderBody(estado, supIdx) {
     }
     // marcar la última fila sin borde
     filas[filas.length - 1] = filas[filas.length - 1].replace('border-bottom:1px solid #efe4c4;', '');
-    paso3 = '<div>' + paso3Titulo + '<div style="border:1px solid #e8d898;border-radius:10px;overflow:hidden;background:#fff;">' + filas.join('') + '</div></div>';
+    const _archivos = '<div style="border:1px solid #e8d898;border-radius:10px;overflow:hidden;background:#fff;">' + filas.join('') + '</div>';
+    if (infoTram) {
+      paso3 = '<div>' + paso3Titulo + _mpeInfoHTML(estado, supSlug, subSlug, infoTram)
+        + '<div style="font-size:0.7rem;font-weight:700;color:#8a5a10;letter-spacing:0.04em;margin:14px 0 6px;">ARCHIVOS Y FORMATOS</div>' + _archivos + '</div>';
+    } else {
+      // Sin requisitos capturados todavía: si entra el administrador y hay
+      // PDF de instrucciones, la IA lo lee en ese momento y lo guarda.
+      const _kEx = estado + '_' + supSlug + '_' + subSlug;
+      let _avisoIA = '';
+      if (_esAdminEmail && instHasFile && metaCargada && !window._mpeExtrayendo[_kEx]) {
+        setTimeout(function(){ _mpeAutoExtraer(estado, supSlug, subSlug, _resumenSel); }, 0);
+        _avisoIA = '<div style="font-size:0.72rem;color:#7a4a00;background:#fef3d8;border:1px solid #e8c878;border-radius:8px;padding:8px 12px;margin-bottom:8px;">⏳ La IA está leyendo los requisitos del PDF para mostrarlos aquí…</div>';
+      } else if (window._mpeExtrayendo[_kEx] === true) {
+        _avisoIA = '<div style="font-size:0.72rem;color:#7a4a00;background:#fef3d8;border:1px solid #e8c878;border-radius:8px;padding:8px 12px;margin-bottom:8px;">⏳ La IA está leyendo los requisitos del PDF para mostrarlos aquí…</div>';
+      }
+      paso3 = '<div>' + paso3Titulo + _avisoIA + _archivos + '</div>';
+    }
   }
 
   // Pie: en modo lectura solo una línea discreta; el botón para editar

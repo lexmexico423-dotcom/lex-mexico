@@ -15799,11 +15799,12 @@ Recibo original im…</td>
 
       <!-- ══ MODAL PANEL DE ESTADOS ══════════════════════════════════════════════════ -->
       <div id="modal-panel-estado" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
-        <div style="background:#ffffff;border:1px solid #e0d8c8;border-radius:14px;width:min(660px,96vw);max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.25);">
+        <div id="mpe-dialog" style="background:#ffffff;border:1px solid #e0d8c8;border-radius:14px;width:min(660px,96vw);max-height:88vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.25);transition:width .15s;">
           <div style="background:#fdf8f0;border-bottom:1px solid #e8dfc8;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;border-radius:14px 14px 0 0;flex-wrap:wrap;gap:8px;">
             <span id="mpe-title" style="font-size:0.8rem;font-weight:700;color:#7a5a1a;font-family:monospace;letter-spacing:0.06em;text-transform:uppercase;">📍 Panel</span>
             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
               <div id="mpe-supuesto-tabs" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
+              <button id="mpe-btn-grande" onclick="_mpeToggleGrande()" style="display:none;background:transparent;border:1px solid #c8a87a;border-radius:6px;color:#7a5a1a;font-size:0.7rem;padding:4px 10px;cursor:pointer;margin-left:6px;">⤢ Agrandar</button>
               <button onclick="cerrarPanelEstado()" style="background:transparent;border:1px solid #c8a87a;border-radius:6px;color:#7a5a1a;font-size:0.7rem;padding:4px 10px;cursor:pointer;margin-left:6px;">✕ Cerrar</button>
             </div>
           </div>
@@ -19424,7 +19425,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20261008a"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=20261008c"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->

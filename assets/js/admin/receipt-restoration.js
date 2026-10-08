@@ -9400,7 +9400,7 @@ function _mpeInfoHTML(estado, supSlug, subSlug, info){
   }
   h += '<div style="display:flex;gap:2px;border-bottom:1px solid #efe4c4;margin-bottom:8px;flex-wrap:wrap;">'
     + tabBtn('req', '📋 Requisitos (' + reqs.length + ')')
-    + tabBtn('pas', '🧭 Pasos (' + pasos.length + ')')
+    + tabBtn('pas', '🧭 Cómo armarlo')
     + (costos.length ? tabBtn('cos', '💲 Costos sugeridos') : '')
     + '</div>';
   if (tab === 'req') {
@@ -9429,7 +9429,7 @@ function _mpeInfoHTML(estado, supSlug, subSlug, info){
       + (costos.length > 1 ? '<div style="text-align:right;font-weight:700;font-size:0.84rem;color:#7a4a00;margin-top:6px;">Total sugerido: <span style="font-family:monospace;">' + _mpeMoney(tot) + '</span>' + (todosConMonto ? '' : ' <span style="font-weight:400;font-size:0.68rem;color:#8a7a5a;">(sin contar los que no tienen monto)</span>') + '</div>' : '')
       + '<div style="font-size:0.66rem;color:#8a7a5a;margin-top:4px;">Costos sugeridos por el despacho — confírmalos antes de cobrar.</div>';
   }
-  h += '<div style="font-size:0.62rem;color:#b0a080;margin-top:8px;">' + (info.fuente === 'ia' ? '✨ Leído del PDF por la IA' : '✏️ Capturado por el administrador') + (info.actualizado ? ' · ' + String(info.actualizado).slice(0, 10) : '') + '</div>';
+  h += '<div style="font-size:0.62rem;color:#b0a080;margin-top:8px;">' + (info.fuente === 'admin' ? '✏️ Actualizado por el administrador' : '📄 Tomado del PDF de requisitos') + (info.actualizado ? ' · ' + String(info.actualizado).slice(0, 10) : '') + '</div>';
   return '<div style="border:1px solid #e8d898;border-radius:10px;background:#fff;padding:2px 14px 10px;">' + h + '</div>';
 }
 function _mpeToggleReq(k, i){ var c = window._mpeChecks[k] = window._mpeChecks[k] || {}; c[i] = !c[i]; _mpeRenderBody(_mpeEstado, _mpeSupuesto); }
@@ -9457,10 +9457,10 @@ function _mpeInfoEditorHTML(estado, supSlug, subSlug, info, instHasFile, etiquet
   var etq = String(etiqueta).replace(/'/g, '');
   return '<div id="mpe-info-editor" data-estado="' + estado + '" data-sup="' + supSlug + '" data-sub="' + subSlug + '">'
     + '<div style="font-size:0.7rem;color:#8a7a5a;line-height:1.5;">Esto es lo que ven las empleadas sin abrir el PDF. '
-    + (borrador ? '<b style="color:#7a4a00;">Recién leído del PDF: revisa y pulsa Guardar.</b>' : (info.fuente === 'ia' ? 'Lo leyó la IA del PDF: revísalo y corrige lo necesario.' : '')) + '</div>'
+    + (info.fuente === 'pdf' ? 'Transcrito del PDF de requisitos; corrige o completa lo que haga falta (por ejemplo, los costos sugeridos).' : '') + '</div>'
     + lbl('📋 Requisitos', 'uno por renglón · para aclarar: Requisito | aclaración')
     + '<textarea id="mpe-ed-req" rows="7" style="' + ta + '" placeholder="Factura original | y 2 copias">' + _mpeEscH(reqTxt) + '</textarea>'
-    + lbl('🧭 Pasos', 'uno por renglón, en orden')
+    + lbl('🧭 Cómo armarlo', 'uno por renglón, en orden')
     + '<textarea id="mpe-ed-pas" rows="5" style="' + ta + '">' + _mpeEscH((info.pasos || []).join('\n')) + '</textarea>'
     + lbl('💲 Costos sugeridos', 'concepto · monto · nota')
     + '<div id="mpe-ed-costos">' + costosRows + '</div>'
@@ -9469,7 +9469,6 @@ function _mpeInfoEditorHTML(estado, supSlug, subSlug, info, instHasFile, etiquet
     + '<textarea id="mpe-ed-avi" rows="2" style="' + ta + '">' + _mpeEscH((info.avisos || []).join('\n')) + '</textarea>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">'
     + '<button type="button" onclick="_mpeGuardarInfo()" style="background:#2a7a4a;border:none;border-radius:7px;color:#fff;font-size:0.74rem;font-weight:700;padding:7px 16px;cursor:pointer;">💾 Guardar requisitos y costos</button>'
-    + (instHasFile ? '<button type="button" ' + (leyendo ? 'disabled' : '') + ' onclick="_mpeReleerPDF(\'' + etq + '\')" style="background:#fef3d8;border:1px solid #c8951a;border-radius:7px;color:#7a4a00;font-size:0.72rem;font-weight:700;padding:6px 13px;cursor:pointer;">' + (leyendo ? '⏳ Leyendo el PDF…' : '✨ Leer del PDF con IA') + '</button>' : '<span style="font-size:0.68rem;color:#a09070;">Adjunta abajo el PDF de instrucciones para que la IA lo lea.</span>')
     + '</div></div>';
 }
 function _mpeLeerEditor(){
@@ -9690,7 +9689,6 @@ function _mpeRenderBody(estado, supIdx) {
     <div style="background:#f0faf4;border:1px solid #b8e0c8;border-radius:10px;padding:9px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
       <span style="font-size:0.72rem;color:#2a7a4a;font-weight:600;">✅ Modo administrador activo</span>
       <div style="display:flex;gap:8px;align-items:center;">
-        <button onclick="_mpeLeerTodosLosPDF()" title="La IA lee los PDF de instrucciones de todos los trámites que aún no tienen requisitos" style="background:#fef3d8;border:1px solid #c8951a;border-radius:7px;color:#7a4a00;font-size:0.72rem;font-weight:700;padding:6px 12px;cursor:pointer;">✨ Leer todos los PDF</button>
         <button id="mpe-btn-guardar" onclick="_mpeGuardarCambios()" style="background:#2a7a4a;border:none;border-radius:7px;color:#fff;font-size:0.72rem;font-weight:700;padding:6px 16px;cursor:pointer;">💾 Guardar cambios</button>
         <button onclick="_mpeCerrarAdminConAviso()" style="background:transparent;border:1px solid #b8e0c8;border-radius:6px;color:#2a7a4a;font-size:0.68rem;padding:5px 12px;cursor:pointer;">Ver en modo lectura</button>
       </div>
@@ -9783,11 +9781,8 @@ function _mpeRenderBody(estado, supIdx) {
       // PDF de instrucciones, la IA lo lee en ese momento y lo guarda.
       const _kEx = estado + '_' + supSlug + '_' + subSlug;
       let _avisoIA = '';
-      if (_esAdminEmail && instHasFile && metaCargada && !window._mpeExtrayendo[_kEx]) {
-        setTimeout(function(){ _mpeAutoExtraer(estado, supSlug, subSlug, _resumenSel); }, 0);
-        _avisoIA = '<div style="font-size:0.72rem;color:#7a4a00;background:#fef3d8;border:1px solid #e8c878;border-radius:8px;padding:8px 12px;margin-bottom:8px;">⏳ La IA está leyendo los requisitos del PDF para mostrarlos aquí…</div>';
-      } else if (window._mpeExtrayendo[_kEx] === true) {
-        _avisoIA = '<div style="font-size:0.72rem;color:#7a4a00;background:#fef3d8;border:1px solid #e8c878;border-radius:8px;padding:8px 12px;margin-bottom:8px;">⏳ La IA está leyendo los requisitos del PDF para mostrarlos aquí…</div>';
+      if (_esAdminEmail) {
+        _avisoIA = '<div style="font-size:0.72rem;color:#7a4a00;background:#fef3d8;border:1px solid #e8c878;border-radius:8px;padding:8px 12px;margin-bottom:8px;">Este trámite todavía no tiene sus requisitos capturados. Captúralos en «✏️ Editar contenido».</div>';
       }
       paso3 = '<div>' + paso3Titulo + _avisoIA + _archivos + '</div>';
     }

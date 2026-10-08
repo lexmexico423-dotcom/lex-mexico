@@ -284,7 +284,8 @@ function renderAcuerdosDrive(lista) {
         + '<button onclick="_juRevisarAcuerdos()" style="background:#b06a00;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:.72rem;font-weight:700;cursor:pointer;">🛠 Revisar y reparar</button></div>';
     }
   } catch(eAv){}
-  cont.innerHTML = avisoRep + barra;
+  cont.innerHTML = avisoRep + '<div id="ju-aviso-parciales"></div>' + barra;
+  if (!avisoRep) setTimeout(function(){ try { _juAvisoParcialesFondo(lista); } catch(e){} }, 0);
   if (!vis.length) {
     cont.insertAdjacentHTML('beforeend', '<div style="padding:18px 10px;text-align:center;color:var(--muted);font-size:0.74rem;">' + (filtro === 'accion' ? '✓ No hay acuerdos pendientes de atender.' : 'No hay acuerdos en este filtro.') + '</div>');
     return;
@@ -592,6 +593,40 @@ Responde ÚNICAMENTE con un JSON válido, sin markdown ni texto extra:
       if (_resFecha.fuente === 'texto' && fechaIALeida && fechaIALeida !== _resFecha.iso) console.info('[Acuerdos] Fecha corregida con el texto del acuerdo:', fechaIALeida, '→', _resFecha.iso);
       fechaIA = _resFecha.iso;
 
+      // ¿Es el mismo documento que otro ya subido (otro escaneo, quizá con
+      // hojas de menos o de más)? Se compara el texto con los de la misma fecha.
+      let _reemplazarAc = null;
+      if (textoOCR) {
+        try {
+          const _sNuevo = _juShingles(textoOCR);
+          const _mismaFecha = lista.filter(a => a.id !== tmpId && a.driveFileId && a.fechaAcuerdo === fechaIA);
+          for (const ex of _mismaFecha) {
+            const _sEx = _juShingles(await _juOcrDe(ex));
+            if (_sEx.size < 30 || _sNuevo.size < 30) continue;
+            const nuevoEnEx = _juContencion(_sNuevo, _sEx), exEnNuevo = _juContencion(_sEx, _sNuevo);
+            if (Math.max(nuevoEnEx, exEnNuevo) < _JU_UMBRAL_MISMO_TEXTO) continue;
+            const _nomEx = (_juFechaLarga(ex.fechaAcuerdo) ? _juFechaLarga(ex.fechaAcuerdo) + ' · ' : '') + _juTituloAcuerdo(ex);
+            if (_sNuevo.size > _sEx.size * 1.15 && exEnNuevo >= _JU_UMBRAL_MISMO_TEXTO) {
+              const okR = await confirmarBonito({ titulo: 'Versión más completa', mensaje: 'Ya está subido «' + _nomEx + '» con el mismo texto, pero incompleto.\n\nEste PDF trae más hojas. ¿Reemplazar el incompleto por este?', btnSi: 'Sí, reemplazar', btnNo: 'Cancelar' });
+              if (!okR) throw { _cancelado: true };
+              _reemplazarAc = ex;
+            } else {
+              const okS = await confirmarBonito({ titulo: 'Este documento ya está subido', mensaje: '«' + _nomEx + '» ya contiene este mismo texto (' + Math.round(Math.max(nuevoEnEx, exEnNuevo) * 100) + '% igual).\n\nNo hace falta subirlo otra vez.', btnSi: 'Subirlo de todos modos', btnNo: 'No subir', peligro: true });
+              if (!okS) throw { _cancelado: true };
+            }
+            break;
+          }
+        } catch(eDup) {
+          if (eDup && eDup._cancelado) {
+            lista = lista.filter(a => a.id !== tmpId);
+            renderAcuerdosDrive(lista);
+            if (typeof toast === 'function') toast('No se subió: el documento ya estaba en el expediente', 'ok');
+            continue;
+          }
+          console.warn('[Acuerdos] comparar texto:', eDup);
+        }
+      }
+
       // Nombre del archivo en Drive: DD-MM-AAAA NOMBRE.pdf; la tarjeta muestra solo NOMBRE
       const [_anioAc, _mesAc, _diaAc] = fechaIA.split('-');
       const _sufijoAc = (nombreCortoIA || nombreIA.replace(/[^A-Z0-9\s\-]/gi,'').trim().slice(0,40)).toUpperCase().replace(/[<>:"/\\|?*]/g,'').trim();
@@ -640,6 +675,21 @@ Responde ÚNICAMENTE con un JSON válido, sin markdown ni texto extra:
       const idx = lista.findIndex(a => a.id === tmpId);
       const acFinal = { md5: fileMd5 || '', tam: file.size, fechaRevisar: !!_resFecha.revisar, id: tmpId, archivo: file.name, nombre: nombreMostrar, nombreLargo: nombreIA, descripcion: descripcionIA, tipo: tipoIA, estado: driveFileId ? 'listo' : 'error_drive', fechaSubida: new Date().toISOString().slice(0,10), fechaAcuerdo: fechaIA, resumen: resumenIA, driveFileId, sha256: fileSha256 };
       if (idx >= 0) lista[idx] = acFinal; else lista.push(acFinal);
+      // Reemplazo de la copia incompleta: va a la papelera y su marca pasa a la nueva
+      if (_reemplazarAc && driveFileId) {
+        try {
+          const _tokR = await driveGetAccessToken();
+          if (_tokR) await _juDrivePatch(_tokR, _reemplazarAc.driveFileId, { trashed: true });
+          lista = lista.filter(a => a.driveFileId !== _reemplazarAc.driveFileId);
+          if (juicioActivoUpload) {
+            const _mR = _juMeta(juicioActivoUpload), _viejo = _mR[_reemplazarAc.driveFileId];
+            if (_viejo) { _mR[driveFileId] = Object.assign({}, _viejo, _mR[driveFileId] || {}); delete _mR[_reemplazarAc.driveFileId]; }
+            if (Array.isArray(juicioActivoUpload.historial)) juicioActivoUpload.historial = juicioActivoUpload.historial.filter(h => !(h && h.driveFileId === _reemplazarAc.driveFileId));
+            juicioActivoUpload.updatedAt = Date.now();
+          }
+          if (typeof toast === 'function') toast('♻ Se reemplazó la copia incompleta', 'ok');
+        } catch(eR) { console.warn('[Acuerdos] reemplazar copia incompleta:', eR); }
+      }
       // Quién lo subió (se guarda en el expediente para que lo vean todos).
       try { if (typeof _juRegistrarSubidoPor === 'function' && driveFileId) _juRegistrarSubidoPor(acFinal); } catch(eSP){}
       // Sin una fecha confiable → queda marcada "⚠ Revisa la fecha" (para todos).
@@ -3471,7 +3521,7 @@ function _juDialogoReparacion(plan){
     var linea = function(ac){ return '<b>' + esc(_juFechaLarga(ac.fechaAcuerdo) || 'sin fecha') + '</b> · ' + esc(_juTituloAcuerdo(ac)); };
     var h = '';
     if (plan.grupos.length) {
-      h += '<div style="font-size:.8rem;font-weight:700;color:var(--ink);margin:4px 0 4px;">1. Copias repetidas · ' + plan.quitar.length + ' archivo(s) sobran</div>'
+      h += '<div style="font-size:.8rem;font-weight:700;color:var(--ink);margin:4px 0 4px;">1. Copias repetidas · ' + plan.grupos.reduce(function(s, g){ return s + g.length - 1; }, 0) + ' archivo(s) sobran</div>'
         + '<div style="font-size:.7rem;color:var(--muted);margin-bottom:8px;line-height:1.5;">Es el mismo PDF subido más de una vez. Se conserva una copia y las demás se mandan a la <b>papelera de Drive</b> (se pueden recuperar durante 30 días).</div>';
       plan.grupos.forEach(function(g){
         h += '<div style="border:1px solid var(--border-l);border-radius:8px;padding:8px 10px;margin-bottom:6px;background:var(--surface);font-size:.72rem;line-height:1.55;">'
@@ -3480,8 +3530,18 @@ function _juDialogoReparacion(plan){
           + '</div>';
       });
     }
+    if (plan.parciales && plan.parciales.length) {
+      h += '<div style="font-size:.8rem;font-weight:700;color:var(--ink);margin:12px 0 4px;">' + (plan.grupos.length ? '1b' : '1') + '. Mismo documento escaneado dos veces · ' + plan.parciales.length + '</div>'
+        + '<div style="font-size:.7rem;color:var(--muted);margin-bottom:8px;line-height:1.5;">Tienen la misma fecha y el mismo texto, pero una copia está <b>incompleta</b> (le faltan hojas). Se conserva la completa y la otra va a la papelera de Drive (recuperable 30 días).</div>';
+      plan.parciales.forEach(function(p){
+        h += '<div style="border:1px solid var(--border-l);border-radius:8px;padding:8px 10px;margin-bottom:6px;background:var(--surface);font-size:.72rem;line-height:1.55;">'
+          + '<div style="color:var(--verde-d);">✓ Se conserva (completa' + (p.masTexto > 0 ? ', ' + p.masTexto + '% más texto' : '') + '): ' + linea(p.conserva) + '</div>'
+          + '<div style="color:#a32d2d;">🗑 A la papelera (su texto ya está en la otra, ' + p.pct + '%): ' + linea(p.quitar) + '</div>'
+          + '</div>';
+      });
+    }
     if (plan.cambiosFecha.length) {
-      h += '<div style="font-size:.8rem;font-weight:700;color:var(--ink);margin:12px 0 4px;">' + (plan.grupos.length ? '2' : '1') + '. Fechas corregidas · ' + plan.cambiosFecha.length + '</div>'
+      h += '<div style="font-size:.8rem;font-weight:700;color:var(--ink);margin:12px 0 4px;">' + (plan.grupos.length || (plan.parciales && plan.parciales.length) ? '2' : '1') + '. Fechas corregidas · ' + plan.cambiosFecha.length + '</div>'
         + '<div style="font-size:.7rem;color:var(--muted);margin-bottom:8px;">Leídas del propio texto del acuerdo. También se corrige el nombre del archivo en Drive.</div>';
       plan.cambiosFecha.forEach(function(c){
         h += '<div style="border:1px solid var(--border-l);border-radius:8px;padding:8px 10px;margin-bottom:6px;background:var(--surface);font-size:.72rem;line-height:1.55;">'
@@ -3518,6 +3578,80 @@ function _juDialogoReparacion(plan){
 // 🛠 Revisa TODO el expediente de una vez: copias repetidas, fechas mal
 // leídas y la línea de tiempo interna. Muestra el detalle y solo aplica si
 // el usuario confirma. Reemplaza al antiguo "🧹 Acuerdos duplicados".
+// ══════════════════════════════════════════════════════════════════════
+// MISMO DOCUMENTO, OTRO ESCANEO (oct-2026). Caso real: el acta de la
+// audiencia de pruebas y alegatos del 10-07-2025 estaba DOS veces: una
+// copia incompleta (las primeras hojas, 0.9 MB) y la completa (2.8 MB). Como
+// los archivos no son idénticos byte a byte, la huella MD5 no las detecta.
+// Ahora se compara el TEXTO (OCR guardado en R2) de los acuerdos con la
+// misma fecha: si casi todo el texto de uno está dentro del otro, es el
+// mismo documento y se conserva el más completo.
+// ══════════════════════════════════════════════════════════════════════
+var _JU_UMBRAL_MISMO_TEXTO = 0.7;
+function _juShingles(txt){
+  var w = _juNormTexto(txt).replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).filter(function(x){ return x.length > 1; });
+  var s = new Set();
+  for (var i = 0; i + 4 <= w.length; i++) s.add(w[i] + ' ' + w[i+1] + ' ' + w[i+2] + ' ' + w[i+3]);
+  return s;
+}
+// Qué fracción del texto A aparece dentro del texto B (0..1)
+function _juContencion(a, b){
+  if (!a || !a.size || !b || !b.size) return 0;
+  var n = 0; a.forEach(function(x){ if (b.has(x)) n++; });
+  return n / a.size;
+}
+window._juOcrCache = window._juOcrCache || {};
+async function _juOcrDe(ac){
+  var id = ac && ac.driveFileId;
+  if (!id) return '';
+  if (window._juOcrCache[id] !== undefined) return window._juOcrCache[id];
+  var t = '';
+  try { var r = await _r2CargarResumen(id); t = (r && r.ocrTexto) || ''; } catch(e){}
+  window._juOcrCache[id] = t;
+  return t;
+}
+// Pares {conserva, quitar, pct} de acuerdos con la misma fecha y el mismo texto.
+async function _juBuscarCopiasParciales(lista){
+  var porFecha = {};
+  (lista || []).forEach(function(a){ if (a && a.driveFileId && a.fechaAcuerdo && a.estado !== 'procesando') (porFecha[a.fechaAcuerdo] = porFecha[a.fechaAcuerdo] || []).push(a); });
+  var res = [], quitados = {};
+  for (var f in porFecha) {
+    var g = porFecha[f]; if (g.length < 2) continue;
+    var sh = [];
+    for (var i = 0; i < g.length; i++) sh.push(_juShingles(await _juOcrDe(g[i])));
+    for (var x = 0; x < g.length; x++) for (var y = x + 1; y < g.length; y++) {
+      var A = g[x], Bq = g[y], sA = sh[x], sB = sh[y];
+      if (quitados[A.driveFileId] || quitados[Bq.driveFileId]) continue;
+      if (sA.size < 30 || sB.size < 30) continue;
+      var aEnB = _juContencion(sA, sB), bEnA = _juContencion(sB, sA);
+      if (Math.max(aEnB, bEnA) < _JU_UMBRAL_MISMO_TEXTO) continue;
+      // Se queda el que tiene MÁS texto (el más completo)
+      var conserva = sA.size >= sB.size ? A : Bq, quitar = conserva === A ? Bq : A;
+      quitados[quitar.driveFileId] = true;
+      res.push({ conserva: conserva, quitar: quitar, pct: Math.round(Math.max(aEnB, bEnA) * 100), masTexto: Math.round((Math.max(sA.size, sB.size) / Math.max(1, Math.min(sA.size, sB.size)) - 1) * 100) });
+    }
+  }
+  return res;
+}
+// Aviso en la lista (en segundo plano; se calcula una vez por lista)
+window._juParcialesCache = window._juParcialesCache || {};
+async function _juAvisoParcialesFondo(lista){
+  var el = document.getElementById('ju-aviso-parciales');
+  if (!el) return;
+  var firma = (lista || []).filter(function(a){ return a && a.driveFileId; }).map(function(a){ return a.driveFileId + ':' + (a.fechaAcuerdo || ''); }).sort().join('|');
+  if (!firma) return;
+  var n = window._juParcialesCache[firma];
+  if (n === undefined) {
+    try { n = (await _juBuscarCopiasParciales(lista)).length; } catch(e){ n = 0; }
+    window._juParcialesCache[firma] = n;
+  }
+  el = document.getElementById('ju-aviso-parciales');
+  if (!el || !n) return;
+  el.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:#fff8e8;border:1.5px solid #e0a040;border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:.74rem;color:#7a4a00;">'
+    + '<span style="flex:1;min-width:180px;">⚠ <b>' + n + '</b> acuerdo' + (n === 1 ? '' : 's') + ' parece' + (n === 1 ? '' : 'n') + ' el mismo documento escaneado dos veces (una copia está incompleta).</span>'
+    + '<button onclick="_juRevisarAcuerdos()" style="background:#b06a00;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:.72rem;font-weight:700;cursor:pointer;">🛠 Revisar y reparar</button></div>';
+}
+
 async function _juRevisarAcuerdos(){
   var jId = window._jdetId;
   var idx = (typeof jdetIdx !== 'undefined' && jdetIdx >= 0) ? jdetIdx : _mexpIdx;
@@ -3536,6 +3670,15 @@ async function _juRevisarAcuerdos(){
   grupos.forEach(function(g){ g.forEach(function(x){ grupoDe[x.driveFileId] = g; }); g.slice(1).forEach(function(x){ quitar.push(x); }); });
   var idsQuitar = {}; quitar.forEach(function(x){ idsQuitar[x.driveFileId] = true; });
   var quedan = lista.filter(function(a){ return !idsQuitar[a.driveFileId]; });
+  // 1b) Mismo documento escaneado dos veces (una copia incompleta)
+  var parciales = [];
+  try { if (typeof toast === 'function') toast('📖 Comparando el texto de los acuerdos…', 'ok'); parciales = await _juBuscarCopiasParciales(quedan); } catch(e){ console.warn('[Acuerdos] comparar textos:', e); }
+  parciales.forEach(function(p){
+    quitar.push(p.quitar); idsQuitar[p.quitar.driveFileId] = true;
+    grupoDe[p.quitar.driveFileId] = [p.conserva, p.quitar];
+    if (!grupoDe[p.conserva.driveFileId]) grupoDe[p.conserva.driveFileId] = [p.conserva, p.quitar];
+  });
+  if (parciales.length) quedan = quedan.filter(function(a){ return !idsQuitar[a.driveFileId]; });
 
   // 2) Fechas: se leen del texto guardado (R2) de cada acuerdo — o de
   // cualquiera de sus copias, que es el mismo documento.
@@ -3565,7 +3708,7 @@ async function _juRevisarAcuerdos(){
   }
   var ok = await _juDialogoReparacion({
     titulo: (j.cliente || j.nombre || '') + (j.expediente ? ' · Exp. ' + j.expediente : ''),
-    total: lista.length, quedan: quedan.length, grupos: grupos, quitar: quitar,
+    total: lista.length, quedan: quedan.length, grupos: grupos, quitar: quitar, parciales: parciales,
     cambiosFecha: cambiosFecha, revisar: revisar, histAntes: histAntes, histDespues: histNuevo.length
   });
   if (!ok) return;

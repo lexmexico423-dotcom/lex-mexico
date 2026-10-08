@@ -9391,17 +9391,24 @@ function _mpeInfoHTML(estado, supSlug, subSlug, info){
   var checks = window._mpeChecks[k] = window._mpeChecks[k] || {};
   var reqs = info.requisitos || [], pasos = info.pasos || [], costos = info.costos || [];
   var tab = window._mpeTabInfo || 'req';
-  if (tab === 'cos' && !costos.length) tab = 'req';
-  var tabBtn = function(id, txt){ var on = tab === id; return '<button onclick="_mpeTabInfo=\'' + id + '\';_mpeRenderBody(_mpeEstado,_mpeSupuesto)" style="background:none;border:none;border-bottom:3px solid ' + (on ? '#c8951a' : 'transparent') + ';padding:8px 12px;font-size:0.78rem;font-weight:' + (on ? 700 : 500) + ';color:' + (on ? '#7a4a00' : '#8a7a5a') + ';cursor:pointer;font-family:inherit;">' + txt + '</button>'; };
+  // Botones (oct-2026, a petición): Requisitos · Cómo armarlo · Precio sugerido
+  var totCos = costos.reduce(function(s, c){ return s + (c.monto != null ? (parseFloat(c.monto) || 0) : 0); }, 0);
+  var tabBtn = function(id, txt, extra){
+    var on = tab === id;
+    return '<button onclick="_mpeTabInfo=\'' + id + '\';_mpeRenderBody(_mpeEstado,_mpeSupuesto)" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;'
+      + (on ? 'border:2px solid #c8951a;background:#fdf1d8;color:#7a4a00;font-weight:700;' : 'border:1.5px solid #d8ceb8;background:#fff;color:#5a4a30;font-weight:500;')
+      + 'border-radius:10px;padding:9px 8px;font-size:0.8rem;cursor:pointer;font-family:inherit;line-height:1.25;">' + txt
+      + (extra ? '<span style="font-size:0.68rem;font-weight:700;font-family:monospace;color:' + (on ? '#7a4a00' : '#1a7a3a') + ';">' + extra + '</span>' : '') + '</button>';
+  };
   var h = '';
   if ((info.avisos || []).length) {
     h += '<div style="background:#fff8e8;border:1px solid #e8c878;border-radius:8px;padding:8px 12px;margin:8px 0 4px;font-size:0.74rem;color:#7a4a00;line-height:1.5;">'
       + info.avisos.map(function(a){ return '⚠ ' + _mpeEscH(a); }).join('<br>') + '</div>';
   }
-  h += '<div style="display:flex;gap:2px;border-bottom:1px solid #efe4c4;margin-bottom:8px;flex-wrap:wrap;">'
+  h += '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0;">'
     + tabBtn('req', '📋 Requisitos (' + reqs.length + ')')
     + tabBtn('pas', '🧭 Cómo armarlo')
-    + (costos.length ? tabBtn('cos', '💲 Costos sugeridos') : '')
+    + tabBtn('cos', '💲 Precio sugerido', totCos > 0 ? _mpeMoney(totCos) : '')
     + '</div>';
   if (tab === 'req') {
     if (!reqs.length) h += '<div style="font-size:0.74rem;color:#a09070;font-style:italic;padding:8px 2px;">Sin requisitos capturados.</div>';
@@ -9419,6 +9426,11 @@ function _mpeInfoHTML(estado, supSlug, subSlug, info){
   } else if (tab === 'pas') {
     h += pasos.length ? '<ol style="margin:4px 0 0 18px;padding:0;font-size:0.8rem;color:#2a1c08;line-height:1.7;">' + pasos.map(function(p){ return '<li>' + _mpeEscH(p) + '</li>'; }).join('') + '</ol>'
       : '<div style="font-size:0.74rem;color:#a09070;font-style:italic;padding:8px 2px;">Sin pasos capturados.</div>';
+  } else if (!costos.length) {
+    h += '<div style="font-size:0.76rem;color:#8a7a5a;padding:12px 4px;text-align:center;line-height:1.6;">Todavía no hay precio sugerido para este trámite.'
+      + ((typeof _mpeCheckAdmin === 'function' && typeof ADMIN_EMAIL !== 'undefined' && typeof empleadoActual !== 'undefined' && empleadoActual && String(empleadoActual.email || '').toLowerCase() === String(ADMIN_EMAIL).toLowerCase())
+        ? '<br><button onclick="_mpeReactivarAdmin()" style="margin-top:8px;background:#fef3d8;border:1px solid #c8951a;border-radius:7px;color:#7a4a00;font-size:0.72rem;font-weight:700;padding:6px 14px;cursor:pointer;">✏️ Capturar precio sugerido</button>' : '<br>Pídele al administrador que lo capture.')
+      + '</div>';
   } else {
     var tot = 0, todosConMonto = true;
     h += '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">' + costos.map(function(c){
@@ -9427,7 +9439,7 @@ function _mpeInfoHTML(estado, supSlug, subSlug, info){
         + '<td style="padding:7px 2px;text-align:right;font-family:monospace;white-space:nowrap;color:#2a1c08;">' + (c.monto != null ? _mpeMoney(c.monto) : '—') + '</td></tr>';
     }).join('') + '</table>'
       + (costos.length > 1 ? '<div style="text-align:right;font-weight:700;font-size:0.84rem;color:#7a4a00;margin-top:6px;">Total sugerido: <span style="font-family:monospace;">' + _mpeMoney(tot) + '</span>' + (todosConMonto ? '' : ' <span style="font-weight:400;font-size:0.68rem;color:#8a7a5a;">(sin contar los que no tienen monto)</span>') + '</div>' : '')
-      + '<div style="font-size:0.66rem;color:#8a7a5a;margin-top:4px;">Costos sugeridos por el despacho — confírmalos antes de cobrar.</div>';
+      + '<div style="font-size:0.66rem;color:#8a7a5a;margin-top:4px;">Precio sugerido por el despacho — confírmalo antes de cobrar.</div>';
   }
   h += '<div style="font-size:0.62rem;color:#b0a080;margin-top:8px;">' + (info.fuente === 'admin' ? '✏️ Actualizado por el administrador' : '📄 Tomado del PDF de requisitos') + (info.actualizado ? ' · ' + String(info.actualizado).slice(0, 10) : '') + '</div>';
   return '<div style="border:1px solid #e8d898;border-radius:10px;background:#fff;padding:2px 14px 10px;">' + h + '</div>';
@@ -9451,18 +9463,20 @@ function _mpeInfoEditorHTML(estado, supSlug, subSlug, info, instHasFile, etiquet
   info = borrador || info || { requisitos: [], pasos: [], costos: [], avisos: [] };
   var ta = 'width:100%;box-sizing:border-box;border:1px solid #d8ceb0;border-radius:6px;padding:7px 9px;font-size:0.76rem;font-family:inherit;color:#2a1c08;background:#fffef8;resize:vertical;';
   var lbl = function(t, s){ return '<div style="font-size:0.7rem;font-weight:700;color:#7a4a00;margin:10px 0 3px;">' + t + (s ? ' <span style="font-weight:400;color:#8a7a5a;">' + s + '</span>' : '') + '</div>'; };
-  var reqTxt = (info.requisitos || []).map(function(r){ return r.texto + (r.detalle ? ' | ' + r.detalle : ''); }).join('\n');
+  var reqTxt = _mpeRequisitosATexto(info.requisitos);
   var costosRows = (info.costos && info.costos.length ? info.costos : [{}]).map(function(c){ return _mpeFilaCosto(c); }).join('');
   var leyendo = window._mpeExtrayendo[k] === true;
   var etq = String(etiqueta).replace(/'/g, '');
   return '<div id="mpe-info-editor" data-estado="' + estado + '" data-sup="' + supSlug + '" data-sub="' + subSlug + '">'
     + '<div style="font-size:0.7rem;color:#8a7a5a;line-height:1.5;">Esto es lo que ven las empleadas sin abrir el PDF. '
     + (info.fuente === 'pdf' ? 'Transcrito del PDF de requisitos; corrige o completa lo que haga falta (por ejemplo, los costos sugeridos).' : '') + '</div>'
-    + lbl('📋 Requisitos', 'uno por renglón · para aclarar: Requisito | aclaración')
-    + '<textarea id="mpe-ed-req" rows="7" style="' + ta + '" placeholder="Factura original | y 2 copias">' + _mpeEscH(reqTxt) + '</textarea>'
+    + lbl('❓ Preguntas para la empleada', 'una por renglón: Pregunta = 🧾 Opción (aclaración) / 📄 Opción')
+    + '<textarea id="mpe-ed-preg" rows="3" style="' + ta + '" placeholder="¿Cómo acredita ser dueño? = 🧾 Factura original / 📄 Refactura">' + _mpeEscH(_mpePreguntasATexto(info.preguntas)) + '</textarea>'
+    + lbl('📋 Requisitos', 'uno por renglón: 🧾 Requisito | aclaración | si: Opción / Opción (solo aparece si eligieron esa opción)')
+    + '<textarea id="mpe-ed-req" rows="9" style="' + ta + '" placeholder="📄 Refactura | si: Refactura">' + _mpeEscH(reqTxt) + '</textarea>'
     + lbl('🧭 Cómo armarlo', 'uno por renglón, en orden')
     + '<textarea id="mpe-ed-pas" rows="5" style="' + ta + '">' + _mpeEscH((info.pasos || []).join('\n')) + '</textarea>'
-    + lbl('💲 Costos sugeridos', 'concepto · monto · nota')
+    + lbl('💲 Precio sugerido', 'concepto · monto · nota (puedes poner varios: honorarios, derechos, envío…)')
     + '<div id="mpe-ed-costos">' + costosRows + '</div>'
     + '<button type="button" onclick="document.getElementById(\'mpe-ed-costos\').insertAdjacentHTML(\'beforeend\', _mpeFilaCosto({}))" style="border:1px dashed #c8951a;border-radius:6px;padding:4px 12px;font-size:0.7rem;color:#7a4a00;background:#fef3d8;cursor:pointer;margin-top:4px;">＋ Agregar costo</button>'
     + lbl('⚠ Avisos importantes', 'opcional, uno por renglón')
@@ -9474,7 +9488,8 @@ function _mpeInfoEditorHTML(estado, supSlug, subSlug, info, instHasFile, etiquet
 function _mpeLeerEditor(){
   var lines = function(id){ return ((document.getElementById(id) || {}).value || '').split('\n').map(function(s){ return s.trim(); }).filter(Boolean); };
   return {
-    requisitos: lines('mpe-ed-req').map(function(l){ var p = l.split('|'); return { texto: p[0].trim(), detalle: p.slice(1).join('|').trim() }; }).filter(function(r){ return r.texto; }),
+    preguntas: _mpeTextoAPreguntas((document.getElementById('mpe-ed-preg') || {}).value || ''),
+    requisitos: _mpeTextoARequisitos((document.getElementById('mpe-ed-req') || {}).value || ''),
     pasos: lines('mpe-ed-pas'),
     costos: Array.prototype.map.call(document.querySelectorAll('#mpe-ed-costos .mpe-ed-costo'), function(row){
       var m = parseFloat(row.querySelector('.c-mon').value);
@@ -9513,6 +9528,173 @@ async function _mpeReleerPDF(etiqueta){
   }
   delete window._mpeExtrayendo[k];
   _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// VENTANA AMPLIA CON PREGUNTAS (oct-2026, a petición: "muy confuso, mucha
+// letra; algo más interactivo y fácil para la empleada"). A la izquierda se
+// contestan preguntas con botones (¿cómo acredita ser dueño?, ¿viene de otro
+// estado?…) y a la derecha aparece SOLO lo que hay que pedirle al cliente,
+// para ir palomeando. Sin scroll; con botón ⤢ Agrandar.
+// Datos (meta.json → _info):
+//   preguntas: [{texto, opciones:[{texto, icono}]}]
+//   requisitos: [{texto, detalle, icono, si:['texto de opción', …]}]
+//     "si" = el requisito solo aparece si en la pregunta correspondiente
+//     está elegida alguna de esas opciones (sin "si" aparece siempre).
+// ══════════════════════════════════════════════════════════════════════
+window._mpeResp = window._mpeResp || {};
+window._mpeVista = window._mpeVista || 'lista';
+window._mpeGrande = !!window._mpeGrande;
+
+function _mpeNormOp(t){ return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+function _mpeRespDe(k, info){
+  var r = window._mpeResp[k] = window._mpeResp[k] || {};
+  (info.preguntas || []).forEach(function(p, pi){ if (r[pi] == null || !(p.opciones || [])[r[pi]]) r[pi] = 0; });
+  return r;
+}
+function _mpeCumple(req, info, resp){
+  var si = (req && req.si) || [];
+  if (!si.length) return true;
+  var lista = si.map(_mpeNormOp);
+  var ok = true;
+  (info.preguntas || []).forEach(function(p, pi){
+    var ops = (p.opciones || []).map(function(o){ return _mpeNormOp(o.texto); });
+    if (!ops.some(function(o){ return lista.indexOf(o) >= 0; })) return;   // esta pregunta no condiciona
+    var elegida = ops[resp[pi] || 0];
+    if (lista.indexOf(elegida) < 0) ok = false;
+  });
+  return ok;
+}
+function _mpeResponder(k, pi, oi){
+  var r = window._mpeResp[k] = window._mpeResp[k] || {};
+  r[pi] = oi; window._mpeVista = 'lista';
+  _mpeRenderBody(_mpeEstado, _mpeSupuesto);
+}
+function _mpeVer(v){ window._mpeVista = v; _mpeRenderBody(_mpeEstado, _mpeSupuesto); }
+function _mpeToggleGrande(){ window._mpeGrande = !window._mpeGrande; _mpeAjustarVentana(true); }
+function _mpeAjustarVentana(amplio){
+  var dlg = document.getElementById('mpe-dialog'), btn = document.getElementById('mpe-btn-grande');
+  if (btn) { btn.style.display = amplio ? '' : 'none'; btn.textContent = window._mpeGrande ? '⤡ Reducir' : '⤢ Agrandar'; }
+  if (!dlg) return;
+  var g = amplio && window._mpeGrande;
+  dlg.style.width = g ? 'calc(100vw - 24px)' : (amplio ? 'min(1180px,96vw)' : 'min(660px,96vw)');
+  dlg.style.height = g ? 'calc(100vh - 24px)' : '';
+  dlg.style.maxHeight = g ? 'calc(100vh - 24px)' : (amplio ? '94vh' : '88vh');
+}
+
+function _mpeLayoutAmplio(estado, supIdx, subIdx, supSlug, subSlug, info, linksHTML){
+  var cfg = _MPE_CONFIG[estado], subTabs = cfg.subTabs || [];
+  var k = estado + '_' + supSlug + '_' + subSlug;
+  if (window._mpeVistaK !== k) { window._mpeVistaK = k; window._mpeVista = 'lista'; }
+  var resp = _mpeRespDe(k, info);
+  var preg = function(t){ return '<div style="font-size:0.66rem;font-weight:700;color:#8a5a10;letter-spacing:0.05em;margin:10px 0 5px;text-transform:uppercase;">' + t + '</div>'; };
+  var btnOp = function(on, onclick, icono, txt, sub){
+    return '<button onclick="' + onclick + '" style="' + (on ? 'border:2px solid #c8951a;background:#fdf1d8;color:#7a4a00;font-weight:700;' : 'border:1.5px solid #d8ceb8;background:#fff;color:#5a4a30;font-weight:500;')
+      + 'border-radius:9px;padding:7px 6px;text-align:center;cursor:pointer;font-family:inherit;font-size:0.76rem;line-height:1.25;">'
+      + (icono ? '<div style="font-size:1.05rem;">' + icono + '</div>' : '') + _mpeEscH(txt)
+      + (sub ? '<div style="font-size:0.62rem;color:#8a7a5a;font-weight:400;">' + _mpeEscH(sub) + '</div>' : '') + '</button>';
+  };
+  var grid = function(n, html){ return '<div style="display:grid;grid-template-columns:repeat(' + n + ',minmax(0,1fr));gap:6px;">' + html + '</div>'; };
+  var _subIco = { 'Alta':'🚗', 'Cambio de propietario':'🔄', 'Renovación de tarjeta':'🪪', 'Reemplacamiento':'🔁', 'Baja':'⛔' };
+  var n = 0, izq = '';
+  if (cfg.supuestos.length > 1) {
+    n++; izq += preg(n + ' · ¿El vehículo es…?') + grid(cfg.supuestos.length, cfg.supuestos.map(function(s, i){ return btnOp(i === supIdx, '_mpeCambiarSup(\'' + estado + '\',' + i + ')', '', s, ''); }).join(''));
+  }
+  n++; izq += preg(n + ' · ¿Qué trámite?') + grid(Math.min(4, subTabs.length), subTabs.map(function(st, si){ return btnOp(si === subIdx, '_mpeCambiarSubTab(' + si + ')', _subIco[st] || '📄', st, ''); }).join(''));
+  (info.preguntas || []).forEach(function(p, pi){
+    var ops = p.opciones || []; if (!ops.length) return;
+    n++; izq += preg(n + ' · ' + p.texto) + grid(Math.min(3, ops.length), ops.map(function(o, oi){ return btnOp(resp[pi] === oi, '_mpeResponder(\'' + k + '\',' + pi + ',' + oi + ')', o.icono || '', o.texto, o.sub || ''); }).join(''));
+  });
+  if (linksHTML) izq += '<div style="font-size:0.68rem;color:#8a7a5a;margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">📎 ' + linksHTML + '</div>';
+
+  // ── Columna derecha ──
+  var checks = window._mpeChecks[k] = window._mpeChecks[k] || {};
+  var visibles = [];
+  (info.requisitos || []).forEach(function(r, i){ if (_mpeCumple(r, info, resp)) visibles.push({ r: r, i: i }); });
+  var costos = info.costos || [];
+  var totCos = costos.reduce(function(s, c){ return s + (c.monto != null ? (parseFloat(c.monto) || 0) : 0); }, 0);
+  var vista = window._mpeVista || 'lista';
+  var der = '';
+  if (vista === 'lista') {
+    var listos = visibles.filter(function(x){ return checks[x.i]; }).length;
+    der += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;"><div style="font-size:0.95rem;font-weight:700;color:#2a1c08;">Pídele al cliente:</div>'
+      + '<div style="font-size:0.72rem;font-weight:700;color:' + (visibles.length && listos === visibles.length ? '#1a7a3a' : '#8a5a10') + ';">' + (visibles.length && listos === visibles.length ? '✓ Completo' : listos + ' de ' + visibles.length + ' · faltan ' + (visibles.length - listos)) + '</div></div>';
+    if ((info.avisos || []).length) der += '<div style="font-size:0.68rem;color:#7a4a00;background:#fff8e8;border:1px solid #e8c878;border-radius:7px;padding:5px 9px;margin-bottom:7px;line-height:1.45;">' + info.avisos.map(function(a){ return '⚠ ' + _mpeEscH(a); }).join('<br>') + '</div>';
+    der += visibles.map(function(x){
+      var ok = !!checks[x.i], r = x.r;
+      return '<div onclick="_mpeToggleReq(\'' + k + '\',' + x.i + ')" title="' + _mpeEscH(r.detalle || '') + '" style="display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid ' + (ok ? '#bfe0c8' : '#efe4c4') + ';border-radius:8px;margin-bottom:5px;cursor:pointer;background:' + (ok ? '#f2f8ee' : '#fff') + ';">'
+        + '<div style="width:18px;height:18px;border-radius:5px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;' + (ok ? 'background:#1a7a3a;border:1.5px solid #1a7a3a;' : 'border:1.5px solid #b4a27a;background:#fff;') + '">' + (ok ? '✓' : '') + '</div>'
+        + '<span style="font-size:1rem;flex-shrink:0;">' + (r.icono || '📄') + '</span>'
+        + '<span style="font-size:0.82rem;color:#2a1c08;' + (ok ? 'text-decoration:line-through;color:#7a7a70;' : '') + '">' + _mpeEscH(r.texto) + '</span>'
+        + (r.detalle ? '<span style="margin-left:auto;font-size:0.66rem;color:#8a7a5a;text-align:right;max-width:45%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _mpeEscH(r.detalle) + '</span>' : '')
+        + '</div>';
+    }).join('');
+    if (listos) der += '<div style="text-align:right;"><button onclick="_mpeReiniciarReq(\'' + k + '\')" style="background:none;border:none;color:#8a7a5a;text-decoration:underline;font-size:0.68rem;cursor:pointer;">Reiniciar</button></div>';
+  } else {
+    der += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="font-size:0.95rem;font-weight:700;color:#2a1c08;">' + (vista === 'pas' ? '🧭 Cómo armarlo' : '💲 Precio sugerido') + '</div>'
+      + '<button onclick="_mpeVer(\'lista\')" style="background:#fff;border:1px solid #d8ceb8;border-radius:7px;color:#5a4a30;font-size:0.72rem;padding:4px 10px;cursor:pointer;">← Volver a la lista</button></div>';
+    if (vista === 'pas') {
+      der += (info.pasos || []).length ? '<ol style="margin:0 0 0 18px;padding:0;font-size:0.8rem;color:#2a1c08;line-height:1.65;">' + info.pasos.map(function(p){ return '<li>' + _mpeEscH(p) + '</li>'; }).join('') + '</ol>'
+        : '<div style="font-size:0.74rem;color:#a09070;font-style:italic;">Sin instrucciones capturadas.</div>';
+    } else if (!costos.length) {
+      der += '<div style="font-size:0.76rem;color:#8a7a5a;padding:14px 4px;text-align:center;line-height:1.6;">Todavía no hay precio sugerido para este trámite.<br>'
+        + ((typeof ADMIN_EMAIL !== 'undefined' && typeof empleadoActual !== 'undefined' && empleadoActual && String(empleadoActual.email || '').toLowerCase() === String(ADMIN_EMAIL).toLowerCase())
+          ? '<button onclick="_mpeReactivarAdmin()" style="margin-top:8px;background:#fef3d8;border:1px solid #c8951a;border-radius:7px;color:#7a4a00;font-size:0.72rem;font-weight:700;padding:6px 14px;cursor:pointer;">✏️ Capturar precio sugerido</button>' : 'Pídele al administrador que lo capture.')
+        + '</div>';
+    } else {
+      der += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;">' + costos.map(function(c){
+        return '<tr style="border-bottom:1px dashed #efe4c4;"><td style="padding:7px 2px;color:#2a1c08;">' + _mpeEscH(c.concepto) + (c.nota ? '<div style="font-size:0.66rem;color:#8a7a5a;">' + _mpeEscH(c.nota) + '</div>' : '') + '</td><td style="padding:7px 2px;text-align:right;font-family:monospace;white-space:nowrap;">' + (c.monto != null ? _mpeMoney(c.monto) : '—') + '</td></tr>';
+      }).join('') + '</table>'
+        + (costos.length > 1 ? '<div style="text-align:right;font-weight:700;font-size:0.86rem;color:#7a4a00;margin-top:6px;">Total sugerido: <span style="font-family:monospace;">' + _mpeMoney(totCos) + '</span></div>' : '')
+        + '<div style="font-size:0.64rem;color:#8a7a5a;margin-top:4px;">Precio sugerido por el despacho — confírmalo antes de cobrar.</div>';
+    }
+  }
+  var bBot = function(id, txt, extra){
+    var on = vista === id;
+    return '<button onclick="_mpeVer(\'' + (on ? 'lista' : id) + '\')" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;' + (on ? 'border:2px solid #c8951a;background:#fdf1d8;color:#7a4a00;font-weight:700;' : 'border:1.5px solid #d8ceb8;background:#fff;color:#5a4a30;font-weight:500;') + 'border-radius:9px;padding:8px;font-size:0.78rem;cursor:pointer;font-family:inherit;">' + txt
+      + (extra ? '<span style="font-size:0.68rem;font-family:monospace;font-weight:700;color:#1a7a3a;">' + extra + '</span>' : '') + '</button>';
+  };
+  der += '<div style="display:flex;gap:6px;margin-top:10px;">' + bBot('pas', '🧭 Cómo armarlo') + bBot('cos', '💲 Precio sugerido', totCos > 0 ? _mpeMoney(totCos) : '') + '</div>';
+
+  return '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px;align-items:start;">'
+    + '<div>' + izq + '</div>'
+    + '<div style="background:#fffdf8;border:1px solid #e8d898;border-radius:12px;padding:12px 14px;">' + der + '</div>'
+    + '</div>';
+}
+
+// ── Editor: preguntas y requisitos con condiciones, en texto sencillo ──
+function _mpeSepararIcono(s){
+  s = String(s || '').trim();
+  var m = s.match(/^([^\sA-Za-z0-9ÁÉÍÓÚÑáéíóúñ¿¡(]+)\s+(.*)$/);
+  return m ? { icono: m[1], texto: m[2].trim() } : { icono: '', texto: s };
+}
+function _mpePreguntasATexto(preg){
+  return (preg || []).map(function(p){ return p.texto + ' = ' + (p.opciones || []).map(function(o){ return (o.icono ? o.icono + ' ' : '') + o.texto + (o.sub ? ' (' + o.sub + ')' : ''); }).join(' / '); }).join('\n');
+}
+function _mpeTextoAPreguntas(txt){
+  return String(txt || '').split('\n').map(function(l){ return l.trim(); }).filter(Boolean).map(function(l){
+    var i = l.indexOf('='); if (i < 0) return null;
+    return { texto: l.slice(0, i).trim(), opciones: l.slice(i + 1).split('/').map(function(o){
+      var x = _mpeSepararIcono(o), m = x.texto.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+      if (m) { x.texto = m[1].trim(); x.sub = m[2].trim(); }
+      return x;
+    }).filter(function(o){ return o.texto; }) };
+  }).filter(function(p){ return p && p.texto && p.opciones.length; });
+}
+function _mpeRequisitosATexto(reqs){
+  return (reqs || []).map(function(r){ return (r.icono ? r.icono + ' ' : '') + r.texto + (r.detalle ? ' | ' + r.detalle : '') + ((r.si || []).length ? ' | si: ' + r.si.join(' / ') : ''); }).join('\n');
+}
+function _mpeTextoARequisitos(txt){
+  return String(txt || '').split('\n').map(function(l){ return l.trim(); }).filter(Boolean).map(function(l){
+    var partes = l.split('|').map(function(p){ return p.trim(); });
+    var cab = _mpeSepararIcono(partes.shift());
+    var r = { texto: cab.texto, icono: cab.icono, detalle: '', si: [] };
+    partes.forEach(function(p){
+      if (/^si\s*:/i.test(p)) r.si = p.replace(/^si\s*:/i, '').split('/').map(function(x){ return x.trim(); }).filter(Boolean);
+      else if (p) r.detalle = r.detalle ? r.detalle + ' · ' + p : p;
+    });
+    return r;
+  }).filter(function(r){ return r.texto; });
 }
 
 function _mpeRenderBody(estado, supIdx) {
@@ -9734,6 +9916,7 @@ function _mpeRenderBody(estado, supIdx) {
   const paso3Titulo = _paso('PASO ' + _nPaso + ' · Todo lo que necesitas para: <span style="color:#2a1c08;">' + _resumenSel + '</span>');
 
   let paso3;
+  let _linksArch = '';
   if (isAdmin) {
     // Administrador editando: se conservan los controles de edición de siempre.
     const _etqTram = [subTabs[subIdx] || '', sup, cfg.label].filter(Boolean).join(' · ');
@@ -9773,6 +9956,15 @@ function _mpeRenderBody(estado, supIdx) {
     // marcar la última fila sin borde
     filas[filas.length - 1] = filas[filas.length - 1].replace('border-bottom:1px solid #efe4c4;', '');
     const _archivos = '<div style="border:1px solid #e8d898;border-radius:10px;overflow:hidden;background:#fff;">' + filas.join('') + '</div>';
+    // Enlaces compactos a los archivos (para la ventana amplia)
+    const _lnk = function(onclick, txt){ return '<a href="#" onclick="event.preventDefault();' + onclick + '" style="color:#1a4a8a;text-decoration:underline;white-space:nowrap;">' + txt + '</a>'; };
+    _linksArch = [
+      instHasFile ? _lnk("_mpePDFVisorData('" + estado + "','" + supSlug + "','" + subSlug + "','" + instTipo + "','" + _esc(instPdfName || 'Instrucciones') + "')", 'PDF original') : '',
+      pdfHasFile ? _lnk("_mpePDFVisorData('" + estado + "','" + supSlug + "','" + subSlug + "','" + pdfTipo + "','" + _esc(pdfName || 'Expediente') + "')", 'Ejemplo de expediente') : ''
+    ].concat(recLista.map(function(r, ri){
+      const recTipo = 'rec_' + ri + '.pdf', archivoReal = metaCache[recTipo] || '';
+      return archivoReal ? _lnk("_mpeRecForzarDescarga('" + estado + "','" + supSlug + "','" + subSlug + "','" + recTipo + "','" + _esc(archivoReal || r) + "',this)", '⬇ ' + _mpeEscH(r)) : '';
+    })).filter(Boolean).join(' · ');
     if (infoTram) {
       paso3 = '<div>' + paso3Titulo + _mpeInfoHTML(estado, supSlug, subSlug, infoTram)
         + '<div style="font-size:0.7rem;font-weight:700;color:#8a5a10;letter-spacing:0.04em;margin:14px 0 6px;">ARCHIVOS Y FORMATOS</div>' + _archivos + '</div>';
@@ -9800,8 +9992,12 @@ function _mpeRenderBody(estado, supIdx) {
   bodyEl.innerHTML = '';
   const wrapper = document.createElement('div');
   wrapper.style.cssText = 'display:flex;flex-direction:column;gap:16px;';
-  wrapper.innerHTML = (isAdmin ? loginBanner : '') + paso1 + paso2 + paso3 + pie;
+  const _amplio = !isAdmin && !!infoTram;
+  wrapper.innerHTML = _amplio
+    ? (_mpeLayoutAmplio(estado, supIdx, subIdx, supSlug, subSlug, infoTram, _linksArch) + pie)
+    : ((isAdmin ? loginBanner : '') + paso1 + paso2 + paso3 + pie);
   bodyEl.appendChild(wrapper);
+  try { _mpeAjustarVentana(_amplio); } catch(e){}
 }
 
 // _mpeGetRecursosConUrls sustituida por _mpeGetRecLista

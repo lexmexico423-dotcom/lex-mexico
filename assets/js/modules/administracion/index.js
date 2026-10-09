@@ -2359,6 +2359,13 @@ async function _pendDeshacerEnDespacho(idx){
   if(typeof toast==='function') toast('Trámite regresado a "enviado"');
 }
 
+// "LIC ANTONIETA CHAVEZ MONTAR" → "LIC ANTONIETA" · "Lic. Nahúm" → "Lic. Nahúm"
+function _pendNombreCorto(n){
+  const w = String(n || '').trim().split(/\s+/).filter(Boolean);
+  if (!w.length) return '';
+  return /^lic\.?$/i.test(w[0]) ? w.slice(0, 2).join(' ') : w[0];
+}
+
 function _pendFechaCorta(iso){
   const m = String(iso||'').split('-');
   const meses = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
@@ -2488,7 +2495,8 @@ function renderPend(){
             <svg width="34" height="34" viewBox="0 0 24 24" style="flex-shrink:0;"><circle cx="12" cy="12" r="10" fill="#eaf3de" stroke="#1a7a3a" stroke-width="1.8"/><path d="M7.5 12.5l3 3 6-6.5" fill="none" stroke="#1a7a3a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <div style="line-height:1.25;">
               <div style="font-family:serif;font-style:italic;font-weight:700;font-size:15px;color:#1a7a3a;white-space:nowrap;">Trámite listo para entregar</div>
-              <div style="font-family:monospace;font-size:0.6rem;font-weight:700;color:#27500a;letter-spacing:0.03em;white-space:nowrap;">${_pendFechaCorta(p.enDespachoFecha)}${p.enDespachoPor?' · recibió '+esc(p.enDespachoPor):''}${_esAdminPend?' ✏️':''}</div>
+              <div style="font-family:monospace;font-size:0.6rem;font-weight:700;color:#27500a;letter-spacing:0.03em;white-space:nowrap;">${_pendFechaCorta(p.enDespachoFecha)}</div>
+              ${p.enDespachoPor?`<div style="font-family:monospace;font-size:0.6rem;font-weight:700;color:#27500a;letter-spacing:0.03em;white-space:nowrap;text-transform:uppercase;">recibió ${esc(_pendNombreCorto(p.enDespachoPor))}</div>`:''}
             </div>
           </div>`;
         } else if(p.enviadoFecha){
@@ -2661,7 +2669,7 @@ function renderPend(){
         ${p.creadoPor?`<div style="font-size:8.5px;color:#9a8a6a;margin-top:5px;padding-top:4px;border-top:1px dashed rgba(0,0,0,0.08);">📤 Subido por: <strong style="color:#6a5a3a;">${esc(p.creadoPor)}</strong>${p.fechaCreacion?` · ${esc(p.fechaCreacion)}`:''}</div>`:''}
         ${p.persona?_finResumen(p.persona, null):''}
       </div>
-      ${enviadoImgHtml ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 8px;flex-shrink:0;align-self:stretch;"><div style="position:relative;display:inline-flex;">${enviadoImgHtml}${enviadoFechaHtml ? `<div style="position:absolute;top:74%;left:35%;font-family:monospace;font-size:0.58rem;font-weight:700;color:#8c6518;letter-spacing:0.03em;white-space:nowrap;">${enviadoFechaHtml}</div>` : ''}</div>${(p.enviado && !p.enDespacho && !p.resuelto) ? `<span onclick="event.stopPropagation();_pendDeshacerEnviado(${idx})" title="Regresar a «no enviado»" style="align-self:flex-end;font-size:9.5px;color:#9a8a6a;text-decoration:underline;cursor:pointer;margin-top:-4px;">Deshacer envío</span>` : ''}</div>` : ''}
+      ${enviadoImgHtml ? `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 8px;flex-shrink:0;align-self:stretch;"><div style="position:relative;display:inline-flex;">${enviadoImgHtml}${enviadoFechaHtml ? `<div style="position:absolute;top:74%;left:35%;font-family:monospace;font-size:0.58rem;font-weight:700;color:#8c6518;letter-spacing:0.03em;white-space:nowrap;">${enviadoFechaHtml}</div>` : ''}${(p.enviado && !p.enDespacho && !p.resuelto) ? `<span onclick="event.stopPropagation();_pendDeshacerEnviado(${idx})" title="Deshacer envío" aria-label="Deshacer envío" style="position:absolute;left:22%;top:100%;transform:translate(-50%,-35%);width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;line-height:1;color:#26265c;border:1.5px dashed #26265c;background:#fffdf6;cursor:pointer;opacity:0.85;" onmouseover="this.style.opacity=1;this.style.borderStyle='solid'" onmouseout="this.style.opacity=0.85;this.style.borderStyle='dashed'">↩</span>` : ''}</div></div>` : ''}
       <div style="display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;padding:10px 10px 10px 4px;flex-shrink:0;gap:5px;">
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
           ${(p.seccion==='placas'||p.reciboVinculadoFolio) ? folioBadgeHtml : ''}

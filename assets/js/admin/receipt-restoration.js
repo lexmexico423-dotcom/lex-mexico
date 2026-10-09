@@ -9648,6 +9648,12 @@ function _mpeLayoutAmplio(estado, supIdx, subIdx, supSlug, subSlug, info, linksH
   var totCos = costos.reduce(function(s, c){ return s + (c.monto != null ? (parseFloat(c.monto) || 0) : 0); }, 0);
   var vista = window._mpeVista || 'lista';
   var der = '';
+  if (info.cargando) {
+    der = '<div style="font-size:0.95rem;font-weight:700;color:#2a1c08;margin-bottom:6px;">Pídele al cliente:</div>'
+      + '<div style="font-size:0.8rem;color:#8a7a5a;padding:24px 4px;text-align:center;">⏳ Cargando…</div>';
+    return '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:16px;align-items:start;"><div>' + izq + '</div>'
+      + '<div style="background:#fffdf8;border:1px solid #e8d898;border-radius:12px;padding:12px 14px;">' + der + '</div></div>';
+  }
   if (vista === 'lista') {
     var listos = visibles.filter(function(x){ return checks[x.i]; }).length;
     der += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;"><div style="font-size:0.95rem;font-weight:700;color:#2a1c08;">Pídele al cliente:</div>'
@@ -10030,9 +10036,13 @@ function _mpeRenderBody(estado, supIdx) {
   bodyEl.innerHTML = '';
   const wrapper = document.createElement('div');
   wrapper.style.cssText = 'display:flex;flex-direction:column;gap:16px;';
-  const _amplio = !isAdmin && !!infoTram;
+  // Mientras se descarga la información del trámite se muestra la misma
+  // ventana amplia con "Cargando…" (antes aparecía un momento la vista vieja
+  // con la lista de PDF y luego cambiaba).
+  const _cargandoInfo = !isAdmin && !metaCargada && !!window.descargarR2 && !!window.SB_DESPACHO_ID;
+  const _amplio = !isAdmin && (!!infoTram || _cargandoInfo);
   wrapper.innerHTML = _amplio
-    ? (_mpeLayoutAmplio(estado, supIdx, subIdx, supSlug, subSlug, infoTram, _linksArch) + pie)
+    ? (_mpeLayoutAmplio(estado, supIdx, subIdx, supSlug, subSlug, infoTram || { cargando: true }, _linksArch) + pie)
     : ((isAdmin ? loginBanner : '') + paso1 + paso2 + paso3 + pie);
   bodyEl.appendChild(wrapper);
   try { _mpeAjustarVentana(_amplio); } catch(e){}
@@ -10092,6 +10102,25 @@ async function _mpePrefetchR2(estado, supIdx, subIdx) {
       }
     } catch(e) {}
   }
+}
+
+// Descarga en paralelo el meta.json de todos los trámites del estado, para
+// que al cambiar de trámite la información aparezca al instante.
+async function _mpePrefetchEstado(estado) {
+  if (!window.descargarR2 || !window.SB_DESPACHO_ID) return;
+  const cfg = _MPE_CONFIG[estado]; if (!cfg) return;
+  const sl = function(t){ return String(t).toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''); };
+  const tareas = [];
+  cfg.supuestos.forEach(function(sup){ (cfg.subTabs || []).forEach(function(sub){
+    const key = estado + '_' + sl(sup) + '_' + (sl(sub) || 'general') + '_meta';
+    if (_mpeCache[key]) return;
+    tareas.push(window.descargarR2(_mpePath(estado, sl(sup), sl(sub) || 'general', 'meta.json'), 'placas')
+      .then(function(b){ return b ? b.text() : null; })
+      .then(function(t){ if (!_mpeCache[key]) _mpeCache[key] = t ? JSON.parse(t) : {}; })
+      .catch(function(){ if (!_mpeCache[key]) _mpeCache[key] = {}; }));
+  }); });
+  await Promise.all(tareas);
+  if (_mpeEstado === estado) _mpeRenderBody(_mpeEstado, _mpeSupuesto);
 }
 
 // Recursos: renombrar, eliminar, agregar
@@ -10163,6 +10192,7 @@ function abrirPanelEstado(estado, btn) {
   _mpeRenderTabs(estado, 0);
   _mpeRenderBody(estado, 0);        // render inmediato con caché
   _mpePrefetchR2(estado, 0, 0);     // cargar R2 en fondo
+  _mpePrefetchEstado(estado);       // y la información de TODOS sus trámites, para cambiar al instante
   const modal = document.getElementById('modal-panel-estado');
   modal.style.display = 'flex';
   // Resaltar botón activo (brillo sobre su propio color)

@@ -9075,7 +9075,7 @@ function abrirModalExpedienteDesdeConsulta(folio){
 //   3) Descarga de recursos
 
 const _MPE_CONFIG = {
-  oax:  { label:'Oaxaca',    supuestos:['Nacional','Legalizado'], subTabs:['Alta','Cambio de propietario','Renovación de tarjeta','Baja'] },
+  oax:  { label:'Oaxaca',    supuestos:['Nacional','Legalizado'], subTabs:['Alta','Cambio de propietario','Renovación de tarjeta','Canje de placas','Baja','REPUVE','Refactura'] },
   mex:  { label:'Edo. Méx.', supuestos:['Nacional','Legalizado'], subTabs:['Alta','Cambio de propietario','Reemplacamiento','Baja'] },
   cdmx: { label:'CDMX',      supuestos:['Nacional'],              subTabs:['Alta','Cambio de propietario','Renovación de tarjeta','Baja'] },
   mich: { label:'Michoacán', supuestos:['Nacional','Legalizado','Sin pedimento'], subTabs:['Alta','Cambio de propietario','Baja'] }
@@ -9448,14 +9448,42 @@ function _mpeToggleReq(k, i){ var c = window._mpeChecks[k] = window._mpeChecks[k
 function _mpeReiniciarReq(k){ window._mpeChecks[k] = {}; _mpeRenderBody(_mpeEstado, _mpeSupuesto); }
 
 // ── Editor del administrador ──
-function _mpeFilaCosto(c){
-  c = c || {};
+function _mpeFilaCosto(c, clase){
+  c = c || {}; clase = clase || 'mpe-ed-costo';
   var inp = 'border:1px solid #d8ceb0;border-radius:5px;padding:5px 7px;font-size:0.74rem;background:#fffef8;color:#2a1c08;min-width:0;';
-  return '<div class="mpe-ed-costo" style="display:flex;gap:6px;margin-bottom:5px;align-items:center;">'
-    + '<input class="c-con" value="' + _mpeEscH(c.concepto || '') + '" placeholder="Concepto (ej. Honorarios)" style="' + inp + 'flex:2;">'
-    + '<input class="c-mon" type="number" min="0" step="0.01" value="' + (c.monto != null ? c.monto : '') + '" placeholder="$" style="' + inp + 'width:95px;">'
-    + '<input class="c-not" value="' + _mpeEscH(c.nota || '') + '" placeholder="Nota (opcional)" style="' + inp + 'flex:2;">'
+  return '<div class="' + clase + '" style="display:flex;gap:6px;margin-bottom:5px;align-items:center;">'
+    + '<input class="c-con" value="' + _mpeEscH(c.concepto || '') + '" placeholder="Concepto (ej. Alta auto)" style="' + inp + 'flex:2;">'
+    + '<input class="c-mon" type="number" min="0" step="0.01" value="' + (c.monto != null ? c.monto : '') + '" placeholder="$" style="' + inp + 'width:90px;">'
+    + '<input class="c-si" value="' + _mpeEscH((c.si || []).join(' / ')) + '" placeholder="Solo si (ej. Moto)" title="Opción de una pregunta; vacío = siempre" style="' + inp + 'flex:1.3;">'
+    + '<input class="c-not" value="' + _mpeEscH(c.nota || '') + '" placeholder="Nota" style="' + inp + 'flex:1.3;">'
     + '<button type="button" onclick="this.parentNode.remove()" style="border:1px solid #e24b4a;border-radius:5px;padding:3px 8px;font-size:0.7rem;color:#a33;background:#fff8f8;cursor:pointer;">✕</button></div>';
+}
+function _mpeLeerFilasCosto(selector){
+  return Array.prototype.map.call(document.querySelectorAll(selector), function(row){
+    var m = parseFloat(row.querySelector('.c-mon').value);
+    return { concepto: row.querySelector('.c-con').value.trim(), monto: isNaN(m) ? null : Math.round(m * 100) / 100,
+      si: row.querySelector('.c-si').value.split('/').map(function(x){ return x.trim(); }).filter(Boolean),
+      nota: row.querySelector('.c-not').value.trim() };
+  }).filter(function(c){ return c.concepto; });
+}
+// Tabla "Cliente − Gestor = Ganancia" para cada opción que cambia el precio
+function _mpeTablaGanancia(info){
+  var cg = info.costoGestor || [], cc = info.costos || [];
+  if (!cg.length || !cc.length) return '';
+  var opciones = [{}];
+  (info.preguntas || []).forEach(function(p, pi){
+    var afecta = cc.concat(cg).some(function(c){ return (c.si || []).some(function(s){ return (p.opciones || []).some(function(o){ return _mpeNormOp(o.texto) === _mpeNormOp(s); }); }); });
+    if (!afecta) return;
+    var nuevo = [];
+    opciones.forEach(function(r){ (p.opciones || []).forEach(function(o, oi){ var x = Object.assign({}, r); x[pi] = oi; x._et = (r._et ? r._et + ' · ' : '') + o.texto; nuevo.push(x); }); });
+    opciones = nuevo;
+  });
+  var filas = opciones.map(function(r){
+    var suma = function(lista){ return lista.filter(function(c){ return _mpeCumple(c, info, r); }).reduce(function(s, c){ return s + (parseFloat(c.monto) || 0); }, 0); };
+    var cli = suma(cc), ges = suma(cg);
+    return '<tr><td style="padding:3px 4px;">' + _mpeEscH(r._et || 'Este trámite') + '</td><td style="padding:3px 4px;text-align:right;">' + _mpeMoney(cli) + '</td><td style="padding:3px 4px;text-align:right;">' + _mpeMoney(ges) + '</td><td style="padding:3px 4px;text-align:right;font-weight:700;color:' + (cli - ges >= 0 ? '#1a7a3a' : '#a32d2d') + ';">' + _mpeMoney(cli - ges) + '</td></tr>';
+  }).join('');
+  return '<table style="width:100%;border-collapse:collapse;font-size:0.7rem;margin-top:8px;color:#2a1c08;font-family:monospace;"><tr style="color:#8a7a5a;"><td style="padding:3px 4px;">Opción</td><td style="padding:3px 4px;text-align:right;">Cliente</td><td style="padding:3px 4px;text-align:right;">Gestor</td><td style="padding:3px 4px;text-align:right;">Ganancia</td></tr>' + filas + '</table>';
 }
 function _mpeInfoEditorHTML(estado, supSlug, subSlug, info, instHasFile, etiqueta){
   var k = estado + '_' + supSlug + '_' + subSlug;
@@ -9465,6 +9493,7 @@ function _mpeInfoEditorHTML(estado, supSlug, subSlug, info, instHasFile, etiquet
   var lbl = function(t, s){ return '<div style="font-size:0.7rem;font-weight:700;color:#7a4a00;margin:10px 0 3px;">' + t + (s ? ' <span style="font-weight:400;color:#8a7a5a;">' + s + '</span>' : '') + '</div>'; };
   var reqTxt = _mpeRequisitosATexto(info.requisitos);
   var costosRows = (info.costos && info.costos.length ? info.costos : [{}]).map(function(c){ return _mpeFilaCosto(c); }).join('');
+  var gestorRows = (info.costoGestor && info.costoGestor.length ? info.costoGestor : [{}]).map(function(c){ return _mpeFilaCosto(c, 'mpe-ed-gestor'); }).join('');
   var leyendo = window._mpeExtrayendo[k] === true;
   var etq = String(etiqueta).replace(/'/g, '');
   return '<div id="mpe-info-editor" data-estado="' + estado + '" data-sup="' + supSlug + '" data-sub="' + subSlug + '">'
@@ -9476,9 +9505,15 @@ function _mpeInfoEditorHTML(estado, supSlug, subSlug, info, instHasFile, etiquet
     + '<textarea id="mpe-ed-req" rows="9" style="' + ta + '" placeholder="📄 Refactura | si: Refactura">' + _mpeEscH(reqTxt) + '</textarea>'
     + lbl('🧭 Cómo armarlo', 'uno por renglón, en orden')
     + '<textarea id="mpe-ed-pas" rows="5" style="' + ta + '">' + _mpeEscH((info.pasos || []).join('\n')) + '</textarea>'
-    + lbl('💲 Precio sugerido', 'concepto · monto · nota (puedes poner varios: honorarios, derechos, envío…)')
+    + lbl('💲 Precio sugerido al cliente', 'lo ven las empleadas · «Solo si» = la opción de una pregunta (ej. Moto); vacío = siempre')
     + '<div id="mpe-ed-costos">' + costosRows + '</div>'
-    + '<button type="button" onclick="document.getElementById(\'mpe-ed-costos\').insertAdjacentHTML(\'beforeend\', _mpeFilaCosto({}))" style="border:1px dashed #c8951a;border-radius:6px;padding:4px 12px;font-size:0.7rem;color:#7a4a00;background:#fef3d8;cursor:pointer;margin-top:4px;">＋ Agregar costo</button>'
+    + '<button type="button" onclick="document.getElementById(\'mpe-ed-costos\').insertAdjacentHTML(\'beforeend\', _mpeFilaCosto({}))" style="border:1px dashed #c8951a;border-radius:6px;padding:4px 12px;font-size:0.7rem;color:#7a4a00;background:#fef3d8;cursor:pointer;margin-top:4px;">＋ Agregar precio</button>'
+    + '<div style="margin-top:12px;border:1.5px dashed #b4a27a;border-radius:8px;padding:8px 10px;background:#f7f3e8;">'
+    + '<div style="font-size:0.7rem;font-weight:700;color:#5a4a30;">🔒 Costo del gestor <span style="font-weight:400;color:#8a7a5a;">— solo lo ves tú aquí (lo que le pagas al gestor, sin ganancia)</span></div>'
+    + '<div id="mpe-ed-gestor" style="margin-top:6px;">' + gestorRows + '</div>'
+    + '<button type="button" onclick="document.getElementById(\'mpe-ed-gestor\').insertAdjacentHTML(\'beforeend\', _mpeFilaCosto({}, \'mpe-ed-gestor\'))" style="border:1px dashed #8a7a5a;border-radius:6px;padding:4px 12px;font-size:0.7rem;color:#5a4a30;background:#fff;cursor:pointer;margin-top:4px;">＋ Agregar costo del gestor</button>'
+    + _mpeTablaGanancia(info)
+    + '</div>'
     + lbl('⚠ Avisos importantes', 'opcional, uno por renglón')
     + '<textarea id="mpe-ed-avi" rows="2" style="' + ta + '">' + _mpeEscH((info.avisos || []).join('\n')) + '</textarea>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">'
@@ -9491,10 +9526,8 @@ function _mpeLeerEditor(){
     preguntas: _mpeTextoAPreguntas((document.getElementById('mpe-ed-preg') || {}).value || ''),
     requisitos: _mpeTextoARequisitos((document.getElementById('mpe-ed-req') || {}).value || ''),
     pasos: lines('mpe-ed-pas'),
-    costos: Array.prototype.map.call(document.querySelectorAll('#mpe-ed-costos .mpe-ed-costo'), function(row){
-      var m = parseFloat(row.querySelector('.c-mon').value);
-      return { concepto: row.querySelector('.c-con').value.trim(), monto: isNaN(m) ? null : Math.round(m * 100) / 100, nota: row.querySelector('.c-not').value.trim() };
-    }).filter(function(c){ return c.concepto; }),
+    costos: _mpeLeerFilasCosto('#mpe-ed-costos .mpe-ed-costo'),
+    costoGestor: _mpeLeerFilasCosto('#mpe-ed-gestor .mpe-ed-gestor'),
     avisos: lines('mpe-ed-avi')
   };
 }
@@ -9502,7 +9535,7 @@ async function _mpeGuardarInfo(){
   var ed = document.getElementById('mpe-info-editor'); if (!ed) return;
   var estado = ed.getAttribute('data-estado'), supSlug = ed.getAttribute('data-sup'), subSlug = ed.getAttribute('data-sub');
   var info = _mpeLeerEditor();
-  if (info.costos.some(function(c){ return c.monto != null && c.monto < 0; })) { if (typeof toast === 'function') toast('⚠ Los montos no pueden ser negativos', 'err'); return; }
+  if (info.costos.concat(info.costoGestor || []).some(function(c){ return c.monto != null && c.monto < 0; })) { if (typeof toast === 'function') toast('⚠ Los montos no pueden ser negativos', 'err'); return; }
   info.fuente = 'admin'; info.actualizado = new Date().toISOString(); info.por = _mpeUsuario();
   var meta = Object.assign({}, _mpeMetaDe(estado, supSlug, subSlug) || {}, { _info: info });
   try {
@@ -9595,7 +9628,7 @@ function _mpeLayoutAmplio(estado, supIdx, subIdx, supSlug, subSlug, info, linksH
       + (sub ? '<div style="font-size:0.62rem;color:#8a7a5a;font-weight:400;">' + _mpeEscH(sub) + '</div>' : '') + '</button>';
   };
   var grid = function(n, html){ return '<div style="display:grid;grid-template-columns:repeat(' + n + ',minmax(0,1fr));gap:6px;">' + html + '</div>'; };
-  var _subIco = { 'Alta':'🚗', 'Cambio de propietario':'🔄', 'Renovación de tarjeta':'🪪', 'Reemplacamiento':'🔁', 'Baja':'⛔' };
+  var _subIco = { 'Alta':'🚗', 'Cambio de propietario':'🔄', 'Renovación de tarjeta':'🪪', 'Reemplacamiento':'🔁', 'Canje de placas':'🔁', 'Baja':'⛔', 'REPUVE':'🛡️', 'Refactura':'📄' };
   var n = 0, izq = '';
   if (cfg.supuestos.length > 1) {
     n++; izq += preg(n + ' · ¿El vehículo es…?') + grid(cfg.supuestos.length, cfg.supuestos.map(function(s, i){ return btnOp(i === supIdx, '_mpeCambiarSup(\'' + estado + '\',' + i + ')', '', s, ''); }).join(''));
@@ -9611,15 +9644,16 @@ function _mpeLayoutAmplio(estado, supIdx, subIdx, supSlug, subSlug, info, linksH
   var checks = window._mpeChecks[k] = window._mpeChecks[k] || {};
   var visibles = [];
   (info.requisitos || []).forEach(function(r, i){ if (_mpeCumple(r, info, resp)) visibles.push({ r: r, i: i }); });
-  var costos = info.costos || [];
+  var costos = (info.costos || []).filter(function(c){ return _mpeCumple(c, info, resp); });
   var totCos = costos.reduce(function(s, c){ return s + (c.monto != null ? (parseFloat(c.monto) || 0) : 0); }, 0);
   var vista = window._mpeVista || 'lista';
   var der = '';
   if (vista === 'lista') {
     var listos = visibles.filter(function(x){ return checks[x.i]; }).length;
     der += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;"><div style="font-size:0.95rem;font-weight:700;color:#2a1c08;">Pídele al cliente:</div>'
-      + '<div style="font-size:0.72rem;font-weight:700;color:' + (visibles.length && listos === visibles.length ? '#1a7a3a' : '#8a5a10') + ';">' + (visibles.length && listos === visibles.length ? '✓ Completo' : listos + ' de ' + visibles.length + ' · faltan ' + (visibles.length - listos)) + '</div></div>';
+      + '<div style="font-size:0.72rem;font-weight:700;color:' + (visibles.length && listos === visibles.length ? '#1a7a3a' : '#8a5a10') + ';">' + (!visibles.length ? '' : (listos === visibles.length ? '✓ Completo' : listos + ' de ' + visibles.length + ' · faltan ' + (visibles.length - listos))) + '</div></div>';
     if ((info.avisos || []).length) der += '<div style="font-size:0.68rem;color:#7a4a00;background:#fff8e8;border:1px solid #e8c878;border-radius:7px;padding:5px 9px;margin-bottom:7px;line-height:1.45;">' + info.avisos.map(function(a){ return '⚠ ' + _mpeEscH(a); }).join('<br>') + '</div>';
+    if (!visibles.length) der += '<div style="font-size:0.76rem;color:#8a7a5a;padding:12px 4px;text-align:center;">Todavía no hay requisitos capturados para este trámite.</div>';
     der += visibles.map(function(x){
       var ok = !!checks[x.i], r = x.r;
       return '<div onclick="_mpeToggleReq(\'' + k + '\',' + x.i + ')" title="' + _mpeEscH(r.detalle || '') + '" style="display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid ' + (ok ? '#bfe0c8' : '#efe4c4') + ';border-radius:8px;margin-bottom:5px;cursor:pointer;background:' + (ok ? '#f2f8ee' : '#fff') + ';">'

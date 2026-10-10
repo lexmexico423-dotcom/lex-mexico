@@ -1726,8 +1726,17 @@ async function generarPDF(datos,folio,qrDataURL){
     };
     const cargosAntes = [], abonosAntes = [], cargosHoy = [];
     let pagoHoy = 0;
-    const costo = (datos.conceptos||[]).reduce(function(s,c){ return s + (parseFloat(c && c.precio)||0); }, 0);
-    if(costo > 0) cargosAntes.push({ txt: _conceptoFolioAUnificado() + ' (costo del trámite)', ref: _ref('A'), monto: costo });
+    // Oct-2026 (a petición: los clientes no entendían la línea general): cada
+    // concepto del folio A va en su propio renglón con CONCEPTO y DESCRIPCIÓN,
+    // igual que en el recibo A.
+    (datos.conceptos||[]).forEach(function(c){
+      if(!c) return;
+      const p = parseFloat(c.precio)||0;
+      if(p <= 0) return;
+      const lc = String(c.folioLetra || 'A').toUpperCase();
+      if(lc > L) return;
+      cargosAntes.push({ txt: c.concepto || 'Costo del trámite', desc: c.descripcion || '', ref: _ref(lc), monto: p });
+    });
     const ant = parseFloat(datos.anticipo)||0;
     if(ant > 0) abonosAntes.push({ txt: 'Anticipo', ref: _ref('A'), monto: ant });
     (datos.costosExtra||[]).forEach(function(c){
@@ -2158,17 +2167,22 @@ async function generarPDF(datos,folio,qrDataURL){
   }
   if(_edo){
     // ── ESTADO DE CUENTA DEL TRÁMITE (recibos B, C, D…) ─────────────────────
-    const _xRef = margin + cW*0.55;
+    const _xRef = margin + cW*0.64;
+    const _xDesc = margin + cW*0.33;
     const _filaEdo = function(txt, refTxt, montoTxt, estilo){
       estilo = estilo || {};
       doc.setFontSize(estilo.size || 8);
       doc.setFont('helvetica', estilo.bold ? 'bold' : 'normal');
       const col = estilo.color || [20,10,5];
       doc.setTextColor(col[0], col[1], col[2]);
-      const lineas = doc.splitTextToSize(txt, cW*0.53);
-      const alto = lineas.length * 3.8 + 1.6;
+      // Con descripción: CONCEPTO | DESCRIPCIÓN | RECIBO · FECHA | IMPORTE
+      const conDesc = estilo.desc !== undefined;
+      const lineas = doc.splitTextToSize(txt, conDesc ? cW*0.31 : cW*0.62);
+      const lineasD = conDesc ? doc.splitTextToSize(estilo.desc || '', cW*0.29) : [];
+      const alto = Math.max(lineas.length, lineasD.length, 1) * 3.8 + 1.6;
       if(y + alto > 262){ doc.addPage(); y = 18; }
       doc.text(lineas, margin, y);
+      if(conDesc && lineasD.length) doc.text(lineasD, _xDesc, y);
       if(refTxt){ doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(110,90,55); doc.text(refTxt, _xRef, y); }
       doc.setFontSize(estilo.size || 8); doc.setFont('helvetica', estilo.bold ? 'bold' : 'normal'); doc.setTextColor(col[0], col[1], col[2]);
       doc.text(montoTxt, margin+cW, y, {align:'right'});
@@ -2176,19 +2190,26 @@ async function generarPDF(datos,folio,qrDataURL){
       else { doc.setDrawColor(230,215,180); doc.setLineWidth(0.2); doc.line(margin, y+alto-2.8, margin+cW, y+alto-2.8); }
       y += alto;
     };
-    const _banda = function(titulo, colFondo, colTexto){
+    const _banda = function(titulo, colFondo, colTexto, tituloDesc){
       if(y + 9 > 262){ doc.addPage(); y = 18; }
       doc.setFillColor(colFondo[0], colFondo[1], colFondo[2]); doc.rect(margin, y-3, cW, 5, 'F');
       doc.setTextColor(colTexto[0], colTexto[1], colTexto[2]); doc.setFontSize(6.5); doc.setFont('helvetica','bold');
       doc.text(titulo, margin+1, y);
+      if(tituloDesc) doc.text(tituloDesc, _xDesc, y);
       doc.text('RECIBO · FECHA', _xRef, y);
       doc.text('IMPORTE', margin+cW, y, {align:'right'});
       y += 4;
     };
-    _banda('ESTADO DE CUENTA DEL TRÁMITE', [248,244,232], [154,110,24]);
-    _edo.cargosAntes.forEach(function(it){ _filaEdo(it.txt, it.ref, '$'+fmtMXN(it.monto)); });
+    // Oct-2026: desglose como en el recibo A (CONCEPTO · DESCRIPCIÓN · RECIBO ·
+    // FECHA · IMPORTE), costo total, anticipo/pagos y "SALDO PENDIENTE".
+    _banda('CONCEPTO', [248,244,232], [154,110,24], 'DESCRIPCIÓN');
+    _edo.cargosAntes.forEach(function(it){ _filaEdo(it.txt, it.ref, '$'+fmtMXN(it.monto), { desc: it.desc || '' }); });
+    if(_edo.cargosAntes.length > 1){
+      const _costoTot = _edo.cargosAntes.reduce(function(s, it){ return s + it.monto; }, 0);
+      _filaEdo('COSTO TOTAL DEL TRÁMITE', '', '$'+fmtMXN(_costoTot), { bold: true, color: [154,110,24], lineaArriba: true });
+    }
     _edo.abonosAntes.forEach(function(it){ _filaEdo('(-) ' + it.txt, it.ref, '-$'+fmtMXN(it.monto), { color: [42,110,58] }); });
-    _filaEdo('SALDO PENDIENTE ANTES DE ESTE RECIBO', '', '$'+fmtMXN(_edo.saldoAntes), { bold: true, color: [154,110,24], lineaArriba: true });
+    _filaEdo('SALDO PENDIENTE', '', '$'+fmtMXN(_edo.saldoAntes), { bold: true, color: [154,110,24], lineaArriba: true });
     if(_edo.cargosHoy.length){
       y += 1.5;
       _banda('SERVICIO COMPLEMENTARIO (NUEVO EN ESTE RECIBO)', [255,240,220], [160,80,16]);

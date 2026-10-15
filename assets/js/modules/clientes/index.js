@@ -40,15 +40,28 @@ function _actualizarVisibilidadFirmantes() {
     if (!varios) chk.checked = true;
   });
 }
+// Oct-2026 (a petición expresa): la firma del cliente YA NO se escribe a mano.
+// Siempre se arma con los clientes marcados "¿Va a firmar?" (uno solo → firma
+// él). Evita que se quede el nombre de un recibo anterior (caso real 77A/77B).
+function _firmaNormNombre(n){
+  return String(n || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim();
+}
+function _firmaDeClientes(clientes){
+  const lista = (clientes || []).filter(function(c){ return c && _firmaNormNombre(c.nombre); });
+  if (!lista.length) return '';
+  const firman = lista.length === 1 ? lista : lista.filter(function(c, i){ return c.firmante !== undefined ? !!c.firmante : i === 0; });
+  return firman.map(function(c){ return _firmaNormNombre(c.nombre); }).join(' Y ');
+}
 function sincronizarFirmantesClientes() {
   _actualizarVisibilidadFirmantes();
   const firmaField = $('nombre_cliente_firma');
-  if (!firmaField || firmaField.dataset.manualEdit) return;
+  if (!firmaField) return;
+  delete firmaField.dataset.manualEdit;
   const nombres = Array.from(document.querySelectorAll('#clientes-wrapper .cliente-row')).filter(function(r){
     const chk = r.querySelector('[id^="firmante_"]');
     return chk ? chk.checked : false;
   }).map(function(r){
-    return (r.querySelector('[id^="nombre_"]')||{}).value || '';
+    return _firmaNormNombre((r.querySelector('[id^="nombre_"]')||{}).value || '');
   }).filter(Boolean);
   firmaField.value = nombres.join(' Y ');
 }
@@ -251,11 +264,10 @@ function cargarReciboEnFormulario(recibo){
   if(elResp && recibo.responsable) elResp.value = recibo.responsable;
   const elFirma = $('nombre_cliente_firma');
   if(elFirma){
-    const _firmaSrc = recibo.nombre_cliente_firma || (recibo.clientes&&recibo.clientes[0]?.nombre) || recibo.nombre || '';
-    const _firmaUp = _firmaSrc.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[.]/g,'');
-    elFirma.value = _firmaUp;
-    if(recibo.nombre_cliente_firma) elFirma.dataset.manualEdit='1';
-    else delete elFirma.dataset.manualEdit;
+    // La firma ya no se toma de lo guardado: se arma con los clientes firmantes
+    delete elFirma.dataset.manualEdit;
+    if (typeof sincronizarFirmantesClientes === 'function') sincronizarFirmantesClientes();
+    if (!elFirma.value) elFirma.value = _firmaNormNombre(recibo.nombre || '');
   }
   // Mostrar bloque de placas si el recibo ya tiene capturadas
   mostrarPlacasEnPantalla(recibo.placasEntregadas, recibo.estadoPlacas);

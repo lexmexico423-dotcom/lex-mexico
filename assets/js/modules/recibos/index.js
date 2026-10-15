@@ -2734,11 +2734,8 @@ async function generarPDF(datos,folio,qrDataURL){
       .replace(/\s+/g,' ').trim();
     mismaPersona = (limpiar(datos.responsable) === limpiar(datos.autorizacion.nombre));
   }
-  // Si es la MISMA persona: poner "AUTORIZÓ" arriba del nombre del responsable
-  if(mismaPersona){
-    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(154,110,24);
-    doc.text('AUTORIZÓ', fS+fw/2, y+5, {align:'center'});
-  }
+  // Oct-2026 (a petición expresa): ya no se imprime "AUTORIZÓ" arriba del
+  // nombre del responsable cuando él mismo autorizó.
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(40,30,15);
   doc.text((datos.responsable||'Responsable del Trámite').toUpperCase(),fS+fw/2,y+12,{align:'center'});
   var _firmaPDF = (typeof _firmaDeClientes === 'function' && Array.isArray(datos.clientes) && datos.clientes.length)

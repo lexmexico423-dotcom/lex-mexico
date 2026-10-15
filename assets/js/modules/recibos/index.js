@@ -2185,7 +2185,7 @@ async function generarPDF(datos,folio,qrDataURL){
       if(conDesc && lineasD.length) doc.text(lineasD, _xDesc, y);
       if(refTxt){ doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(110,90,55); doc.text(refTxt, _xRef, y); }
       doc.setFontSize(estilo.size || 8); doc.setFont('helvetica', estilo.bold ? 'bold' : 'normal'); doc.setTextColor(col[0], col[1], col[2]);
-      doc.text(montoTxt, margin+cW, y, {align:'right'});
+      doc.text(montoTxt, margin+cW-1.5, y, {align:'right'});
       if(estilo.lineaArriba){ doc.setDrawColor(180,140,40); doc.setLineWidth(0.4); doc.line(margin, y-3.4, margin+cW, y-3.4); }
       else { doc.setDrawColor(230,215,180); doc.setLineWidth(0.2); doc.line(margin, y+alto-2.8, margin+cW, y+alto-2.8); }
       y += alto;
@@ -2197,8 +2197,23 @@ async function generarPDF(datos,folio,qrDataURL){
       doc.text(titulo, margin+1, y);
       if(tituloDesc) doc.text(tituloDesc, _xDesc, y);
       doc.text('RECIBO · FECHA', _xRef, y);
-      doc.text('IMPORTE', margin+cW, y, {align:'right'});
+      doc.text('IMPORTE', margin+cW-1.5, y, {align:'right'});
       y += 4;
+    };
+    // Oct-2026: renglón de SUMA — línea doble de extremo a extremo y la
+    // etiqueta alineada con las del cuadro de abajo (PAGO RECIBIDO HOY /
+    // SALDO RESTANTE); el importe alineado con todos los demás importes.
+    const _filaSumaEdo = function(titulo, monto, colTit){
+      if(y + 8 > 262){ doc.addPage(); y = 18; }
+      y += 0.6;
+      doc.setDrawColor(154,110,24); doc.setLineWidth(0.3);
+      doc.line(margin, y-3.4, margin+cW, y-3.4);
+      doc.line(margin, y-2.7, margin+cW, y-2.7);
+      doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(colTit[0], colTit[1], colTit[2]);
+      doc.text(titulo, margin+cW-64, y+1.9);
+      doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
+      doc.text(monto, margin+cW-1.5, y+2.1, {align:'right'});
+      y += 6.2;
     };
     // Oct-2026: desglose como en el recibo A (CONCEPTO · DESCRIPCIÓN · RECIBO ·
     // FECHA · IMPORTE), costo total, anticipo/pagos y "SALDO PENDIENTE".
@@ -2209,14 +2224,13 @@ async function generarPDF(datos,folio,qrDataURL){
       _filaEdo('COSTO TOTAL DEL TRÁMITE', '', '$'+fmtMXN(_costoTot), { bold: true, color: [154,110,24], lineaArriba: true });
     }
     _edo.abonosAntes.forEach(function(it){ _filaEdo('(-) ' + it.txt, it.ref, '-$'+fmtMXN(it.monto), { color: [42,110,58] }); });
-    _filaEdo('SALDO PENDIENTE', '', '$'+fmtMXN(_edo.saldoAntes), { bold: true, color: [154,110,24], lineaArriba: true });
+    _filaSumaEdo('SALDO PENDIENTE:', '$'+fmtMXN(_edo.saldoAntes), [154,110,24]);
     if(_edo.cargosHoy.length){
       y += 1.5;
       _banda('SERVICIO COMPLEMENTARIO (NUEVO EN ESTE RECIBO)', [255,240,220], [160,80,16]);
       _edo.cargosHoy.forEach(function(it){ _filaEdo('(+) ' + it.txt, it.ref, '$'+fmtMXN(it.monto)); });
-      _filaEdo('TOTAL A PAGAR', '', '$'+fmtMXN(_edo.totalAPagar), { bold: true, color: [160,80,16], lineaArriba: true });
+      _filaSumaEdo('TOTAL A PAGAR:', '$'+fmtMXN(_edo.totalAPagar), [160,80,16]);
     }
-    y += 1;
   } else
   if(!(_esAbiertoPDF && _esUpdate)){
     if(_esFilaSaldoPendienteCP){
@@ -2542,20 +2556,20 @@ async function generarPDF(datos,folio,qrDataURL){
     if(y + 34 > 262){ doc.addPage(); y = 18; }
     y += 0.5;
     if(qrDataURL){ try{doc.addImage(qrDataURL,'PNG',margin,y,18,18);}catch(e){ registrarError('catch vacio', e); } }
-    doc.setFillColor(255,255,255); doc.rect(margin+cW-66,y,66,22,'F');
-    doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.rect(margin+cW-66,y,66,22);
+    // Cuadro aparte: solo lo que pasó HOY (el SALDO PENDIENTE ya quedó arriba
+    // como resultado de la suma de la tabla).
+    doc.setFillColor(255,255,255); doc.rect(margin+cW-66,y,66,15,'F');
+    doc.setDrawColor(200,160,60); doc.setLineWidth(0.4); doc.rect(margin+cW-66,y,66,15);
+    doc.setDrawColor(230,215,180); doc.setLineWidth(0.2); doc.line(margin+cW-64, y+7.6, margin+cW-2, y+7.6);
     doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(100,80,40);
-    doc.text('SALDO PENDIENTE:', margin+cW-64, y+5);
-    doc.text('PAGO RECIBIDO HOY:', margin+cW-64, y+11);
+    doc.text('PAGO RECIBIDO HOY:', margin+cW-64, y+5);
     doc.setFont('helvetica','bold'); doc.setTextColor(154,110,24);
-    doc.text('SALDO RESTANTE:', margin+cW-64, y+18);
-    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(20,10,5);
-    doc.text('$'+fmtMXN(_edo.totalAPagar), margin+cW-1.5, y+5, {align:'right'});
-    doc.setTextColor(139,90,43);
-    doc.text('$'+fmtMXN(_edo.pagoHoy), margin+cW-1.5, y+11, {align:'right'});
+    doc.text('SALDO RESTANTE:', margin+cW-64, y+12);
+    doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(139,90,43);
+    doc.text('$'+fmtMXN(_edo.pagoHoy), margin+cW-1.5, y+5.2, {align:'right'});
     doc.setFontSize(11.5); doc.setTextColor(_edo.restante>0?154:42, _edo.restante>0?110:122, _edo.restante>0?24:58);
-    doc.text('$'+fmtMXN(_edo.restante), margin+cW-1.5, y+18.5, {align:'right'});
-    y += 26;
+    doc.text('$'+fmtMXN(_edo.restante), margin+cW-1.5, y+12.5, {align:'right'});
+    y += 21;
     doc.setFontSize(7.5); doc.setFont('helvetica','bold');
     const _completo = _edo.totalCargado > 0 && _edo.totalPagado >= _edo.totalCargado - 0.005;
     doc.setTextColor(_completo?42:154, _completo?122:110, _completo?58:24);

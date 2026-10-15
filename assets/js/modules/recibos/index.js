@@ -2727,7 +2727,10 @@ async function generarPDF(datos,folio,qrDataURL){
   }
   doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(40,30,15);
   doc.text((datos.responsable||'Responsable del Trámite').toUpperCase(),fS+fw/2,y+12,{align:'center'});
-  doc.text('C. '+(datos.nombre_cliente_firma||(datos.clientes[0]?.nombre)||'Cliente'),fS+fw+14+fw/2,y+12,{align:'center'});
+  var _firmaPDF = (typeof _firmaDeClientes === 'function' && Array.isArray(datos.clientes) && datos.clientes.length)
+    ? (_firmaDeClientes(datos.clientes) || String(datos.clientes[0]?.nombre || '').trim())
+    : '';
+  doc.text('C. '+(_firmaPDF||datos.nombre_cliente_firma||'Cliente'),fS+fw+14+fw/2,y+12,{align:'center'});
   doc.setFontSize(6); doc.setTextColor(120,100,60);
   doc.text('Responsable del trámite',fS+fw/2,y+15.5,{align:'center'});
   doc.text('Cliente',fS+fw+14+fw/2,y+15.5,{align:'center'});
@@ -4069,6 +4072,7 @@ async function _imprimirActualizacionReal(){
         // de cada versión posterior (bug detectado en folio 6, fila 6C).
         pagosParciales:   pagosParciales_conAuth.map(p => Object.assign({}, p, {locked:true, folioLetra: p.folioLetra || letraActual})),
         copias:           appData.recibos[idx].copias,
+        nombre_cliente_firma: (typeof _firmaDeClientes === 'function' ? _firmaDeClientes(appData.recibos[idx].clientes) : '') || appData.recibos[idx].nombre_cliente_firma || '',
         fechasImpresion:  fechasImpresion,
         total:            totalGeneral,
         saldoPendiente:   saldoNuevo,

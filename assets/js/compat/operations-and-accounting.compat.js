@@ -1528,16 +1528,17 @@ window.lexQuitarTombstone = async function(folioNum, letra) {
   }
   // 2. Quitar de Supabase directamente
   try {
-    var _r = await window.SB.from('app_state').select('recibos').eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
-    if (_r.data && _r.data.recibos) {
-      var dat = JSON.parse(JSON.stringify(_r.data.recibos));
-      var antSB = (dat.folios_eliminados||[]).length;
+    // Oct-2026 · Concurrencia: lectura + escritura condicionada a rev
+    var antSB = 0, despSB = 0;
+    await _lexActualizarColumnaAppState('recibos', function(dat){
+      antSB = (dat.folios_eliminados||[]).length;
       dat.folios_eliminados = (dat.folios_eliminados||[]).filter(function(t){
         return !(String(t.folio)===folioStr && (t.letra||'A')===letra);
       });
-      await window.SB.from('app_state').update({ recibos: dat }).eq('despacho_id', window.SB_DESPACHO_ID);
-      console.log('[lexQuitarTombstone] Tombstones en Supabase eliminados:', antSB - dat.folios_eliminados.length);
-    }
+      despSB = dat.folios_eliminados.length;
+      return dat;
+    });
+    console.log('[lexQuitarTombstone] Tombstones en Supabase eliminados:', antSB - despSB);
   } catch(e) { console.error('[lexQuitarTombstone] Error Supabase:', e); return; }
   if(typeof toast==='function') toast('✅ Tombstone de folio '+folioNum+letra+' eliminado — ya puedes restaurar el recibo', 'ok');
   console.log('✅ Tombstone folio '+folioNum+letra+' limpiado. Ahora usa el panel "Restaurar desde PDF" en Herramientas > Restaurar recibo desde PDF.');

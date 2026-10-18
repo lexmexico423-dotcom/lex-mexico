@@ -860,7 +860,7 @@ async function guardarRecibo(){
         if (!_syncOkRecibo) {
           toast('⚠️ El cobro del recibo #' + _folioLetraTxt + ' NO se pudo guardar en el servidor tras varios intentos. Verifica tu conexión — no cierres esta pestaña y vuelve a intentar, o revisa SCANSYS PRO → Diagnóstico de Folios.', 'err');
           if (typeof _lexPush === 'function') {
-            try { _lexPush('error', 'recibo.sync', 'Movimiento del recibo #' + _folioLetraTxt + ' no se pudo sincronizar tras 4 intentos — sigue solo en memoria local.', null, { folio: _folioGuardado, letra: _letraGuardada }); } catch(eLex){}
+            try { _lexPush('error', 'recibo.sync', 'Movimiento del recibo #' + _folioLetraTxt + ' no se pudo sincronizar tras 4 intentos — sigue solo en memoria local.', null, { folio: _folioGuardado, letra: _letraGuardada }); } catch(eLex){ if(typeof _lexSil==="function")_lexSil(eLex); }
           }
         }
         // 4. Refrescar TODOS los paneles en cascada
@@ -1778,7 +1778,7 @@ function _placasPreguntarDuplicado(nombreArchivo, nombreCliente){
     card.addEventListener('click', function(ev){
       const op = ev.target && ev.target.getAttribute && ev.target.getAttribute('data-op');
       if(!op) return;
-      try{ ov.remove(); }catch(e){}
+      try{ ov.remove(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       resolve(op);
     });
   });
@@ -2380,11 +2380,11 @@ async function confirmarCerrarExpediente(){
         window.borrarR2(_r2ResumenPath(ac.driveFileId), 'expedientes').catch(()=>{});
     });
     localStorage.removeItem(lsKeyCerrar);
-  } catch(e) {}
+  } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   // Marcar como concluido
   D.juicios[_mexpIdx].estatus = 'concluido';
   D.juicios[_mexpIdx].r2Docs = [];
-  try{ backupLocal('D', D); } catch(e){}
+  try{ backupLocal('D', D); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   saveJuicios();
   cerrarModalExpediente();
   renderJuicios();

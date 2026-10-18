@@ -346,7 +346,7 @@ function _csAbrirSinLiquidar(){
           saldo = parseFloat(ec.totales.adeudo) || 0;
         }
       }
-    } catch(e){}
+    } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     return saldo > 0.005 ? { r: r, saldo: saldo } : null;
   }).filter(Boolean)
     .sort(function(a,b){ return b.saldo - a.saldo; });
@@ -800,7 +800,7 @@ async function _limpiarBackupsViejos(did, ahora) {
                 + '&bucket=backups';
         var res = await fetch(url, { method: 'DELETE', headers: { 'X-Auth-Token': _tokBackup } });
         if (res.ok) eliminados++;
-      } catch(_){}
+      } catch(_){ if(typeof _lexSil==="function")_lexSil(_); }
     }
     if (eliminados) console.log('[Backup] Snapshots viejos eliminados:', eliminados);
   } catch(e) { console.warn('[Backup] limpiar:', e); }

@@ -35,6 +35,26 @@ function registrarError(modulo, error, extra = {}) {
     // Silencioso — no llamar console aquí para evitar recursión
   }
 }
+// Oct-2026 · Errores que antes se ignoraban sin dejar rastro (catch vacíos).
+// Ahora quedan anotados en "Errores del Sistema" como advertencia (amarillo), SIN
+// avisos en pantalla ni contar en el globo rojo. Cada mensaje distinto se anota
+// una sola vez por sesión (las repeticiones solo suman al contador).
+window.LEX_SILENCIOSOS = {};
+function _lexSil(error) {
+  try {
+    var msg = (error && (error.message || error)) ? String(error.message || error) : 'error sin mensaje';
+    var reg = window.LEX_SILENCIOSOS[msg];
+    if (reg) { reg.veces++; return; }
+    var stk = (error && error.stack) ? String(error.stack) : '';
+    var origen = (stk.split('\n')[1] || '').trim().slice(0, 160);
+    window.LEX_SILENCIOSOS[msg] = { veces: 1, origen: origen, fecha: new Date().toISOString() };
+    if (typeof window._lexPush === 'function') window._lexPush('warn', 'Error silencioso', msg, stk, { origen: origen });
+    else if (Array.isArray(window.LEX_ERRORS)) {
+      window.LEX_ERRORS.push({ fecha: new Date().toISOString(), nivel: 'warn', modulo: 'Error silencioso', mensaje: msg.slice(0, 800), stack: stk.split('\n').slice(0, 8).join('\n'), extra: { origen: origen } });
+      if (window.LEX_ERRORS.length > 500) window.LEX_ERRORS.shift();
+    }
+  } catch (_) { /* nunca debe fallar */ }
+}
 function safeExec(nombre, fn, fallback = null) {
   try {
     return fn();

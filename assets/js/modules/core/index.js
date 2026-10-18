@@ -646,7 +646,7 @@ function _horarioGateCountdownIniciar(){
       clearInterval(_hgCountdownTimer); _hgCountdownTimer = null;
       _horarioGateCerrar();
       if(typeof toast==='function') toast('🌅 El sistema ya está habilitado — ¡buen inicio de jornada!');
-      try{ registrarConexionDiaria(); }catch(e){}
+      try{ registrarConexionDiaria(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       return;
     }
     if(!elCountdown) return;
@@ -2486,12 +2486,12 @@ function _flujoRepararYParsear(txtOriginal){
     cerrarFaltantes(limpiar(escapado)),
   ];
   for (const intento of intentos) {
-    try { const r = JSON.parse(intento); if (Array.isArray(r) && r.length) return r; } catch(e){}
+    try { const r = JSON.parse(intento); if (Array.isArray(r) && r.length) return r; } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   }
   const base = cerrarFaltantes(limpiar(escapado));
   const recortado = recortarAlUltimoCompleto(base);
   if (recortado) {
-    try { const r = JSON.parse(recortado); if (Array.isArray(r) && r.length) return r; } catch(e){}
+    try { const r = JSON.parse(recortado); if (Array.isArray(r) && r.length) return r; } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   }
   throw new Error('No se pudo interpretar la respuesta de la IA como JSON válido.');
 }
@@ -2597,7 +2597,7 @@ function _prImprimirEstadoCuenta(prId) {
 
   const win = window.open('', '_blank');
   if (!win) { if (typeof toast === 'function') toast('⚠ El navegador bloqueó la ventana. Permite ventanas emergentes para este sitio e inténtalo de nuevo.', 'err'); return; }
-  win.document.write(html); win.document.close(); setTimeout(() => { try { win.print(); } catch(e){} }, 400);
+  win.document.write(html); win.document.close(); setTimeout(() => { try { win.print(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }, 400);
 }
 
 function cerrarModalEscrito(){

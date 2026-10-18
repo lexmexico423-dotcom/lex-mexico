@@ -44,7 +44,7 @@ async function initSupabase(){
             if(_em && typeof empleadoActual !== 'undefined'){
               empleadoActual = { email: _em, nombre: _en || _em.split('@')[0] };
             }
-          } catch(e){}
+          } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
           if(event === 'INITIAL_SESSION'){
             obtenerDespachoActivo().then(function(did){
               if(did){
@@ -248,7 +248,7 @@ function mostrarLoginSupabase(){
           email: res.data.user.email,
           nombre: EMPLEADOS[res.data.user.email.toLowerCase()] || res.data.user.email.split('@')[0]
         };
-        try{ if(typeof _driveSyncRefreshPendiente==='function') _driveSyncRefreshPendiente(); } catch(e){}
+        try{ if(typeof _driveSyncRefreshPendiente==='function') _driveSyncRefreshPendiente(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
         // SEGURIDAD: el "Modo administrador" del panel de Placas (_mpeAdminActivo)
         // es una variable en memoria que antes NO se reseteaba al cambiar de
         // usuario dentro de la misma pestaña — si el admin lo activaba y luego
@@ -259,7 +259,7 @@ function mostrarLoginSupabase(){
           if(typeof _mpeAdminActivo !== 'undefined') _mpeAdminActivo = false;
           if(typeof _mpeAdminOff !== 'undefined') _mpeAdminOff = false;
           sessionStorage.removeItem('mpe_admin_off');
-        } catch(e){}
+        } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
         try{ localStorage.setItem('empleado_email', empleadoActual.email); } catch(e){ registrarError('localStorage.setItem', e); }
 try{ localStorage.setItem('empleado_nombre', empleadoActual.nombre); } catch(e){ registrarError('localStorage.setItem', e); }
 // Bloquea "Responsable del Trámite" al nombre de quien inició sesión (o lo
@@ -295,7 +295,7 @@ const _despachoOk = await obtenerDespachoActivo();
         actualizarAmbossBadges(true);
         setStatus('loading','Cargando datos del despacho...','loading');
         await sincronizarFolio();
-        try { if(typeof window._pendMovsRecuperar === 'function') window._pendMovsRecuperar(); } catch(_ePend){}
+        try { if(typeof window._pendMovsRecuperar === 'function') window._pendMovsRecuperar(); } catch(_ePend){ if(typeof _lexSil==="function")_lexSil(_ePend); }
         setStatus('ok','Sistema conectado — ' + empleadoActual.nombre,'ok');
         const _btnCS = document.getElementById('btn-cerrar-sesion'); if(_btnCS) _btnCS.style.display = 'block';
         auditoriaRegistrar('login', 'Inicio de sesión — ' + empleadoActual.email);
@@ -617,8 +617,8 @@ Responde ÚNICAMENTE con un objeto JSON válido (NO un arreglo), sin markdown ni
     const j = D.juicios && D.juicios[_mexpIdx];
     if(j && Array.isArray(j.flujoProcedimiento) && j.flujoProcedimiento[i]){
       Object.assign(j.flujoProcedimiento[i], et);
-      try { saveJuicios(); } catch(e){}
-      try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){}
+      try { saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+      try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     }
 
     if(slot) slot.innerHTML = '<div style="font-size:0.62rem;color:var(--verde-d);background:var(--verde-l);border-radius:var(--radius-sm);padding:6px 9px;">✓ Etapa profundizada' + (leyParaEtapa ? ' con el texto de la ley.' : ' (sin texto de la ley a la vista).') + '</div>';

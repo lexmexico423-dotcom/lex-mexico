@@ -113,7 +113,7 @@ async function cargarAcuerdosDrive(juicioId, nombreCarpetaJuicio) {
   const lsKey = 'lex_acuerdos_' + juicioId;
   // 1) Cargar caché local de inmediato (renderiza sin esperar a Drive)
   let local = [];
-  try { local = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){}
+  try { local = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (local.length) renderAcuerdosDrive(local);
 
   // 2) Refrescar desde Drive en segundo plano si hay carpeta
@@ -143,8 +143,8 @@ async function cargarAcuerdosDrive(juicioId, nombreCarpetaJuicio) {
               if (m.resumen) ac.resumen = m.resumen;
             }
           });
-        } catch(e){}
-        try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){}
+        } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+        try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
         renderAcuerdosDrive(lista);
         // Restaurar resúmenes desde R2 para acuerdos que no tienen en localStorage
         lista.forEach(async ac => {
@@ -156,7 +156,7 @@ async function cargarAcuerdosDrive(juicioId, nombreCarpetaJuicio) {
                 const ls2 = JSON.parse(localStorage.getItem(lsKey) || '[]');
                 const i2 = ls2.findIndex(a => a.driveFileId === ac.driveFileId);
                 if (i2 >= 0) { ls2[i2].resumen = r2d.resumen; localStorage.setItem(lsKey, JSON.stringify(ls2)); }
-              } catch(e) {}
+              } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
             }
           }
         });
@@ -169,7 +169,7 @@ async function cargarAcuerdosDrive(juicioId, nombreCarpetaJuicio) {
 async function _acuerdosListarDriveFresco(juicioId, nombreCarpetaJuicio) {
   const lsKey = 'lex_acuerdos_' + juicioId;
   let local = [];
-  try { local = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){}
+  try { local = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (!nombreCarpetaJuicio) return local;
   try {
     const token = await driveGetAccessToken();
@@ -191,14 +191,14 @@ async function _acuerdosListarDriveFresco(juicioId, nombreCarpetaJuicio) {
         if (m.resumen) ac.resumen = m.resumen;
       }
     });
-    try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){}
+    try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     return lista;
   } catch(e) { console.warn('[Acuerdos] No se pudo refrescar desde Drive:', e.message); return local; }
 }
 
 async function guardarAcuerdosDrive(juicioId, lista) {
   if (!juicioId) return;
-  try { localStorage.setItem('lex_acuerdos_'+juicioId, JSON.stringify(lista)); } catch(e){}
+  try { localStorage.setItem('lex_acuerdos_'+juicioId, JSON.stringify(lista)); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
 }
 
 function renderAcuerdosDrive(lista) {
@@ -227,7 +227,7 @@ function renderAcuerdosDrive(lista) {
   if (j && j.acuerdosPendientesAccion !== nPend && lista.length) {
     j.acuerdosPendientesAccion = nPend;
     j.updatedAt = Date.now();
-    if (typeof saveJuicios === 'function') try { saveJuicios(); } catch(e){}
+    if (typeof saveJuicios === 'function') try { saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   }
   try {
     if (j && Array.isArray(j.historial) && lista.some(a => a && a.md5)) {
@@ -235,11 +235,11 @@ function renderAcuerdosDrive(lista) {
       lista.forEach(a => { if (a && a.driveFileId && a.md5 && a.fechaAcuerdo && _juFechaValida(a.fechaAcuerdo, j)) fPorId[a.driveFileId] = a.fechaAcuerdo; });
       let cambio = false;
       j.historial.forEach(h => { if (h && h.driveFileId && fPorId[h.driveFileId] && h.fecha !== fPorId[h.driveFileId]) { h.fecha = fPorId[h.driveFileId]; cambio = true; } });
-      if (cambio) { j.updatedAt = Date.now(); if (typeof saveJuicios === 'function') try { saveJuicios(); } catch(e){} if (typeof syncEstadoSupabaseDebounced === 'function') try { syncEstadoSupabaseDebounced(); } catch(e){} }
+      if (cambio) { j.updatedAt = Date.now(); if (typeof saveJuicios === 'function') try { saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } if (typeof syncEstadoSupabaseDebounced === 'function') try { syncEstadoSupabaseDebounced(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }
     }
-  } catch(eH){}
-  try { if (typeof _juRenderFichaSimple === 'function' && idxJ != null) _juRenderFichaSimple(idxJ); } catch(e){}
-  try { if (typeof _juRenderPestanas === 'function' && idxJ != null) { const b = document.getElementById('mexp-pestanas'); if (b) _juRenderPestanas(idxJ); } } catch(e){}
+  } catch(eH){ if(typeof _lexSil==="function")_lexSil(eH); }
+  try { if (typeof _juRenderFichaSimple === 'function' && idxJ != null) _juRenderFichaSimple(idxJ); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { if (typeof _juRenderPestanas === 'function' && idxJ != null) { const b = document.getElementById('mexp-pestanas'); if (b) _juRenderPestanas(idxJ); } } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
 
   if (!lista.length) {
     cont.innerHTML = '<div style="padding:24px 10px;text-align:center;color:var(--muted);font-size:0.76rem;line-height:1.6;">Sin acuerdos subidos todavía.<br>Usa <strong>📄 Subir acuerdo</strong> o arrastra el PDF aquí.</div>';
@@ -283,9 +283,9 @@ function renderAcuerdosDrive(lista) {
         + '<span style="flex:1;min-width:180px;">⚠ En estos acuerdos hay ' + partes.join(' y ') + '.</span>'
         + '<button onclick="_juRevisarAcuerdos()" style="background:#b06a00;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:.72rem;font-weight:700;cursor:pointer;">🛠 Revisar y reparar</button></div>';
     }
-  } catch(eAv){}
+  } catch(eAv){ if(typeof _lexSil==="function")_lexSil(eAv); }
   cont.innerHTML = avisoRep + '<div id="ju-aviso-parciales"></div>' + barra;
-  if (!avisoRep) setTimeout(function(){ try { _juAvisoParcialesFondo(lista); } catch(e){} }, 0);
+  if (!avisoRep) setTimeout(function(){ try { _juAvisoParcialesFondo(lista); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }, 0);
   if (!vis.length) {
     cont.insertAdjacentHTML('beforeend', '<div style="padding:18px 10px;text-align:center;color:var(--muted);font-size:0.74rem;">' + (filtro === 'accion' ? '✓ No hay acuerdos pendientes de atender.' : 'No hay acuerdos en este filtro.') + '</div>');
     return;
@@ -349,7 +349,7 @@ function _editarNotifAcuerdo(acuerdoId) {
   if (!jId) return;
   const lsKey = 'lex_acuerdos_' + jId;
   let lista = [];
-  try { lista = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){}
+  try { lista = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   const ac = lista.find(a => a.id == acuerdoId);
   if (!ac) return;
 
@@ -374,12 +374,12 @@ function _editarNotifAcuerdo(acuerdoId) {
   function guardar() {
     const val = inp.value;
     ac.fechaNotificacion = val || '';
-    try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){}
+    try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     try {
       const jj = D.juicios[window._mexpIdxActual];
       if (jj) { const mm = _juMeta(jj), kk = ac.driveFileId || ac.id; mm[kk] = mm[kk] || {}; mm[kk].fechaNotificacion = val || ''; jj.updatedAt = Date.now();
         if (typeof saveJuicios === 'function') saveJuicios(); if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); }
-    } catch(e){}
+    } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     // Re-renderizar para reflejar el cambio
     renderAcuerdosDrive(lista);
   }
@@ -393,7 +393,7 @@ async function eliminarAcuerdoDrive(acuerdoId) {
   if (!jId) return;
   const lsKey = 'lex_acuerdos_' + jId;
   let lista = [];
-  try { lista = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){}
+  try { lista = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   const ac = lista.find(a => a.id == acuerdoId);
   if (!ac) return;
   const ok = await confirmarBonito({
@@ -413,7 +413,7 @@ async function eliminarAcuerdoDrive(acuerdoId) {
     } catch(e) { console.warn('[Acuerdos] No se pudo eliminar de Drive:', e); }
   }
   lista = lista.filter(a => a.id != acuerdoId);
-  try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){}
+  try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   // También se quita de la línea de tiempo interna y de sus marcas — antes
   // quedaban "huérfanos" y la IA los seguía contando al detectar la etapa.
   try {
@@ -425,7 +425,7 @@ async function eliminarAcuerdoDrive(acuerdoId) {
       if (typeof saveJuicios === 'function') saveJuicios();
       if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
     }
-  } catch(e){}
+  } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   renderAcuerdosDrive(lista);
   if (typeof toast === 'function') toast('🗑 Acuerdo eliminado', 'ok');
 }
@@ -487,7 +487,7 @@ async function subirAcuerdoDriveFiles(files) {
         fileSha256 = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2,'0')).join('');
         // Huella MD5 = la misma que Drive calcula de cada archivo. Solo se
         // calcula si ya hay otro PDF del MISMO tamaño (si no, no puede ser copia).
-        if (lista.some(a => a.id !== tmpId && a.tam && a.tam === file.size)) { try { fileMd5 = _juMD5(arrBuf); } catch(eMd5){} }
+        if (lista.some(a => a.id !== tmpId && a.tam && a.tam === file.size)) { try { fileMd5 = _juMD5(arrBuf); } catch(eMd5){ if(typeof _lexSil==="function")_lexSil(eMd5); } }
         const nombreNorm = (file.name || '').trim().toLowerCase();
         const existente = lista.find(a =>
           a.id !== tmpId && a.estado !== 'error' && (
@@ -691,9 +691,9 @@ Responde ÚNICAMENTE con un JSON válido, sin markdown ni texto extra:
         } catch(eR) { console.warn('[Acuerdos] reemplazar copia incompleta:', eR); }
       }
       // Quién lo subió (se guarda en el expediente para que lo vean todos).
-      try { if (typeof _juRegistrarSubidoPor === 'function' && driveFileId) _juRegistrarSubidoPor(acFinal); } catch(eSP){}
+      try { if (typeof _juRegistrarSubidoPor === 'function' && driveFileId) _juRegistrarSubidoPor(acFinal); } catch(eSP){ if(typeof _lexSil==="function")_lexSil(eSP); }
       // Sin una fecha confiable → queda marcada "⚠ Revisa la fecha" (para todos).
-      if (_resFecha.revisar && driveFileId && juicioActivoUpload) { try { const _mF = _juMeta(juicioActivoUpload); (_mF[driveFileId] = _mF[driveFileId] || {}).fechaRevisar = true; } catch(eFR){} }
+      if (_resFecha.revisar && driveFileId && juicioActivoUpload) { try { const _mF = _juMeta(juicioActivoUpload); (_mF[driveFileId] = _mF[driveFileId] || {}).fechaRevisar = true; } catch(eFR){ if(typeof _lexSil==="function")_lexSil(eFR); } }
 
       // 5) Agregar al historial cronológico automáticamente
       await agregarEntradaHistorialDesdeAcuerdo(jId, acFinal);
@@ -822,7 +822,7 @@ function cerrarVisorAcuerdo() {
   const iframe  = document.getElementById('acuerdo-visor-iframe');
   const resDiv  = document.getElementById('acuerdo-resumen-modal-div');
   if (overlay) overlay.style.display = 'none';
-  if (iframe) { try { URL.revokeObjectURL(iframe.src); } catch(e){} iframe.src = 'about:blank'; iframe.style.display = ''; }
+  if (iframe) { try { URL.revokeObjectURL(iframe.src); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } iframe.src = 'about:blank'; iframe.style.display = ''; }
   if (resDiv) { resDiv.style.display = 'none'; resDiv.innerHTML = ''; }
   verResumenAcuerdoModal._pdfBtn = null;
   verResumenAcuerdoModal._acActivo = null;
@@ -930,7 +930,7 @@ function verResumenAcuerdoModal(ac) {
             const lista = JSON.parse(localStorage.getItem(lsKey) || '[]');
             const idx = lista.findIndex(a => a.driveFileId === ac.driveFileId);
             if (idx >= 0) { lista[idx].resumen = r2data.resumen; localStorage.setItem(lsKey, JSON.stringify(lista)); }
-          } catch(e) {}
+          } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
         }
         _renderContenido(r2data.resumen, false);
       }
@@ -957,7 +957,7 @@ function verResumenAcuerdoModal(ac) {
         try {
           const r2data = await _r2CargarResumen(ac.driveFileId);
           if (r2data && r2data.ocrTexto) ocrTexto = r2data.ocrTexto;
-        } catch(e) {}
+        } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       }
       // Si no hay OCR guardado → descargar PDF de Drive y extraer su texto
       // (antes esto se mandaba tal cual a Gemini; ahora se extrae el texto
@@ -981,7 +981,7 @@ function verResumenAcuerdoModal(ac) {
         const juicioActual = D && D.juicios && D.juicios[typeof jdetIdx !== 'undefined' ? jdetIdx : _mexpIdx];
         const leyesActivas = (juicioActual && juicioActual.leyesActivas) ? juicioActual.leyesActivas : [];
         if (leyesActivas.length) leyesActivasStr = leyesActivas.join(', ');
-      } catch(e) {}
+      } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
 
       // Prompt de resumen extendido con recomendaciones
       const prompt = `Eres un abogado litigante mexicano experto con 20 años de experiencia en derecho civil y familiar. Analiza este acuerdo judicial con rigor técnico y genera el siguiente informe estructurado. Responde ÚNICAMENTE con el texto, sin JSON, sin bloques de código, sin comentarios adicionales.
@@ -1016,7 +1016,7 @@ Redacta 4 a 6 recomendaciones técnicas y estratégicas dirigidas al abogado lit
           if (idx >= 0) { lista[idx].resumen = nuevoResumen; }
           else { lista.push({ ...ac, resumen: nuevoResumen }); }
           localStorage.setItem(lsKey, JSON.stringify(lista));
-        } catch(e) {}
+        } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       }
       // Guardar en R2 de forma permanente (no depende del navegador)
       if (ac.driveFileId) _r2GuardarResumen(ac.driveFileId, nuevoResumen);
@@ -1293,7 +1293,7 @@ function abrirDetallesCarpeta(idx){
       try { renderCarp(); } catch(e){ console.warn('[abrirDetallesCarpeta] renderCarp:', e); }
       try { save(); } catch(e){ console.warn('[abrirDetallesCarpeta] save:', e); }
       try { saveCarpetas(); } catch(e){ console.warn('[abrirDetallesCarpeta] saveCarpetas:', e); }
-      try { toast('📋 Observaciones guardadas ✓'); } catch(e){}
+      try { toast('📋 Observaciones guardadas ✓'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       btn.innerHTML = '✓ Guardado';
       btn.style.cursor = '';
       // Ya no se cierra la ficha al guardar — se queda abierta y regresa
@@ -2705,7 +2705,7 @@ function abrirDetalle(idx){
   window._juTabActiva = '0';
   window._juAcFiltro = 'todos';
   window._juAcuerdosLista = [];
-  try { _juToggleMasOpciones(false); var _avw = document.getElementById('mexp-aviso-wrap'); if (_avw) _avw.style.display = 'none'; } catch(e){}
+  try { _juToggleMasOpciones(false); var _avw = document.getElementById('mexp-aviso-wrap'); if (_avw) _avw.style.display = 'none'; } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   const j = D.juicios[idx];
   if(!j) return;
 
@@ -2806,9 +2806,9 @@ function _juFijarEtapaFlujo(idx, i){
   j.flujoEtapaActualRazon = ''; // marca manual: sin razón de IA
   j.updatedAt = Date.now();
   if(typeof saveJuicios === 'function') saveJuicios();
-  try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){}
+  try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   _juRenderEtapas(j, idx);
-  try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(idx); } catch(e){}
+  try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(idx); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(typeof renderJuicios === 'function') renderJuicios();
   // Si el panel "Flujo del Procedimiento" está abierto para este mismo
   // expediente, refrescarlo también para que no se desincronice.
@@ -2816,7 +2816,7 @@ function _juFijarEtapaFlujo(idx, i){
     if (typeof _flujoRender === 'function' && window._mexpIdxActual === idx && Array.isArray(window._flujoEtapasActual) && window._flujoEtapasActual.length) {
       _flujoRender(window._flujoEtapasActual, window._flujoLeyActual);
     }
-  } catch(e){}
+  } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(typeof toast === 'function') toast(j.flujoEtapaActual === null ? 'Marca de etapa actual retirada' : 'Etapa: ' + (nueva.etapa || ''));
 }
 
@@ -2826,7 +2826,7 @@ function _juRenderAvisoTermino(j, idx){
   const slot = document.getElementById('mexp-aviso-termino-slot');
   if(!slot) return;
   // Mantener al día la tarjeta "Términos por vencer" de la ficha simple.
-  setTimeout(function(){ try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(idx); } catch(e){} }, 0);
+  setTimeout(function(){ try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(idx); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }, 0);
   const esc2 = (s) => (typeof esc === 'function' ? esc(s == null ? '' : s) : String(s == null ? '' : s));
   const lista = _juTerminosPropiosAbiertos(j);
   if(!lista.length){
@@ -3009,7 +3009,7 @@ function _juFechaLarga(iso){
 }
 function _juEsc(s){ return (typeof esc === 'function') ? esc(s == null ? '' : s) : String(s == null ? '' : s); }
 function _juUsuarioActual(){
-  try { if (typeof empleadoActual !== 'undefined' && empleadoActual) return empleadoActual.nombre || empleadoActual.email || ''; } catch(e){}
+  try { if (typeof empleadoActual !== 'undefined' && empleadoActual) return empleadoActual.nombre || empleadoActual.email || ''; } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   return '';
 }
 function _juMeta(j){ if (!j.acuerdosMeta || typeof j.acuerdosMeta !== 'object') j.acuerdosMeta = {}; return j.acuerdosMeta; }
@@ -3115,10 +3115,10 @@ function _juTerminoDesdeAcuerdo(clave){
       var cat = document.getElementById('trPlazoCat');
       if (cat) {
         var o = Array.from(cat.options || []).find(function(op){ return /cumplir requerimiento/i.test(op.textContent || op.value); });
-        if (o) { cat.value = o.value; if (typeof cat.onchange === 'function') try { cat.onchange(); } catch(e){} }
+        if (o) { cat.value = o.value; if (typeof cat.onchange === 'function') try { cat.onchange(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }
       }
     }
-    var dEl = document.getElementById('trDias'); if (dEl) setTimeout(function(){ try { dEl.focus(); dEl.select(); } catch(e){} }, 150);
+    var dEl = document.getElementById('trDias'); if (dEl) setTimeout(function(){ try { dEl.focus(); dEl.select(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }, 150);
     if (typeof _juRecalcularVenc === 'function') _juRecalcularVenc();
   } catch(e){ console.warn('[Juicios] término desde acuerdo:', e); }
 }
@@ -3205,7 +3205,7 @@ function _juRenderFichaSimple(idx){
         else if ((parseFloat(ec.totales.adeudo) || 0) > 0.005) { estadoTxt = 'Debe $' + (typeof fmt === 'function' ? fmt(ec.totales.adeudo) : ec.totales.adeudo); colorP = 'var(--rojo)'; }
         else { estadoTxt = ec.abierto ? 'Sin adeudo por ahora' : 'Liquidado'; colorP = 'var(--verde-d)'; }
       }
-    } catch(e){}
+    } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     tPago = tile('abrirFichaDesdeContab(' + f + ')', 'var(--surface)', 'var(--border-l)', 'Pago del cliente' + (folios.length > 1 ? ' (' + folios.length + ' folios)' : ''), 'var(--muted)',
       '<div style="font-size:.82rem;font-weight:700;color:' + colorP + ';margin-top:2px;">Folio #' + (typeof folioFormato === 'function' ? folioFormato(f) : f) + (estadoTxt ? ' · ' + estadoTxt : '') + '</div>');
   }
@@ -3318,7 +3318,7 @@ function _juFechasEnTexto(texto){
 }
 
 function _juHoyISO(){
-  try { if (typeof fechaCDMX_ISO === 'function') return fechaCDMX_ISO(); } catch(e){}
+  try { if (typeof fechaCDMX_ISO === 'function') return fechaCDMX_ISO(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   return new Date().toISOString().slice(0, 10);
 }
 
@@ -3510,7 +3510,7 @@ async function _juDrivePatch(token, fileId, cuerpo){
   var r = await fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?fields=id,name,trashed', {
     method: 'PATCH', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' }, body: JSON.stringify(cuerpo)
   });
-  if (!r.ok) { var t = ''; try { t = await r.text(); } catch(e){} throw new Error('Drive HTTP ' + r.status + ' ' + t.slice(0, 80)); }
+  if (!r.ok) { var t = ''; try { t = await r.text(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } throw new Error('Drive HTTP ' + r.status + ' ' + t.slice(0, 80)); }
   return r.json();
 }
 
@@ -3569,7 +3569,7 @@ function _juDialogoReparacion(plan){
       + '<button type="button" data-r="0" style="padding:8px 16px;border-radius:8px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);font-size:.78rem;cursor:pointer;">Cancelar</button>'
       + '<button type="button" data-r="1" style="padding:8px 16px;border-radius:8px;border:none;background:var(--verde-d,#1a7a3a);color:#fff;font-size:.78rem;font-weight:700;cursor:pointer;">✓ Aplicar cambios</button>'
       + '</div></div>';
-    var fin = function(v){ try { ov.remove(); } catch(e){} resolve(v); };
+    var fin = function(v){ try { ov.remove(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } resolve(v); };
     ov.addEventListener('click', function(e){
       var bc = e.target.closest && e.target.closest('button[data-confirmar]');
       if (bc) {
@@ -3616,7 +3616,7 @@ async function _juOcrDe(ac){
   if (!id) return '';
   if (window._juOcrCache[id] !== undefined) return window._juOcrCache[id];
   var t = '';
-  try { var r = await _r2CargarResumen(id); t = (r && r.ocrTexto) || ''; } catch(e){}
+  try { var r = await _r2CargarResumen(id); t = (r && r.ocrTexto) || ''; } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   window._juOcrCache[id] = t;
   return t;
 }
@@ -3679,9 +3679,9 @@ function _juConfirmarFecha(ac){
   m[k].fechaConfirmadaPor = (typeof _juUsuarioActual === 'function') ? _juUsuarioActual() : '';
   delete m[k].fechaRevisar;
   j.updatedAt = Date.now();
-  try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){}
-  try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){}
-  try { renderAcuerdosDrive(window._juAcuerdosLista || []); } catch(e){}
+  try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { renderAcuerdosDrive(window._juAcuerdosLista || []); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
 }
 
 async function _juRevisarAcuerdos(){
@@ -3690,7 +3690,7 @@ async function _juRevisarAcuerdos(){
   var j = D.juicios && D.juicios[idx];
   if (!jId || !j) { if (typeof toast === 'function') toast('⚠ Abre un expediente primero', 'err'); return; }
   var token = null;
-  try { token = await driveGetAccessToken(); } catch(e){}
+  try { token = await driveGetAccessToken(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (!token) { if (typeof toast === 'function') toast('⚠ Conecta Google Drive (Panel Admin) para revisar los acuerdos', 'err'); return; }
   if (typeof toast === 'function') toast('🔍 Revisando acuerdos en Drive…', 'ok');
   var lista = await _acuerdosListarDriveFresco(jId, _juCarpetaDriveNombre(j, jId));
@@ -3720,7 +3720,7 @@ async function _juRevisarAcuerdos(){
     if (i % 3 === 0 && typeof toast === 'function') toast('📖 Leyendo fechas ' + (i + 1) + ' de ' + quedan.length + '…', 'ok');
     var copias = grupoDe[ac.driveFileId] || [ac], texto = '';
     for (var c = 0; c < copias.length && !texto; c++) {
-      try { var r2 = await _r2CargarResumen(copias[c].driveFileId); texto = (r2 && r2.ocrTexto) || ''; } catch(e){}
+      try { var r2 = await _r2CargarResumen(copias[c].driveFileId); texto = (r2 && r2.ocrTexto) || ''; } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     }
     var porTexto = texto ? _juFechaDesdeTexto(texto, j) : null;
     var fuerte = porTexto && porTexto.fuente !== 'inicio';
@@ -3741,8 +3741,8 @@ async function _juRevisarAcuerdos(){
     if (limpiarMarca.length) {
       var mL = _juMeta(j); limpiarMarca.forEach(function(ac){ if (mL[ac.driveFileId]) delete mL[ac.driveFileId].fechaRevisar; });
       j.updatedAt = Date.now();
-      try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){}
-      try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){}
+      try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+      try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       renderAcuerdosDrive(lista);
     }
     if (typeof toast === 'function') toast('✓ Todo en orden: sin copias repetidas y con fechas correctas', 'ok');
@@ -3787,12 +3787,12 @@ async function _juRevisarAcuerdos(){
   j.historialRespaldos = resp.slice(0, 3);
   j.historial = _juHistorialReconstruido(j, listaFinal);
   j.updatedAt = Date.now();
-  try { localStorage.setItem('lex_acuerdos_' + jId, JSON.stringify(listaFinal)); } catch(e){}
-  try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){}
+  try { localStorage.setItem('lex_acuerdos_' + jId, JSON.stringify(listaFinal)); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   try { if (typeof syncEstadoSupabase === 'function') await syncEstadoSupabase(); else if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){ console.warn('[Acuerdos] sync reparación:', e); }
   renderAcuerdosDrive(listaFinal);
-  try { if (typeof renderHistorialModal === 'function') renderHistorialModal(); } catch(e){}
-  try { if (typeof renderJuicios === 'function') renderJuicios(); } catch(e){}
+  try { if (typeof renderHistorialModal === 'function') renderHistorialModal(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { if (typeof renderJuicios === 'function') renderJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (typeof toast === 'function') toast('✓ Listo: ' + nPapelera + ' copia(s) a la papelera · ' + nFechas + ' fecha(s) corregida(s)' + (errores.length ? ' · ⚠ ' + errores.length + ' aviso(s)' : ''), errores.length ? 'err' : 'ok');
   if (errores.length) console.warn('[Acuerdos] reparación con avisos:', errores);
 }
@@ -3815,7 +3815,7 @@ function _juEditarFechaAcuerdo(k){
     + '<button type="button" data-r="0" style="padding:7px 14px;border-radius:8px;border:1px solid var(--border-l);background:var(--surface);color:var(--muted);font-size:.76rem;cursor:pointer;">Cancelar</button>'
     + '<button type="button" data-r="1" style="padding:7px 14px;border-radius:8px;border:none;background:var(--gold-d);color:#fff;font-size:.76rem;font-weight:700;cursor:pointer;">Guardar</button></div></div>';
   document.body.appendChild(ov);
-  var cerrarOv = function(){ try { ov.remove(); } catch(e){} };
+  var cerrarOv = function(){ try { ov.remove(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } };
   ov.addEventListener('click', async function(e){
     var b = e.target.closest && e.target.closest('button[data-r]');
     if (!b) { if (e.target === ov) cerrarOv(); return; }
@@ -3841,24 +3841,24 @@ async function _juAplicarFechaAcuerdo(ac, iso){
     try {
       var rN = await fetch('https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(ac.driveFileId) + '?fields=name', { headers: { Authorization: 'Bearer ' + token } });
       if (rN.ok) { var dN = await rN.json(); if (dN && dN.name) nombreActual = dN.name; }
-    } catch(e){}
+    } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     var nombreNuevo = _juNombreConFecha(nombreActual, iso);
     if (nombreNuevo !== nombreActual) await _juDrivePatch(token, ac.driveFileId, { name: nombreNuevo });
     ac.archivo = nombreNuevo;
   }
   ac.fechaAcuerdo = iso; ac.fechaRevisar = false;
   var lista = [];
-  try { lista = JSON.parse(localStorage.getItem('lex_acuerdos_' + jId) || '[]'); } catch(e){}
+  try { lista = JSON.parse(localStorage.getItem('lex_acuerdos_' + jId) || '[]'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   var k = _juClaveAcuerdo(ac);
   lista.forEach(function(a){ if (_juClaveAcuerdo(a) === k) { a.fechaAcuerdo = iso; a.archivo = ac.archivo; a.fechaRevisar = false; } });
-  try { localStorage.setItem('lex_acuerdos_' + jId, JSON.stringify(lista)); } catch(e){}
+  try { localStorage.setItem('lex_acuerdos_' + jId, JSON.stringify(lista)); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (j) {
     var m = _juMeta(j); m[k] = m[k] || {}; delete m[k].fechaRevisar;
     m[k].fechaConfirmada = iso; m[k].fechaConfirmadaPor = (typeof _juUsuarioActual === 'function') ? _juUsuarioActual() : '';
     (j.historial || []).forEach(function(h){ if (h && ac.driveFileId && h.driveFileId === ac.driveFileId) h.fecha = iso; });
     j.updatedAt = Date.now();
-    try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){}
-    try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){}
+    try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+    try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   }
   renderAcuerdosDrive(lista.length ? lista : window._juAcuerdosLista);
   if (typeof toast === 'function') toast('📅 Fecha actualizada: ' + _juFechaLarga(iso), 'ok');
@@ -3956,7 +3956,7 @@ async function _docRelCargar(idx, cat){
   const { jId, nombre } = _docRelNombreCarpetaJuicio(idx);
   const lsKey = _docRelClave(jId, cat);
   let local = [];
-  try { local = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){}
+  try { local = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   _docRelRender(cat, local);
   (async () => {
     try {
@@ -3969,7 +3969,7 @@ async function _docRelCargar(idx, cat){
       if(!carpetaCatId) return;
       const archivos = await driveListarArchivosCarpeta(token, carpetaCatId);
       const lista = archivos.map(f => ({ id: f.id, driveFileId: f.id, nombre: (f.name||'').replace(/\.pdf$/i,''), archivo: f.name||'', fechaSubida: (f.createdTime||'').slice(0,10) }));
-      try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){}
+      try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       _docRelRender(cat, lista);
     } catch(e){ console.warn('[Documentos] Error al listar', cat, e.message); }
   })();
@@ -3982,7 +3982,7 @@ async function _docRelSubirFiles(idx, files){
   const { jId, nombre } = _docRelNombreCarpetaJuicio(idx);
   const lsKey = _docRelClave(jId, cat);
   let lista = [];
-  try { lista = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){}
+  try { lista = JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   const proc = document.getElementById('mexp-docrel-procesando');
   if(proc) proc.style.display = 'flex';
   for(const file of Array.from(files)){
@@ -4013,7 +4013,7 @@ async function _docRelSubirFiles(idx, files){
       if(typeof toast==='function') toast('❌ Error subiendo ' + file.name + ': ' + e.message, 'err');
     }
   }
-  try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){}
+  try { localStorage.setItem(lsKey, JSON.stringify(lista)); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(proc) proc.style.display = 'none';
   _docRelRender(cat, lista);
   if(typeof toast==='function') toast('✅ Documento(s) guardado(s) en Drive · ' + cat, 'ok');
@@ -4144,8 +4144,8 @@ function _juConfirmarSugerencia(idx){
   j.updatedAt = Date.now();
   if(typeof saveJuicios === 'function') saveJuicios();
   _juDescartarSugerencia();
-  if(typeof renderHistorialModal === 'function') try{ renderHistorialModal(); }catch(e){}
-  if(typeof renderTerminos === 'function') try{ renderTerminos(); }catch(e){}
+  if(typeof renderHistorialModal === 'function') try{ renderHistorialModal(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  if(typeof renderTerminos === 'function') try{ renderTerminos(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(typeof renderJuicios === 'function') renderJuicios();
   if(typeof toast === 'function'){
     toast(creoTermino ? '✓ Actuación y término guardados — vence ' + vence : '✓ Actuación guardada','ok');
@@ -4196,7 +4196,7 @@ async function subirDocR2(input){
     const kb = Math.round(file.size/1024);
     const fecha = new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'});
     j.r2Docs.push({ nombre: file.name, path: path, fecha: fecha, size: kb + ' KB' });
-    try{ backupLocal('D', D); } catch(e){}
+    try{ backupLocal('D', D); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     saveJuicios();
     cargarDocsR2(_mexpIdx);
     if(typeof toast==='function') toast(ok ? '✓ ' + file.name + ' guardado en R2' : '⚠ Guardado local (R2 no disponible)', ok?'ok':'err');
@@ -4228,7 +4228,7 @@ async function eliminarDocR2(idx, docIdx){
     if(typeof window.eliminarR2==='function') await window.eliminarR2(doc.path, 'juicios');
   } catch(e){ console.warn('eliminarR2:', e); }
   j.r2Docs.splice(docIdx, 1);
-  try{ backupLocal('D', D); } catch(e){}
+  try{ backupLocal('D', D); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   saveJuicios();
   cargarDocsR2(idx);
   if(typeof toast==='function') toast('Documento eliminado', 'ok');
@@ -4315,7 +4315,7 @@ function guardarFechaNotificacion(entradaId, valor){
   const entry = j.historial.find(h => h.id === entradaId);
   if(!entry) return;
   entry.fechaNotificacion = valor.trim();
-  try{ backupLocal('D',D); } catch(e){}
+  try{ backupLocal('D',D); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   saveJuicios();
 }
 
@@ -4330,7 +4330,7 @@ async function abrirResumenDesdeHistorial(entradaId){
       const lista = await cargarAcuerdosDrive(jId);
       const ac = lista.find(a => a.driveFileId === h.driveFileId);
       if(ac){ verResumenAcuerdo(ac); return; }
-    } catch(e){}
+    } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     // No está en la lista del panel "Acuerdos" (viejo pipeline) — por ejemplo,
     // los subidos con "📷 Subir acuerdo y leerlo". El archivo igual existe en
     // Drive con ese ID, así que se abre el PDF directo en vez de mostrar nada.
@@ -4351,7 +4351,7 @@ function guardarEntradaHistorial(){
   if(!texto){ if(typeof toast==='function') toast('Escribe el contenido de la entrada', 'err'); return; }
   if(!j.historial) j.historial = [];
   j.historial.push({ fecha, tipo, texto });
-  try{ backupLocal('D', D); } catch(e){}
+  try{ backupLocal('D', D); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   saveJuicios();
   cerrarFormHistorial();
   renderHistorialModal();
@@ -4434,7 +4434,7 @@ function toggleLeyActiva(nombre){
   const idx = j.leyesActivas.indexOf(nombre);
   if(idx >= 0) j.leyesActivas.splice(idx, 1);
   else j.leyesActivas.push(nombre);
-  try{ backupLocal('D', D); } catch(e){}
+  try{ backupLocal('D', D); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   saveJuicios();
   renderListaLeyes();
 }
@@ -4538,7 +4538,7 @@ async function _leyesEliminar(idx) {
       j.leyesActivas = j.leyesActivas.filter(n => n !== ley.nombre);
     }
   });
-  try { saveJuicios(); } catch(e){}
+  try { saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   _leyesRenderAdmin(leyes);
   if(typeof toast==='function') toast('✓ Ley eliminada', 'ok');
 }
@@ -4559,7 +4559,7 @@ async function _leyesHandleFiles(files) {
 
     // SHA-256 para detectar duplicados de contenido
     let sha = '';
-    try { sha = await _sha256File(file); } catch(e){}
+    try { sha = await _sha256File(file); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
 
     // Verificar duplicado por nombre o SHA
     const dupNombre = leyes.find(l => l.archivo === file.name || l.nombre === file.name.replace(/\.pdf$/i,''));
@@ -4621,7 +4621,7 @@ async function abrirSelectorFlujo() {
     try {
       const driveLista = await _leyesListarDrive();
       if (driveLista.length) { setLeyesDespacho(driveLista); leyes = driveLista; }
-    } catch(e) {}
+    } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   }
   if (!leyes.length) {
     if (typeof toast === 'function') toast('⚠ Primero carga leyes en "Cargar Leyes"', 'err');
@@ -4897,7 +4897,7 @@ ${_formato}`;
       j.flujoEtapaActual = null;
       j.flujoEtapaActualRazon = '';
       j.flujoEstados = null;
-      try { saveJuicios(); } catch(e) {}
+      try { saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       // Antes esto era "disparar y olvidar" (syncEstadoSupabaseDebounced sin
       // esperar su resultado): si el usuario recargaba la página justo después
       // de ver el aviso de éxito, podía ganar la carrera el fetch de estado
@@ -4921,7 +4921,7 @@ ${_formato}`;
     window._flujoLeyTextoCompleto = leyTexto || '';
     window._flujoTipoJuicioActual = tipoJuicio;
     _flujoRender(etapas, ley.nombre);
-    try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(_mexpIdx); } catch(e){}
+    try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(_mexpIdx); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     if (typeof toast === 'function') {
       if (!_flujoEstaCompleto(etapas)) {
         toast('⚠ El flujo podría estar incompleto: termina en «' + String(etapas[etapas.length - 1].etapa || '') + '» y no llega a la sentencia. Intenta «Generar Flujo» de nuevo.', 'err');
@@ -5079,17 +5079,17 @@ function _flujoMarcarEtapaActual(i) {
   // Toggle: si ya era la actual, se quita la marca
   j.flujoEtapaActual = (j.flujoEtapaActual === i) ? null : i;
   j.flujoEtapaActualRazon = ''; // marca manual: sin razón de IA
-  try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e) {}
-  try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e) {}
+  try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   const ov = document.getElementById('flujo-detalle-ov');
   if (ov) ov.remove();
   _flujoRender(window._flujoEtapasActual, window._flujoLeyActual);
   // La barra "ETAPA" del encabezado toma sus datos del mismo j.flujoEtapaActual
   // cuando el expediente ya tiene flujo generado — refrescarla para que no
   // se desincronice de lo que se acaba de marcar aquí.
-  try { if (typeof _juRenderEtapas === 'function') _juRenderEtapas(j, _mexpIdx); } catch(e){}
-  try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(_mexpIdx); } catch(e){}
-  try { if (typeof renderJuicios === 'function') renderJuicios(); } catch(e){}
+  try { if (typeof _juRenderEtapas === 'function') _juRenderEtapas(j, _mexpIdx); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(_mexpIdx); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { if (typeof renderJuicios === 'function') renderJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (typeof toast === 'function') {
     toast(j.flujoEtapaActual === null ? 'Marca de etapa actual retirada' : '📍 Etapa actual actualizada', 'ok');
   }
@@ -5225,7 +5225,7 @@ async function _flujoDetectarEtapa() {
   // cronológico, más las notas capturadas a mano. Antes también se mandaban
   // los registros repetidos/huérfanos de la línea de tiempo y la IA se confundía.
   let acuerdos = [];
-  try { acuerdos = JSON.parse(localStorage.getItem('lex_acuerdos_' + (window._jdetId || '')) || '[]'); } catch(e) {}
+  try { acuerdos = JSON.parse(localStorage.getItem('lex_acuerdos_' + (window._jdetId || '')) || '[]'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (!acuerdos.length && Array.isArray(window._juAcuerdosLista)) acuerdos = window._juAcuerdosLista;
   const _sobran = {};
   _acuerdosAgruparDuplicados(acuerdos, j).forEach(g => g.slice(1).forEach(x => { _sobran[x.driveFileId || x.id] = true; }));
@@ -5297,12 +5297,12 @@ Responde ÚNICAMENTE en JSON válido, sin markdown ni texto extra, con TODAS las
     else if (Number.isFinite(nIA) && nIA !== n) razon = 'Etapa ' + n + ' según el estado de cada etapa (la IA sugería la ' + nIA + ', que no corresponde). ' + razon;
     j.flujoEtapaActualRazon = razon.slice(0, 360);
     j.updatedAt = Date.now();
-    try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e) {}
-    try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e) {}
+    try { if (typeof saveJuicios === 'function') saveJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+    try { if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     _flujoRender(window._flujoEtapasActual, window._flujoLeyActual);
-    try { if (typeof _juRenderEtapas === 'function') _juRenderEtapas(j, _mexpIdx); } catch(e){}
-    try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(_mexpIdx); } catch(e){}
-    try { if (typeof renderJuicios === 'function') renderJuicios(); } catch(e){}
+    try { if (typeof _juRenderEtapas === 'function') _juRenderEtapas(j, _mexpIdx); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+    try { if (typeof _juRenderFichaSimple === 'function') _juRenderFichaSimple(_mexpIdx); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+    try { if (typeof renderJuicios === 'function') renderJuicios(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     if (typeof toast === 'function') toast('🔮 Etapa detectada: ' + (etapas[n - 1].etapa || ('Etapa ' + n)), 'ok');
   } catch(e) {
     console.error('[Flujo] detectar etapa:', e);
@@ -5319,7 +5319,7 @@ function _acuerdoAbrirChatEscrito() {
   if (!overlay) return;
 
   // Ocultar otros paneles
-  if (iframe) { iframe.style.display = 'none'; try { URL.revokeObjectURL(iframe.src); } catch(e){} }
+  if (iframe) { iframe.style.display = 'none'; try { URL.revokeObjectURL(iframe.src); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }
   if (resDiv) { resDiv.style.display = 'none'; }
 
   // Obtener acuerdo activo

@@ -134,7 +134,7 @@ esPeriodoCerrado = function(fecha, hora) {
     var teniaFoco = !!(input && document.activeElement === input);
     var selStart, selEnd;
     if (teniaFoco) {
-      try { selStart = input.selectionStart; selEnd = input.selectionEnd; } catch(e){}
+      try { selStart = input.selectionStart; selEnd = input.selectionEnd; } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     }
     var enConsulta = document.body.classList.contains('modo-consulta');
     if (enConsulta) {
@@ -148,7 +148,7 @@ esPeriodoCerrado = function(fecha, hora) {
     }
     if (teniaFoco) {
       input.focus();
-      if (selStart != null) { try { input.setSelectionRange(selStart, selEnd); } catch(e){} }
+      if (selStart != null) { try { input.setSelectionRange(selStart, selEnd); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }
     }
   }
   var _moFolioAnt = new MutationObserver(function() { _folioAnteriorSync(); });

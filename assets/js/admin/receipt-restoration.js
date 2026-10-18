@@ -6730,6 +6730,52 @@ async function _lexGuardarClaveData(clave, valor){
   }
   throw new Error('otra sesión sigue guardando al mismo tiempo');
 }
+// Oct-2026 · Concurrencia: lee UNA columna de app_state, la modifica con
+// mutar(valor) y la guarda solo si nadie más guardó entre medio (rev).
+// Reintenta hasta 5 veces leyendo de nuevo, así nunca pisa cambios ajenos.
+async function _lexActualizarColumnaAppState(col, mutar){
+  for (var intento = 0; intento < 6; intento++) {
+    var lect = await window.SB.from('app_state').select(col + ', rev').eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+    if (lect.error) throw lect.error;
+    if (!lect.data) return null;
+    var nuevo = mutar(JSON.parse(JSON.stringify(lect.data[col] || {})));
+    var patch = {}; patch[col] = nuevo;
+    var q = window.SB.from('app_state').update(patch).eq('despacho_id', window.SB_DESPACHO_ID);
+    if (typeof lect.data.rev === 'number') q = q.eq('rev', lect.data.rev);
+    var esc = await q.select('rev');
+    if (esc.error) throw esc.error;
+    if (typeof lect.data.rev !== 'number' || (esc.data && esc.data.length)) return nuevo;
+    await new Promise(function(res){ setTimeout(res, 200 + Math.random() * 400); });
+  }
+  throw new Error('Otra persona está guardando al mismo tiempo. Vuelve a intentarlo en unos segundos.');
+}
+// Oct-2026 · Escritura completa de herramientas de administrador (borrar
+// movimientos por fecha, revertir letra A). Antes reemplazaban TODO "data"
+// con una lista parcial de apartados (se perdían cierres de caja,
+// pre-recibos, leyes, gestiones…) y sin revisar guardados ajenos. Ahora:
+// conserva los apartados que la herramienta no toca, conserva movimientos que
+// otra persona agregó, y solo escribe si nadie guardó entre medio (rev).
+async function _lexEscribirEstadoAdmin(estado, recibos, updatedBy){
+  var lect = await window.SB.from('app_state').select('data, rev').eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle();
+  if (lect.error) throw new Error(lect.error.message);
+  var rem = (lect.data && lect.data.data) || {};
+  var final = Object.assign({}, rem, estado);
+  if (Array.isArray(estado.movimientos) && Array.isArray(rem.movimientos)) {
+    var ids = new Set(estado.movimientos.map(function(m){ return m && m.id; }));
+    final.movimientos = estado.movimientos.concat(rem.movimientos.filter(function(m){
+      return m && m.id && !ids.has(m.id) && !/^R-\d+$/.test(m.id);
+    }));
+  }
+  var q = window.SB.from('app_state').update({
+    data: final, recibos: recibos, folio_actual: recibos.folioActual, updated_by: updatedBy || null
+  }).eq('despacho_id', window.SB_DESPACHO_ID);
+  if (lect.data && typeof lect.data.rev === 'number') q = q.eq('rev', lect.data.rev);
+  var esc = await q.select('rev');
+  if (esc.error) throw new Error(esc.error.message);
+  if (lect.data && typeof lect.data.rev === 'number' && !(esc.data && esc.data.length))
+    throw new Error('Otra persona guardó al mismo tiempo. Vuelve a intentarlo en unos segundos.');
+  return final;
+}
 // Mensaje claro cuando el servidor rechaza un borrado masivo de una cuenta no admin
 function _lexMensajePermiso(err){
   var m = String((err && (err.message || err)) || '');

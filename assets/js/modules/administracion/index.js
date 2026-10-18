@@ -5721,13 +5721,7 @@ async function adminBorrarMovimientosPorFecha() {
         recibos:     appData.recibos || []
       };
       var user = (await window.SB.auth.getUser()).data.user;
-      var res  = await window.SB.from('app_state').update({
-        data:         estado,
-        recibos:      recibos,
-        folio_actual: recibos.folioActual,
-        updated_by:   user ? user.id : null
-      }).eq('despacho_id', window.SB_DESPACHO_ID);
-      if (res.error) throw new Error(res.error.message);
+      await _lexEscribirEstadoAdmin(estado, recibos, user ? user.id : null);
     }
   } catch(e) {
     // Si falla la sync revertimos los tombstones para no dejar datos corruptos
@@ -7231,18 +7225,18 @@ async function adminEliminarRecibo(idx, skipConfirm, silent) {
           15000, 'Eliminar recibo: leer recibos SB'
         );
         if (_sbPurgaRow?.recibos) {
-          var _sbPurgaDat = JSON.parse(JSON.stringify(_sbPurgaRow.recibos));
-          _sbPurgaDat.recibos = (_sbPurgaDat.recibos||[]).filter(function(rec){
-            return !(String(rec.folio)===String(r.folio) && (rec.letra||'A')===letra);
-          });
-          if (!Array.isArray(_sbPurgaDat.folios_eliminados)) _sbPurgaDat.folios_eliminados = [];
-          if (!_sbPurgaDat.folios_eliminados.some(function(t){
-            return String(t.folio)===String(r.folio) && t.letra===letra;
-          })) _sbPurgaDat.folios_eliminados.push({ folio: r.folio, letra: letra, ts: Date.now() + 10000 });
-          await _sbConTimeout(
-            window.SB.from('app_state').update({ recibos: _sbPurgaDat }).eq('despacho_id', window.SB_DESPACHO_ID),
-            15000, 'Eliminar recibo: purga directa SB'
-          );
+          // Oct-2026 · Concurrencia: se vuelve a leer y se escribe solo si nadie
+          // guardó entre medio (rev), para no borrar recibos recién hechos por otra persona.
+          await _sbConTimeout(_lexActualizarColumnaAppState('recibos', function(_sbPurgaDat){
+            _sbPurgaDat.recibos = (_sbPurgaDat.recibos||[]).filter(function(rec){
+              return !(String(rec.folio)===String(r.folio) && (rec.letra||'A')===letra);
+            });
+            if (!Array.isArray(_sbPurgaDat.folios_eliminados)) _sbPurgaDat.folios_eliminados = [];
+            if (!_sbPurgaDat.folios_eliminados.some(function(t){
+              return String(t.folio)===String(r.folio) && t.letra===letra;
+            })) _sbPurgaDat.folios_eliminados.push({ folio: r.folio, letra: letra, ts: Date.now() + 10000 });
+            return _sbPurgaDat;
+          }), 15000, 'Eliminar recibo: purga directa SB');
           console.log('[adminEliminarRecibo] Purga directa SB completada —', folioConLetraStr);
           _purgaOk = true;
         } else {
@@ -7616,12 +7610,7 @@ async function adminRevertirLetraA(folio, letra) {
         recibos:     appData.recibos || []
       };
       var user = (await window.SB.auth.getUser()).data.user;
-      var res  = await window.SB.from('app_state').update({
-        data: estado, recibos: recibosSync,
-        folio_actual: recibosSync.folioActual,
-        updated_by: user ? user.id : null
-      }).eq('despacho_id', window.SB_DESPACHO_ID);
-      if (res.error) throw new Error(res.error.message);
+      await _lexEscribirEstadoAdmin(estado, recibosSync, user ? user.id : null);
     }
   } catch(e) {
     toast('⚠ Error al sincronizar con Supabase: ' + e.message, 'err');

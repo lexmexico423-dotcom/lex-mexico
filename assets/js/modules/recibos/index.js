@@ -875,12 +875,13 @@ async function reservarFolioEnDrive(){
   // Ahora: UNA llamada RPC que PostgreSQL ejecuta atómicamente.
   // Es IMPOSIBLE que dos llamadas obtengan el mismo folio.
   // ═══════════════════════════════════════════════════════════════
-  if(!window.SB || !window.SB_DESPACHO_ID){
-    // Sin sesión: fallback local (solo para que no rompa offline)
-    const f = appData.folioActual;
-    appData.folioActual = f + 1;
-    console.warn('⚠ Folio local usado (sin sesión Supabase):', f);
-    return f;
+  // Oct-2026 (a petición expresa): SIN conexión NO se asigna folio ni se
+  // imprime. Antes había un "plan B" local que podía repetir un número si
+  // dos computadoras imprimían sin internet al mismo tiempo.
+  const _MSG_SIN_CONEXION = 'Sin conexión con el servidor: no se puede asignar el número de folio. El recibo NO se imprimió. Revisa tu internet e inténtalo de nuevo.';
+  if(!window.SB || !window.SB_DESPACHO_ID || (typeof navigator !== 'undefined' && navigator.onLine === false)){
+    if(typeof toast === 'function') toast('📡 ' + _MSG_SIN_CONEXION, 'err');
+    throw new Error(_MSG_SIN_CONEXION);
   }
   try {
     // Llamada atómica a PostgreSQL — lock + increment + return en 1 transacción
@@ -896,20 +897,8 @@ async function reservarFolioEnDrive(){
     return folio;
   } catch(e) {
     console.error('❌ reservarFolioEnDrive (RPC):', e);
-    // Fallback local: buscar el primer folio que NO exista ya en appData.recibos
-    console.warn('⚠ Usando fallback local para folio (RPC no disponible)');
-    const recibosActuales = new Set((appData.recibos || []).map(r => r.folio));
-    let f = Math.max(
-      appData.folioActual || 1,
-      // también considerar el mayor folio existente + 1
-      ...([...(appData.recibos || [])].map(r => (r.folio || 0) + 1))
-    );
-    // Saltar cualquier folio ya usado
-    while(recibosActuales.has(f)) f++;
-    appData.folioActual = f + 1;
-    if(typeof REC !== 'undefined' && REC) REC.folioActual = f + 1;
-    console.warn('⚠ Folio fallback asignado:', f, '(próximo:', f+1, ')');
-    return f;
+    if(typeof toast === 'function') toast('📡 ' + _MSG_SIN_CONEXION, 'err');
+    throw new Error(_MSG_SIN_CONEXION);
   }
 }
 
@@ -6766,9 +6755,9 @@ async function _tomarFolioSeguro() {
   while(_folioEnUso && espera < 50) { await new Promise(r=>setTimeout(r,100)); espera++; }
   _folioEnUso = true;
   try {
-    const folioBase = REC.folioActual || appData.folioActual || 1;
-    const folio = _folioSiguienteUnico(folioBase);
-    // Avanzar inmediatamente para que la siguiente llamada no tome el mismo
+    // Oct-2026: el número lo asigna el servidor (atómico, sin repetirse entre
+    // computadoras). Sin conexión lanza error y NO se imprime.
+    const folio = await reservarFolioEnDrive();
     REC.folioActual = folio + 1;
     appData.folioActual = folio + 1;
     return folio;
@@ -6777,15 +6766,17 @@ async function _tomarFolioSeguro() {
   }
 }
 
-async function guardarFolioEnDrive(nuevoFolio) {
-  // Versión Supabase: actualizar folio_actual + recibos en app_state
+async function guardarFolioEnDrive(nuevoFolio, permitirBajar) {
+  // Oct-2026 · Concurrencia: antes subía TODA la lista de recibos de esta pestaña
+  // (sin revisar si otra persona había guardado). Ahora solo adelanta el contador
+  // folio_actual; la lista de recibos la sube save() con su protección de rev.
+  // El contador solo avanza (nunca retrocede por una copia vieja), salvo que el
+  // administrador lo fije a propósito (permitirBajar = true).
   if(!window.SB || !window.SB_DESPACHO_ID) return;
   try {
-    var payload = Object.assign({}, REC, { folioActual: nuevoFolio, folioRapido: REC.folioRapido || 1 });
-    await window.SB.from('app_state').update({
-      recibos: payload,
-      folio_actual: nuevoFolio
-    }).eq('despacho_id', window.SB_DESPACHO_ID);
+    var q = window.SB.from('app_state').update({ folio_actual: nuevoFolio }).eq('despacho_id', window.SB_DESPACHO_ID);
+    if (!permitirBajar) q = q.lt('folio_actual', nuevoFolio);
+    await q;
   } catch(e){ console.warn('guardarFolioEnDrive:', e); }
 }
 
@@ -7217,7 +7208,7 @@ async function _gfFijarContador(n){
   appData.folioActual=n;
   if(typeof REC!=='undefined') REC.folioActual=n;
   if(typeof actualizarFolioDisplay==='function') actualizarFolioDisplay();
-  try{ if(typeof guardarFolioEnDrive==='function') await guardarFolioEnDrive(n); }
+  try{ if(typeof guardarFolioEnDrive==='function') await guardarFolioEnDrive(n, true); }
   catch(e){ console.warn('[gestorFolios] guardarFolioEnDrive', e); }
 }
 

@@ -6712,6 +6712,29 @@ if(document.readyState==='loading'){
 }
 // ═══ FIN MÓDULO ESCRITURAS ══════════════════════════════════════════════
 // ═══ MODO RETROACTIVO GLOBAL (ADMIN) ════════════════════════════════════
+// Oct-2026 · Concurrencia: cambia UNA clave de app_state.data sin pisar lo que
+// otra sesión haya guardado entre la lectura y la escritura (condición por rev,
+// hasta 5 reintentos).
+async function _lexGuardarClaveData(clave, valor){
+  for (var intento = 0; intento < 6; intento++) {
+    var lect = await window.SB.from('app_state').select('data, rev').eq('despacho_id', window.SB_DESPACHO_ID).single();
+    if (lect.error) throw lect.error;
+    var d = (lect.data && lect.data.data) ? lect.data.data : {};
+    d[clave] = (typeof valor === 'function') ? valor(d[clave]) : valor;
+    var q = window.SB.from('app_state').update({ data: d }).eq('despacho_id', window.SB_DESPACHO_ID);
+    if (typeof lect.data.rev === 'number') q = q.eq('rev', lect.data.rev);
+    var esc = await q.select('rev');
+    if (esc.error) throw esc.error;
+    if (typeof lect.data.rev !== 'number' || (esc.data && esc.data.length)) return true;
+    await new Promise(function(res){ setTimeout(res, 200 + Math.random() * 400); });
+  }
+  throw new Error('otra sesión sigue guardando al mismo tiempo');
+}
+// Mensaje claro cuando el servidor rechaza un borrado masivo de una cuenta no admin
+function _lexMensajePermiso(err){
+  var m = String((err && (err.message || err)) || '');
+  return /LEX_PERMISO/.test(m) ? 'Solo el administrador puede borrar varios registros a la vez. No se guardó el cambio.' : '';
+}
 function adminToggleRetroGlobal(){
   // Leer estado actual desde variable global (seteada por aplicarRetroGlobal)
   var nuevoActivo = !window._retroGlobalActivo;
@@ -6722,19 +6745,12 @@ function adminToggleRetroGlobal(){
   toast(nuevoActivo ? '⏰ Modo Retroactivo habilitado para todos' : '○ Modo Retroactivo deshabilitado', 'ok');
   // Guardar en Supabase y broadcast en segundo plano
   if(window.SB && window.SB_DESPACHO_ID){
-    window.SB.from('app_state')
-      .select('data').eq('despacho_id', window.SB_DESPACHO_ID).single()
-      .then(function(res){
-        var d = (res.data && res.data.data) ? res.data.data : {};
-        d.retro_global = {
+    _lexGuardarClaveData('retro_global', {
           activo:      nuevoActivo,
           activadoPor: typeof empNombre === 'function' ? empNombre() : 'Admin',
           fecha:       typeof hoy  === 'function' ? hoy()  : new Date().toISOString().split('T')[0],
           hora:        typeof hora === 'function' ? hora() : new Date().toTimeString().slice(0,5)
-        };
-        return window.SB.from('app_state')
-          .update({ data: d }).eq('despacho_id', window.SB_DESPACHO_ID);
-      })
+        })
       .then(function(){
         if(window._lexRealtimeChannel && window._lexRealtimeChannel.state === 'joined'){
           window._lexRealtimeChannel.send({
@@ -6901,12 +6917,7 @@ function capturaMesToggle(cb){
   if(typeof D !== 'undefined' && D) D.captura_meses = cfg;
   // Sincronizar con Supabase inmediatamente para no perder cambios
   if(window.SB && window.SB_DESPACHO_ID){
-    window.SB.from('app_state').select('data').eq('despacho_id', window.SB_DESPACHO_ID).single()
-      .then(({data:actual})=>{
-        const dataActual = (actual && actual.data) ? actual.data : {};
-        dataActual.captura_meses = cfg;
-        return window.SB.from('app_state').update({data: dataActual}).eq('despacho_id', window.SB_DESPACHO_ID);
-      }).catch(e=>console.warn('[CapturaMes] Error sync:', e));
+    _lexGuardarClaveData('captura_meses', cfg).catch(e=>console.warn('[CapturaMes] Error sync:', e));
   }
   // Actualizar barra lateral en tiempo real
   renderBarraSecretariaCaptura();
@@ -6915,14 +6926,8 @@ async function guardarCapturaMes(){
   const cfg = capturaMesCargar();
   if(window.SB && window.SB_DESPACHO_ID){
     try{
-      // Leer data actual para no sobreescribir otros campos
-      const { data: actual } = await window.SB.from('app_state')
-        .select('data').eq('despacho_id', window.SB_DESPACHO_ID).single();
-      const dataActual = (actual && actual.data) ? actual.data : {};
-      dataActual.captura_meses = cfg;
-      await window.SB.from('app_state')
-        .update({ data: dataActual })
-        .eq('despacho_id', window.SB_DESPACHO_ID);
+      // Guardar solo esta clave, sin pisar otros campos ni cambios simultáneos
+      await _lexGuardarClaveData('captura_meses', cfg);
       if(typeof toast==='function') toast('💾 Configuración guardada');
       // Notificar a otros dispositivos (secretaria) vía Realtime
       if(_lexRealtimeChannel && _lexRealtimeChannel.state === 'joined'){

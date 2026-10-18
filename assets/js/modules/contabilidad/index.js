@@ -2014,6 +2014,10 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     if (_revPreSync !== null) _updQuery = _updQuery.eq('rev', _revPreSync);
     const { data: _updRows, error } = await _sbConTimeout(_updQuery.select('rev'), 30000, 'subida de estado');
     if(error){
+      if (typeof _lexMensajePermiso === 'function' && _lexMensajePermiso(error)) {
+        if (typeof toast === 'function') toast('🔒 ' + _lexMensajePermiso(error), 'err');
+        throw new Error(_lexMensajePermiso(error));
+      }
       throw new Error('syncEstadoSupabase: '+error.message);
     }
     if (_revPreSync !== null && (!_updRows || _updRows.length === 0)) {

@@ -170,8 +170,11 @@ async function crearArchivoControl(){
   return 'supabase';
 }
 
-async function actualizarArchivoControl(){
+async function actualizarArchivoControl(_intentoAC){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
+  _intentoAC = (typeof _intentoAC === 'number') ? _intentoAC : 0;
+  // Oct-2026 · Concurrencia: rev leída justo antes de escribir (null = no se pudo leer)
+  let _revPreAC = null;
   syncStart();
   try {
     // ── Sellar recibos activos contra tombstones remotos obsoletos ──────────────
@@ -192,8 +195,39 @@ async function actualizarArchivoControl(){
     // de lo contrario su upload sobreescribiría el tombstone y el folio volvería.
     try {
       const { data: _sbPreRead } = await _sbConTimeout(window.SB
-        .from('app_state').select('recibos')
+        .from('app_state').select('recibos, rev, folio_actual')
         .eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle(), 4000, 'pre-lectura tombstones');
+      _revPreAC = (_sbPreRead && typeof _sbPreRead.rev === 'number') ? _sbPreRead.rev : null;
+      // Oct-2026 · Concurrencia: si otra persona agregó recibos (o versiones B, C…)
+      // que esta pestaña todavía no tiene, se incorporan ANTES de subir para no
+      // borrarlos. Lo que ya existe aquí se respeta tal cual (es lo que se guarda).
+      try {
+        const _sbRecsPre = (_sbPreRead && _sbPreRead.recibos && Array.isArray(_sbPreRead.recibos.recibos)) ? _sbPreRead.recibos.recibos : [];
+        const _tombsUnion = [].concat((_sbPreRead && _sbPreRead.recibos && _sbPreRead.recibos.folios_eliminados) || [], appData.folios_eliminados || []);
+        const _claveRec = function(r){ return String(r.folio) + '|' + (r.letra || 'A') + '|' + (r.esComplemento ? 'C' + (r.folioRef || '') : ''); };
+        const _locales = {};
+        (appData.recibos || []).forEach(function(r){ if (r) _locales[_claveRec(r)] = r; });
+        let _agregados = 0;
+        _sbRecsPre.forEach(function(r){
+          if (!r || _locales[_claveRec(r)]) return;
+          const _borrado = _tombsUnion.some(function(t){
+            return (typeof _tombstoneAplicaA === 'function') ? _tombstoneAplicaA(t, r)
+              : (String(t.folio) === String(r.folio) && (t.letra || 'A') === (r.letra || 'A'));
+          });
+          if (_borrado) return;
+          appData.recibos.push(r); _agregados++;
+        });
+        if (_agregados) {
+          console.log('[SB] actualizarArchivoControl: se incorporaron ' + _agregados + ' recibo(s) guardados por otra sesión');
+          if (typeof REC !== 'undefined') REC.recibos = appData.recibos;
+        }
+        // El contador de folios nunca retrocede por una copia vieja
+        const _faSB = Number(_sbPreRead && _sbPreRead.folio_actual) || 0;
+        if (_faSB > (Number(appData.folioActual) || 0)) {
+          appData.folioActual = _faSB;
+          if (typeof REC !== 'undefined') REC.folioActual = _faSB;
+        }
+      } catch(_eFusAC){ console.warn('[SB] actualizarArchivoControl: fusión previa', _eFusAC); }
       const _sbTombsPre = (_sbPreRead?.recibos?.folios_eliminados) || [];
       if (_sbTombsPre.length > 0) {
         if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
@@ -294,16 +328,31 @@ async function actualizarArchivoControl(){
     // Obtener user ID fuera del objeto para evitar await dentro de literal
     let _updByArc = null;
     try { _updByArc = (await Promise.race([window.SB.auth.getUser(), new Promise((_,rj)=>setTimeout(()=>rj(new Error('getUser timeout')),4000))])).data?.user?.id || null; } catch(_egu){}
-    const { error } = await _sbConTimeout(window.SB
+    // Oct-2026 · Escritura condicionada a rev: solo se aplica si nadie más guardó
+    // desde la pre-lectura. Si alguien sí guardó, se vuelve a leer, fusionar y
+    // reintentar (hasta 5 veces) en vez de pisar su trabajo.
+    let _updQAC = window.SB
       .from('app_state')
       .update({
         recibos: ligero,
         folio_actual: ligero.folioActual,
         updated_by: _updByArc
       })
-      .eq('despacho_id', window.SB_DESPACHO_ID), 30000, 'subida de recibos');
+      .eq('despacho_id', window.SB_DESPACHO_ID);
+    if (_revPreAC !== null) _updQAC = _updQAC.eq('rev', _revPreAC);
+    const { data: _updRowsAC, error } = await _sbConTimeout(_updQAC.select('rev'), 30000, 'subida de recibos');
     if(error){
+      if (typeof _lexMensajePermiso === 'function' && _lexMensajePermiso(error)) throw new Error(_lexMensajePermiso(error));
       throw new Error('actualizarArchivoControl: '+error.message);
+    }
+    if (_revPreAC !== null && (!_updRowsAC || _updRowsAC.length === 0)) {
+      if (_intentoAC < 5) {
+        console.log('[SB] 🔁 Guardado simultáneo detectado (recibos) — reintentando ' + (_intentoAC + 1) + '/5…');
+        syncEnd(false, 'Sincronizando (detectado guardado simultáneo, reintentando)…');
+        await new Promise(function(res){ setTimeout(res, 300 + Math.random() * 500); });
+        return actualizarArchivoControl(_intentoAC + 1);
+      }
+      throw new Error('No se pudo guardar: otra sesión sigue guardando al mismo tiempo. Reintenta en unos segundos.');
     }
     console.log('✓ archivoControl actualizado — folioActual:', ligero.folioActual, '— recibos:', ligero.recibos.length);
     try { backupAppData(); } catch(e){ console.warn('backup appData:', e); }
@@ -6428,7 +6477,7 @@ async function adminUsarSiguienteHueco() {
   if (typeof actualizarFolioDisplay === 'function') actualizarFolioDisplay();
   _ultimoSyncPropio = Date.now();
   try {
-    await guardarFolioEnDrive(siguiente);
+    await guardarFolioEnDrive(siguiente, true);
   } catch(e) {
     console.warn('[UsarSiguienteHueco] guardarFolioEnDrive:', e);
   }

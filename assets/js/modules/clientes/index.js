@@ -1986,8 +1986,13 @@ async function guardarReciboInterno() {
   var now = new Date();
   var _rfecha = document.getElementById('r-fecha'); if(_rfecha) _rfecha.value = hoy();
   var _rhora = document.getElementById('r-hora'); if(_rhora) _rhora.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-  // _tomarFolioSeguro usa lock para evitar colisiones si dos secretarias imprimen simultáneamente
-  var folio = await _tomarFolioSeguro();
+  // _tomarFolioSeguro reserva el folio en el servidor; sin conexión NO se imprime
+  var folio;
+  try { folio = await _tomarFolioSeguro(); }
+  catch (eFolio) {
+    btn.disabled = false; btn.textContent = '🖨 Generar PDF e Imprimir';
+    return;
+  }
   var total = parsePrecioR((document.getElementById('r-total')||{value:''}).value);
   var anticipo = parsePrecioR((document.getElementById('r-anticipo')||{value:''}).value);
   var saldo = Math.max(0, total - anticipo);

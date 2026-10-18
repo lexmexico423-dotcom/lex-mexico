@@ -1001,12 +1001,12 @@ async function _rfcAbrirVisorPDF(folio, letra, btnOrigen) {
 
     // ── Ventana flotante a pantalla completa con X para cerrar ──────────────
     var prev = document.getElementById('rfc-pdf-modal');
-    if (prev) { try{ URL.revokeObjectURL(prev.dataset.bloburl); }catch(_e){} prev.remove(); }
+    if (prev) { try{ URL.revokeObjectURL(prev.dataset.bloburl); }catch(_e){ if(typeof _lexSil==="function")_lexSil(_e); } prev.remove(); }
     var modal = document.createElement('div');
     modal.id = 'rfc-pdf-modal';
     modal.dataset.bloburl = blobUrl;
     modal.style.cssText = 'position:fixed;inset:0;z-index:2147483000;background:rgba(20,12,6,0.82);display:flex;flex-direction:column;padding:22px;box-sizing:border-box;';
-    var _cerrarModal = function(){ try{ URL.revokeObjectURL(blobUrl); }catch(_e){} modal.remove(); document.removeEventListener('keydown', _onEscModal); };
+    var _cerrarModal = function(){ try{ URL.revokeObjectURL(blobUrl); }catch(_e){ if(typeof _lexSil==="function")_lexSil(_e); } modal.remove(); document.removeEventListener('keydown', _onEscModal); };
     var _onEscModal = function(ev){ if(ev.key==='Escape') _cerrarModal(); };
     document.addEventListener('keydown', _onEscModal);
     // Barra superior con nombre y botón X
@@ -1266,7 +1266,7 @@ async function _rfcAplicarUno(idx, accion) {
       var _tieneMovR = (p.movsLv && p.movsLv.length > 0);
       if (!_tieneMovR && (p.montoPdf||0) > 0 && typeof _rfcConstruirMov === 'function' && typeof _registrarMovimiento === 'function') {
         var _movR = _rfcConstruirMov(folio, p.letra, cR);
-        if (_movR && _movR.monto > 0) { try { _registrarMovimiento(_movR); } catch(_eR){} }
+        if (_movR && _movR.monto > 0) { try { _registrarMovimiento(_movR); } catch(_eR){ if(typeof _lexSil==="function")_lexSil(_eR); } }
       }
       // 2) Reparar los campos guardados del recibo desde el PDF (fuente de verdad).
       //    Si el recibo NO está en local, se OMITE esta parte (no hay campos que reparar);
@@ -1324,7 +1324,7 @@ async function _rfcAplicarUno(idx, accion) {
           if (typeof _lexRealtimeChannel !== 'undefined' && _lexRealtimeChannel && _lexRealtimeChannel.state === 'joined') {
             _lexRealtimeChannel.send({ type:'broadcast', event:'folio_eliminado', payload:{ folio: folioE, letra: letraE, ts: Date.now()+10000, _adminForce:true } }).catch(function(){});
           }
-        } catch(_ebE){}
+        } catch(_ebE){ if(typeof _lexSil==="function")_lexSil(_ebE); }
         // Eliminar movimientos de esa letra + tombstone (si hay)
         var _movsBorrados = 0;
         if (typeof D !== 'undefined' && Array.isArray(D.movimientos)) {
@@ -1343,10 +1343,10 @@ async function _rfcAplicarUno(idx, accion) {
             var _pathR2E = window.SB_DESPACHO_ID + '/recibos/' + folioE + letraE + '.pdf';
             await window.borrarR2(_pathR2E, 'recibos').catch(function(){});
           }
-        } catch(_erE){}
+        } catch(_erE){ if(typeof _lexSil==="function")_lexSil(_erE); }
         if (typeof save === 'function') save();
         if (typeof renderContab === 'function') renderContab();
-        if (typeof syncEstadoSupabase === 'function') { try { await syncEstadoSupabase(); } catch(_esE){} }
+        if (typeof syncEstadoSupabase === 'function') { try { await syncEstadoSupabase(); } catch(_esE){ if(typeof _lexSil==="function")_lexSil(_esE); } }
         if (progEl) progEl.textContent = '✅ Eliminado donde existía (R2 + ' + _movsBorrados + ' movimiento(s) + tombstone). Local omitido.';
       }
       if (filaEl) { filaEl.style.opacity = '0.55'; var _dE=filaEl.querySelector('div'); if(_dE) _dE.textContent = '🗑 ' + folio + p.letra + ' — Eliminado (permanente)'; }

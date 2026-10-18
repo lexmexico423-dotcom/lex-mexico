@@ -438,7 +438,7 @@ window.obtenerBlobPdfReciboValidado = async function(recibo, abortar){
             || (window.SB_DESPACHO_ID + '/recibos/' + (recibo.archivoR2 || recibo.archivo || (String(recibo.folio).padStart(4,'0') + (_vr.letra||'A') + '.pdf')));
           const _f = new File([_blob], _r2path.split('/').pop(), {type:'application/pdf'});
           if(typeof window.subirR2==='function') window.subirR2(_f, _r2path, 'recibos').catch(function(){});
-        }catch(_eUp){}
+        }catch(_eUp){ if(typeof _lexSil==="function")_lexSil(_eUp); }
       }
     }catch(_eVR){ console.warn('[obtenerBlobPdfReciboValidado] versiones_recibo:', _eVR); }
   }
@@ -1769,7 +1769,7 @@ window.limpiarCacheLocal = function() {
     if (k && !clavesMantener.has(k)) clavesABorrar.push(k);
   }
   clavesABorrar.forEach(function(k) {
-    try { localStorage.removeItem(k); eliminadas++; } catch(e) {}
+    try { localStorage.removeItem(k); eliminadas++; } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   });
   console.log('[limpiarCacheLocal] Eliminadas ' + eliminadas + ' entradas de localStorage. La próxima carga tomará datos de Supabase.');
   if(typeof toast==='function') toast('🧹 Caché local limpiado ('+eliminadas+' entradas). Recargando...', 'ok');
@@ -2012,7 +2012,7 @@ window.onload=async function(){
     var mantener = new Set(['empleado_email','empleado_nombre','drive_token','drive_expiry','lex-supabase-auth','lex-supabase-session','lex_pend_caja_movs']);
     var borrar = [];
     for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && !mantener.has(k)) borrar.push(k); }
-    borrar.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
+    borrar.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } });
     if (borrar.length) console.log('[LEX] localStorage limpiado al inicio —', borrar.length, 'entradas eliminadas');
   })();
   // ── INIT UI: selectores, fecha, formulario ───────────────────────────────
@@ -2100,13 +2100,13 @@ try{ localStorage.setItem('empleado_nombre', empleadoActual.nombre); } catch(e){
 // Ver nota en el flujo de login manual: bloquea "Responsable del Trámite"
 // también al restaurar una sesión ya abierta (recarga de página).
 try{ if(typeof detectarEmpleado==='function') await detectarEmpleado(); } catch(e){ console.warn('[detectarEmpleado]', e); }
-try{ if(typeof _driveSyncRefreshPendiente==='function') _driveSyncRefreshPendiente(); } catch(e){}
+try{ if(typeof _driveSyncRefreshPendiente==='function') _driveSyncRefreshPendiente(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
 const _despachoRestaurado = await obtenerDespachoActivo();
       // Si no tiene membresía asignada, obtenerDespachoActivo ya cerró la sesión
       if(!_despachoRestaurado) return;
       actualizarAmbossBadges(true);
       await sincronizarFolio();
-      try { if(typeof window._pendMovsRecuperar === 'function') window._pendMovsRecuperar(); } catch(_ePend){}
+      try { if(typeof window._pendMovsRecuperar === 'function') window._pendMovsRecuperar(); } catch(_ePend){ if(typeof _lexSil==="function")_lexSil(_ePend); }
       // El splash NO se oculta aquí todavía — se deja como cortina (mismo
       // fondo negro texturizado) hasta que horarioGateLogin() esté listo para
       // mostrar su aviso (o de inmediato si es admin). Así, igual que en el

@@ -199,7 +199,7 @@ async function _lanzarFolioCancelacion(recibo, tipo, monto, motivo, auth, retroO
     imprimirDesdeBlob(doc.output('blob'), nombreArchivo);
 
     if(typeof siguienteFolio === 'function'){
-      setTimeout(()=>{ try{ window._vieneDePagoActualizacion = true; siguienteFolio(); }catch(e){} }, 700);
+      setTimeout(()=>{ try{ window._vieneDePagoActualizacion = true; siguienteFolio(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }, 700);
     }
 
   } catch(e){
@@ -936,9 +936,9 @@ function _carpGuardarUbicacion(){
   c.ubicacion = { tipo: modal.dataset.tipo === 'caja' ? 'caja' : 'gaveta', num: num };
   c.fechaModificacion = new Date().toISOString();
   cerrar('mCarpUbic');
-  try { renderCarp(); } catch(e){}
-  try { save(); } catch(e){}
-  try { if (typeof saveCarpetas === 'function') saveCarpetas(); } catch(e){}
+  try { renderCarp(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { save(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { if (typeof saveCarpetas === 'function') saveCarpetas(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (typeof toast === 'function') toast('✓ ' + c.num + ' en ' + (c.ubicacion.tipo === 'caja' ? 'Caja ' : 'Gaveta ') + num);
 }
 function _carpQuitarUbicacion(){
@@ -947,9 +947,9 @@ function _carpQuitarUbicacion(){
   delete c.ubicacion;
   c.fechaModificacion = new Date().toISOString();
   cerrar('mCarpUbic');
-  try { renderCarp(); } catch(e){}
-  try { save(); } catch(e){}
-  try { if (typeof saveCarpetas === 'function') saveCarpetas(); } catch(e){}
+  try { renderCarp(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { save(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { if (typeof saveCarpetas === 'function') saveCarpetas(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (typeof toast === 'function') toast('Ubicación quitada');
 }
 
@@ -1079,7 +1079,7 @@ async function sync(){
   if(!window.SB || !window.SB_DESPACHO_ID) return;
   try {
     await sincronizarFolio();
-    try { if(typeof window._pendMovsRecuperar === 'function') window._pendMovsRecuperar(); } catch(_ePend){}
+    try { if(typeof window._pendMovsRecuperar === 'function') window._pendMovsRecuperar(); } catch(_ePend){ if(typeof _lexSil==="function")_lexSil(_ePend); }
     if(typeof renderCaja==='function') renderCaja();
     if(typeof renderRec==='function') renderRec();
     if(typeof renderContab==='function') renderContab();
@@ -1311,7 +1311,7 @@ async function reconciliarAplicar(ids, opts){
   try {
     if(typeof syncEstadoSupabase==='function'){ if(typeof _ultimoSyncPropio!=='undefined') _ultimoSyncPropio=Date.now(); await syncEstadoSupabase(); }
   } catch(e){ console.warn('[reconciliar] sync', e); }
-  ['renderContab','renderCaja','renderHistorial','badges'].forEach(function(fn){ if(typeof window[fn]==='function'){ try{ window[fn](); }catch(e){} } });
+  ['renderContab','renderCaja','renderHistorial','badges'].forEach(function(fn){ if(typeof window[fn]==='function'){ try{ window[fn](); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } } });
   // Refrescar SCANSYS PRO si está abierto — para que actualice el badge y la lista de problemas
   setTimeout(function(){
     if(typeof window._scRefrescar==='function') window._scRefrescar();
@@ -1368,7 +1368,7 @@ async function reconciliarDeshacerUltimo(opts){
   try {
     if(typeof syncEstadoSupabase==='function'){ if(typeof _ultimoSyncPropio!=='undefined') _ultimoSyncPropio=Date.now(); await syncEstadoSupabase(); }
   } catch(e){ console.warn('[reconciliar] sync', e); }
-  ['renderContab','renderCaja','renderHistorial','badges'].forEach(function(fn){ if(typeof window[fn]==='function'){ try{ window[fn](); }catch(e){} } });
+  ['renderContab','renderCaja','renderHistorial','badges'].forEach(function(fn){ if(typeof window[fn]==='function'){ try{ window[fn](); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } } });
   console.log('%c✅ '+candidatos.length+' movimiento(s) restaurado(s).','color:#1a7a3a;font-weight:bold');
   if(typeof toast==='function') toast('✅ '+candidatos.length+' movimiento(s) restaurado(s)','ok');
   if(typeof _lexPush==='function'){
@@ -1988,7 +1988,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
         adeudosLocal: estado.adeudosSinRecibo.length, adeudosSB: _sbAdeudosCountGuard
       });
       if (typeof toast === 'function') toast(_msjGuard, 'err');
-      else try { alert(_msjGuard); } catch(_eAl){}
+      else try { alert(_msjGuard); } catch(_eAl){ if(typeof _lexSil==="function")_lexSil(_eAl); }
       syncEnd(false, 'Guardado bloqueado — recarga la página (Ctrl+Shift+R)');
       return;
     }
@@ -1998,7 +1998,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     // D.movimientos mientras esta subida ya estaba en curso.
     const _idsSubidosEstaVez = (estado.movimientos||[]).map(function(m){ return m && m.id; }).filter(Boolean);
     let _updBySy = null;
-    try { _updBySy = (await Promise.race([window.SB.auth.getUser(), new Promise((_,rj)=>setTimeout(()=>rj(new Error('getUser timeout')),4000))])).data?.user?.id || null; } catch(_egu){}
+    try { _updBySy = (await Promise.race([window.SB.auth.getUser(), new Promise((_,rj)=>setTimeout(()=>rj(new Error('getUser timeout')),4000))])).data?.user?.id || null; } catch(_egu){ if(typeof _lexSil==="function")_lexSil(_egu); }
     // ── Escritura condicionada a rev (optimistic concurrency) ──────────────────
     // Si _revPreSync se pudo leer, el UPDATE solo aplica si la fila SIGUE en esa
     // misma rev. Si otra sesión ya escribió en medio (rev cambió), el trigger de
@@ -2043,7 +2043,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     _ultimoSyncPropio = Date.now();
     _syncEnCurso = false;
     syncEnd(true);
-    try { if(typeof _pendMovsLimpiar === 'function') _pendMovsLimpiar(_idsSubidosEstaVez); } catch(_ePend){}
+    try { if(typeof _pendMovsLimpiar === 'function') _pendMovsLimpiar(_idsSubidosEstaVez); } catch(_ePend){ if(typeof _lexSil==="function")_lexSil(_ePend); }
     lexRealtimeBroadcast();
     // Re-renderizar UI propia después de guardar exitosamente
     try { if(typeof renderCaja       ==='function') renderCaja();       } catch(e){ registrarError('catch vacio', e); }
@@ -2800,7 +2800,7 @@ async function _fichaVisorMostrarVersion(folio, letra){
   var embed = document.getElementById('cpdf-embed');
   var _src = embed ? embed.getAttribute('src') : '';
   if(_src){
-    if(window._fichaPdfTempBlobUrl){ try{ URL.revokeObjectURL(window._fichaPdfTempBlobUrl); }catch(e){} }
+    if(window._fichaPdfTempBlobUrl){ try{ URL.revokeObjectURL(window._fichaPdfTempBlobUrl); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }
     window._fichaPdfTempBlobUrl = _src.indexOf('blob:')===0 ? _src.split('#')[0] : null;
     iframe.src = _src.split('#')[0] + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
   } else if(typeof toast==='function'){

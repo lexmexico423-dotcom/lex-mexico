@@ -327,7 +327,7 @@ async function actualizarArchivoControl(_intentoAC){
     };
     // Obtener user ID fuera del objeto para evitar await dentro de literal
     let _updByArc = null;
-    try { _updByArc = (await Promise.race([window.SB.auth.getUser(), new Promise((_,rj)=>setTimeout(()=>rj(new Error('getUser timeout')),4000))])).data?.user?.id || null; } catch(_egu){}
+    try { _updByArc = (await Promise.race([window.SB.auth.getUser(), new Promise((_,rj)=>setTimeout(()=>rj(new Error('getUser timeout')),4000))])).data?.user?.id || null; } catch(_egu){ if(typeof _lexSil==="function")_lexSil(_egu); }
     // Oct-2026 · Escritura condicionada a rev: solo se aplica si nadie más guardó
     // desde la pre-lectura. Si alguien sí guardó, se vuelve a leer, fusionar y
     // reintentar (hasta 5 veces) en vez de pisar su trabajo.
@@ -439,7 +439,7 @@ async function adminRecuperarPDFsFaltantesR2(){
   if(!recibos.length){ alert('No hay recibos en el sistema.'); return; }
   if(!confirm('RECUPERAR PDFs FALTANTES EN R2\n\nSe revisarán '+recibos.length+' recibo(s). A los que NO tengan PDF en R2 se les regenera desde sus datos y se sube (nombre corto canónico). Los que ya están NO se tocan.\n\nLos recibos cancelados se omiten (su PDF lleva sello especial).\n\n¿Continuar?')) return;
   // ── overlay de progreso ──
-  try{ var _ex=document.getElementById('rec-recover-ov'); if(_ex) _ex.remove(); }catch(e){}
+  try{ var _ex=document.getElementById('rec-recover-ov'); if(_ex) _ex.remove(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   var ov=document.createElement('div');
   ov.id='rec-recover-ov';
   ov.style.cssText='position:fixed;inset:0;background:rgba(12,9,5,0.92);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
@@ -527,7 +527,7 @@ async function activarModoConsulta(recibo){
   const _esJuicioAbierto = window._abiertoSinCosto(recibo);
   const saldo = parseFloat(recibo.saldoPendiente || 0); // saldo real siempre
   // Limpiar blob URL anterior si existe
-  if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){} iframe._blobUrl = null; }
+  if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } iframe._blobUrl = null; }
   iframe.src = '';
   // ── Asignación robusta del PDF al visor ───────────────────────────────────
   // FIX (caso real 10-ago-2026, folio 114): al consultar un folio cuyo PDF YA
@@ -576,7 +576,7 @@ async function activarModoConsulta(recibo){
       for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
       const blob = new Blob([bytes],{type:'application/pdf'});
       const blobUrl = URL.createObjectURL(blob);
-      if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(blobUrl);}catch(e){} return; }
+      if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(blobUrl);}catch(e){ if(typeof _lexSil==="function")_lexSil(e); } return; }
       iframe._blobUrl = blobUrl;
       // view=Fit (no FitH): ajusta la página COMPLETA (ancho y alto) dentro del
       // visor, para que el recibo se vea entero sin necesitar scroll.
@@ -683,7 +683,7 @@ async function activarModoConsulta(recibo){
       if(myToken !== _modoConsultaToken) return;
       if(_blob && _blob.size > 0){
         const _url = URL.createObjectURL(_blob);
-        if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_url);}catch(e){} return; }
+        if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_url);}catch(e){ if(typeof _lexSil==="function")_lexSil(e); } return; }
         iframe._blobUrl = _url;
         const _srcR2 = _url + '#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
         window._fichaPdfDefaultSrc = _srcR2; // referencia para restaurar al cerrar
@@ -709,7 +709,7 @@ async function activarModoConsulta(recibo){
           if(myToken !== _modoConsultaToken) return;
           if(_rvBlob&&_rvBlob.size>0){
             var _rvUrl=URL.createObjectURL(_rvBlob);
-            if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_rvUrl);}catch(e){} return; }
+            if(myToken !== _modoConsultaToken){ try{URL.revokeObjectURL(_rvUrl);}catch(e){ if(typeof _lexSil==="function")_lexSil(e); } return; }
             iframe._blobUrl=_rvUrl;
             var _srcVer = _rvUrl+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
             window._fichaPdfDefaultSrc = _srcVer; // referencia para restaurar al cerrar
@@ -2342,7 +2342,7 @@ function _pendDialogoRecibido(p, fechaIni, quienIni, opts){
         b.style.color = on ? '#1a7a3a' : '#5a4a30';
       });
     };
-    const fin = function(v){ try { ov.remove(); } catch(e){} resolve(v); };
+    const fin = function(v){ try { ov.remove(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } resolve(v); };
     ov.addEventListener('click', function(e){
       const bq = e.target.closest && e.target.closest('button[data-q]');
       if (bq) { quien = bq.getAttribute('data-q'); marcar(); document.getElementById('pend-rec-err').textContent = ''; return; }
@@ -2744,7 +2744,7 @@ function renderPend(){
     if(typeof _juRenderNotas === 'function' && document.getElementById('mexp-notas-lista') && window._mexpIdxActual >= 0){
       _juRenderNotas(window._mexpIdxActual);
     }
-  }catch(e){}
+  }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
 }
 
 function _placasAdjuntarDoc(idx){
@@ -2773,7 +2773,7 @@ function _placasAdjuntarDoc(idx){
   // llega; se retira al terminar.
   inp.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0;';
   document.body.appendChild(inp);
-  const _quitarInput = function(){ try{ inp.remove(); }catch(e){} };
+  const _quitarInput = function(){ try{ inp.remove(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } };
   // Si el usuario cancela el explorador, "change" no se dispara — se limpia el
   // input igualmente para no dejar basura acumulada en el documento.
   window.addEventListener('focus', function _limpiar(){
@@ -3041,7 +3041,7 @@ function _auditoriaRegistrar(accion, mov, extra){
     try{
       if(!window._auditRecientes) window._auditRecientes = Object.create(null);
       if(mov.id) window._auditRecientes[accion + '|' + mov.id] = Date.now();
-    }catch(e2){}
+    }catch(e2){ if(typeof _lexSil==="function")_lexSil(e2); }
   }catch(e){ console.warn('[auditoria]', e); }
 }
 
@@ -4270,7 +4270,7 @@ function cerrarSesionUsuario() {
     if(typeof _mpeAdminActivo !== 'undefined') _mpeAdminActivo = false;
     if(typeof _mpeAdminOff !== 'undefined') _mpeAdminOff = false;
     sessionStorage.removeItem('mpe_admin_off');
-  } catch(e){}
+  } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   localStorage.removeItem('empleado_email');
   localStorage.removeItem('empleado_nombre');
   lexRealtimeDesconectar();
@@ -4301,17 +4301,17 @@ async function _checkCuentaHabilitada(){
 
 function _forzarCierreSesionPorDeshabilitado(){
   if(_watchCuentaTimer){ clearInterval(_watchCuentaTimer); _watchCuentaTimer = null; }
-  try{ if(window.SB) window.SB.auth.signOut().catch(function(){}); } catch(e){}
+  try{ if(window.SB) window.SB.auth.signOut().catch(function(){}); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   sbSession = null; sbExpiry = 0;
   empleadoActual = null;
   try{
     if(typeof _mpeAdminActivo !== 'undefined') _mpeAdminActivo = false;
     if(typeof _mpeAdminOff !== 'undefined') _mpeAdminOff = false;
     sessionStorage.removeItem('mpe_admin_off');
-  } catch(e){}
+  } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   localStorage.removeItem('empleado_email');
   localStorage.removeItem('empleado_nombre');
-  try{ if(typeof lexRealtimeDesconectar === 'function') lexRealtimeDesconectar(); } catch(e){}
+  try{ if(typeof lexRealtimeDesconectar === 'function') lexRealtimeDesconectar(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   alert('Tu acceso fue deshabilitado por el administrador. Tu sesión se cerrará ahora.');
   location.reload();
 }
@@ -4666,7 +4666,7 @@ async function adminModernizarPDFs() {
       var qrURL = await qrToDataURL(qrTxt);
       var doc = await generarPDF(_datosRegenerarPDF(r, letra), r.folio, qrURL);
       r.pdfBase64 = doc.output('datauristring');
-      try { subirPDFaDrive(doc.output('blob'), folioStr + '.pdf'); } catch(e2){}
+      try { subirPDFaDrive(doc.output('blob'), folioStr + '.pdf'); } catch(e2){ if(typeof _lexSil==="function")_lexSil(e2); }
       ok++;
     } catch(e) {
       console.warn('[modernizarPDFs] error en folio', r.folio, e);
@@ -4675,8 +4675,8 @@ async function adminModernizarPDFs() {
     await new Promise(function(res){ setTimeout(res, 100); });
   }
   Object.keys(localStorage).filter(function(k){ return k.startsWith('lex_backup'); }).forEach(function(k){ localStorage.removeItem(k); });
-  try { await actualizarArchivoControl(); } catch(e){}
-  try { await syncEstadoSupabase(); } catch(e){}
+  try { await actualizarArchivoControl(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { await syncEstadoSupabase(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(typeof toast==='function') toast('OK: ' + ok + ' PDFs modernizados' + (err ? ' · ' + err + ' errores' : ''));
 }
 
@@ -4737,7 +4737,7 @@ async function adminRegenerarPDFsSerieB() {
       r.pdfBase64 = doc.output('datauristring');
       var r2n = (typeof _nombreArchivoR2 === 'function') ? _nombreArchivoR2(folioStr, r.nombre||'') : folioStr+'.pdf';
       var _okSubida = false;
-      try { _okSubida = await subirPDFaDrive(doc.output('blob'), folioStr + '.pdf', r2n); } catch(e2){}
+      try { _okSubida = await subirPDFaDrive(doc.output('blob'), folioStr + '.pdf', r2n); } catch(e2){ if(typeof _lexSil==="function")_lexSil(e2); }
       if (_okSubida === false) throw new Error('no se pudo subir el PDF');
       ok++;
     } catch(e) {
@@ -4746,8 +4746,8 @@ async function adminRegenerarPDFsSerieB() {
     }
     await new Promise(function(res){ setTimeout(res, 100); });
   }
-  try { await actualizarArchivoControl(); } catch(e){}
-  try { await syncEstadoSupabase(); } catch(e){}
+  try { await actualizarArchivoControl(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { await syncEstadoSupabase(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(typeof toast==='function') toast('OK: ' + ok + ' recibos B, C, D… regenerados' + (err ? ' · ' + err + ' con error (ver consola)' : ''), err ? 'err' : 'ok');
 }
 
@@ -4767,7 +4767,7 @@ async function adminRegenerarPDFsDocumentos() {
       var doc = await generarPDF(_datosRegenerarPDF(r, letra), r.folio, qrURL);
       r.pdfBase64 = doc.output('datauristring');
       var r2n = (typeof _nombreArchivoR2 === 'function') ? _nombreArchivoR2(folioStr, r.nombre||'') : folioStr+'.pdf';
-      try { await subirPDFaDrive(doc.output('blob'), folioStr + '.pdf', r2n); } catch(e2){}
+      try { await subirPDFaDrive(doc.output('blob'), folioStr + '.pdf', r2n); } catch(e2){ if(typeof _lexSil==="function")_lexSil(e2); }
       ok++;
     } catch(e) {
       console.warn('[regenerarPDFsDocumentos] error en folio', r.folio, e);
@@ -4776,8 +4776,8 @@ async function adminRegenerarPDFsDocumentos() {
     await new Promise(function(res){ setTimeout(res, 100); });
   }
   Object.keys(localStorage).filter(function(k){ return k.startsWith('lex_backup'); }).forEach(function(k){ localStorage.removeItem(k); });
-  try { await actualizarArchivoControl(); } catch(e){}
-  try { await syncEstadoSupabase(); } catch(e){}
+  try { await actualizarArchivoControl(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { await syncEstadoSupabase(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(typeof toast==='function') toast('OK: ' + ok + ' PDFs regenerados' + (err ? ' · ' + err + ' errores' : ''));
 }
 
@@ -4801,7 +4801,7 @@ async function adminRegenerarPDFsVehiculares() {
       var doc = await generarPDF(_datosRegenerarPDF(r, letra), r.folio, qrURL);
       r.pdfBase64 = doc.output('datauristring');
       var r2n = (typeof _nombreArchivoR2 === 'function') ? _nombreArchivoR2(folioStr, r.nombre||'') : folioStr+'.pdf';
-      try { await subirPDFaDrive(doc.output('blob'), folioStr + '.pdf', r2n); } catch(e2){}
+      try { await subirPDFaDrive(doc.output('blob'), folioStr + '.pdf', r2n); } catch(e2){ if(typeof _lexSil==="function")_lexSil(e2); }
       ok++;
     } catch(e) {
       console.warn('[regenerarPDFsVehiculares] error en folio', r.folio, e);
@@ -4810,8 +4810,8 @@ async function adminRegenerarPDFsVehiculares() {
     await new Promise(function(res){ setTimeout(res, 100); });
   }
   Object.keys(localStorage).filter(function(k){ return k.startsWith('lex_backup'); }).forEach(function(k){ localStorage.removeItem(k); });
-  try { await actualizarArchivoControl(); } catch(e){}
-  try { await syncEstadoSupabase(); } catch(e){}
+  try { await actualizarArchivoControl(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { await syncEstadoSupabase(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(typeof toast==='function') toast('OK: ' + ok + ' PDFs vehiculares regenerados' + (err ? ' · ' + err + ' errores' : ''));
 }
 
@@ -5188,7 +5188,7 @@ async function adminMarcaPagadoPDFs(){
     }
     await new Promise(function(res){ setTimeout(res, 120); });
   }
-  try { await syncEstadoSupabase(); } catch(e){}
+  try { await syncEstadoSupabase(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   toast('✅ ' + ok + ' PDFs con marca PAGADO' + (err ? ' · ' + err + ' errores' : ''));
 }
 
@@ -5361,8 +5361,8 @@ async function adminMigrarFoliosInfinitos() {
 
   // ─── 14. Guardar estado final ────────────────────────────────────────────
   if (typeof save === 'function') save();
-  try { await actualizarArchivoControl(); } catch(e) {}
-  try { await syncEstadoSupabase(); } catch(e) {}
+  try { await actualizarArchivoControl(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { await syncEstadoSupabase(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (typeof renderContab     === 'function') renderContab();
   if (typeof renderHistorial  === 'function') renderHistorial();
   if (typeof badges           === 'function') badges();
@@ -5463,8 +5463,8 @@ async function adminNormalizarNombresR2() {
     await new Promise(function(res){ setTimeout(res, 80); });
   }
 
-  try { await actualizarArchivoControl(); } catch(e) {}
-  try { await syncEstadoSupabase(); } catch(e) {}
+  try { await actualizarArchivoControl(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try { await syncEstadoSupabase(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (typeof renderHistorial === 'function') renderHistorial();
   toast('✅ ' + renombrados + ' renombrado(s)' + (errores ? ' · ⚠ ' + errores + ' errores' : '') + ' — nombres cortos aplicados', renombrados > 0 ? 'ok' : 'err');
 }
@@ -7200,7 +7200,7 @@ async function adminEliminarRecibo(idx, skipConfirm, silent) {
                 return m && !(m.fuente==='recibo' && m.folio==r.folio);
               });
             try{ localStorage.setItem(item.clave, JSON.stringify(bk)); } catch(e){ registrarError('localStorage.setItem', e); }
-          } catch(e2) {}
+          } catch(e2){ if(typeof _lexSil==="function")_lexSil(e2); }
         });
       });
     } catch(eLs) { console.warn('localStorage cleanup:', eLs); }
@@ -7618,7 +7618,7 @@ async function adminRevertirLetraA(folio, letra) {
     // No revertir — los cambios locales ya se hicieron; el usuario debe reintentar
   }
   // 4. Persistir local y refrescar UI
-  try { if (typeof backupLocal === 'function') backupLocal('D', D); } catch(e){}
+  try { if (typeof backupLocal === 'function') backupLocal('D', D); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (typeof save === 'function') save();
   if (typeof renderCaja === 'function') renderCaja();
   if (typeof renderContab === 'function') renderContab();
@@ -8210,7 +8210,7 @@ async function adminGuardarEdicionRecibo() {
       } catch(_eR2PDF){ console.warn('[Admin] R2 PDF no subido:', _eR2PDF); }
     }
     // 6. Sincronizar pre-recibos a R2
-    if (typeof _prGuardar === 'function') { try { _prGuardar(); } catch(e){} }
+    if (typeof _prGuardar === 'function') { try { _prGuardar(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }
     // 7. Refrescar vistas
     if (typeof renderRec === 'function') renderRec();
     if (typeof renderHistorial === 'function') renderHistorial();
@@ -8344,7 +8344,7 @@ function fichaGuardarEdicionCargo(idx) {
   Promise.resolve(_cargoR2Guardar(folio, anio, recibo._cargosInternos))
     .catch(function(e){ console.warn('[Cargo] R2 editar:', e); })
     .then(function(){
-      try { if(typeof save==='function') save(); } catch(e) {}
+      try { if(typeof save==='function') save(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       _fichaEnviarSenalSync('cargo-editado', folio);
       if(typeof toast==='function') toast('✅ Cargo actualizado y sincronizado', 'ok');
     });
@@ -8367,7 +8367,7 @@ function fichaEliminarCargo(idx) {
   Promise.resolve(_cargoR2Guardar(folio, anio, recibo._cargosInternos))
     .catch(function(e){ console.warn('[Cargo] R2 eliminar:', e); })
     .then(function(){
-      try { if(typeof save==='function') save(); } catch(e) {}
+      try { if(typeof save==='function') save(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       _fichaEnviarSenalSync('cargo-eliminado', folio);
       if(typeof toast==='function') toast('✅ Cargo eliminado y sincronizado', 'ok');
     });
@@ -8401,7 +8401,7 @@ async function adminRecuperarExpedientesPlacas(){
     + '• Los archivos se vuelven a ligar al Expediente Digital de cada folio.\n\n'
     + 'No se borra ningún archivo. Puede tardar unos minutos.\n\n¿Continuar?')) return;
   var token = '';
-  try { token = await driveGetAccessToken(); } catch(e){}
+  try { token = await driveGetAccessToken(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(!token){ alert('Sin acceso a Google Drive. Conecta Drive y vuelve a intentarlo.'); return; }
   var conArchivos = [], vacios = [], errores = [], tot = { movidos: 0, renombradas: 0, archivos: 0 };
   for(var i = 0; i < lista.length; i++){
@@ -8421,7 +8421,7 @@ async function adminRecuperarExpedientesPlacas(){
   if(typeof save === 'function') save();
   try { if(typeof syncEstadoSupabase === 'function') await syncEstadoSupabase(); }
   catch(e){ if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced().catch(function(){}); }
-  if(typeof renderPend === 'function') try { renderPend(); } catch(e){}
+  if(typeof renderPend === 'function') try { renderPend(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   alert('ORGANIZACIÓN TERMINADA\n\n'
     + '✅ Folios con archivos ligados: ' + conArchivos.length + ' (' + tot.archivos + ' archivo(s))\n'
     + '📁 Carpetas renombradas: ' + tot.renombradas + '   ·   Archivos movidos: ' + tot.movidos + '\n'
@@ -8499,7 +8499,7 @@ async function _juExtraerDatosAcuerdo(texto){
     const fT = _juFechaDesdeTexto(texto, jF);
     if (fT && fT.fuente !== 'inicio') datos.fechaAcuerdo = fT.iso;
     else if (datos.fechaAcuerdo && !_juFechaValida(datos.fechaAcuerdo, jF)) datos.fechaAcuerdo = '';
-  } catch(eF){}
+  } catch(eF){ if(typeof _lexSil==="function")_lexSil(eF); }
   return datos;
 }
 

@@ -126,7 +126,7 @@ function formatearPlaca(input) {
   var newPos = rawPos + guionesNuevos;
   input.value = formatted;
   // Restaurar posición del cursor
-  try { input.setSelectionRange(newPos, newPos); } catch(e) {}
+  try { input.setSelectionRange(newPos, newPos); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
 }
 
 function _abrevEstadoPlaca(valor){
@@ -550,7 +550,7 @@ function formatearCampoPlacas(inp){
   } else {
     const posF = inp.selectionStart;
     inp.value = inp.value.toUpperCase();
-    try { inp.setSelectionRange(posF, posF); } catch(e){}
+    try { inp.setSelectionRange(posF, posF); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   }
 }
 
@@ -639,7 +639,7 @@ async function _r2GuardarResumen(driveFileId, resumen) {
     try {
       const prev = await _r2CargarResumen(driveFileId);
       if (prev && prev.ocrTexto) ocrTexto = prev.ocrTexto;
-    } catch(e) {}
+    } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     const json = JSON.stringify({ resumen, ocrTexto, ts: Date.now() });
     const blob = new Blob([json], { type: 'application/json' });
     const file = new File([blob], 'resumen.json', { type: 'application/json' });
@@ -806,7 +806,7 @@ function _placasPutConProgreso(sessionUri, file, onProgreso, timeoutMs){
     xhr.onload = function(){
       if(xhr.status >= 200 && xhr.status < 300){
         let data = {};
-        try{ data = JSON.parse(xhr.responseText || '{}'); }catch(e){}
+        try{ data = JSON.parse(xhr.responseText || '{}'); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
         resolve(data);
       } else {
         reject(new Error('HTTP ' + xhr.status + ' ' + String(xhr.responseText||'').slice(0,200)));
@@ -1287,7 +1287,7 @@ function _pVerDocImprimir(){
   const ctx = window._docPreviewCtx;
   if (!ctx || !ctx.d) return;
   const ifr = document.getElementById('docPreviewIframe');
-  if (ifr && ifr.contentWindow) { try { ifr.contentWindow.focus(); ifr.contentWindow.print(); return; } catch(e){} }
+  if (ifr && ifr.contentWindow) { try { ifr.contentWindow.focus(); ifr.contentWindow.print(); return; } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }
   const img = document.getElementById('docPreviewImg');
   if (img) {
     const w = window.open('', '_blank');

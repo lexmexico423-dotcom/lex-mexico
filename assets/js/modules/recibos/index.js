@@ -647,7 +647,7 @@ async function sincronizarFolio(forzarSB){
           D.adeudosSinRecibo = [..._fusionadasAdeudos, ..._soloLocalesAdeudos];
           // Si la pantalla de Adeudos está abierta, mostrar de inmediato lo
           // que capturaron en otra computadora.
-          try { const _pa = document.getElementById('panel-adeudos-sin-recibo'); if (_pa && _pa.classList.contains('active') && typeof renderAdeudosLista === 'function') renderAdeudosLista(); } catch(e){}
+          try { const _pa = document.getElementById('panel-adeudos-sin-recibo'); if (_pa && _pa.classList.contains('active') && typeof renderAdeudosLista === 'function') renderAdeudosLista(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
         })();
         // Estos dos son listas de folios (strings) que se agregan/quitan desde
         // varias funciones admin — se unen local+SB (en vez de sobreescribir)
@@ -922,8 +922,8 @@ async function _purgarPDFRecibo(folioStr, nombre){
   var arr = Array.from(variantes);
   for(var i=0;i<arr.length;i++){
     var pn = arr[i];
-    try{ if(typeof window.borrarR2==='function' && window.SB_DESPACHO_ID) await window.borrarR2(window.SB_DESPACHO_ID+'/recibos/'+pn, 'recibos').catch(function(){}); }catch(e){}
-    try{ if(typeof borrarPDFdeDrive==='function') await borrarPDFdeDrive(pn).catch(function(){}); }catch(e){}
+    try{ if(typeof window.borrarR2==='function' && window.SB_DESPACHO_ID) await window.borrarR2(window.SB_DESPACHO_ID+'/recibos/'+pn, 'recibos').catch(function(){}); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+    try{ if(typeof borrarPDFdeDrive==='function') await borrarPDFdeDrive(pn).catch(function(){}); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   }
 }
 
@@ -2949,7 +2949,7 @@ function salirModoConsulta(){
   // Limpiar iframe y liberar blob URL
   const iframe = document.getElementById('pdf-consulta-iframe');
   if(iframe){
-    if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){} iframe._blobUrl = null; }
+    if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } iframe._blobUrl = null; }
     iframe.src = '';
   }
   // Restaurar folio display al actual
@@ -3090,7 +3090,7 @@ function abrirModoActualizacion(recibo){
   _panelesBusquedaAbiertos = false;
   const iframe = document.getElementById('pdf-consulta-iframe');
   if(iframe){
-    if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){} iframe._blobUrl = null; }
+    if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } iframe._blobUrl = null; }
     iframe.src = '';
   }
   // Cargar todos los datos del recibo en el formulario
@@ -4279,7 +4279,7 @@ async function _imprimirActualizacionReal(){
       const _folioLetraActTxt = folioConLetra(recibo.folio, recibo.anio_folio, letraActual);
       toast('⚠️ La actualización del recibo #' + _folioLetraActTxt + ' NO se pudo guardar en el servidor tras varios intentos. Verifica tu conexión y vuelve a intentar, o revisa SCANSYS PRO.', 'err');
       if (typeof _lexPush === 'function') {
-        try { _lexPush('error', 'recibo.sync', 'Actualización del recibo #' + _folioLetraActTxt + ' no se pudo sincronizar tras 4 intentos.', null, { folio: recibo.folio, letra: letraActual }); } catch(eLex){}
+        try { _lexPush('error', 'recibo.sync', 'Actualización del recibo #' + _folioLetraActTxt + ' no se pudo sincronizar tras 4 intentos.', null, { folio: recibo.folio, letra: letraActual }); } catch(eLex){ if(typeof _lexSil==="function")_lexSil(eLex); }
       }
     }
     // ✅ Apagar guard AQUÍ, después del segundo save(), para que _protegerMovimientosRecibo()
@@ -4627,7 +4627,7 @@ function _mostrarVisorReciboPDF(blob, nombreArchivo){
     // Pestaña independiente abierta con éxito — no se necesita el visor
     // embebido. Se libera la URL hasta un buen rato después, dando tiempo de
     // sobra a que la pestaña termine de cargar el PDF.
-    setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(e){} }, 60000);
+    setTimeout(function(){ try{ URL.revokeObjectURL(url); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }, 60000);
     return;
   }
   // Pestaña bloqueada por el navegador — respaldo: visor embebido en la misma
@@ -4660,7 +4660,7 @@ function _cerrarVisorReciboPDF(){
   if(!overlay) return;
   var url = overlay.dataset.blobUrl;
   overlay.remove();
-  if(url){ try{ URL.revokeObjectURL(url); }catch(e){} }
+  if(url){ try{ URL.revokeObjectURL(url); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }
 }
 
 function imprimirDesdeBlob(blob, nombreArchivo) {
@@ -4738,7 +4738,7 @@ function _eliminarPendientePorFolio(folio) {
       _lb.push(String(folio));
       localStorage.setItem('lex-placas-liquidados', JSON.stringify(_lb));
     }
-  } catch(e) {}
+  } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (idx >= 0) {
     // Respaldar documentos del pendiente en el recibo antes de borrarlo (folio 121).
     if (typeof _placasPreservarDocsEnRecibo === 'function') _placasPreservarDocsEnRecibo(D.pendientes[idx]);
@@ -5747,7 +5747,7 @@ async function vincularReciboAJuicio(folio) {
   _jvrRenderActual(j);
   filtrarRecibosParaJuicio();
   renderJuicios();
-  try{ if (window._mexpIdxActual === _juicioVincRecIdx) _juRenderDatosDuros(j, _juicioVincRecIdx); }catch(e){}
+  try{ if (window._mexpIdxActual === _juicioVincRecIdx) _juRenderDatosDuros(j, _juicioVincRecIdx); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   toast('✓ Recibo #' + folioFormato(folio) + ' vinculado al juicio', 'ok');
 }
 
@@ -5768,7 +5768,7 @@ async function desvincularReciboDeJuicio(folio) {
   _jvrRenderActual(j);
   filtrarRecibosParaJuicio();
   renderJuicios();
-  try{ if (window._mexpIdxActual === _juicioVincRecIdx) _juRenderDatosDuros(j, _juicioVincRecIdx); }catch(e){}
+  try{ if (window._mexpIdxActual === _juicioVincRecIdx) _juRenderDatosDuros(j, _juicioVincRecIdx); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   toast('✓ Recibo desvinculado del juicio', 'ok');
 }
 
@@ -6461,7 +6461,7 @@ async function backupAppData() {
     if (!appData || !appData.recibos || appData.recibos.length === 0) return;
 
     var hoyKey = 'lex-backup-' + new Date().toISOString().slice(0, 10);
-    try { if (localStorage.getItem(hoyKey)) { _backupHecho = true; return; } } catch(_){}
+    try { if (localStorage.getItem(hoyKey)) { _backupHecho = true; return; } } catch(_){ if(typeof _lexSil==="function")_lexSil(_); }
 
     _backupHecho = true;
 
@@ -6537,7 +6537,7 @@ async function backupAppData() {
           if (k.startsWith('lex-backup-') && k < 'lex-backup-' + hace7)
             localStorage.removeItem(k);
         });
-      } catch(_){}
+      } catch(_){ if(typeof _lexSil==="function")_lexSil(_); }
       _limpiarBackupsViejos(did, ahora).catch(function(){});
     } else {
       console.warn('[Backup] No se pudo guardar en R2');
@@ -7234,8 +7234,8 @@ async function _gfInsertarEjecutar(folioN, logFn){
   if(logFn) logFn('Actualizando Supabase…');
   await _gfActualizarVersionesSB(Array.from(mapa.entries()).sort(function(a,b){ return b[0]-a[0]; }), logFn);
   await _gfFijarContador(folioN);
-  try{ await actualizarArchivoControl(); }catch(e){}
-  try{ await syncEstadoSupabase(); }catch(e){}
+  try{ await actualizarArchivoControl(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try{ await syncEstadoSupabase(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(typeof renderHistorial==='function') renderHistorial();
   if(typeof renderContab==='function') renderContab();
   var _quedoLibre = _gfVerificarLibre(folioN, logFn);
@@ -7262,7 +7262,7 @@ async function _gfEliminarEjecutar(folioN, cerrarHueco, logFn){
     try{
       if(typeof _lexRealtimeChannel!=='undefined' && _lexRealtimeChannel && _lexRealtimeChannel.state==='joined')
         _lexRealtimeChannel.send({type:'broadcast', event:'folio_eliminado', payload:{folio:folioN, letra:letra, ts:Date.now()+10000, _adminForce:true}}).catch(function(){});
-    }catch(e){}
+    }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   });
   var pdfsDel=delRecs.map(function(r){ return {folio:folioN, letra:(r.letra||'A'), nombre:(r.nombre||'')}; });
   // Quitar de memoria (recibo, movimientos, historial de pagos, snapshots, pendientes).
@@ -7302,8 +7302,8 @@ async function _gfEliminarEjecutar(folioN, cerrarHueco, logFn){
     if(typeof save==='function') save();
     await _gfFijarContador((typeof _recalcularFolioActual==='function')?_recalcularFolioActual():(_gfMaxFolio()+1));
   }
-  try{ await actualizarArchivoControl(); }catch(e){}
-  try{ await syncEstadoSupabase(); }catch(e){}
+  try{ await actualizarArchivoControl(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  try{ await syncEstadoSupabase(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if(typeof renderHistorial==='function') renderHistorial();
   if(typeof renderContab==='function') renderContab();
   if(typeof renderCaja==='function') renderCaja();
@@ -7331,7 +7331,7 @@ async function _gfEliminarEjecutar(folioN, cerrarHueco, logFn){
 }
 
 function abrirGestorFolios(){
-  try{ var ex=document.getElementById('gf-ov'); if(ex) ex.remove(); }catch(e){}
+  try{ var ex=document.getElementById('gf-ov'); if(ex) ex.remove(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   var max=_gfMaxFolio();
   var ov=document.createElement('div');
   ov.id='gf-ov';
@@ -7440,8 +7440,8 @@ async function _gfUICerrarHuecoVacio(){
     _gfLog('Actualizando Supabase…');
     await _gfActualizarVersionesSB(Array.from(mapa.entries()).sort(function(a,b){ return a[0]-b[0]; }), _gfLog);
     await _gfFijarContador(max);
-    try{ await actualizarArchivoControl(); }catch(e){}
-    try{ await syncEstadoSupabase(); }catch(e){}
+    try{ await actualizarArchivoControl(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+    try{ await syncEstadoSupabase(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     if(typeof renderHistorial==='function') renderHistorial();
     if(typeof renderContab==='function') renderContab();
     if(typeof renderCaja==='function') renderCaja();
@@ -8391,7 +8391,7 @@ async function verVistaPrevia(idx) {
   modal.classList.add('show');
   var iframe = document.getElementById('vp-iframe');
   function _mostrarEnIframe(src){
-    if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){} iframe._blobUrl=null; }
+    if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } iframe._blobUrl=null; }
     if(src.startsWith('data:')){
       const b64=src.split(',')[1], bin=atob(b64), arr=new Uint8Array(bin.length);
       for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
@@ -8415,7 +8415,7 @@ async function verVistaPrevia(idx) {
   }
   if(_blob){
     const bUrl=URL.createObjectURL(_blob);
-    if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){} } iframe._blobUrl=bUrl;
+    if(iframe._blobUrl){ try{ URL.revokeObjectURL(iframe._blobUrl); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } } iframe._blobUrl=bUrl;
     iframe.src=bUrl+'#toolbar=0&navpanes=0&scrollbar=0&view=FitH';
     const rd=new FileReader(); rd.onload=()=>{ r.pdfBase64=rd.result; }; rd.readAsDataURL(_blob);
   } else {
@@ -8834,7 +8834,7 @@ function abrirFichaFolio(){
   document.getElementById('ficha-folio-ref').textContent=fStr;
   document.getElementById('ficha-cliente-nombre').textContent=recibo.nombre||'—';
   // VSL — registrar apertura de ficha
-  try{ auditoriaRegistrar('folio','Abrió ficha: '+fStr+' — '+(recibo.nombre||'sin nombre')+' — '+(recibo.concepto||recibo.servicio||'')); }catch(e){}
+  try{ auditoriaRegistrar('folio','Abrió ficha: '+fStr+' — '+(recibo.nombre||'sin nombre')+' — '+(recibo.concepto||recibo.servicio||'')); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   // Teléfono del primer cliente
   var tel='';
   if(recibo.clientes&&recibo.clientes[0])tel=recibo.clientes[0].movil||recibo.clientes[0].tel||'';
@@ -9664,7 +9664,7 @@ function fichaGuardarCargo() {
     .catch(function(e){ console.warn('[Cargo] R2 agregar:', e); })
     .then(function(){
       try { if(typeof save==='function') save(); } catch(e) { console.warn('[Cargo] Supabase:', e); }
-      if (typeof generarBackupDiario === 'function') { try { generarBackupDiario(); } catch(e) {} }
+      if (typeof generarBackupDiario === 'function') { try { generarBackupDiario(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }
       _fichaEnviarSenalSync('cargo-agregado', folio);
       if(typeof toast==='function') toast('✅ Cargo agregado y sincronizado: $' + monto.toLocaleString('es-MX',{minimumFractionDigits:2}), 'ok');
     });
@@ -9682,7 +9682,7 @@ async function _cargoR2Cargar(folio, anio) {
       if (blob) {
         const txt = await blob.text();
         const data = JSON.parse(txt);
-        try { localStorage.setItem('ficha-cargos-'+folio+'-'+anio, txt); } catch(e){}
+        try { localStorage.setItem('ficha-cargos-'+folio+'-'+anio, txt); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
         return data;
       }
     } catch(e) { console.warn('[CargoR2] Carga R2 falló, usando localStorage:', e); }
@@ -9692,7 +9692,7 @@ async function _cargoR2Cargar(folio, anio) {
 
 async function _cargoR2Guardar(folio, anio, cargos) {
   const json = JSON.stringify(cargos);
-  try { localStorage.setItem('ficha-cargos-'+folio+'-'+anio, json); } catch(e){}
+  try { localStorage.setItem('ficha-cargos-'+folio+'-'+anio, json); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (window.subirR2 && window.SB_DESPACHO_ID) {
     try {
       const blob = new Blob([json], {type:'application/json'});
@@ -10518,7 +10518,7 @@ function abrirExpDigitalVehiculo(recibo) {
   if (_expDigState.pendiente && typeof _placasHeredarDocsDelRecibo === 'function' && _placasHeredarDocsDelRecibo(_expDigState.pendiente)) {
     if (typeof save === 'function') save();
     if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced();
-    if (typeof renderPend === 'function') try { renderPend(); } catch(e){}
+    if (typeof renderPend === 'function') try { renderPend(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   }
   _expDigRenderStatus();
   _expDigRenderArchivos();
@@ -10693,14 +10693,14 @@ function cerrarFichaFolio(){
   window._fichaVisorToken = (window._fichaVisorToken||0)+1; // invalida cargas de versión en vuelo
   var _iframeFicha = document.getElementById('pdf-consulta-iframe');
   if(_iframeFicha && window._fichaPdfDefaultSrc && _iframeFicha.src !== window._fichaPdfDefaultSrc){
-    if(window._fichaPdfTempBlobUrl){ try{ URL.revokeObjectURL(window._fichaPdfTempBlobUrl); }catch(e){} window._fichaPdfTempBlobUrl=null; }
+    if(window._fichaPdfTempBlobUrl){ try{ URL.revokeObjectURL(window._fichaPdfTempBlobUrl); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } window._fichaPdfTempBlobUrl=null; }
     _iframeFicha.src = window._fichaPdfDefaultSrc;
   }
 }
 
 // ── Pre-Recibos: utilidades (oct-2026) ──
 function _prHoy() {
-  try { if (typeof fechaCDMX_ISO === 'function') return fechaCDMX_ISO(); } catch(e){}
+  try { if (typeof fechaCDMX_ISO === 'function') return fechaCDMX_ISO(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   return new Date().toISOString().slice(0,10);
 }
 // Cada cambio lleva su sello de tiempo: al sincronizar entre computadoras
@@ -10949,7 +10949,7 @@ function _prConvertirARecibo(prId) {
           const inP = tr.querySelector('input.precio');
           if (inP) {
             inP.value = f.precio > 0 ? String(f.precio) : '';
-            if (typeof formatPrecio === 'function') try { formatPrecio(inP); } catch(e){}
+            if (typeof formatPrecio === 'function') try { formatPrecio(inP); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
           }
         });
         if (typeof calcTotales === 'function') calcTotales();

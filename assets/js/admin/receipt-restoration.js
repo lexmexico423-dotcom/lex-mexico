@@ -259,12 +259,12 @@ async function rgenAutoCargar(tipo){
                 txt += tc.items.map(it=>it.str).join(' ')+'\n';
               }
               datos = _rgenParsearPDF(txt);
-            }catch(ePdf){}
+            }catch(ePdf){ if(typeof _lexSil==="function")_lexSil(ePdf); }
           }
           const recibo = datos ? Object.assign({},datos,{pdfBase64:dataUri,archivo:f.name})
                                 : {folio:_rgenFolio,pdfBase64:dataUri,archivo:f.name};
           candidatos.push({tipo:'pdf',nombre:f.name,recibo,dataUri});
-        }catch(eDl){}
+        }catch(eDl){ if(typeof _lexSil==="function")_lexSil(eDl); }
       }
       if(candidatos.length === 0){
         st.style.background='#fff0f0'; st.style.borderColor='#c0161a'; st.style.color='#c0161a';
@@ -305,7 +305,7 @@ async function rgenAutoCargar(tipo){
               candidatos.push({tipo:'backup',nombre:'Backup '+fecha+' ('+f.name+')',recibo:rec});
             }
           }
-        }catch(eFile){}
+        }catch(eFile){ if(typeof _lexSil==="function")_lexSil(eFile); }
       }
       if(candidatos.length === 0){
         st.style.background='#fff8e8'; st.style.borderColor='#c8952a'; st.style.color='#8c6518';
@@ -1962,7 +1962,7 @@ const VSL_AUTOSAVE_KEY = 'vsl_ultimo_guardado_drive'; // timestamp del último g
           'registro-civil':'Registro Civil', sesiones:'Monitor de Sesiones'
         };
         auditoriaRegistrar('navegacion', 'Abrió módulo: ' + (nombres[panel] || panel));
-      } catch(e) {}
+      } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       _vslCheckVisible();
       return _irOrig.apply(this, arguments);
     };
@@ -1984,7 +1984,7 @@ function vslAbrir() {
       localStorage.setItem(AUDITORIA_KEY, JSON.stringify(log));
       console.log('[VSL] Entradas antiguas eliminadas del log local:', antes - log.length);
     }
-  } catch(e) {}
+  } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   try {
     const log = JSON.parse(localStorage.getItem(AUDITORIA_KEY) || '[]');
     const usuarios = [...new Set(log.map(e => e.usuario).filter(Boolean))].sort();
@@ -1993,7 +1993,7 @@ function vslAbrir() {
       sel.innerHTML = '<option value="">— Todos los usuarios —</option>' +
         usuarios.map(u => `<option value="${u}">${u}</option>`).join('');
     }
-  } catch(e) {}
+  } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   document.getElementById('vsl-overlay').style.display = 'block';
   vslFiltrar();
 }
@@ -2007,7 +2007,7 @@ function vslFiltrar() {
   const tipo = (document.getElementById('vsl-tipo')?.value || '');
   const usr  = (document.getElementById('vsl-usuario')?.value || '');
   let log = [];
-  try { log = JSON.parse(localStorage.getItem(AUDITORIA_KEY) || '[]'); } catch(e) {}
+  try { log = JSON.parse(localStorage.getItem(AUDITORIA_KEY) || '[]'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
 
   const iconos  = { impresion:'🖨', abono:'💰', cancelacion:'🚫', liquidacion:'✅', edicion:'✏️', login:'🔑', complemento:'📎', navegacion:'🧭', folio:'📂' };
   const colores = { impresion:'rgba(200,149,42,0.13)', abono:'rgba(26,122,58,0.13)', cancelacion:'rgba(192,22,26,0.13)', liquidacion:'rgba(26,122,58,0.18)', edicion:'rgba(90,58,138,0.13)', login:'rgba(26,74,138,0.13)', complemento:'rgba(200,149,42,0.08)', navegacion:'rgba(200,149,42,0.06)', folio:'rgba(26,100,138,0.13)' };
@@ -2048,7 +2048,7 @@ function vslFiltrar() {
 
 function vslLimpiar() {
   if (!confirm('¿Limpiar todo el log de vigilancia? Esta acción no se puede deshacer.')) return;
-  try { localStorage.removeItem(AUDITORIA_KEY); } catch(e) {}
+  try { localStorage.removeItem(AUDITORIA_KEY); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   vslFiltrar();
   if (typeof toast === 'function') toast('Log VSL limpiado', 'ok');
 }
@@ -2121,7 +2121,7 @@ async function _vslGuardarDriveInterno(conFeedback) {
                      : await _vslCrearArchivo(token, fileName, folderId, blob);
     if (ok) {
       // Registrar timestamp del último guardado exitoso
-      try { localStorage.setItem(VSL_AUTOSAVE_KEY, String(Date.now())); } catch(e) {}
+      try { localStorage.setItem(VSL_AUTOSAVE_KEY, String(Date.now())); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
       const eliminados = await _vslLimpiarAntiguos(token, folderId);
       const msgExtra = eliminados > 0 ? ` · ${eliminados} archivo(s) antiguos eliminados` : '';
       if (conFeedback) {
@@ -2507,7 +2507,7 @@ function _secretSessionSet(key, value){
   try { sessionStorage.setItem(key, value); return true; } catch(_) { return false; }
 }
 function _secretSessionRemove(key){
-  try { sessionStorage.removeItem(key); } catch(_) {}
+  try { sessionStorage.removeItem(key); } catch(_){ if(typeof _lexSil==="function")_lexSil(_); }
 }
 
 window._groqKeyCached = window._groqKeyCached || '';
@@ -9156,7 +9156,7 @@ async function _mpeR2Subir(estado, supSlug, subSlug, tipo, file) {
       const reader = new FileReader();
       reader.onload = e => {
         try { localStorage.setItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}`, e.target.result);
-              localStorage.setItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}_name`, file.name); } catch(err){}
+              localStorage.setItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}_name`, file.name); } catch(err){ if(typeof _lexSil==="function")_lexSil(err); }
         _mpeCache[`${estado}_${supSlug}_${subSlug}_${tipo}`] = e.target.result;
         res(true);
       };
@@ -9199,7 +9199,7 @@ async function _mpeR2Descargar(estado, supSlug, subSlug, tipo) {
 async function _mpeR2Quitar(estado, supSlug, subSlug, tipo) {
   delete _mpeCache[`${estado}_${supSlug}_${subSlug}_${tipo}`];
   try { localStorage.removeItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}`);
-        localStorage.removeItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}_name`); } catch(e){}
+        localStorage.removeItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}_name`); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (!window.borrarR2 || !window.SB_DESPACHO_ID) return;
   const path = _mpePath(estado, supSlug, subSlug, tipo);
   await window.borrarR2(path, 'placas').catch(()=>{});
@@ -9216,7 +9216,7 @@ async function _mpeR2NombreArchivo(estado, supSlug, subSlug, tipo) {
     try {
       const blob = await window.descargarR2(path, 'placas');
       if (blob) { const txt = await blob.text(); meta = JSON.parse(txt); _mpeCache[metaKey] = meta; }
-    } catch(e) {}
+    } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   }
   return (meta && meta[tipo]) || '';
 }
@@ -9243,7 +9243,7 @@ async function _mpeR2GetRecLista(estado, supSlug, subSlug) {
       try {
         const blob = await window.descargarR2(path, 'placas');
         if (blob) { const txt = await blob.text(); meta = JSON.parse(txt); _mpeCache[metaKey] = meta; }
-      } catch(e) {}
+      } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     }
   }
   if (meta && meta._recLista) return meta._recLista;
@@ -9257,7 +9257,7 @@ async function _mpeR2SetRecLista(estado, supSlug, subSlug, arr) {
   meta._recLista = arr;
   _mpeCache[metaKey] = meta;
   if (!window.subirR2 || !window.SB_DESPACHO_ID) {
-    try { localStorage.setItem(`mpe_reclist_${estado}_${supSlug}_${subSlug}`, JSON.stringify(arr)); } catch(e){}
+    try { localStorage.setItem(`mpe_reclist_${estado}_${supSlug}_${subSlug}`, JSON.stringify(arr)); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     return;
   }
   const path = _mpePath(estado, supSlug, subSlug, 'meta.json');
@@ -9418,7 +9418,7 @@ async function _mpeLeerTodosLosPDF(){
       try {
         var metaKey = estado + '_' + s.supSlug + '_' + s.subSlug + '_meta';
         if (!_mpeCache[metaKey]) {
-          try { var b = await window.descargarR2(_mpePath(estado, s.supSlug, s.subSlug, 'meta.json'), 'placas'); if (b) _mpeCache[metaKey] = JSON.parse(await b.text()); } catch(e){}
+          try { var b = await window.descargarR2(_mpePath(estado, s.supSlug, s.subSlug, 'meta.json'), 'placas'); if (b) _mpeCache[metaKey] = JSON.parse(await b.text()); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
         }
         var meta = _mpeCache[metaKey] || {};
         if (meta._info) { yaTenian++; continue; }
@@ -9893,7 +9893,7 @@ function _mpeRenderBody(estado, supIdx) {
     try {
       const raw = localStorage.getItem(`mpe_reclist_${estado}_${supSlug}_${subSlug}`);
       if (raw) return JSON.parse(raw);
-    } catch(e){}
+    } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
     return _mpeDefaultRecursos(estado, supSlug);
   })();
   let listaHTML = recLista.map((r, ri) => {
@@ -10096,7 +10096,7 @@ function _mpeRenderBody(estado, supIdx) {
     ? (_mpeLayoutAmplio(estado, supIdx, subIdx, supSlug, subSlug, infoTram || { cargando: true }, _linksArch) + pie)
     : ((isAdmin ? loginBanner : '') + paso1 + paso2 + paso3 + pie);
   bodyEl.appendChild(wrapper);
-  try { _mpeAjustarVentana(_amplio); } catch(e){}
+  try { _mpeAjustarVentana(_amplio); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
 }
 
 // _mpeGetRecursosConUrls sustituida por _mpeGetRecLista
@@ -10151,7 +10151,7 @@ async function _mpePrefetchR2(estado, supIdx, subIdx) {
           _mpeRenderBody(estado, supIdx);
         }
       }
-    } catch(e) {}
+    } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   }
 }
 
@@ -10209,7 +10209,7 @@ function _mpePDFVer(key) {
 }
 function _mpeQuitarKey(key) {
   if (!confirm('¿Quitar el archivo adjunto?')) return;
-  try { localStorage.removeItem(key); } catch(e){}
+  try { localStorage.removeItem(key); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   _mpeRenderBody(_mpeEstado, _mpeSupuesto);
 }
 function _mpeRecSubirKey(key, input) {
@@ -10278,13 +10278,13 @@ async function _mpeSubirArchivo(estado, supSlug, subSlug, tipo, input) {
   const cacheKey = `${estado}_${supSlug}_${subSlug}_${tipo}`;
   _mpeCache[cacheKey] = dataUrl;
   try { localStorage.setItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}`, dataUrl);
-        localStorage.setItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}_name`, file.name); } catch(e){}
+        localStorage.setItem(`mpe_${estado}_${supSlug}_${subSlug}_${tipo}_name`, file.name); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   // Actualizar meta cache con nombre
   const metaKey = `${estado}_${supSlug}_${subSlug}_meta`;
   const meta = _mpeCache[metaKey] || {};
   meta[tipo] = file.name;
   _mpeCache[metaKey] = meta;
-  try { localStorage.setItem(`mpe_reclist_${estado}_${supSlug}_${subSlug}`, JSON.stringify(meta._recLista || [])); } catch(e){}
+  try { localStorage.setItem(`mpe_reclist_${estado}_${supSlug}_${subSlug}`, JSON.stringify(meta._recLista || [])); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   // Re-renderizar inmediatamente con los datos en caché
   _mpeRenderBody(_mpeEstado, _mpeSupuesto);
   // Subir a R2 en segundo plano
@@ -10547,7 +10547,7 @@ async function _mpeDoLogin() {
       }
       _mpeAdminActivo = true;
       _mpeAdminOff = false;
-      try { sessionStorage.removeItem('mpe_admin_off'); } catch(e){} // Limpiar bloqueo
+      try { sessionStorage.removeItem('mpe_admin_off'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } // Limpiar bloqueo
       document.getElementById('mpe-login-overlay').remove();
       _mpeRenderTabs(_mpeEstado, _mpeSupuesto);
       _mpeRenderBody(_mpeEstado, _mpeSupuesto);
@@ -10560,7 +10560,7 @@ async function _mpeDoLogin() {
   // Fallback sin Supabase (solo verifica email admin)
   _mpeAdminActivo = true;
   _mpeAdminOff = false;
-  try { sessionStorage.removeItem('mpe_admin_off'); } catch(e){}
+  try { sessionStorage.removeItem('mpe_admin_off'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   document.getElementById('mpe-login-overlay').remove();
   _mpeRenderTabs(_mpeEstado, _mpeSupuesto);
   _mpeRenderBody(_mpeEstado, _mpeSupuesto);
@@ -10591,7 +10591,7 @@ function _mpeCerrarAdmin() {
   _mpeAdminActivo = false;
   _mpeAdminOff = true;
   _mpeCambiosPendientes = false;
-  try { sessionStorage.setItem('mpe_admin_off', '1'); } catch(e){} // Persistir para refresco
+  try { sessionStorage.setItem('mpe_admin_off', '1'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); } // Persistir para refresco
   const visor = document.getElementById('mpe-pdf-visor-overlay');
   if (visor) visor.remove();
   if (_mpeEstado !== null) {
@@ -10606,7 +10606,7 @@ function _mpeCerrarAdmin() {
 function _mpeReactivarAdmin() {
   _mpeAdminActivo = true;
   _mpeAdminOff = false;
-  try { sessionStorage.removeItem('mpe_admin_off'); } catch(e){}
+  try { sessionStorage.removeItem('mpe_admin_off'); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   if (_mpeEstado !== null) {
     _mpeRenderTabs(_mpeEstado, _mpeSupuesto);
     _mpeRenderBody(_mpeEstado, _mpeSupuesto);
@@ -10754,16 +10754,16 @@ async function _cargarConfigOCRDesdeSupabase(){
         case 'drive_token':
           if(v.length > 10){
             window._ocrDriveTokenCached = v;
-            try{ localStorage.setItem('lex-drive-token', v); }catch(_){}
-            try{ localStorage.setItem('lex-ocr-drive-token', v); }catch(_){}
+            try{ localStorage.setItem('lex-drive-token', v); }catch(_){ if(typeof _lexSil==="function")_lexSil(_); }
+            try{ localStorage.setItem('lex-ocr-drive-token', v); }catch(_){ if(typeof _lexSil==="function")_lexSil(_); }
             console.log('[Config] ✅ Drive token cargado desde Supabase');
           }
           break;
         case 'ocr_prof':
-          try{ localStorage.setItem('lex-ocr-prof', v); }catch(_){}
+          try{ localStorage.setItem('lex-ocr-prof', v); }catch(_){ if(typeof _lexSil==="function")_lexSil(_); }
           break;
         case 'ocr_extra':
-          try{ localStorage.setItem('lex-ocr-extra', v); }catch(_){}
+          try{ localStorage.setItem('lex-ocr-extra', v); }catch(_){ if(typeof _lexSil==="function")_lexSil(_); }
           break;
       }
     });
@@ -12020,7 +12020,7 @@ function driveIniciarOAuth(){
 window.addEventListener('message', function(ev){
   if(ev.origin !== window.location.origin) return;
   if(!ev.data || ev.data.tipo !== 'lex-drive-oauth-code') return;
-  if(window._driveOAuthPopup){ try{ window._driveOAuthPopup.close(); }catch(e){} }
+  if(window._driveOAuthPopup){ try{ window._driveOAuthPopup.close(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } }
   _driveCompletarExchange(ev.data.code);
 });
 // Procesar código OAuth al regresar de Google — ruta de RESPALDO para cuando
@@ -13741,7 +13741,7 @@ async function _tareaAdjuntarDoc(id){
   inp.type = 'file'; inp.accept = '.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx'; inp.multiple = true;
   inp.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;opacity:0;';
   document.body.appendChild(inp);
-  const _quitar = function(){ try{ inp.remove(); }catch(e){} };
+  const _quitar = function(){ try{ inp.remove(); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); } };
   window.addEventListener('focus', function _lim(){
     setTimeout(function(){ if(!inp.files || !inp.files.length) _quitar(); window.removeEventListener('focus', _lim); }, 800);
   });
@@ -13996,7 +13996,7 @@ function _adeudoTotal(a){
 
 // ── Utilidades (oct-2026) ──
 function _adeudoHoy(){
-  try { if (typeof fechaCDMX_ISO === 'function') return fechaCDMX_ISO(); } catch(e){}
+  try { if (typeof fechaCDMX_ISO === 'function') return fechaCDMX_ISO(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
   return new Date().toISOString().slice(0,10);
 }
 // Fecha en hora de Ciudad de México (antes se mostraba la fecha UTC: un

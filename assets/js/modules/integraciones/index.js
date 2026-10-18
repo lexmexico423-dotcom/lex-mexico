@@ -11,7 +11,7 @@ async function initSupabase(){
     // Intento de carga de respaldo si el script principal falló
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
-      s.src = 'https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+      s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.min.js';
       s.onload = resolve;
       s.onerror = () => reject(new Error('No se pudo cargar el SDK de Supabase desde unpkg ni jsdelivr. Desactiva bloqueadores y recarga.'));
       document.head.appendChild(s);

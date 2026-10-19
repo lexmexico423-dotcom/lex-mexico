@@ -1439,7 +1439,7 @@ function _juRenderListaTabla(lista, el){
         .map((h,i) => '<th style="background:var(--surface2);font-family:monospace;font-size:.56rem;letter-spacing:.11em;'
           + 'text-transform:uppercase;color:var(--gold-d);text-align:left;padding:9px 10px;'
           + 'border-bottom:1.5px solid var(--border-l);font-weight:500;'
-          + (i===0?'width:22px;':'') + (i===7?'width:78px;':'') + '">'+h+'</th>').join('')
+          + (i===0?'width:22px;':'') + (i===7?'width:110px;':'') + '">'+h+'</th>').join('')
     + '</tr></thead><tbody>';
 
   conOrden.forEach(({ j, t, e }) => {
@@ -1485,6 +1485,7 @@ function _juRenderListaTabla(lista, el){
       + '<td style="padding:9px 10px;">' + _juPillEstatus(j, idx) + '</td>'
       // acciones + señales
       + '<td style="padding:9px 10px;white-space:nowrap;">'
+        + ((typeof lexBtnLlamada === 'function') ? lexBtnLlamada('jui', j.id, 'margin-right:5px;') : '')
         + '<button onclick="event.stopPropagation();abrirJuicioEdit('+idx+')" title="Editar expediente / cambiar estatus"'
         +   ' style="background:none;border:1px solid var(--border-l);border-radius:5px;cursor:pointer;'
         +   'color:var(--muted);font-size:.75rem;padding:3px 7px;margin-right:5px;"'

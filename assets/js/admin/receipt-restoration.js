@@ -12304,7 +12304,7 @@ function renderCitas(){
         <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-wrap:wrap;">
             <div style="font-weight:700;font-size:0.95rem;color:var(--ink);">${escHTML(c.titulo||'Sin título')}</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">${calLink}${comoLlegarBtn}${editarBtn}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">${(typeof lexBtnLlamada==='function')?lexBtnLlamada('cita',c.id,'border-radius:14px;'):''}${calLink}${comoLlegarBtn}${editarBtn}</div>
           </div>
           ${c.cliente?`<div style="display:flex;align-items:center;gap:6px;font-size:0.82rem;color:var(--ink);font-weight:600;">👤 ${escHTML(c.cliente)}</div>`:''}
           ${c.lugar?`<div style="font-size:0.78rem;color:var(--muted);">📍 ${escHTML(c.lugar)}</div>`:''}

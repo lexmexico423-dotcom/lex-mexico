@@ -191,10 +191,12 @@
       var esAdm = esAdmin();
       var dest = destinoLlamada(x);
       var et = etiquetaLlamadas(x);
+      var ep = (x.categoria === 'placas') ? estadoPlacas(x.folio) : null;
       return '<div class="cob-row" data-f="' + esc(x.folio) + '" style="display:grid;grid-template-columns:52px minmax(0,1fr) 110px 78px ' + (esAdm ? '96px ' : '') + '132px;gap:10px;align-items:center;padding:8px 10px;background:' + (sel ? '#fff8e4' : '#fff') + ';border:1px solid ' + (sel ? '#c8951a' : '#eadfbf') + ';border-radius:7px;margin-bottom:6px;font-size:0.8rem;">'
         + '<span class="cob-folio" data-f="' + esc(x.folio) + '" title="Abrir la ficha del folio ' + esc(x.folio) + '" style="color:#1a4a8a;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">#' + esc(x.folio) + esc(x.letra) + '</span>'
         + '<div style="min-width:0;"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(x.nombre || '(sin nombre)') + '</div>'
         + '<div style="font-size:0.7rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(oracion(x.concepto)) + ' · ' + (x.tel ? esc(x.tel) : '<span style="color:#a32d2d;">sin teléfono</span>') + (x.personas.length > 1 ? ' · <b style="color:#1a4a8a;">👥 ' + x.personas.length + ' personas</b>' : '') + '</div>'
+        + (ep ? '<div style="margin-top:3px;"><span style="display:inline-block;font-size:0.66rem;font-weight:600;border-radius:10px;padding:1px 8px;background:' + ep.fondo + ';color:' + ep.color + ';" title="' + esc(ep.tip || '') + '">' + esc(ep.txt) + '</span></div>' : '')
         + (et ? '<div style="margin-top:3px;"><span style="display:inline-block;font-size:0.66rem;border-radius:10px;padding:1px 8px;background:' + et.fondo + ';color:' + et.color + ';">' + esc(et.txt) + '</span></div>' : '')
         + '</div>'
         + '<span style="text-align:right;font-weight:700;color:#a32d2d;">' + dinero(x.saldo) + '</span>'
@@ -374,6 +376,16 @@
       if (r.tipo === 'promesa') return { txt: '📅 Prometió pagar ' + fCorta(r.fecha), fondo: '#eaf3de', color: '#3b6d11' };
     }
     return null;
+  }
+  // Oct-2026 · Estado del trámite de placas (mismo dato que el avioncito de Pendientes)
+  function estadoPlacas(folio){
+    var ps = [];
+    try { if (typeof D !== 'undefined' && D && Array.isArray(D.pendientes)) ps = D.pendientes; } catch(e){}
+    var p = ps.filter(function(q){ return q && q.seccion === 'placas' && String(q.reciboVinculadoFolio) === String(folio) && !q.resuelto; })[0];
+    if (!p) return null;
+    if (p.enDespacho) return { txt: '✅ Listo para entregar' + (p.enDespachoFecha ? ' · ' + fCorta(p.enDespachoFecha) : ''), fondo: '#e3f3e6', color: '#1b6e2e', tip: p.enDespachoPor ? 'Recibió: ' + p.enDespachoPor : '' };
+    if (p.enviado) return { txt: '🛫 Enviado' + (p.enviadoFecha ? ' · ' + fCorta(p.enviadoFecha) : ''), fondo: '#fdeedc', color: '#b0560a', tip: p.enviadoPor ? 'Envió: ' + p.enviadoPor : '' };
+    return { txt: '✈ Por enviar', fondo: '#e6f1fb', color: '#0c447c', tip: '' };
   }
   // Saldo actual del folio (versión más reciente, sin cancelados)
   function saldoActual(folio){

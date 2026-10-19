@@ -1739,6 +1739,10 @@ async function syncEstadoSupabase(_intentoConcurrencia){
         estado.tareasHoyEliminadas = Array.from(_lap).slice(-3000);
         estado.tareasHoy = estado.tareasHoy.filter(function(t){ return !(t && _lap.has(t.id)); });
         D.tareasHoyEliminadas = estado.tareasHoyEliminadas;
+        // El guardrail de "caída sospechosa" debe comparar contra las tareas del
+        // servidor que NO están borradas (si no, una limpieza legítima de tareas
+        // resueltas viejas bloqueaba todos los guardados).
+        _sbTareasCountGuard = _sbTareasPreSync.filter(function(t){ return !(t && _lap.has(t.id)); }).length;
       })();
       D.cobranzaBitacora = estado.cobranzaBitacora;
       D.tareasHoy        = estado.tareasHoy;

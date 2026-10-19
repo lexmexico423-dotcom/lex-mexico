@@ -1503,6 +1503,67 @@ function _lexFusionarListaPorId(local, remoto){
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// FIX (19-oct-2026, caso real: folio 108 "Listo para entregar" regresó a
+// "Trámite enviado"). Los PENDIENTES se subían tal cual estaban en memoria,
+// sin compararlos con el servidor: una pestaña/computadora con una copia
+// vieja que guardaba cualquier cosa pisaba los cambios recientes de otra
+// sesión (ej. "Recibido en despacho" que marcó la empleada).
+// Ahora, antes de subir, se fusiona contra el servidor usando la "huella"
+// de la última versión que esta pestaña vio del servidor (_lexPendBase):
+//  · si solo cambió el servidor → se toma la del servidor
+//  · si solo cambió local → se queda la local
+//  · si cambiaron los dos → gana la de fechaMod más reciente (empate: local)
+//  · uno nuevo en el servidor que esta pestaña nunca vio → se agrega
+//  · uno que esta pestaña tenía y ya quitó (borrado aquí) → no se resucita
+//  · uno que otra sesión borró y aquí no se tocó → no se vuelve a subir
+// ═══════════════════════════════════════════════════════════════════
+function _lexHuellaPend(p){
+  try { const c = Object.assign({}, p); delete c.fechaMod; return JSON.stringify(c); } catch(e){ return ''; }
+}
+function _lexPendBaseFijar(lista){
+  const m = {};
+  (Array.isArray(lista) ? lista : []).forEach(function(p){ if(p && p.id) m[p.id] = _lexHuellaPend(p); });
+  window._lexPendBase = m;
+}
+function _lexFusionarPendientes(local, remoto){
+  const _local  = Array.isArray(local)  ? local  : [];
+  const _remoto = Array.isArray(remoto) ? remoto : [];
+  const base = window._lexPendBase || null;
+  const delsRec = window._pendsEliminadosRecientemente || {};
+  const mapaR = {};
+  _remoto.forEach(function(r){ if(r && r.id) mapaR[r.id] = r; });
+  const vistos = {}, out = [];
+  _local.forEach(function(p){
+    if(!p || !p.id){ if(p) out.push(p); return; }
+    vistos[p.id] = 1;
+    const r = mapaR[p.id];
+    const hb = base ? base[p.id] : undefined;
+    const hl = _lexHuellaPend(p);
+    if(!r){
+      // No está en el servidor: si aquí no se tocó desde la última vez que se
+      // vio en el servidor, es que otra sesión lo borró → no resucitarlo.
+      if(hb !== undefined && hl === hb) return;
+      out.push(p); return;
+    }
+    const hr = _lexHuellaPend(r);
+    if(hl === hr){ out.push(p); return; }
+    if(hb !== undefined){
+      if(hl === hb){ out.push(r); return; }   // solo cambió el servidor
+      if(hr === hb){ out.push(p); return; }   // solo cambió esta pestaña
+    }
+    const tl = Date.parse(p.fechaMod || 0) || 0, tr = Date.parse(r.fechaMod || 0) || 0;
+    out.push(tr > tl ? r : p);
+  });
+  _remoto.forEach(function(r){
+    if(!r || !r.id || vistos[r.id]) return;
+    if(base && base[r.id] !== undefined) return; // esta pestaña lo tenía y lo quitó
+    if(delsRec[r.id]) return;
+    out.push(r);
+  });
+  return out;
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // GUARDIAS CONTRA PESTAÑAS VIEJAS (2026-10-02, caso real: el corte de
 // caja del 01-oct se borró dos veces). Una pestaña que carga una copia
 // VIEJA del sistema (publicación nueva recién terminada, caché del
@@ -1634,7 +1695,8 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     const _movTombLocal = new Set((Array.isArray(D.movimientos_eliminados) ? D.movimientos_eliminados : []).map(function(t){ return t && t.id; }));
     const movsLimpios = (D.movimientos||[]).filter(m => m && m.id && !/^R-\d+$/.test(m.id) && !_movTombLocal.has(m.id));
     // Filtrar pendientes de placas liquidados antes de subir a Supabase
-    const _pendientesSinLiquidados = (D.pendientes || []).filter(function(p){
+    const _filtrarPendLiquidados = function(lista){ return (lista || []).filter(function(p){
+      if(!p) return false;
       if(p.seccion !== 'placas' || !p.reciboVinculadoFolio) return true;
       var _versSave = (appData.recibos||[]).filter(function(r){ return Number(r.folio) === Number(p.reciboVinculadoFolio); });
       var saldo = _versSave.reduce(function(m,r){
@@ -1644,7 +1706,8 @@ async function syncEstadoSupabase(_intentoConcurrencia){
         return m;
       }, Infinity);
       return _versSave.length > 0 && !_versSave.some(function(r){return r.cancelado;}) && (saldo > 0);
-    });
+    }); };
+    const _pendientesSinLiquidados = _filtrarPendLiquidados(D.pendientes);
     const estado = {
       movimientos:           movsLimpios,
       movimientos_eliminados: (Array.isArray(D.movimientos_eliminados) ? D.movimientos_eliminados : []),
@@ -1761,6 +1824,11 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       // _lexFusionarCierres) — una pestaña vieja ya no puede borrar un corte.
       estado.cierres = _lexFusionarCierres(D.cierres, Array.isArray(_sbDataPreSync.cierres) ? _sbDataPreSync.cierres : []);
       D.cierres = estado.cierres;
+      // Pendientes: fusionar con el servidor antes de subir (ver _lexFusionarPendientes)
+      if (Array.isArray(_sbDataPreSync.pendientes)) {
+        D.pendientes = _lexFusionarPendientes(D.pendientes, _sbDataPreSync.pendientes);
+        estado.pendientes = _filtrarPendLiquidados(D.pendientes);
+      }
       // Fusionar tombstones
       if (_sbTombsPreSync.length > 0) {
         if (!Array.isArray(appData.folios_eliminados)) appData.folios_eliminados = [];
@@ -2058,6 +2126,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     _driveTimestampAlCargar = Date.now();
     _ultimoSyncPropio = Date.now();
     _syncEnCurso = false;
+    try { _lexPendBaseFijar(estado.pendientes); } catch(_eBase){ if(typeof _lexSil==="function")_lexSil(_eBase); }
     syncEnd(true);
     try { if(typeof _pendMovsLimpiar === 'function') _pendMovsLimpiar(_idsSubidosEstaVez); } catch(_ePend){ if(typeof _lexSil==="function")_lexSil(_ePend); }
     lexRealtimeBroadcast();

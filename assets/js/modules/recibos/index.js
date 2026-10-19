@@ -514,6 +514,10 @@ async function sincronizarFolio(forzarSB){
             });
           const _soloLocalesPend = _localPends.filter(function(p){ return p && p.id && !_sbPendIds.has(p.id); });
           D.pendientes = [..._fusionadasPend, ..._soloLocalesPend];
+          // Oct-2026: recordar cómo estaba cada pendiente en el servidor, para
+          // que al subir no se pise un cambio hecho en otra sesión (ver
+          // _lexFusionarPendientes en contabilidad/index.js)
+          try { if (typeof _lexPendBaseFijar === 'function' && Array.isArray(data.data.pendientes)) _lexPendBaseFijar(sbPends); } catch(_eB){ if(typeof _lexSil==="function")_lexSil(_eB); }
           // La numeración de ficha ya NO se guarda ni se reinicia aquí
           // (18/ago/2026) — pasó a ser dinámica, recalculada en cada render
           // de renderPend() según los pendientes activos del momento. Ver

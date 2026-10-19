@@ -5572,7 +5572,7 @@ function escRender(){
             <div style="font-family:serif;font-size:0.95rem;color:${_esCanceladaCard?_colorAcento:'#1a4a8a'};font-weight:800;">${folioRecHtml}</div>
           </div>`:''}
           <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
-            <span style="font-size:0.65rem;font-weight:700;color:${_pillColCard};background:${_pillBgCard};padding:3px 10px;border-radius:12px;white-space:nowrap;">${cfg.lbl}</span>
+            <div style="display:flex;align-items:center;gap:6px;">${(!_esCanceladaCard&&typeof lexBtnLlamada==='function')?lexBtnLlamada('esc',e.id,'','ESCRITURA'+(folioPendiente?' '+folioPendiente:'')+(actoTxt?' · '+actoTxt:'')):''}<span style="font-size:0.65rem;font-weight:700;color:${_pillColCard};background:${_pillBgCard};padding:3px 10px;border-radius:12px;white-space:nowrap;">${cfg.lbl}</span></div>
             <span style="font-family:monospace;font-size:0.62rem;color:var(--muted);">${pct}% completado</span>
           </div>
         </div>

@@ -1492,6 +1492,14 @@ function reloj(){
     // izquierda (sidebar), no se repite aquí.
     var elTopFecha=document.getElementById('topbar-fecha-txt');
     if(elTopFecha) elTopFecha.textContent = dias[d.getDay()]+' '+String(d.getDate()).padStart(2,'0')+' '+meses[d.getMonth()]+' '+d.getFullYear();
+    // Oct-2026: debajo de la fecha, el usuario con el que se ingresó
+    var elTopUsr=document.getElementById('topbar-usuario-txt');
+    if(elTopUsr){
+      var _usrTop='';
+      try{ if(typeof empleadoActual!=='undefined' && empleadoActual) _usrTop=String(empleadoActual.nombre||empleadoActual.email||'').trim(); }catch(_eU){}
+      var _txtUsr=_usrTop ? '👤 '+_usrTop.toUpperCase() : '';
+      if(elTopUsr.textContent!==_txtUsr) elTopUsr.textContent=_txtUsr;
+    }
     // Sincronizar hora en panel de recibo (tiempo real)
     var elHoraRecibo=document.getElementById('hora_recibo_display');
     var elHoraHidden=$('hora_recibo');

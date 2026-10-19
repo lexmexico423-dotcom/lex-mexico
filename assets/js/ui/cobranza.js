@@ -386,7 +386,7 @@
     var c = { folio: x.folio, letra: x.letra, nombre: p.nombre || x.nombre, tel: p.tel, saldo: x.saldo, tramite: nombreTramite(x.concepto) };
     var tNueva = tareaLlamada(c, '', 1);
     tareas().unshift(tNueva);
-    anotar(c.folio, 'llamada', 'Llamada pedida a ' + c.nombre + ' (' + c.tel + ')', { tareaId: tNueva.id });
+    anotar(c.folio, 'llamada', 'Se ordenó llamar a ' + c.nombre + ' (' + c.tel + ')', { tareaId: tNueva.id });
     guardarTareas();
     if (typeof toast === 'function') toast('📞 Tarea creada en "Tareas para hoy": llamar a ' + c.nombre, 'ok');
     render();
@@ -616,7 +616,7 @@
       + (bs.length ? bs.map(function(b){
           return '<div style="display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid #eadfbf;border-radius:7px;padding:7px 10px;margin-bottom:6px;font-size:0.78rem;color:#2a1c08;">'
             + '<span style="font-size:1rem;line-height:1.2;">' + (ico[b.tipo] || '•') + '</span>'
-            + '<div style="flex:1;min-width:0;"><div>' + esc(b.texto) + '</div><div style="font-size:0.66rem;color:#9a6e18;margin-top:2px;">' + esc(hora(b.fecha)) + ' · ' + esc(b.por || '') + '</div></div></div>';
+            + '<div style="flex:1;min-width:0;"><div>' + esc(String(b.texto || '').replace(/^Llamada pedida a /, 'Se ordenó llamar a ')) + '</div><div style="font-size:0.66rem;color:#9a6e18;margin-top:2px;">' + esc(hora(b.fecha)) + ' · ' + esc(b.por || '') + '</div></div></div>';
         }).join('') : '<div style="text-align:center;color:#7a6a4a;padding:24px;font-size:0.8rem;">Todavía no hay movimientos de cobranza en este folio.</div>')
       + '</div></div>';
     document.body.appendChild(ov);

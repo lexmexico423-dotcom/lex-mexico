@@ -152,6 +152,11 @@ async function detectarEmpleado(){
     if(monitorBtn){
       monitorBtn.style.display = esAdminUI ? '' : 'none';
     }
+    // "💰 Cobranza" — saldos por cobrar y textos de recordatorio, solo administrador
+    const cobranzaBtn = document.getElementById('btnContabCobranza');
+    if(cobranzaBtn){
+      cobranzaBtn.style.display = esAdminUI ? '' : 'none';
+    }
     console.log('✓ Empleado activo:', empleadoActual.nombre, '(' + empleadoActual.email + ')');
   }
 }
@@ -4312,7 +4317,8 @@ function _forzarCierreSesionPorDeshabilitado(){
   localStorage.removeItem('empleado_email');
   localStorage.removeItem('empleado_nombre');
   try{ if(typeof lexRealtimeDesconectar === 'function') lexRealtimeDesconectar(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
-  alert('Tu acceso fue deshabilitado por el administrador. Tu sesión se cerrará ahora.');
+  // Aviso nativo a propósito: detiene todo hasta que se lea, porque luego se recarga
+  (window._alertNativo || alert)('Tu acceso fue deshabilitado por el administrador. Tu sesión se cerrará ahora.');
   location.reload();
 }
 

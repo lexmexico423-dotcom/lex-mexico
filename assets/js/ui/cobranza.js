@@ -314,7 +314,35 @@
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
   var MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-  function fCorta(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? (+m[3]) + '-' + MESES[+m[2] - 1] : ''; }
+  var MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  var DIAS_L = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  function fLarga(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); if (!m) return ''; var d = new Date(+m[1], +m[2] - 1, +m[3]); return DIAS_L[d.getDay()] + ' ' + (+m[3]) + ' de ' + MESES_L[+m[2] - 1]; }
+  // Oct-2026: títulos/textos de promesas con la FECHA explícita (antes decía
+  // "HOY" y confundía mientras la tarea esperaba en Programadas)
+  // El título cambia solo según el día: antes → "PROMESA DE PAGO · 3-NOV";
+  // ese día → "HOY SE COMPROMETIÓ A PAGAR"; después → "PROMESA VENCIDA".
+  function momentoPromesa(fecha){ var h = hoyStr(0); return fecha > h ? 'antes' : (fecha === h ? 'hoy' : 'vencida'); }
+  function tituloPromesa(c, fecha, esAbono){
+    var mo = momentoPromesa(fecha), folio = ' · FOLIO ' + c.folio + (c.letra || '') + ' — ' + String(c.nombre).toUpperCase();
+    if (mo === 'hoy') return (esAbono ? '💵 HOY SE COMPROMETIÓ A ABONAR' : '💰 HOY SE COMPROMETIÓ A PAGAR') + folio;
+    if (mo === 'vencida') return '⚠ ' + (esAbono ? 'PROMESA DE ABONO VENCIDA · ' : 'PROMESA DE PAGO VENCIDA · ') + fCorta(fecha).toUpperCase() + folio;
+    return (esAbono ? '💵 PROMESA DE ABONO · ' : '💰 PROMESA DE PAGO · ') + fCorta(fecha).toUpperCase() + folio;
+  }
+  function textoPromesa(c, fecha, esAbono, llamada, nota){
+    var mo = momentoPromesa(fecha), acc = esAbono ? 'abonar' : 'liquidar';
+    var frase = mo === 'hoy' ? 'Se comprometió a venir a ' + acc + ' HOY, ' + fLarga(fecha)
+      : mo === 'vencida' ? 'Se comprometió a venir a ' + acc + ' el ' + fLarga(fecha) + ' y no ha venido'
+      : 'Se comprometió a venir a ' + acc + ' el ' + fLarga(fecha);
+    var cierre = mo === 'hoy' ? 'Si no viene antes de cerrar, llamarle.' : mo === 'vencida' ? 'Llamarle para preguntar qué pasó y pedir nueva fecha.' : 'Si ese día no viene antes de cerrar, llamarle.';
+    return frase + (llamada ? ' (llamada del ' + fCorta(llamada) + ')' : '') + '. ' + (esAbono ? 'Saldo total: ' : 'Saldo: ') + dinero(c.saldo) + ' · Tel. ' + c.tel + '.' + (nota ? '\nNota: ' + nota : '') + '\n' + cierre;
+  }
+  function fCorta(iso){
+    var t = String(iso || '');
+    // Fecha con hora (ISO en UTC): se usa el día LOCAL de México, no el de UTC
+    // (antes una llamada pedida a las 23:56 del 18-oct aparecía como 19-oct)
+    if (/T\d{2}:\d{2}/.test(t)) { var d = new Date(t); if (!isNaN(d)) return d.getDate() + '-' + MESES[d.getMonth()]; }
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(t); return m ? (+m[3]) + '-' + MESES[+m[2] - 1] : '';
+  }
   function quien(){
     try { if (typeof empleadoActual !== 'undefined' && empleadoActual && empleadoActual.nombre) return empleadoActual.nombre; } catch(e){}
     return (typeof NOMBRE_TITULAR !== 'undefined') ? NOMBRE_TITULAR : '';
@@ -430,6 +458,31 @@
     return cambio;
   }
   window._cobranzaRevisarPagos = revisarPagos;
+  window._cobranzaCorregirTextos = function(){ return corregirTextosHoy(); };
+  function corregirTextosHoy(){
+    var cambio = false, MESNUM = {};
+    MESES.forEach(function(m, i){ MESNUM[m] = i; });
+    tareas().forEach(function(t){
+      if (!t || t.tipo !== 'cobranza-promesa' || t.estado === 'resuelta' || !t.cobranza || !t.fechaProgramada) return;
+      var tit = String(t.titulo || '');
+      // Solo títulos generados por el sistema (no se tocan los que alguien reescribió a mano)
+      if (!/^(💰 HOY SE COMPROMETIÓ A PAGAR|💵 HOY SE COMPROMETIÓ A ABONAR|💰 PROMESA DE PAGO|💵 PROMESA DE ABONO|⚠ PROMESA DE (PAGO|ABONO) VENCIDA)/.test(tit)) return;
+      var esAb = t.subtipo === 'abono';
+      var nuevo = tituloPromesa(t.cobranza, t.fechaProgramada, esAb);
+      if (nuevo === tit) return;
+      var txt = String(t.texto || '');
+      var llam = t.llamadaFecha || '';
+      if (!llam) { var m = /llamada del (\d{1,2})-([a-z]{3})\)/.exec(txt); if (m && MESNUM[m[2]] != null) { var y = new Date().getFullYear(); llam = y + '-' + String(MESNUM[m[2]] + 1).padStart(2, '0') + '-' + String(+m[1]).padStart(2, '0'); } }
+      var notaM = /\nNota: ([^\n]*)/.exec(txt);
+      t.titulo = nuevo;
+      t.texto = textoPromesa(t.cobranza, t.fechaProgramada, esAb, llam, t.nota || (notaM ? notaM[1] : ''));
+      t.fechaMod = new Date().toISOString();
+      cambio = true;
+    });
+    if (cambio) guardarTareas();
+  }
+  setTimeout(function(){ try { corregirTextosHoy(); } catch(e){} }, 12000);
+  setInterval(function(){ try { corregirTextosHoy(); } catch(e){} }, 120000);
   setInterval(function(){ try { revisarPagos(); } catch(e){} }, 120000);
   setTimeout(function(){ try { revisarPagos(); } catch(e){} }, 15000);
 
@@ -449,7 +502,7 @@
       + '<div style="padding:14px 16px;">'
       + '<div style="font-weight:600;font-size:0.86rem;margin-bottom:10px;color:#2a1c08;">' + esc(c.nombre) + ' · ' + esc(c.tel) + '</div>'
       + opc('promesa', 'Prometió liquidar todo el', ' <input type="date" id="cob-res-fecha" min="' + hoyStr(0) + '" value="' + hoyStr(1) + '" style="margin-left:4px;border:1px solid #c8951a;border-radius:5px;padding:2px 6px;font-size:0.8rem;">')
-      + opc('abono', 'Prometió abonar el', ' <input type="date" id="cob-res-fecha-ab" min="' + hoyStr(0) + '" value="' + hoyStr(1) + '" style="margin-left:4px;border:1px solid #c8951a;border-radius:5px;padding:2px 6px;font-size:0.8rem;"> <span style="font-size:0.78rem;">por $</span><input type="number" id="cob-res-monto" min="1" step="0.01" placeholder="monto" style="width:86px;border:1px solid #c8951a;border-radius:5px;padding:2px 6px;font-size:0.8rem;">')
+      + opc('abono', 'Prometió abonar el', ' <input type="date" id="cob-res-fecha-ab" min="' + hoyStr(0) + '" value="' + hoyStr(1) + '" style="margin-left:4px;border:1px solid #c8951a;border-radius:5px;padding:2px 6px;font-size:0.8rem;">')
       + opc('no-contesto', 'No contestó', ' <span style="font-size:0.7rem;color:#7a6a4a;">(se crea otra tarea para mañana)</span>')
       + opc('numero', 'Número equivocado o sin servicio')
       + opc('ya-pago', 'Ya pagó / dice que ya pagó')
@@ -462,8 +515,8 @@
     document.body.appendChild(ov);
     var fechaInp = ov.querySelector('#cob-res-fecha');
     fechaInp.addEventListener('focus', function(){ ov.querySelector('input[value="promesa"]').checked = true; });
-    var fechaAb = ov.querySelector('#cob-res-fecha-ab'), montoAb = ov.querySelector('#cob-res-monto');
-    [fechaAb, montoAb].forEach(function(el){ el.addEventListener('focus', function(){ ov.querySelector('input[value="abono"]').checked = true; }); });
+    var fechaAb = ov.querySelector('#cob-res-fecha-ab');
+    fechaAb.addEventListener('focus', function(){ ov.querySelector('input[value="abono"]').checked = true; });
     ov.querySelector('#cob-res-cancel').onclick = function(){ ov.remove(); };
     ov.querySelector('#cob-res-ok').onclick = function(){
       var sel = ov.querySelector('input[name="cob-res"]:checked');
@@ -472,10 +525,8 @@
       var err = ov.querySelector('#cob-res-err');
       if (!tipo) { err.textContent = 'Elige qué pasó en la llamada.'; err.style.display = 'block'; return; }
       var fecha = tipo === 'abono' ? fechaAb.value : fechaInp.value;
-      var monto = tipo === 'abono' ? (parseFloat(montoAb.value) || 0) : 0;
+      var monto = 0; // Oct-2026 (a petición): el abono prometido ya no lleva monto
       if ((tipo === 'promesa' || tipo === 'abono') && (!fecha || fecha < hoyStr(0))) { err.textContent = 'Elige la fecha que prometió (hoy o después).'; err.style.display = 'block'; return; }
-      if (tipo === 'abono' && montoAb.value && !(monto > 0)) { err.textContent = 'El monto del abono debe ser mayor a cero (o déjalo vacío).'; err.style.display = 'block'; return; }
-      if (tipo === 'abono' && monto > (Number(c.saldo) || 0) + 0.005) { err.textContent = 'El abono no puede ser mayor al saldo (' + dinero(c.saldo) + '). Si va a pagar todo, elige "Prometió liquidar todo".'; err.style.display = 'block'; return; }
       var ahora = new Date().toISOString();
       t.estado = 'resuelta'; t.fechaResolucion = ahora; t.fechaMod = ahora;
       var conFecha = (tipo === 'promesa' || tipo === 'abono');
@@ -486,16 +537,16 @@
       if (tipo === 'promesa') {
         tareas().unshift({
           id: nuevoId(), tipo: 'cobranza-promesa',
-          titulo: '💰 HOY SE COMPROMETIÓ A PAGAR · FOLIO ' + c.folio + (c.letra || '') + ' — ' + String(c.nombre).toUpperCase(),
-          texto: 'Se comprometió a venir a liquidar hoy (llamada del ' + fCorta(hoyStr(0)) + '). Saldo: ' + dinero(c.saldo) + ' · Tel. ' + c.tel + '.' + (nota ? '\nNota: ' + nota : '') + '\nSi no viene antes de cerrar, llamarle.',
+          titulo: tituloPromesa(c, fecha, false),
+          texto: textoPromesa(c, fecha, false, hoyStr(0), nota), llamadaFecha: hoyStr(0), nota: nota,
           estado: 'pendiente', fechaProgramada: fecha, creadoPor: quien(), fechaCreacion: ahora, fechaResolucion: '', fechaMod: ahora,
           cobranza: Object.assign({}, c)
         });
       } else if (tipo === 'abono') {
         tareas().unshift({
           id: nuevoId(), tipo: 'cobranza-promesa', subtipo: 'abono',
-          titulo: '💵 HOY SE COMPROMETIÓ A ABONAR' + (monto ? ' ' + dinero(monto) : '') + ' · FOLIO ' + c.folio + (c.letra || '') + ' — ' + String(c.nombre).toUpperCase(),
-          texto: 'Se comprometió a venir a abonar ' + (monto ? dinero(monto) + ' ' : '') + 'hoy (llamada del ' + fCorta(hoyStr(0)) + '). Saldo total: ' + dinero(c.saldo) + ' · Tel. ' + c.tel + '.' + (nota ? '\nNota: ' + nota : '') + '\nSi no viene antes de cerrar, llamarle.',
+          titulo: tituloPromesa(c, fecha, true),
+          texto: textoPromesa(c, fecha, true, hoyStr(0), nota), llamadaFecha: hoyStr(0), nota: nota,
           estado: 'pendiente', fechaProgramada: fecha, creadoPor: quien(), fechaCreacion: ahora, fechaResolucion: '', fechaMod: ahora,
           cobranza: Object.assign({}, c, { montoPrometido: monto || 0 })
         });
@@ -642,6 +693,7 @@
     }
     ov.style.display = 'flex';
     try { revisarPagos(); } catch(e){}
+    try { corregirTextosHoy(); } catch(e){}
     render();
   };
   window.cerrarCobranza = function(){

@@ -2,6 +2,18 @@
  * Funciones extraídas sin modificar su contenido.
  */
 
+// Oct-2026: tipo de trámite vehicular a partir del concepto del recibo.
+// Antes, cualquier concepto que no dijera baja/cambio/tarjeta/reemplacamiento
+// quedaba como "Alta de placas" (caso real: folio 132 "Copia de factura de
+// origen" aparecía en Pendientes como "Alta de placas"). Ahora solo es "alta"
+// si el concepto habla de alta/placas; si no, queda como trámite vehicular
+// genérico ('otro') y el pendiente usa el concepto real como título.
+function _lexTipoVehBase(concepto){
+  var c = String(concepto || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/canje|reemplac/.test(c)) return 'reemplacamiento';
+  if (/\balta\b|placa|emplac/.test(c)) return 'alta';
+  return 'otro';
+}
 function generarQRPreview(){
   const div=document.getElementById('qr-preview'); div.innerHTML='';
   const folio=folioFormato(appData.folioActual);
@@ -769,7 +781,7 @@ async function guardarRecibo(){
           try {
             // Detectar tipo de trámite vehicular desde el primer concepto
             const concepto0 = (_concepto0 || '').toLowerCase();
-            let tipoVeh = 'alta';
+            let tipoVeh = _lexTipoVehBase(concepto0);
             if (concepto0.includes('reemplac'))               tipoVeh = 'reemplacamiento';
             else if (concepto0.includes('baja'))              tipoVeh = 'baja';
             else if (concepto0.includes('cambio') || concepto0.includes('propiet')) tipoVeh = 'cambio_propietario';

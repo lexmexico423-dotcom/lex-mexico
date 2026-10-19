@@ -152,10 +152,11 @@ async function detectarEmpleado(){
     if(monitorBtn){
       monitorBtn.style.display = esAdminUI ? '' : 'none';
     }
-    // "💰 Cobranza" — saldos por cobrar y textos de recordatorio, solo administrador
+    // "💰 Cobranza" — saldos por cobrar y textos de recordatorio.
+    // Oct-2026 (a petición expresa): visible también para la empleada.
     const cobranzaBtn = document.getElementById('btnContabCobranza');
     if(cobranzaBtn){
-      cobranzaBtn.style.display = esAdminUI ? '' : 'none';
+      cobranzaBtn.style.display = '';
     }
     console.log('✓ Empleado activo:', empleadoActual.nombre, '(' + empleadoActual.email + ')');
   }
@@ -6897,7 +6898,7 @@ function adminCrearPendientePlacas(folio, letra) {
   var concepto0 = (r.conceptos && r.conceptos[0]) ? (r.conceptos[0].concepto||'') : '';
   var desc0     = (r.conceptos && r.conceptos[0]) ? (r.conceptos[0].descripcion||'') : '';
   var concDesc  = [concepto0, desc0].filter(Boolean).join(' — ');
-  var tipoVeh = 'alta';
+  var tipoVeh = (typeof _lexTipoVehBase === 'function') ? _lexTipoVehBase(concepto0) : 'alta';
   var c0lower = concepto0.toLowerCase();
   if (c0lower.includes('reemplac'))                                tipoVeh = 'reemplacamiento';
   else if (c0lower.includes('baja'))                              tipoVeh = 'baja';

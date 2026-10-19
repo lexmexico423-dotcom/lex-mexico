@@ -1230,7 +1230,7 @@ async function guardarRestauracion(){
         const idPend = 'PEND-REC-' + folio;
         if(!D.pendientes.some(p => p.id === idPend)){
           const conc0 = (conceptos[0]?.concepto||'').toLowerCase();
-          let tipoVeh = 'alta';
+          let tipoVeh = (typeof _lexTipoVehBase === 'function') ? _lexTipoVehBase(conc0) : 'alta';
           if(conc0.includes('reemplac'))                                    tipoVeh = 'reemplacamiento';
           else if(conc0.includes('baja'))                                   tipoVeh = 'baja';
           else if(conc0.includes('cambio')||conc0.includes('propiet'))      tipoVeh = 'cambio_propietario';
@@ -8250,6 +8250,20 @@ function sincronizarPendientesPlacas() {
         _pendExist.fechaResolucion = '';
         creados++;
       }
+      // Oct-2026: corregir pendientes automáticos que quedaron como "Alta de
+      // placas" aunque el concepto del recibo era otro (p. ej. copia de factura)
+      if (typeof _lexTipoVehBase === 'function' && _pendExist.id === idPend && _pendExist.tipoVehicular === 'alta'
+          && /^Alta de placas — /.test(String(_pendExist.texto || ''))) {
+        var _cFix = (r.conceptos && r.conceptos[0]) ? (r.conceptos[0].concepto || '') : '';
+        if (_cFix && _lexTipoVehBase(_cFix) !== 'alta') {
+          var _nomFix = String(_pendExist.texto).replace(/^Alta de placas — /, '');
+          _pendExist.tipoVehicular = _lexTipoVehBase(_cFix);
+          _pendExist.texto = _cFix + ' — ' + _nomFix;
+          _pendExist.descripcionPlacas = _cFix;
+          _pendExist.fechaMod = new Date().toISOString();
+          creados++;
+        }
+      }
       // Si el pendiente perdió (o nunca tuvo) los archivos que ya están
       // ligados al recibo, recuperarlos (caso folio 121).
       if (typeof _placasHeredarDocsDelRecibo === 'function' && _placasHeredarDocsDelRecibo(_pendExist)) creados++;
@@ -8260,7 +8274,7 @@ function sincronizarPendientesPlacas() {
     if (_listaNegraPlacas.indexOf(String(folio)) >= 0) return;
     // Detectar tipo de trámite vehicular desde el primer concepto
     const conc0 = ((r.conceptos && r.conceptos[0]) ? (r.conceptos[0].concepto || '') : '').toLowerCase();
-    let tipoVeh = 'alta';
+    let tipoVeh = (typeof _lexTipoVehBase === 'function') ? _lexTipoVehBase(conc0) : 'alta';
     if (conc0.includes('reemplac'))                                     tipoVeh = 'reemplacamiento';
     else if (conc0.includes('baja'))                                    tipoVeh = 'baja';
     else if (conc0.includes('cambio') || conc0.includes('propiet'))     tipoVeh = 'cambio_propietario';
@@ -8271,9 +8285,13 @@ function sincronizarPendientesPlacas() {
     const origen  = r.origen  || (r.vehiculo && r.vehiculo.estado) || '';
     const marca   = r.marca   || (r.vehiculo && r.vehiculo.marca)  || '';
     const clase   = r.clase   || (r.vehiculo && r.vehiculo.clase)  || '';
+    // Título = concepto real del recibo (igual que los demás caminos de alta)
+    const _c0txt = (r.conceptos && r.conceptos[0]) ? (r.conceptos[0].concepto || '') : '';
+    const _d0txt = (r.conceptos && r.conceptos[0]) ? (r.conceptos[0].descripcion || '') : '';
+    const _concDescS = [_c0txt, _d0txt].filter(Boolean).join(' — ');
     D.pendientes.unshift({
       id: idPend,
-      texto: tipoLbl + ' — ' + nombre + (placa ? ' (' + placa + ')' : ''),
+      texto: (_concDescS ? _concDescS + ' — ' + nombre : tipoLbl + ' — ' + nombre) + (placa ? ' (' + placa + ')' : ''),
       persona: nombre,
       categoria: 'Placas',
       seccion: 'placas',
@@ -13665,7 +13683,7 @@ function renderTareasHoyLista(){
       + '<div style="display:flex;align-items:center;gap:10px;">'+checkSel+circulo+fichaHtml
       + '<div style="font-size:13.5px;font-weight:600;font-family:\'Outfit\',sans-serif;letter-spacing:0.025em;text-transform:uppercase;opacity:0.92;'+tituloEstilo+'">👤 '+_negritaRoja(esc(t.titulo||'(sin título)'))+'</div></div>'
       + badge + '</div>'
-      + (t.texto ? '<div style="margin:6px 0 0 30px;font-size:0.78rem;color:var(--ink);">'+_negritaRoja(esc(t.texto))+'</div>' : '')
+      + (t.texto ? '<div style="margin:6px 0 0 30px;font-size:0.78rem;color:var(--ink);white-space:pre-line;">'+_negritaRoja(esc(t.texto))+'</div>' : '')
       + ((t.documentos && t.documentos.length) ? '<div style="margin:6px 0 0 30px;display:flex;flex-wrap:wrap;gap:4px;">'+t.documentos.map(function(d,di){ return _tareaDocChip(t.id,d,di); }).join('')+'</div>' : '')
       + acciones
       + '</div>'

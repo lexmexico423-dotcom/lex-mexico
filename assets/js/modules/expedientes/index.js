@@ -2159,7 +2159,8 @@ function _verDetallePendiente(idx){
     'alta':'Alta de placas','baja':'Baja de placas',
     'cambio_propietario':'Cambio de propietario',
     'tarjeta_circulacion':'Tarjeta de circulación',
-    'reemplacamiento':'Reemplacamiento'
+    'reemplacamiento':'Reemplacamiento',
+    'otro':'Trámite vehicular'
   };
   const priColor={'urgente':'#c0161a','medio':'#b07010','normal':'#1a7a3a'};
   const priDot={'urgente':'#c0161a','medio':'#d4900a','normal':'#1a9a4a'};

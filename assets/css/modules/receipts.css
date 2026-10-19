@@ -1135,3 +1135,18 @@
 }
 /* En modo congelado, ocultar sugerencias IA solo en modo actualización */
 body.recibo-frozen.modo-actualizacion .ia-sugerencia { display: none !important; }
+
+/* ── Oct-2026: pantallas angostas — que nada se salga en Consulta de folio ──
+   Los botones de pago, la barra "Consultar folios / Vincular / Fecha / Hora"
+   y la Ficha del Folio se acomodan en varias líneas cuando no caben, en vez de
+   salirse por los lados. En pantallas anchas se ven exactamente igual. */
+#header-pago-btns { flex-wrap: wrap; row-gap: 8px; padding: 0 8px; }
+#panel-busqueda-cliente > div:first-child { flex-wrap: wrap; row-gap: 8px; }
+#modal-ficha-folio > div {
+  width: min(100%, max(675px, min(935px, calc(100vw - var(--sidebar-w) - 305px)))) !important;
+  flex-wrap: wrap !important;
+}
+#modal-ficha-folio > div > div:first-child { flex: 1 1 560px !important; min-width: 0 !important; }
+#modal-ficha-folio > div > div:nth-child(2) { flex: 1 1 200px !important; }
+#ficha-recibos-lista { overflow-x: auto; }
+#ficha-recibos-lista > div { min-width: 540px; }

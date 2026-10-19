@@ -10800,20 +10800,13 @@ function ocrModGetExtra(){
 function ocrModTab(tab, el){
   // Mostrar botón de conectar Drive si no hay refresh token
   if(tab === 'drive'){
-    const hasRefresh = !!localStorage.getItem('lex-drive-refresh-token');
+    // Oct-2026: el estado de Drive se pregunta al servidor (el permiso
+    // permanente ya no se descarga al navegador).
     const hasManual  = !!ocrModGetDriveToken();
     const connectBtn = document.getElementById('ocr-drive-connect-btn');
-    if(connectBtn) connectBtn.style.display = (!hasRefresh && !hasManual) ? 'block' : 'none';
-  }
-  // Cargar refresh token de Supabase si no está en localStorage
-  if(tab === 'drive' && !localStorage.getItem('lex-drive-refresh-token') && window.SB){
-    window.SB.from('configuracion').select('valor').eq('id','drive_refresh_token').single()
-      .then(({data,error}) => {
-        if(!error && data && data.valor){
-          try{ localStorage.setItem('lex-drive-refresh-token', data.valor); } catch(e){ registrarError('localStorage.setItem', e); }
-ocrModActualizarDrive();
-        }
-      }).catch((e)=>{ registrarError('Promise catch vacio', e); });
+    _driveEstado().then(function(conectado){
+      if(connectBtn) connectBtn.style.display = (!conectado && !hasManual) ? 'block' : 'none';
+    });
   }
   // Actualizar estilo de los botones
   const btnSubir = document.getElementById('ocr-btn-subir');
@@ -10842,17 +10835,8 @@ async function ocrModActualizarDrive(){
   const el  = document.getElementById('ocr-dst');
   const txt = document.getElementById('ocr-dst-txt');
   if(!el) return;
-  let refresh = localStorage.getItem('lex-drive-refresh-token');
-  // Si no hay en localStorage, buscar en Supabase
-  if(!refresh && window.SB){
-    try{
-      const {data, error} = await window.SB.from('configuracion').select('valor').eq('id','drive_refresh_token').single();
-      if(!error && data && data.valor){
-        refresh = data.valor;
-        try{ localStorage.setItem('lex-drive-refresh-token', refresh); } catch(e){ registrarError('localStorage.setItem', e); }
-}
-    }catch(e){ registrarError('catch vacio', e); }
-  }
+  // Oct-2026: se pregunta al servidor si Drive está conectado (sin descargar el permiso)
+  const refresh = await _driveEstado();
   const manual  = ocrModGetDriveToken();
   if(refresh){
     el.className = 'ocr-drive-st on';
@@ -11869,6 +11853,23 @@ const DRIVE_CLIENT_ID     = '331190113413-cc7vvh3uujh06rnsmta20vlkidpt38i3.apps.
 const DRIVE_REDIRECT_URI  = window.LEX_PUBLIC_CONFIG.googleOAuthRedirectUri;
 // El Client Secret de Google YA NO vive aquí — se movió al Worker de Cloudflare
 // (endpoints /drive/refresh y /drive/exchange) para que nunca viaje al navegador.
+// Oct-2026: ¿Drive conectado? Se pregunta al Worker (no revela el permiso).
+// Si el Worker anterior sigue publicado (sin /drive/estado), se usa la copia
+// local como antes. Con el Worker nuevo se borra la copia local del permiso.
+let _driveEstadoCache = null, _driveEstadoTs = 0;
+async function _driveEstado(){
+  if(_driveEstadoCache !== null && Date.now() - _driveEstadoTs < 60000) return _driveEstadoCache;
+  try{
+    const r = await fetch(R2_WORKER + '/drive/estado', { headers: { 'X-Auth-Token': await _r2AuthToken() } });
+    if(r.ok){
+      const j = await r.json().catch(()=>({}));
+      _driveEstadoCache = !!j.conectado; _driveEstadoTs = Date.now();
+      try{ localStorage.removeItem('lex-drive-refresh-token'); localStorage.removeItem('lex-drive-refresh-pendiente-sync'); }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+      return _driveEstadoCache;
+    }
+  }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+  return !!localStorage.getItem('lex-drive-refresh-token');
+}
 // Obtener Access Token válido — renueva automáticamente si expiró
 async function driveGetAccessToken(){
   // Siempre intentar renovar primero si el token guardado tiene más de 50 min
@@ -11877,33 +11878,37 @@ async function driveGetAccessToken(){
   const age      = Date.now() - savedAt;
   const MAX_AGE  = 50 * 60 * 1000; // 50 minutos
   if(saved && age < MAX_AGE) return saved; // Token reciente, usarlo directo
-  // Obtener Refresh Token: siempre desde Supabase (fuente de verdad)
-  let refresh = '';
-  if(window.SB){
-    try{
-      const {data, error} = await window.SB.from('configuracion').select('valor').eq('id','drive_refresh_token').single();
-      if(!error && data && data.valor){
-        refresh = data.valor;
-        try{ localStorage.setItem('lex-drive-refresh-token', refresh); } catch(e){ registrarError('localStorage.setItem', e); }
-console.log('[Drive] Refresh token cargado desde Supabase');
-      }
-    }catch(e){ console.warn('[Drive] No se pudo cargar refresh token de Supabase:', e.message); }
-  }
-  // Fallback a localStorage si Supabase no responde
-  if(!refresh) refresh = localStorage.getItem('lex-drive-refresh-token') || '';
-  if(!refresh) return saved || '';
   try{
-    // El intercambio con Google ahora lo hace el Worker — el Client Secret
-    // de Google ya no vive en el navegador, solo en Cloudflare (env secret).
-    const resp = await fetch(R2_WORKER+'/drive/refresh', {
+    // Oct-2026: el permiso permanente de Drive (refresh token) ya NO pasa por
+    // el navegador: el Worker lo lee de Supabase con su llave de servidor y
+    // solo regresa un acceso temporal (1 hora). Así la empleada nunca lo ve.
+    let resp = await fetch(R2_WORKER+'/drive/refresh', {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-Auth-Token': await _r2AuthToken()},
-      body: JSON.stringify({
-        client_id:     DRIVE_CLIENT_ID,
-        refresh_token: refresh
-      })
+      body: JSON.stringify({ client_id: DRIVE_CLIENT_ID })
     });
-    const data = await resp.json().catch(()=>({}));
+    let data = await resp.json().catch(()=>({}));
+    // Compatibilidad mientras el Worker anterior siga publicado (pedía el
+    // permiso en la petición): se usa el método anterior una sola vez.
+    if(!resp.ok && data && data.error === 'Falta refresh_token' && window.SB){
+      let refresh = '';
+      try{
+        const r0 = await window.SB.from('configuracion').select('valor').eq('id','drive_refresh_token').single();
+        if(!r0.error && r0.data && r0.data.valor) refresh = r0.data.valor;
+      }catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+      if(!refresh) refresh = localStorage.getItem('lex-drive-refresh-token') || '';
+      if(!refresh) return saved || '';
+      resp = await fetch(R2_WORKER+'/drive/refresh', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-Auth-Token': await _r2AuthToken()},
+        body: JSON.stringify({ client_id: DRIVE_CLIENT_ID, refresh_token: refresh })
+      });
+      data = await resp.json().catch(()=>({}));
+    }
+    if(!resp.ok && data && data.error === 'Drive no está conectado'){
+      _driveMarcarDesconectado('Drive no está conectado');
+      return saved || '';
+    }
     if(resp.ok && data.access_token && !data.error){
       try{ localStorage.setItem('lex-drive-token',          data.access_token); } catch(e){ registrarError('localStorage.setItem', e); }
 try{ localStorage.setItem('lex-drive-token-saved-at', String(Date.now())); } catch(e){ registrarError('localStorage.setItem', e); }
@@ -11978,7 +11983,7 @@ function _driveSyncRefreshPendiente(){
 }
 // Guardar Refresh Token (se llama una vez al completar el flujo OAuth)
 function driveSaveRefreshToken(refreshToken, accessToken, expiresIn){
-  if(refreshToken) try{ localStorage.setItem('lex-drive-refresh-token', refreshToken); } catch(e){ registrarError('localStorage.setItem', e); }
+  // Oct-2026: el permiso permanente ya no se guarda en el navegador (vive en el servidor)
 if(accessToken){
     try{ localStorage.setItem('lex-drive-access-token', accessToken); } catch(e){ registrarError('localStorage.setItem', e); }
 try{ localStorage.setItem('lex-drive-token-expiry', String(Date.now() + (expiresIn||3600)*1000)); } catch(e){ registrarError('localStorage.setItem', e); }
@@ -12055,7 +12060,18 @@ async function _driveCompletarExchange(code){
       })
     });
     const data = await resp.json();
-    if(data.refresh_token){
+    // Oct-2026: el Worker nuevo guarda el permiso en el servidor y responde
+    // refresh_guardado:true (ya no lo manda al navegador).
+    if(data.refresh_guardado && data.access_token){
+      driveSaveRefreshToken(null, data.access_token, data.expires_in);
+      try{ localStorage.setItem('lex-ocr-drive-token', data.access_token); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+      try{ localStorage.setItem('drive_token', data.access_token); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
+      _driveEstadoCache = true; _driveEstadoTs = Date.now();
+      if(typeof toast==='function') toast('✅ Drive conectado permanentemente — ya no necesitas tokens manuales','ok');
+      window._driveNecesitaReconexion = false;
+      window._driveAvisoMostrado = false;
+      setTimeout(ocrModActualizarDrive, 500);
+    } else if(data.refresh_token){
       driveSaveRefreshToken(data.refresh_token, data.access_token, data.expires_in);
       // Guardar refresh token en Supabase. Con la ventana emergente la sesión
       // de la pestaña principal ya está garantizada (nunca se movió de

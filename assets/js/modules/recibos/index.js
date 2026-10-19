@@ -9378,6 +9378,13 @@ function abrirFichaFolio(){
   // Actualizar display del botón retro según estado actual
   if(typeof fichaRetroActualizarDisplay === 'function') fichaRetroActualizarDisplay();
 
+  // Oct-2026 · 📞 Mandar llamada de AVISO (no de cobro) — solo administrador,
+  // en folios abiertos: con saldo pendiente o sin costo pactado aún abiertos.
+  try {
+    var _wrapLlam = document.getElementById('ficha-btn-llamada-wrap');
+    if (_wrapLlam) _wrapLlam.innerHTML = (!_bloquearAcciones && typeof lexBtnLlamada === 'function') ? lexBtnLlamada('folio', recibo.folio, 'padding:4px 9px;font-size:12px;') : '';
+  } catch(_eLl){ if(typeof _lexSil==="function")_lexSil(_eLl); }
+
   // Badge tipo de trámite
   var _badgeTipo = document.getElementById('ficha-badge-tipo-tramite');
   var _headerTipoTotal = document.getElementById('ficha-header-tipo-total');

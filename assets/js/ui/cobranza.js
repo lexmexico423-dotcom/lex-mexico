@@ -422,7 +422,7 @@
       t.resultado = { tipo: 'pago', automatico: true, recibo: t.cobranza.folio + s.letra, abono: abono, saldo: s.saldo };
       if (!bitacoraDe(t.cobranza.folio).some(function(b){ return b.tipo === 'pago' && b.tareaId === t.id; }))
         anotar(t.cobranza.folio, 'pago', 'Pagó ' + dinero(abono) + ' (recibo ' + t.cobranza.folio + s.letra + ')' + (s.saldo > 0.005 ? ' · saldo restante ' + dinero(s.saldo) : ' · folio liquidado'), { tareaId: t.id, por: 'Sistema' });
-      t.titulo = '✅ PAGÓ · FOLIO ' + t.cobranza.folio + ' — ' + String(t.cobranza.nombre).toUpperCase();
+      t.titulo = (s.saldo > 0.005 ? '✅ ABONÓ · FOLIO ' : '✅ PAGÓ · FOLIO ') + t.cobranza.folio + ' — ' + String(t.cobranza.nombre).toUpperCase();
       t.texto = 'Resuelta automáticamente: se registró el recibo ' + t.cobranza.folio + s.letra + ' por ' + dinero(abono) + (s.saldo > 0.005 ? ' (saldo restante ' + dinero(s.saldo) + ').' : ' (folio liquidado).');
       cambio = true;
     });
@@ -448,7 +448,8 @@
       + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.72rem;letter-spacing:0.1em;font-family:monospace;">📞 RESULTADO DE LA LLAMADA · FOLIO ' + esc(c.folio) + esc(c.letra || '') + '</div>'
       + '<div style="padding:14px 16px;">'
       + '<div style="font-weight:600;font-size:0.86rem;margin-bottom:10px;color:#2a1c08;">' + esc(c.nombre) + ' · ' + esc(c.tel) + '</div>'
-      + opc('promesa', 'Prometió pagar el', ' <input type="date" id="cob-res-fecha" min="' + hoyStr(0) + '" value="' + hoyStr(1) + '" style="margin-left:4px;border:1px solid #c8951a;border-radius:5px;padding:2px 6px;font-size:0.8rem;">')
+      + opc('promesa', 'Prometió liquidar todo el', ' <input type="date" id="cob-res-fecha" min="' + hoyStr(0) + '" value="' + hoyStr(1) + '" style="margin-left:4px;border:1px solid #c8951a;border-radius:5px;padding:2px 6px;font-size:0.8rem;">')
+      + opc('abono', 'Prometió abonar el', ' <input type="date" id="cob-res-fecha-ab" min="' + hoyStr(0) + '" value="' + hoyStr(1) + '" style="margin-left:4px;border:1px solid #c8951a;border-radius:5px;padding:2px 6px;font-size:0.8rem;"> <span style="font-size:0.78rem;">por $</span><input type="number" id="cob-res-monto" min="1" step="0.01" placeholder="monto" style="width:86px;border:1px solid #c8951a;border-radius:5px;padding:2px 6px;font-size:0.8rem;">')
       + opc('no-contesto', 'No contestó', ' <span style="font-size:0.7rem;color:#7a6a4a;">(se crea otra tarea para mañana)</span>')
       + opc('numero', 'Número equivocado o sin servicio')
       + opc('ya-pago', 'Ya pagó / dice que ya pagó')
@@ -461,6 +462,8 @@
     document.body.appendChild(ov);
     var fechaInp = ov.querySelector('#cob-res-fecha');
     fechaInp.addEventListener('focus', function(){ ov.querySelector('input[value="promesa"]').checked = true; });
+    var fechaAb = ov.querySelector('#cob-res-fecha-ab'), montoAb = ov.querySelector('#cob-res-monto');
+    [fechaAb, montoAb].forEach(function(el){ el.addEventListener('focus', function(){ ov.querySelector('input[value="abono"]').checked = true; }); });
     ov.querySelector('#cob-res-cancel').onclick = function(){ ov.remove(); };
     ov.querySelector('#cob-res-ok').onclick = function(){
       var sel = ov.querySelector('input[name="cob-res"]:checked');
@@ -468,21 +471,33 @@
       var nota = ov.querySelector('#cob-res-nota').value.trim();
       var err = ov.querySelector('#cob-res-err');
       if (!tipo) { err.textContent = 'Elige qué pasó en la llamada.'; err.style.display = 'block'; return; }
-      var fecha = fechaInp.value;
-      if (tipo === 'promesa' && (!fecha || fecha < hoyStr(0))) { err.textContent = 'Elige la fecha en que prometió pagar (hoy o después).'; err.style.display = 'block'; return; }
+      var fecha = tipo === 'abono' ? fechaAb.value : fechaInp.value;
+      var monto = tipo === 'abono' ? (parseFloat(montoAb.value) || 0) : 0;
+      if ((tipo === 'promesa' || tipo === 'abono') && (!fecha || fecha < hoyStr(0))) { err.textContent = 'Elige la fecha que prometió (hoy o después).'; err.style.display = 'block'; return; }
+      if (tipo === 'abono' && montoAb.value && !(monto > 0)) { err.textContent = 'El monto del abono debe ser mayor a cero (o déjalo vacío).'; err.style.display = 'block'; return; }
+      if (tipo === 'abono' && monto > (Number(c.saldo) || 0) + 0.005) { err.textContent = 'El abono no puede ser mayor al saldo (' + dinero(c.saldo) + '). Si va a pagar todo, elige "Prometió liquidar todo".'; err.style.display = 'block'; return; }
       var ahora = new Date().toISOString();
       t.estado = 'resuelta'; t.fechaResolucion = ahora; t.fechaMod = ahora;
-      t.resultado = { tipo: tipo, fecha: tipo === 'promesa' ? fecha : '', nota: nota, por: quien() };
-      var etq = { promesa: 'Prometió pagar el ' + fCorta(fecha), 'no-contesto': 'No contestó', numero: 'Número equivocado o sin servicio', 'ya-pago': 'Dice que ya pagó' }[tipo];
+      var conFecha = (tipo === 'promesa' || tipo === 'abono');
+      t.resultado = { tipo: tipo, fecha: conFecha ? fecha : '', monto: monto || 0, nota: nota, por: quien() };
+      var etq = { promesa: 'Prometió liquidar todo el ' + fCorta(fecha), abono: 'Prometió abonar ' + (monto ? dinero(monto) + ' ' : '') + 'el ' + fCorta(fecha), 'no-contesto': 'No contestó', numero: 'Número equivocado o sin servicio', 'ya-pago': 'Dice que ya pagó' }[tipo];
       t.texto = (t.texto || '') + '\nResultado: ' + etq + (nota ? ' · Nota: ' + nota : '');
-      anotar(c.folio, tipo, etq + (nota ? ' · "' + nota + '"' : ''), { fechaPromesa: tipo === 'promesa' ? fecha : '', tel: c.tel, tareaId: t.id });
+      anotar(c.folio, tipo === 'abono' ? 'abono-promesa' : tipo, etq + (nota ? ' · "' + nota + '"' : ''), { fechaPromesa: conFecha ? fecha : '', monto: monto || 0, tel: c.tel, tareaId: t.id });
       if (tipo === 'promesa') {
         tareas().unshift({
           id: nuevoId(), tipo: 'cobranza-promesa',
           titulo: '💰 HOY SE COMPROMETIÓ A PAGAR · FOLIO ' + c.folio + (c.letra || '') + ' — ' + String(c.nombre).toUpperCase(),
-          texto: 'Se comprometió a venir a pagar hoy (llamada del ' + fCorta(hoyStr(0)) + '). Saldo: ' + dinero(c.saldo) + ' · Tel. ' + c.tel + '.' + (nota ? '\nNota: ' + nota : '') + '\nSi no viene antes de cerrar, llamarle.',
+          texto: 'Se comprometió a venir a liquidar hoy (llamada del ' + fCorta(hoyStr(0)) + '). Saldo: ' + dinero(c.saldo) + ' · Tel. ' + c.tel + '.' + (nota ? '\nNota: ' + nota : '') + '\nSi no viene antes de cerrar, llamarle.',
           estado: 'pendiente', fechaProgramada: fecha, creadoPor: quien(), fechaCreacion: ahora, fechaResolucion: '', fechaMod: ahora,
           cobranza: Object.assign({}, c)
+        });
+      } else if (tipo === 'abono') {
+        tareas().unshift({
+          id: nuevoId(), tipo: 'cobranza-promesa', subtipo: 'abono',
+          titulo: '💵 HOY SE COMPROMETIÓ A ABONAR' + (monto ? ' ' + dinero(monto) : '') + ' · FOLIO ' + c.folio + (c.letra || '') + ' — ' + String(c.nombre).toUpperCase(),
+          texto: 'Se comprometió a venir a abonar ' + (monto ? dinero(monto) + ' ' : '') + 'hoy (llamada del ' + fCorta(hoyStr(0)) + '). Saldo total: ' + dinero(c.saldo) + ' · Tel. ' + c.tel + '.' + (nota ? '\nNota: ' + nota : '') + '\nSi no viene antes de cerrar, llamarle.',
+          estado: 'pendiente', fechaProgramada: fecha, creadoPor: quien(), fechaCreacion: ahora, fechaResolucion: '', fechaMod: ahora,
+          cobranza: Object.assign({}, c, { montoPrometido: monto || 0 })
         });
       } else if (tipo === 'no-contesto') {
         tareas().unshift(tareaLlamada(c, hoyStr(1), (Number(c.intento) || 1) + 1));
@@ -490,7 +505,7 @@
       }
       ov.remove();
       guardarTareas();
-      if (typeof toast === 'function') toast(tipo === 'promesa' ? '📅 Promesa de pago programada para el ' + fCorta(fecha) : tipo === 'no-contesto' ? '📞 Se programó otra llamada para mañana' : '✅ Resultado guardado', 'ok');
+      if (typeof toast === 'function') toast(tipo === 'promesa' ? '📅 Promesa de pago programada para el ' + fCorta(fecha) : tipo === 'abono' ? '💵 Promesa de abono programada para el ' + fCorta(fecha) : tipo === 'no-contesto' ? '📞 Se programó otra llamada para mañana' : '✅ Resultado guardado', 'ok');
       var ovC = document.getElementById('overlay-cobranza'); if (ovC && ovC.style.display !== 'none') render();
     };
   }
@@ -515,13 +530,15 @@
     if (ll) return B('programada', '📅 Programada ' + fCorta(ll.fechaProgramada), false, '#e6f1fb', '#185fa5', '1px solid #b5d4f4', 'Se volverá a llamar el ' + fCorta(ll.fechaProgramada) + ' (intento ' + ((ll.cobranza && ll.cobranza.intento) || 2) + ').');
     var pr = ts.filter(function(t){ return t.tipo === 'cobranza-promesa'; }).sort(function(a, b){ return String(b.fechaProgramada).localeCompare(String(a.fechaProgramada)); })[0];
     if (pr) return pr.fechaProgramada >= hoy
-      ? B('promesa', '📅 Promesa ' + fCorta(pr.fechaProgramada), false, '#eaf3de', '#3b6d11', '1px solid #c0dd97', 'Se comprometió a pagar el ' + fCorta(pr.fechaProgramada) + '.')
+      ? (pr.subtipo === 'abono'
+          ? B('promesa', '💵 Abono ' + fCorta(pr.fechaProgramada), false, '#eaf3de', '#3b6d11', '1px solid #c0dd97', 'Se comprometió a abonar' + (pr.cobranza && pr.cobranza.montoPrometido ? ' ' + dinero(pr.cobranza.montoPrometido) : '') + ' el ' + fCorta(pr.fechaProgramada) + '.')
+          : B('promesa', '📅 Promesa ' + fCorta(pr.fechaProgramada), false, '#eaf3de', '#3b6d11', '1px solid #c0dd97', 'Se comprometió a liquidar el ' + fCorta(pr.fechaProgramada) + '.'))
       : B('vencida', '📞 Llamar de nuevo', true, '#fff', '#a32d2d', '1.5px solid #a32d2d', 'Venció su promesa de pago del ' + fCorta(pr.fechaProgramada) + ' y no ha pagado.');
     // Sin tareas en curso: se usa la última anotación de la bitácora
-    var bs = bitacoraDe(x.folio).filter(function(b){ return /^(promesa|numero|ya-pago|pago|eliminada-promesa)$/.test(b.tipo); });
+    var bs = bitacoraDe(x.folio).filter(function(b){ return /^(promesa|abono-promesa|numero|ya-pago|pago|eliminada-promesa)$/.test(b.tipo); });
     var u = bs[bs.length - 1];
     if (!u || u.tipo === 'pago') return normal;
-    if (u.tipo === 'promesa' || u.tipo === 'eliminada-promesa') {
+    if (u.tipo === 'promesa' || u.tipo === 'abono-promesa' || u.tipo === 'eliminada-promesa') {
       var fp = u.fechaPromesa || '';
       if (fp && fp >= hoy) return B('promesa', '📅 Promesa ' + fCorta(fp) + ' (sin recordatorio)', false, '#eaf3de', '#3b6d11', '1px solid #c0dd97', 'Prometió pagar el ' + fCorta(fp) + '. Su tarea de recordatorio fue eliminada.');
       if (fp) return B('vencida', '📞 Llamar de nuevo', true, '#fff', '#a32d2d', '1.5px solid #a32d2d', 'Venció su promesa de pago del ' + fCorta(fp) + ' y no ha pagado.');
@@ -539,7 +556,7 @@
     var viejo = document.getElementById('cob-bit-ov'); if (viejo) viejo.remove();
     var ov = document.createElement('div'); ov.id = 'cob-bit-ov';
     ov.style.cssText = 'position:fixed;inset:0;z-index:2147482000;background:rgba(26,16,8,0.55);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Helvetica,Arial,sans-serif;';
-    var ico = { llamada: '📞', promesa: '📅', 'no-contesto': '📵', reintento: '🔁', numero: '☎', 'ya-pago': '💬', pago: '✅', eliminada: '🗑', 'eliminada-promesa': '🗑' };
+    var ico = { llamada: '📞', promesa: '📅', 'abono-promesa': '💵', 'no-contesto': '📵', reintento: '🔁', numero: '☎', 'ya-pago': '💬', pago: '✅', eliminada: '🗑', 'eliminada-promesa': '🗑' };
     var hora = function(iso){ var d = new Date(iso); return isNaN(d) ? '' : fCorta(iso) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
     ov.innerHTML = '<div style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:560px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(0,0,0,0.45);">'
       + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.72rem;letter-spacing:0.1em;font-family:monospace;display:flex;justify-content:space-between;align-items:center;"><span>🕑 BITÁCORA DE COBRANZA · FOLIO ' + esc(x.folio) + esc(x.letra) + '</span><button type="button" id="cob-bit-x" style="background:none;border:none;color:#e8c875;font-size:1.1rem;cursor:pointer;">✕</button></div>'
@@ -588,6 +605,8 @@
     var envuelta = function(id){
       var t = tareas().filter(function(x){ return x && x.id === id; })[0];
       if (t && t.tipo === 'cobranza-llamada' && t.estado !== 'resuelta') { dialogoResultado(t); return; }
+      // Oct-2026 (a petición expresa): las demás tareas piden confirmación
+      if (t && t.estado !== 'resuelta' && !window.confirm('¿Marcar como resuelta esta tarea?\n\n"' + String(t.titulo || '').replace(/\*/g, '') + '"')) return;
       return orig.apply(this, arguments);
     };
     envuelta._cob = true;

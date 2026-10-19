@@ -624,7 +624,17 @@ async function sincronizarFolio(forzarSB){
             return t;
           });
           const _soloLocalesTareas = _localTareas.filter(function(t){ return t && t.id && !_sbTareasIds.has(t.id); });
-          D.tareasHoy = [..._fusionadasTareas, ..._soloLocalesTareas];
+          // Oct-2026 · lápidas: una tarea borrada en cualquier computadora no regresa
+          const _lapT = new Set([].concat(Array.isArray(data.data.tareasHoyEliminadas) ? data.data.tareasHoyEliminadas : [], Array.isArray(D.tareasHoyEliminadas) ? D.tareasHoyEliminadas : []));
+          D.tareasHoyEliminadas = Array.from(_lapT).slice(-3000);
+          D.tareasHoy = [..._fusionadasTareas, ..._soloLocalesTareas].filter(function(t){ return !(t && _lapT.has(t.id)); });
+        })();
+        // Oct-2026 · Bitácora de cobranza: unión por id (las entradas no se editan)
+        (function(){
+          const _sbBit = Array.isArray(data.data.cobranzaBitacora) ? data.data.cobranzaBitacora : [];
+          const _locBit = Array.isArray(D.cobranzaBitacora) ? D.cobranzaBitacora : [];
+          const _ids = new Set(_sbBit.map(function(b){ return b && b.id; }));
+          D.cobranzaBitacora = _sbBit.concat(_locBit.filter(function(b){ return b && b.id && !_ids.has(b.id); }));
         })();
         // Merge adeudos sin recibo (gastos/deudas de clientes fuera del
         // sistema de folios) — mismo patrón id + fechaMod que tareasHoy.
@@ -6499,6 +6509,8 @@ async function backupAppData() {
         cierres:               (D && D.cierres)                 || [],
         prestamos:             (D && D.prestamos)               || [],
         tareasHoy:             (D && D.tareasHoy)               || [],
+        cobranzaBitacora:      (D && D.cobranzaBitacora)        || [],
+        tareasHoyEliminadas:   (D && D.tareasHoyEliminadas)     || [],
         adeudosSinRecibo:      (D && D.adeudosSinRecibo)        || [],
         escrituras:            (D && D.escrituras)              || [],
         recibosExcluidosCaja:  (D && D.recibosExcluidosCaja)    || [],

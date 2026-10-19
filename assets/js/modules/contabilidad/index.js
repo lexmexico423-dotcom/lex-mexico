@@ -1658,6 +1658,9 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       prestamos:             D.prestamos             || [],
       tareasHoy:             D.tareasHoy             || [],
       adeudosSinRecibo:      D.adeudosSinRecibo      || [],
+      // Oct-2026: bitácora permanente de cobranza (llamadas, promesas, pagos)
+      cobranzaBitacora:      Array.isArray(D.cobranzaBitacora) ? D.cobranzaBitacora : [],
+      tareasHoyEliminadas:   Array.isArray(D.tareasHoyEliminadas) ? D.tareasHoyEliminadas : [],
       saldoAcumulado:        D.saldoAcumulado        || 0,
       escrituras:            D.escrituras            || [],
       recibosExcluidosCaja:  D.recibosExcluidosCaja  || [],
@@ -1729,6 +1732,15 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       _sbAdeudosCountGuard = _sbAdeudosPreSync.length;
       estado.tareasHoy        = _lexFusionarListaPorId(D.tareasHoy, _sbTareasPreSync);
       estado.adeudosSinRecibo = _lexFusionarListaPorId(D.adeudosSinRecibo, _sbAdeudosPreSync);
+      estado.cobranzaBitacora = _lexFusionarListaPorId(D.cobranzaBitacora, Array.isArray(_sbDataPreSync.cobranzaBitacora) ? _sbDataPreSync.cobranzaBitacora : []);
+      // Oct-2026 · lápidas de tareas borradas (unión) — una tarea borrada no regresa
+      (function(){
+        var _lap = new Set([].concat(Array.isArray(D.tareasHoyEliminadas) ? D.tareasHoyEliminadas : [], Array.isArray(_sbDataPreSync.tareasHoyEliminadas) ? _sbDataPreSync.tareasHoyEliminadas : []));
+        estado.tareasHoyEliminadas = Array.from(_lap).slice(-3000);
+        estado.tareasHoy = estado.tareasHoy.filter(function(t){ return !(t && _lap.has(t.id)); });
+        D.tareasHoyEliminadas = estado.tareasHoyEliminadas;
+      })();
+      D.cobranzaBitacora = estado.cobranzaBitacora;
       D.tareasHoy        = estado.tareasHoy;
       D.adeudosSinRecibo = estado.adeudosSinRecibo;
       // FIX (14-sep-2026): mismo problema que tareasHoy/adeudosSinRecibo —

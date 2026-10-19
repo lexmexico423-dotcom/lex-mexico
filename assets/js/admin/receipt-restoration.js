@@ -13519,6 +13519,16 @@ async function _tareasBorrarDocsDeDrive(tareas){
 // eliminan solas, junto con sus archivos adjuntos en Drive. Se revisa en cada
 // render (igual que _pendPurgarResueltosViejos con Pendientes), es barato si
 // no hay nada que purgar.
+// Oct-2026 · FIX: las tareas borradas "regresaban" al sincronizar, porque la
+// fusión con el servidor recuperaba cualquier tarea que allá siguiera
+// existiendo. Ahora cada borrado deja una lápida (id) en D.tareasHoyEliminadas
+// que viaja con los datos y hace que todas las computadoras la quiten.
+function _lexLapidaTareas(ids){
+  if (typeof D === 'undefined' || !D) return;
+  if (!Array.isArray(D.tareasHoyEliminadas)) D.tareasHoyEliminadas = [];
+  (ids || []).forEach(function(id){ if (id && D.tareasHoyEliminadas.indexOf(id) < 0) D.tareasHoyEliminadas.push(id); });
+  if (D.tareasHoyEliminadas.length > 3000) D.tareasHoyEliminadas = D.tareasHoyEliminadas.slice(-3000);
+}
 async function _tareasPurgarResueltosViejos(){
   const lista = Array.isArray(D.tareasHoy) ? D.tareasHoy : [];
   const LIMITE_DIAS = 2;
@@ -13532,6 +13542,7 @@ async function _tareasPurgarResueltosViejos(){
   if(!aBorrar.length) return false;
   await _tareasBorrarDocsDeDrive(aBorrar);
   const idsBorrar = new Set(aBorrar.map(function(t){ return t.id; }));
+  _lexLapidaTareas(Array.from(idsBorrar));
   D.tareasHoy = lista.filter(function(t){ return !(t && idsBorrar.has(t.id)); });
   aBorrar.forEach(function(t){ _tareasSeleccion.delete(t.id); });
   console.warn('[Tareas hoy] 🗑 Purgadas '+aBorrar.length+' resuelta(s) con más de '+LIMITE_DIAS+' días — adjuntos borrados de Drive');
@@ -13580,6 +13591,7 @@ async function vaciarTareasResueltas(){
   if(typeof _placasProgreso === 'function') _placasProgreso('🗑 Eliminando archivos adjuntos…');
   await _tareasBorrarDocsDeDrive(aBorrar);
   if(typeof _placasProgreso === 'function') _placasProgreso(null);
+  _lexLapidaTareas(ids);
   D.tareasHoy = todas.filter(function(t){ return !(t && idsSet.has(t.id)); });
   _tareasSeleccion.clear();
   if(typeof save === 'function') save();
@@ -13981,6 +13993,7 @@ function eliminarTareaHoy(){
   const tarea = (D.tareasHoy||[]).find(function(x){ return x && x.id === _tareaEdId; });
   if(!tarea) return;
   if(!confirm('¿Eliminar definitivamente la tarea "'+tarea.titulo+'"?')) return;
+  _lexLapidaTareas([_tareaEdId]);
   D.tareasHoy = (D.tareasHoy||[]).filter(function(x){ return x && x.id !== _tareaEdId; });
   cerrar('mTareaEditar');
   if(typeof save === 'function') save();

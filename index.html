@@ -28,7 +28,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 <script src="assets/js/diagnostics/network-console.js?v=20260904d"></script>
   <!-- ═══ CSS SISTEMA DE RECIBOS (index.html) ═══ -->
-  <link rel="stylesheet" href="assets/css/modules/receipts.css?v=20261005a">
+  <link rel="stylesheet" href="assets/css/modules/receipts.css?v=20261018a">
 <link rel="stylesheet" href="assets/css/components/modal-states.css">
 <script src="assets/js/core/error-guard.js?v=20261018c"></script>
 <script src="assets/js/ui/avisos.js?v=20261018a"></script>
@@ -14212,7 +14212,10 @@ Recibo original im…</td>
         </div>
       </div>
       <!-- ══ NUEVO RECIBO (sub-formulario REC) ══════════════════════════ -->
-      <div class="card" style="margin-top:18px;">
+      <!-- Oct-2026 (a petición expresa): oculto en Historial de Recibos. Los recibos
+           se generan en la pantalla principal de recibo. Se deja en la página
+           (oculto) solo porque código existente consulta algunos de sus campos. -->
+      <div class="card" id="rec-subform-nuevo" style="display:none;margin-top:18px;">
         <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
           <h2>📝 Nuevo Recibo</h2>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -14307,8 +14310,8 @@ Recibo original im…</td>
           </div>
         </div>
       </div>
-      <!-- Recibos recientes (mini historial) -->
-      <div class="card" style="margin-top:14px;">
+      <!-- Recibos recientes (mini historial) — Oct-2026: oculto; la tabla de arriba ya muestra primero los más recientes -->
+      <div class="card" id="rec-recientes-card" style="display:none;margin-top:14px;">
         <div class="card-header"><h2>🕐 Recibos Recientes</h2></div>
         <div id="recibos-recientes-panel" style="max-height:300px;overflow-y:auto;"></div>
       </div>
@@ -19455,6 +19458,6 @@ Recibo original im…</td>
 </div>
 <script src="assets/js/ui/accounting-scroll.js?v=20260904d"></script>
 <script src="assets/js/ui/back-navigation.js?v=20261010a"></script>
-<script src="assets/js/ui/cobranza.js?v=20261018c"></script>
+<script src="assets/js/ui/cobranza.js?v=20261018d"></script>
 
 </body></html>

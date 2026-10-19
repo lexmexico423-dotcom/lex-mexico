@@ -47,6 +47,9 @@
         folio: r.folio, letra: String(r.letra || 'A').toUpperCase(),
         nombre: String(r.nombre || c0.nombre || '').trim(),
         tel: String(c0.movil || c0.tel || '').trim(),
+        personas: (Array.isArray(r.clientes) ? r.clientes : []).map(function(c){
+          return { nombre: String((c && c.nombre) || '').trim(), tel: String((c && (c.movil || c.tel)) || '').trim() };
+        }).filter(function(p){ return p.nombre || p.tel; }),
         concepto: String(concepto).trim(), saldo: saldo, fecha: fecha, dias: diasDesde(fecha)
       });
     });
@@ -80,7 +83,7 @@
   // ── Teléfono → número internacional para WhatsApp ──
   // México (+52) por defecto; Estados Unidos (+1) si la lada no existe en México.
   // El usuario puede cambiar el país con un clic si la detección se equivoca.
-  var paisElegido = {};
+  var paisElegido = {}, personaElegida = {};
   function soloDigitos(t){ return String(t || '').replace(/\D/g, ''); }
   function paisDetectado(tel){
     var d = soloDigitos(tel);
@@ -154,7 +157,7 @@
     var q = norm(busca);
     var lista = todos.filter(function(x){
       if (filtro !== null && !(x.dias >= GRUPOS[filtro].min && x.dias <= GRUPOS[filtro].max)) return false;
-      if (q && norm(x.nombre + ' ' + x.folio + ' ' + x.concepto + ' ' + x.tel).indexOf(q) < 0) return false;
+      if (q && norm(x.nombre + ' ' + x.folio + ' ' + x.concepto + ' ' + x.tel + ' ' + x.personas.map(function(p){ return p.nombre + ' ' + p.tel; }).join(' ')).indexOf(q) < 0) return false;
       return true;
     });
     ov.querySelector('#cob-lista').innerHTML = lista.length ? lista.map(function(x){
@@ -162,7 +165,7 @@
       return '<div class="cob-row" data-f="' + esc(x.folio) + '" style="display:grid;grid-template-columns:52px minmax(0,1fr) 110px 78px 132px;gap:10px;align-items:center;padding:8px 10px;background:' + (sel ? '#fff8e4' : '#fff') + ';border:1px solid ' + (sel ? '#c8951a' : '#eadfbf') + ';border-radius:7px;margin-bottom:6px;font-size:0.8rem;">'
         + '<span class="cob-folio" data-f="' + esc(x.folio) + '" title="Abrir la ficha del folio ' + esc(x.folio) + '" style="color:#1a4a8a;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">#' + esc(x.folio) + esc(x.letra) + '</span>'
         + '<div style="min-width:0;"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(x.nombre || '(sin nombre)') + '</div>'
-        + '<div style="font-size:0.7rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(oracion(x.concepto)) + ' · ' + (x.tel ? esc(x.tel) : '<span style="color:#a32d2d;">sin teléfono</span>') + '</div></div>'
+        + '<div style="font-size:0.7rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(oracion(x.concepto)) + ' · ' + (x.tel ? esc(x.tel) : '<span style="color:#a32d2d;">sin teléfono</span>') + (x.personas.length > 1 ? ' · <b style="color:#1a4a8a;">👥 ' + x.personas.length + ' personas</b>' : '') + '</div></div>'
         + '<span style="text-align:right;font-weight:700;color:#a32d2d;">' + dinero(x.saldo) + '</span>'
         + '<span style="font-size:0.68rem;padding:3px 6px;border-radius:10px;text-align:center;background:' + g.fondo + ';color:' + g.color + ';">' + x.dias + ' días</span>'
         + '<button type="button" class="cob-gen" data-f="' + esc(x.folio) + '" style="background:#1a1008;color:#e8c875;border:1px solid #c8951a;border-radius:6px;padding:6px 8px;font-size:0.68rem;letter-spacing:0.04em;cursor:pointer;">✉ Generar mensaje</button>'
@@ -193,18 +196,35 @@
       box.innerHTML = '<div style="color:#7a6a4a;font-size:0.8rem;text-align:center;padding:26px 10px;line-height:1.6;">Pulsa <b>✉ Generar mensaje</b> en un cliente.<br>Aquí aparecerá el mensaje listo para enviar por WhatsApp.</div>';
       return;
     }
-    var pais = paisElegido[x.folio] || paisDetectado(x.tel);
-    var numero = numeroWhats(x.tel, pais);
+    // Oct-2026: si el recibo tiene 2+ personas, se elige a quién va el mensaje
+    var personas = x.personas.length ? x.personas : [{ nombre: x.nombre, tel: x.tel }];
+    var idxP = Math.min(personaElegida[x.folio] || 0, personas.length - 1);
+    var dest = { folio: x.folio, letra: x.letra, concepto: x.concepto, saldo: x.saldo, nombre: personas[idxP].nombre || x.nombre, tel: personas[idxP].tel };
+    var claveP = x.folio + '|' + idxP;
+    var pais = paisElegido[claveP] || paisDetectado(dest.tel);
+    var numero = numeroWhats(dest.tel, pais);
     var bandera = function(p, txt){
       var on = pais === p;
       return '<button type="button" class="cob-pais" data-p="' + p + '" title="Cambiar país del teléfono" style="border:1px solid ' + (on ? '#2e7d32' : '#d9c38a') + ';background:' + (on ? '#e9f7ee' : '#fff') + ';color:' + (on ? '#1b5e20' : '#7a6a4a') + ';border-radius:5px;padding:2px 6px;font-size:0.66rem;cursor:pointer;">' + txt + '</button>';
     };
     var M = MENSAJES[numMensaje];
     box.innerHTML =
-      '<div style="font-size:0.68rem;color:#9a6e18;letter-spacing:0.08em;font-family:\'DM Mono\',monospace;margin-bottom:6px;">MENSAJE PARA ' + esc(x.nombre) + '</div>'
+      '<div style="font-size:0.68rem;color:#9a6e18;letter-spacing:0.08em;font-family:\'DM Mono\',monospace;margin-bottom:6px;">MENSAJE PARA ' + esc(dest.nombre) + '</div>'
+      + (personas.length > 1
+          ? '<div style="background:#eef4fb;border:1px solid #b5d4f4;border-radius:7px;padding:7px 8px;margin-bottom:8px;">'
+            + '<div style="font-size:0.66rem;color:#1a4a8a;margin-bottom:5px;">👥 Este recibo tiene ' + personas.length + ' personas · ¿a quién se lo envías?</div>'
+            + '<div style="display:flex;flex-direction:column;gap:4px;">'
+            + personas.map(function(p, i){
+                var on = i === idxP;
+                return '<button type="button" class="cob-persona" data-i="' + i + '" style="text-align:left;border:1px solid ' + (on ? '#1a4a8a' : '#d0dcea') + ';background:' + (on ? '#1a4a8a' : '#fff') + ';color:' + (on ? '#fff' : '#1a2a3a') + ';border-radius:6px;padding:5px 8px;font-size:0.74rem;cursor:pointer;display:flex;justify-content:space-between;gap:8px;">'
+                  + '<span style="font-weight:600;">' + (on ? '● ' : '○ ') + esc(p.nombre || '(sin nombre)') + '</span>'
+                  + '<span style="opacity:.85;">' + (p.tel ? esc(p.tel) : 'sin teléfono') + '</span></button>';
+              }).join('')
+            + '</div></div>'
+          : '')
       + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:0.78rem;">'
-      +   '<span>📱 ' + (x.tel ? '<b>' + esc(x.tel) + '</b>' : '<span style="color:#a32d2d;">Sin teléfono registrado</span>') + '</span>'
-      +   (x.tel ? bandera('MX', '🇲🇽 +52') + bandera('US', '🇺🇸 +1') : '')
+      +   '<span>📱 ' + (dest.tel ? '<b>' + esc(dest.tel) + '</b>' : '<span style="color:#a32d2d;">Sin teléfono registrado</span>') + '</span>'
+      +   (dest.tel ? bandera('MX', '🇲🇽 +52') + bandera('US', '🇺🇸 +1') : '')
       + '</div>'
       + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px;">'
       +   MENSAJES.map(function(m, i){
@@ -219,12 +239,13 @@
       +   '<button type="button" id="cob-whats" ' + (numero ? '' : 'disabled ') + 'title="' + (numero ? 'Abre WhatsApp con el mensaje ya escrito; solo pulsa Enviar' : 'Teléfono no válido para WhatsApp') + '" style="background:' + (numero ? '#25a244' : '#c9c9c9') + ';color:#fff;border:none;border-radius:7px;padding:10px;font-size:0.8rem;font-weight:600;cursor:' + (numero ? 'pointer' : 'not-allowed') + ';">💬 Abrir en WhatsApp</button>'
       +   '<button type="button" id="cob-copiar" style="background:#fff;color:#2e7d32;border:1.5px solid #2e7d32;border-radius:7px;padding:10px;font-size:0.8rem;font-weight:600;cursor:pointer;">📋 Copiar mensaje</button>'
       + '</div>'
-      + (x.tel && !numero ? '<div style="font-size:0.68rem;color:#a32d2d;margin-top:6px;">El teléfono registrado no tiene 10 dígitos; corrígelo en el recibo para poder abrir WhatsApp.</div>' : '');
-    var ta = box.querySelector('#cob-texto'); ta.value = mensaje(x);
+      + (dest.tel && !numero ? '<div style="font-size:0.68rem;color:#a32d2d;margin-top:6px;">El teléfono registrado no tiene 10 dígitos; corrígelo en el recibo para poder abrir WhatsApp.</div>' : '');
+    var ta = box.querySelector('#cob-texto'); ta.value = mensaje(dest);
     box.querySelector('#cob-copiar').onclick = function(){ copiar(ta.value, this); };
     var bw = box.querySelector('#cob-whats'); if (bw && numero) bw.onclick = function(){ abrirWhatsApp(numero, ta.value); };
     box.querySelectorAll('.cob-num').forEach(function(b){ b.onclick = function(){ numMensaje = +b.getAttribute('data-i'); pintarMensaje(); }; });
-    box.querySelectorAll('.cob-pais').forEach(function(b){ b.onclick = function(){ paisElegido[x.folio] = b.getAttribute('data-p'); pintarMensaje(); }; });
+    box.querySelectorAll('.cob-pais').forEach(function(b){ b.onclick = function(){ paisElegido[claveP] = b.getAttribute('data-p'); pintarMensaje(); }; });
+    box.querySelectorAll('.cob-persona').forEach(function(b){ b.onclick = function(){ personaElegida[x.folio] = +b.getAttribute('data-i'); pintarMensaje(); }; });
   }
 
   window.abrirCobranza = function(){

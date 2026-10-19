@@ -1,7 +1,7 @@
 // ── Panel de Cobranza (oct-2026) ─────────────────────────────────────────
-// Saldos pendientes por antigüedad y generador del texto de recordatorio.
-// NO abre enlaces ni envía nada: solo arma el mensaje para copiarlo y
-// pegarlo en WhatsApp (o donde se quiera). Botón junto a "Monitor".
+// Saldos pendientes por antigüedad y 7 mensajes de recordatorio escalonados.
+// "Abrir en WhatsApp" abre el chat del cliente con el texto ya escrito (no
+// envía nada solo: el usuario pulsa Enviar). Botón junto a "Monitor".
 (function(){
   'use strict';
   var GRUPOS = [
@@ -61,12 +61,53 @@
     var sin = t.replace(/^tr[aá]mite\s+(de\s+|del\s+)?/i, '').trim();
     return (sin || t).toUpperCase();
   }
-  function mensaje(x){
-    return 'Buen día, ' + titulo(x.nombre) + '.\n\n'
-      + 'Le saludamos de LEX-MÉXICO Despacho Jurídico. Le recordamos que su trámite «'
-      + nombreTramite(x.concepto) + '» (folio ' + x.folio + ') tiene un saldo pendiente de ' + dinero(x.saldo) + '.\n\n'
-      + 'Puede pasar a liquidarlo a nuestra oficina en Calle Miguel Hidalgo esq. México No. 200, Local B, Col. Centro, Santiago Juxtlahuaca, Oaxaca, o comunicarse al 953 128 7511.\n\n'
-      + '¡Gracias por su preferencia!';
+  var FIRMA = '\n\nLEX-MÉXICO Despacho Jurídico\nCalle Miguel Hidalgo esq. México No. 200, Local B, Col. Centro, Santiago Juxtlahuaca, Oaxaca · Tel. 953 128 7511';
+  var MENSAJES = [
+    { et:'1 · Recordatorio amable', cuando:'Primer aviso', txt:function(n,t,f,s){ return 'Buen día, ' + n + '.\n\nLe saludamos de LEX-MÉXICO Despacho Jurídico. Le recordamos que su trámite ' + t + ' (folio ' + f + ') tiene un saldo pendiente de ' + s + '.\n\nPuede pasar a liquidarlo a nuestra oficina o comunicarse con nosotros. ¡Gracias por su preferencia!'; } },
+    { et:'2 · Seguimiento', cuando:'Unos 7 días después', txt:function(n,t,f,s){ return 'Buen día, ' + n + '.\n\nLe escribimos para dar seguimiento a nuestro mensaje anterior. Su trámite ' + t + ' (folio ' + f + ') mantiene un saldo pendiente de ' + s + '.\n\nSi ya realizó el pago, le pedimos de favor nos envíe su comprobante para actualizar su expediente. Quedamos atentos.'; } },
+    { et:'3 · Fecha de pago', cuando:'Unos 15 días después', txt:function(n,t,f,s){ return 'Buen día, ' + n + '.\n\nNo hemos recibido respuesta sobre el saldo de ' + s + ' de su trámite ' + t + ' (folio ' + f + ').\n\n¿Nos podría indicar en qué fecha le es posible realizar el pago? Con gusto registramos la fecha que nos indique.'; } },
+    { et:'4 · Convenio de pago', cuando:'Unos 30 días después', txt:function(n,t,f,s){ return 'Buen día, ' + n + '.\n\nEntendemos que pueden surgir imprevistos. Si se le dificulta cubrir en una sola exhibición el saldo de ' + s + ' de su trámite ' + t + ' (folio ' + f + '), le ofrecemos un convenio de pagos parciales.\n\nResponda este mensaje o visítenos para acordarlo.'; } },
+    { et:'5 · Aviso formal', cuando:'Unos 45 días después', txt:function(n,t,f,s){ return n + ':\n\nPor medio del presente le comunicamos formalmente que su trámite ' + t + ' (folio ' + f + ') presenta un adeudo de ' + s + ', sin que a la fecha hayamos recibido el pago ni una propuesta de convenio.\n\nLe solicitamos regularizar su situación a la brevedad.'; } },
+    { et:'6 · Pausa del trámite', cuando:'Unos 60 días después', txt:function(n,t,f,s){ return n + ':\n\nLe informamos que, al persistir el adeudo de ' + s + ' de su trámite ' + t + ' (folio ' + f + '), las gestiones pendientes quedarán en pausa hasta que se regularice el pago.\n\nPara reanudarlo, comuníquese con nosotros o acuda a nuestra oficina.'; } },
+    { et:'7 · Aviso final', cuando:'Último mensaje', txt:function(n,t,f,s){ return n + ':\n\nAVISO FINAL. Su trámite ' + t + ' (folio ' + f + ') mantiene un adeudo de ' + s + '. Le concedemos un plazo de 5 días hábiles a partir de este mensaje para liquidarlo o formalizar un convenio de pago.\n\nDe no recibir respuesta, el despacho procederá conforme a derecho para la recuperación del adeudo.'; } }
+  ];
+  var numMensaje = 0;
+  function mensaje(x, i){
+    var m = MENSAJES[(typeof i === 'number') ? i : numMensaje] || MENSAJES[0];
+    return m.txt(titulo(x.nombre), '«' + nombreTramite(x.concepto) + '»', String(x.folio), dinero(x.saldo)) + FIRMA;
+  }
+
+  // ── Teléfono → número internacional para WhatsApp ──
+  // México (+52) por defecto; Estados Unidos (+1) si la lada no existe en México.
+  // El usuario puede cambiar el país con un clic si la detección se equivoca.
+  var paisElegido = {};
+  function soloDigitos(t){ return String(t || '').replace(/\D/g, ''); }
+  function paisDetectado(tel){
+    var d = soloDigitos(tel);
+    if (d.length === 12 && d.indexOf('52') === 0) return 'MX';
+    if (d.length === 13 && d.indexOf('521') === 0) return 'MX';
+    if (d.length === 11 && d.charAt(0) === '1') return 'US';
+    if (d.length !== 10) return 'MX';
+    if (/^(55|56|33|81)/.test(d)) return 'MX';
+    if (d.charAt(0) === '5') return 'US';
+    if (/^(20|21|30|40|60|70|80|90)/.test(d) || /^(220|310|910|911|912)/.test(d)) return 'US';
+    return 'MX';
+  }
+  function numeroWhats(tel, pais){
+    var d = soloDigitos(tel);
+    if (d.length === 13 && d.indexOf('521') === 0) d = '52' + d.slice(3);
+    if (d.length === 12 && d.indexOf('52') === 0) return d;
+    if (d.length === 11 && d.charAt(0) === '1') return d;
+    if (d.length !== 10) return '';
+    return (pais === 'US' ? '1' : '52') + d;
+  }
+  function esCelular(){ return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || ''); }
+  function abrirWhatsApp(numero, texto){
+    var t = encodeURIComponent(texto || '');
+    var url = esCelular()
+      ? 'https://wa.me/' + numero + '?text=' + t
+      : 'https://web.whatsapp.com/send?phone=' + numero + '&text=' + t;
+    window.open(url, '_blank', 'noopener');
   }
 
   function copiar(texto, boton){
@@ -119,7 +160,7 @@
     ov.querySelector('#cob-lista').innerHTML = lista.length ? lista.map(function(x){
       var g = grupoDe(x.dias), sel = seleccionado === String(x.folio);
       return '<div class="cob-row" data-f="' + esc(x.folio) + '" style="display:grid;grid-template-columns:52px minmax(0,1fr) 110px 78px 132px;gap:10px;align-items:center;padding:8px 10px;background:' + (sel ? '#fff8e4' : '#fff') + ';border:1px solid ' + (sel ? '#c8951a' : '#eadfbf') + ';border-radius:7px;margin-bottom:6px;font-size:0.8rem;">'
-        + '<span style="color:#9a6e18;font-weight:700;">#' + esc(x.folio) + esc(x.letra) + '</span>'
+        + '<span class="cob-folio" data-f="' + esc(x.folio) + '" title="Abrir la ficha del folio ' + esc(x.folio) + '" style="color:#1a4a8a;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">#' + esc(x.folio) + esc(x.letra) + '</span>'
         + '<div style="min-width:0;"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(x.nombre || '(sin nombre)') + '</div>'
         + '<div style="font-size:0.7rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(oracion(x.concepto)) + ' · ' + (x.tel ? esc(x.tel) : '<span style="color:#a32d2d;">sin teléfono</span>') + '</div></div>'
         + '<span style="text-align:right;font-weight:700;color:#a32d2d;">' + dinero(x.saldo) + '</span>'
@@ -127,6 +168,17 @@
         + '<button type="button" class="cob-gen" data-f="' + esc(x.folio) + '" style="background:#1a1008;color:#e8c875;border:1px solid #c8951a;border-radius:6px;padding:6px 8px;font-size:0.68rem;letter-spacing:0.04em;cursor:pointer;">✉ Generar mensaje</button>'
         + '</div>';
     }).join('') : '<div style="text-align:center;color:#7a6a4a;padding:30px;font-size:0.82rem;">No hay folios con saldo en este filtro.</div>';
+    // Clic en el folio → cierra Cobranza y abre la Ficha del Folio (misma ruta que Contabilidad)
+    ov.querySelectorAll('.cob-folio').forEach(function(el){
+      el.onclick = function(){
+        var n = parseInt(el.getAttribute('data-f'), 10);
+        if (!n) return;
+        window.cerrarCobranza();
+        if (typeof abrirFichaDesdeContab === 'function') abrirFichaDesdeContab(n);
+      };
+    });
+    // Si el cliente del mensaje ya no está en la lista filtrada, se limpia el mensaje
+    if (seleccionado && !lista.some(function(x){ return String(x.folio) === seleccionado; })) seleccionado = null;
     ov.querySelectorAll('.cob-gen').forEach(function(b){
       b.onclick = function(){ seleccionado = b.getAttribute('data-f'); render(); pintarMensaje(todos); };
     });
@@ -138,21 +190,41 @@
     var box = ov.querySelector('#cob-msg');
     var x = (todos || datosCobranza()).filter(function(y){ return String(y.folio) === seleccionado; })[0];
     if (!x) {
-      box.innerHTML = '<div style="color:#7a6a4a;font-size:0.8rem;text-align:center;padding:26px 10px;line-height:1.6;">Pulsa <b>✉ Generar mensaje</b> en un cliente.<br>Aquí aparecerá el texto listo para copiar y pegar en WhatsApp.</div>';
+      box.innerHTML = '<div style="color:#7a6a4a;font-size:0.8rem;text-align:center;padding:26px 10px;line-height:1.6;">Pulsa <b>✉ Generar mensaje</b> en un cliente.<br>Aquí aparecerá el mensaje listo para enviar por WhatsApp.</div>';
       return;
     }
+    var pais = paisElegido[x.folio] || paisDetectado(x.tel);
+    var numero = numeroWhats(x.tel, pais);
+    var bandera = function(p, txt){
+      var on = pais === p;
+      return '<button type="button" class="cob-pais" data-p="' + p + '" title="Cambiar país del teléfono" style="border:1px solid ' + (on ? '#2e7d32' : '#d9c38a') + ';background:' + (on ? '#e9f7ee' : '#fff') + ';color:' + (on ? '#1b5e20' : '#7a6a4a') + ';border-radius:5px;padding:2px 6px;font-size:0.66rem;cursor:pointer;">' + txt + '</button>';
+    };
+    var M = MENSAJES[numMensaje];
     box.innerHTML =
       '<div style="font-size:0.68rem;color:#9a6e18;letter-spacing:0.08em;font-family:\'DM Mono\',monospace;margin-bottom:6px;">MENSAJE PARA ' + esc(x.nombre) + '</div>'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:0.78rem;">'
+      + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:0.78rem;">'
       +   '<span>📱 ' + (x.tel ? '<b>' + esc(x.tel) + '</b>' : '<span style="color:#a32d2d;">Sin teléfono registrado</span>') + '</span>'
-      +   (x.tel ? '<button type="button" id="cob-cop-tel" style="background:#fff;border:1px solid #c8951a;color:#7a4a00;border-radius:5px;padding:3px 8px;font-size:0.68rem;cursor:pointer;">Copiar número</button>' : '')
+      +   (x.tel ? bandera('MX', '🇲🇽 +52') + bandera('US', '🇺🇸 +1') : '')
       + '</div>'
-      + '<textarea id="cob-texto" rows="9" style="width:100%;box-sizing:border-box;border:1px solid #d9c38a;border-radius:7px;padding:10px;font-size:0.82rem;line-height:1.5;color:#2a1c08;background:#fffef8;resize:vertical;font-family:Helvetica,Arial,sans-serif;"></textarea>'
-      + '<div style="font-size:0.66rem;color:#7a6a4a;margin:4px 0 8px;">Puedes editar el texto antes de copiarlo.</div>'
-      + '<button type="button" id="cob-copiar" style="width:100%;background:#2e7d32;color:#fff;border:none;border-radius:7px;padding:10px;font-size:0.8rem;font-weight:600;cursor:pointer;letter-spacing:0.04em;">📋 Copiar mensaje</button>';
+      + '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px;">'
+      +   MENSAJES.map(function(m, i){
+            var on = i === numMensaje;
+            return '<button type="button" class="cob-num" data-i="' + i + '" title="' + esc(m.et) + '" style="min-width:30px;border:1px solid #c8951a;background:' + (on ? '#1a1008' : '#fff') + ';color:' + (on ? '#e8c875' : '#7a4a00') + ';border-radius:6px;padding:4px 8px;font-size:0.74rem;font-weight:700;cursor:pointer;">' + (i + 1) + '</button>';
+          }).join('')
+      + '</div>'
+      + '<div style="display:flex;justify-content:space-between;gap:8px;font-size:0.7rem;margin-bottom:6px;"><b style="color:#2a1c08;">' + esc(M.et) + '</b><span style="color:#7a6a4a;">Sugerido: ' + esc(M.cuando) + '</span></div>'
+      + '<textarea id="cob-texto" rows="10" style="width:100%;box-sizing:border-box;border:1px solid #d9c38a;border-radius:7px;padding:10px;font-size:0.82rem;line-height:1.5;color:#2a1c08;background:#fffef8;resize:vertical;font-family:Helvetica,Arial,sans-serif;"></textarea>'
+      + '<div style="font-size:0.66rem;color:#7a6a4a;margin:4px 0 8px;">Puedes editar el texto antes de enviarlo.</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+      +   '<button type="button" id="cob-whats" ' + (numero ? '' : 'disabled ') + 'title="' + (numero ? 'Abre WhatsApp con el mensaje ya escrito; solo pulsa Enviar' : 'Teléfono no válido para WhatsApp') + '" style="background:' + (numero ? '#25a244' : '#c9c9c9') + ';color:#fff;border:none;border-radius:7px;padding:10px;font-size:0.8rem;font-weight:600;cursor:' + (numero ? 'pointer' : 'not-allowed') + ';">💬 Abrir en WhatsApp</button>'
+      +   '<button type="button" id="cob-copiar" style="background:#fff;color:#2e7d32;border:1.5px solid #2e7d32;border-radius:7px;padding:10px;font-size:0.8rem;font-weight:600;cursor:pointer;">📋 Copiar mensaje</button>'
+      + '</div>'
+      + (x.tel && !numero ? '<div style="font-size:0.68rem;color:#a32d2d;margin-top:6px;">El teléfono registrado no tiene 10 dígitos; corrígelo en el recibo para poder abrir WhatsApp.</div>' : '');
     var ta = box.querySelector('#cob-texto'); ta.value = mensaje(x);
     box.querySelector('#cob-copiar').onclick = function(){ copiar(ta.value, this); };
-    var bt = box.querySelector('#cob-cop-tel'); if (bt) bt.onclick = function(){ copiar(x.tel, this); };
+    var bw = box.querySelector('#cob-whats'); if (bw && numero) bw.onclick = function(){ abrirWhatsApp(numero, ta.value); };
+    box.querySelectorAll('.cob-num').forEach(function(b){ b.onclick = function(){ numMensaje = +b.getAttribute('data-i'); pintarMensaje(); }; });
+    box.querySelectorAll('.cob-pais').forEach(function(b){ b.onclick = function(){ paisElegido[x.folio] = b.getAttribute('data-p'); pintarMensaje(); }; });
   }
 
   window.abrirCobranza = function(){
@@ -192,4 +264,6 @@
   // Para pruebas
   window._cobranzaDatos = datosCobranza;
   window._cobranzaMensaje = mensaje;
+  window._cobranzaPais = paisDetectado;
+  window._cobranzaNumero = numeroWhats;
 })();

@@ -26,6 +26,7 @@
   function buscarOrigen(tipo, id){
     if (tipo === 'pend') return lista('pendientes').filter(function(p){ return p && String(p.id) === String(id); })[0] || null;
     if (tipo === 'esc')  return lista('escrituras').filter(function(e){ return e && String(e.id) === String(id); })[0] || null;
+    if (tipo === 'jui')  return lista('juicios').filter(function(j){ return j && String(j.id) === String(id); })[0] || null;
     return null;
   }
   function nombreDe(p){ return typeof p === 'string' ? p : ((p && p.nombre) || ''); }
@@ -71,11 +72,14 @@
   function personasDe(tipo, o){
     var ns = [];
     if (tipo === 'pend') { ns = [o.persona, o.juiCliente]; }
+    else if (tipo === 'jui') { ns = [o.cliente]; }
     else { ns = (o.compradores || []).map(nombreDe).concat((o.vendedores || []).map(nombreDe)); }
     var vistos = {}, out = [];
-    ns.forEach(function(nm){
+    ns.forEach(function(nm, i){
       nm = String(nm || '').trim(); var k = norm(nm); if (!k || vistos[k]) return; vistos[k] = 1;
-      out.push({ nombre: nm, tel: telDe(nm, o) });
+      // En juicios el teléfono del cliente viene en el propio expediente
+      var propio = (tipo === 'jui' && i === 0 && o.tel) ? String(o.tel).trim() : '';
+      out.push({ nombre: nm, tel: propio || telDe(nm, o) });
     });
     return out;
   }
@@ -84,6 +88,7 @@
       var n = String(o.num || '').replace(/^carp\.?-?\s*/i, '').trim();
       return 'ESCRITURA' + (n ? ' ' + n : '');
     }
+    if (tipo === 'jui') return 'JUICIO' + (o.expediente ? ' ' + String(o.expediente).trim() : '') + (o.tipo ? ' · ' + String(o.tipo).trim().toUpperCase() : '');
     var sec = { placas:'PLACAS', juicios:'JUICIO', escrituras:'ESCRITURA', registro:'REGISTRO CIVIL' }[o.seccion] || 'PENDIENTE';
     var num = o.reciboVinculadoFolio ? 'FOLIO ' + o.reciboVinculadoFolio : '';
     return sec + (num ? ' · ' + num : '');
@@ -115,7 +120,7 @@
     var personas = personasDe(tipo, o);
     if (!personas.length) personas = [{ nombre: '', tel: '' }];
     var origenTxt = String(etiqueta || '').trim() || etiquetaOrigen(tipo, o);
-    var resumen = tipo === 'esc' ? String(o.tipo || o.tramite || '').trim() : String(o.texto || '').trim();
+    var resumen = tipo === 'esc' ? String(o.tipo || o.tramite || '').trim() : tipo === 'jui' ? String(o.juzgado || '').trim() : String(o.texto || '').trim();
     var viejo = document.getElementById('lex-llam-ov'); if (viejo) viejo.remove();
     var ov = document.createElement('div');
     ov.id = 'lex-llam-ov';
@@ -205,6 +210,7 @@
       try { if (typeof renderTareasHoyCount === 'function') renderTareasHoyCount(); } catch(e){}
       try { if (tipo === 'pend' && typeof renderPend === 'function') renderPend(); } catch(e){}
       try { if (tipo === 'esc' && typeof escRender === 'function') escRender(); } catch(e){}
+      try { if (tipo === 'jui' && typeof renderJuicios === 'function') renderJuicios(); } catch(e){}
       cerrar();
       if (typeof toast === 'function') toast('📞 Llamada enviada a "Tareas para hoy"' + (fecha ? ' para el ' + fCorta(fecha) : '') + ': ' + nombre, 'ok');
     };

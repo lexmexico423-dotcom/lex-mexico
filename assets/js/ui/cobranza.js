@@ -10,7 +10,24 @@
     { id:'g30',  txt:'31 a 90 días',    min:31,  max:90,  fondo:'#fbf6d6', color:'#7a6a10' },
     { id:'g0',   txt:'0 a 30 días',     min:0,   max:30,  fondo:'#eaf3de', color:'#3b6d11' }
   ];
-  var filtro = null, busca = '', seleccionado = null;
+  var filtro = null, busca = '', seleccionado = null, categoria = null;
+  // Oct-2026: categorías del trámite (por tipo de recibo y palabras del concepto)
+  var CATEGORIAS = [
+    { id:'placas',     txt:'Placas',         ico:'🚗', re:/PLACA|REPUVE|FACTURA DE ORIGEN|TARJETA DE CIRCULACION|TENENCIA|REFACTURA|VEHICUL/ },
+    { id:'juicios',    txt:'Juicios',        ico:'⚖️', re:/JUICIO|DIVORCIO|PRESCRIPCION|PENSION|SUCESORIO|INTESTAMENTARIO|DILIGENCIA|DEMANDA|AMPARO|CONVENIO JUDICIAL/ },
+    { id:'registro',   txt:'Registro civil', ico:'🏛️', re:/ACTA DE NACIMIENTO|ACTA DE MATRIMONIO|ACTA DE DEFUNCION|RECTIFICACION DE ACTA|REGISTRO CIVIL|CURP/ },
+    { id:'escrituras', txt:'Escrituras',     ico:'📜', re:/ESCRITUR|RECTIFICACION DE MEDIDAS|COLINDANCIA|TERRENO|PREDIO|CATASTR|MEDICION|PREDIAL|IFREO/ },
+    { id:'contratos',  txt:'Contratos',      ico:'📝', re:/CONTRATO|DONACION|PODER NOTARIAL|COMPRAVENTA|ARRENDAMIENTO|CESION/ },
+    { id:'otros',      txt:'Otros',          ico:'📁', re:null }
+  ];
+  function categoriaDe(r, texto){
+    var tt = String(r.tipoTramite || '').toLowerCase();
+    if (tt === 'vehicular') return 'placas';
+    if (tt === 'escritura') return 'escrituras';
+    var t = norm(texto);
+    for (var i = 0; i < CATEGORIAS.length; i++) if (CATEGORIAS[i].re && CATEGORIAS[i].re.test(t)) return CATEGORIAS[i].id;
+    return 'otros';
+  }
 
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function dinero(n){ return '$' + (Number(n) || 0).toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 }); }
@@ -50,7 +67,8 @@
         personas: (Array.isArray(r.clientes) ? r.clientes : []).map(function(c){
           return { nombre: String((c && c.nombre) || '').trim(), tel: String((c && (c.movil || c.tel)) || '').trim() };
         }).filter(function(p){ return p.nombre || p.tel; }),
-        concepto: String(concepto).trim(), saldo: saldo, fecha: fecha, dias: diasDesde(fecha)
+        concepto: String(concepto).trim(), saldo: saldo, fecha: fecha, dias: diasDesde(fecha),
+        categoria: categoriaDe(r, (Array.isArray(r.conceptos) ? r.conceptos.map(function(c){ return (c && c.concepto) || ''; }).join(' ') : '') + ' ' + (r.tramites || '')),
       });
     });
     lista.sort(function(a, b){ return b.dias - a.dias; });
@@ -140,9 +158,26 @@
 
   function render(){
     var ov = document.getElementById('overlay-cobranza'); if (!ov) return;
-    var todos = datosCobranza();
-    var total = todos.reduce(function(s, x){ return s + x.saldo; }, 0);
-    ov.querySelector('#cob-total').textContent = dinero(total) + ' · ' + todos.length + ' folios';
+    var todosSinCat = datosCobranza();
+    // Botones de categoría (solo las que tienen folios con saldo)
+    var catsBox = ov.querySelector('#cob-cats');
+    if (catsBox) {
+      var chip = function(id, ico, txt, rs){
+        var on = categoria === id;
+        return '<button type="button" class="cob-cat" data-c="' + (id || '') + '" style="border:1px solid ' + (on ? '#9a6e18' : '#d9c38a') + ';background:' + (on ? '#1a1008' : '#fff') + ';color:' + (on ? '#e8c875' : '#5a4a30') + ';border-radius:20px;padding:5px 12px;font-size:0.74rem;cursor:pointer;white-space:nowrap;">'
+          + ico + ' ' + txt + ' <b>' + rs.length + '</b> · ' + dinero(rs.reduce(function(s, x){ return s + x.saldo; }, 0)) + '</button>';
+      };
+      catsBox.innerHTML = chip(null, '📋', 'Todas', todosSinCat) + CATEGORIAS.map(function(c){
+        var rs = todosSinCat.filter(function(x){ return x.categoria === c.id; });
+        return rs.length ? chip(c.id, c.ico, c.txt, rs) : '';
+      }).join('');
+      catsBox.querySelectorAll('.cob-cat').forEach(function(b){
+        b.onclick = function(){ var c = b.getAttribute('data-c') || null; categoria = (categoria === c ? null : c); render(); };
+      });
+    }
+    var todos = categoria ? todosSinCat.filter(function(x){ return x.categoria === categoria; }) : todosSinCat;
+    var total = todosSinCat.reduce(function(s, x){ return s + x.saldo; }, 0);
+    ov.querySelector('#cob-total').textContent = dinero(total) + ' · ' + todosSinCat.length + ' folios';
     ov.querySelector('#cob-cards').innerHTML = GRUPOS.map(function(g, i){
       var rs = todos.filter(function(x){ return x.dias >= g.min && x.dias <= g.max; });
       var on = filtro === i;
@@ -263,6 +298,7 @@
         +   '<button type="button" onclick="cerrarCobranza()" style="background:none;border:none;color:rgba(232,200,117,0.7);font-size:1.4rem;cursor:pointer;line-height:1;" aria-label="Cerrar">✕</button>'
         + '</div>'
         + '<div style="padding:14px 18px 0;flex-shrink:0;">'
+        +   '<div id="cob-cats" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>'
         +   '<div id="cob-cards" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;"></div>'
         +   '<input id="cob-busca" type="text" placeholder="🔍 Buscar por nombre, folio, trámite o teléfono" style="width:100%;box-sizing:border-box;margin:10px 0;border:1px solid #d9c38a;border-radius:20px;padding:8px 14px;font-size:0.8rem;background:#fff;">'
         + '</div>'
@@ -286,5 +322,6 @@
   window._cobranzaDatos = datosCobranza;
   window._cobranzaMensaje = mensaje;
   window._cobranzaPais = paisDetectado;
+  window._cobranzaCategoria = categoriaDe;
   window._cobranzaNumero = numeroWhats;
 })();

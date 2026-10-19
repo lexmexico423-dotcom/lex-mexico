@@ -190,19 +190,20 @@
       var g = grupoDe(x.dias), sel = seleccionado === String(x.folio);
       var esAdm = esAdmin();
       var dest = destinoLlamada(x);
-      var et = etiquetaLlamadas(x);
+      var eb = esAdm ? estadoBoton(x, dest) : null;
+      var nBit = bitacoraDe(x.folio).length;
       var ep = (x.categoria === 'placas') ? estadoPlacas(x.folio) : null;
-      return '<div class="cob-row" data-f="' + esc(x.folio) + '" style="display:grid;grid-template-columns:52px minmax(0,1fr) 110px 78px ' + (esAdm ? '96px ' : '') + '132px;gap:10px;align-items:center;padding:8px 10px;background:' + (sel ? '#fff8e4' : '#fff') + ';border:1px solid ' + (sel ? '#c8951a' : '#eadfbf') + ';border-radius:7px;margin-bottom:6px;font-size:0.8rem;">'
+      return '<div class="cob-row" data-f="' + esc(x.folio) + '" style="display:grid;grid-template-columns:52px minmax(0,1fr) 110px 78px ' + '34px ' + (esAdm ? '118px ' : '') + '132px;gap:10px;align-items:center;padding:8px 10px;background:' + (sel ? '#fff8e4' : '#fff') + ';border:1px solid ' + (sel ? '#c8951a' : '#eadfbf') + ';border-radius:7px;margin-bottom:6px;font-size:0.8rem;">'
         + '<span class="cob-folio" data-f="' + esc(x.folio) + '" title="Abrir la ficha del folio ' + esc(x.folio) + '" style="color:#1a4a8a;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">#' + esc(x.folio) + esc(x.letra) + '</span>'
         + '<div style="min-width:0;"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(x.nombre || '(sin nombre)') + '</div>'
         + '<div style="font-size:0.7rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(oracion(x.concepto)) + ' · ' + (x.tel ? esc(x.tel) : '<span style="color:#a32d2d;">sin teléfono</span>') + (x.personas.length > 1 ? ' · <b style="color:#1a4a8a;">👥 ' + x.personas.length + ' personas</b>' : '') + '</div>'
         + (ep ? '<div style="margin-top:3px;"><span style="display:inline-block;font-size:0.66rem;font-weight:600;border-radius:10px;padding:1px 8px;background:' + ep.fondo + ';color:' + ep.color + ';" title="' + esc(ep.tip || '') + '">' + esc(ep.txt) + '</span></div>' : '')
-        + (et ? '<div style="margin-top:3px;"><span style="display:inline-block;font-size:0.66rem;border-radius:10px;padding:1px 8px;background:' + et.fondo + ';color:' + et.color + ';">' + esc(et.txt) + '</span></div>' : '')
         + '</div>'
         + '<span style="text-align:right;font-weight:700;color:#a32d2d;">' + dinero(x.saldo) + '</span>'
         + '<span style="font-size:0.68rem;padding:3px 6px;border-radius:10px;text-align:center;background:' + g.fondo + ';color:' + g.color + ';">' + x.dias + ' días</span>'
+        + '<button type="button" class="cob-bit" data-f="' + esc(x.folio) + '" title="Bitácora de cobranza del folio ' + esc(x.folio) + (nBit ? ' (' + nBit + ' movimientos)' : ' (sin movimientos)') + '" style="position:relative;background:#fff;border:1px solid #d9c38a;border-radius:6px;padding:5px 0;font-size:0.8rem;cursor:pointer;color:' + (nBit ? '#7a4a00' : '#c4b48a') + ';">🕑' + (nBit ? '<span style="position:absolute;top:-6px;right:-6px;background:#9a6e18;color:#fff;border-radius:9px;font-size:0.55rem;padding:1px 4px;line-height:1.2;">' + nBit + '</span>' : '') + '</button>'
         + (esAdm
-            ? '<button type="button" class="cob-llamar" data-f="' + esc(x.folio) + '" ' + (dest.tel ? '' : 'disabled ') + 'title="' + (dest.tel ? 'Crear tarea para que la secretaria llame a ' + esc(dest.nombre) : 'Sin teléfono registrado') + '" style="background:#fff;color:' + (dest.tel ? '#1a4a8a' : '#aaa') + ';border:1px solid ' + (dest.tel ? '#1a4a8a' : '#ccc') + ';border-radius:6px;padding:6px 6px;font-size:0.68rem;cursor:' + (dest.tel ? 'pointer' : 'not-allowed') + ';">📞 Llamar</button>'
+            ? '<button type="button" class="cob-llamar" data-f="' + esc(x.folio) + '" ' + (eb.activo ? '' : 'disabled ') + 'title="' + esc(eb.tip) + '" style="background:' + eb.fondo + ';color:' + eb.color + ';border:' + eb.borde + ';border-radius:6px;padding:6px 4px;font-size:0.66rem;line-height:1.15;cursor:' + (eb.activo ? 'pointer' : 'not-allowed') + ';">' + esc(eb.txt) + '</button>'
             : '')
         + '<button type="button" class="cob-gen" data-f="' + esc(x.folio) + '" style="background:#1a1008;color:#e8c875;border:1px solid #c8951a;border-radius:6px;padding:6px 8px;font-size:0.68rem;letter-spacing:0.04em;cursor:pointer;">✉ Generar mensaje</button>'
         + '</div>';
@@ -221,7 +222,17 @@
     ov.querySelectorAll('.cob-llamar').forEach(function(b){
       b.onclick = function(){
         var x = todos.filter(function(y){ return String(y.folio) === b.getAttribute('data-f'); })[0];
-        if (x) crearTareaLlamada(x);
+        if (!x) return;
+        var e = estadoBoton(x, destinoLlamada(x));
+        if (!e.activo) return;
+        if (e.id === 'verificar' && !window.confirm('Este cliente dijo que ya pagó.\n\n¿Ya revisaste que su pago no esté registrado?\n\nAceptar = crear la tarea para llamarle de nuevo.')) return;
+        crearTareaLlamada(x);
+      };
+    });
+    ov.querySelectorAll('.cob-bit').forEach(function(b){
+      b.onclick = function(){
+        var x = todos.filter(function(y){ return String(y.folio) === b.getAttribute('data-f'); })[0];
+        if (x) verBitacora(x);
       };
     });
     ov.querySelectorAll('.cob-gen').forEach(function(b){
@@ -345,7 +356,9 @@
     var ya = tareas().some(function(t){ return t && t.tipo === 'cobranza-llamada' && t.estado !== 'resuelta' && t.cobranza && String(t.cobranza.folio) === String(x.folio); });
     if (ya) { if (typeof toast === 'function') toast('📞 Ya hay una tarea pendiente para llamar a este cliente (folio ' + x.folio + ')', 'err'); return; }
     var c = { folio: x.folio, letra: x.letra, nombre: p.nombre || x.nombre, tel: p.tel, saldo: x.saldo, tramite: nombreTramite(x.concepto) };
-    tareas().unshift(tareaLlamada(c, '', 1));
+    var tNueva = tareaLlamada(c, '', 1);
+    tareas().unshift(tNueva);
+    anotar(c.folio, 'llamada', 'Llamada pedida a ' + c.nombre + ' (' + c.tel + ')', { tareaId: tNueva.id });
     guardarTareas();
     if (typeof toast === 'function') toast('📞 Tarea creada en "Tareas para hoy": llamar a ' + c.nombre, 'ok');
     render();
@@ -407,6 +420,8 @@
       var abono = (Number(t.cobranza.saldo) || 0) - s.saldo;
       t.estado = 'resuelta'; t.fechaResolucion = ahora; t.fechaMod = ahora;
       t.resultado = { tipo: 'pago', automatico: true, recibo: t.cobranza.folio + s.letra, abono: abono, saldo: s.saldo };
+      if (!bitacoraDe(t.cobranza.folio).some(function(b){ return b.tipo === 'pago' && b.tareaId === t.id; }))
+        anotar(t.cobranza.folio, 'pago', 'Pagó ' + dinero(abono) + ' (recibo ' + t.cobranza.folio + s.letra + ')' + (s.saldo > 0.005 ? ' · saldo restante ' + dinero(s.saldo) : ' · folio liquidado'), { tareaId: t.id, por: 'Sistema' });
       t.titulo = '✅ PAGÓ · FOLIO ' + t.cobranza.folio + ' — ' + String(t.cobranza.nombre).toUpperCase();
       t.texto = 'Resuelta automáticamente: se registró el recibo ' + t.cobranza.folio + s.letra + ' por ' + dinero(abono) + (s.saldo > 0.005 ? ' (saldo restante ' + dinero(s.saldo) + ').' : ' (folio liquidado).');
       cambio = true;
@@ -460,6 +475,7 @@
       t.resultado = { tipo: tipo, fecha: tipo === 'promesa' ? fecha : '', nota: nota, por: quien() };
       var etq = { promesa: 'Prometió pagar el ' + fCorta(fecha), 'no-contesto': 'No contestó', numero: 'Número equivocado o sin servicio', 'ya-pago': 'Dice que ya pagó' }[tipo];
       t.texto = (t.texto || '') + '\nResultado: ' + etq + (nota ? ' · Nota: ' + nota : '');
+      anotar(c.folio, tipo, etq + (nota ? ' · "' + nota + '"' : ''), { fechaPromesa: tipo === 'promesa' ? fecha : '', tel: c.tel, tareaId: t.id });
       if (tipo === 'promesa') {
         tareas().unshift({
           id: nuevoId(), tipo: 'cobranza-promesa',
@@ -470,6 +486,7 @@
         });
       } else if (tipo === 'no-contesto') {
         tareas().unshift(tareaLlamada(c, hoyStr(1), (Number(c.intento) || 1) + 1));
+        anotar(c.folio, 'reintento', 'Se programó otra llamada para el ' + fCorta(hoyStr(1)) + ' (intento ' + ((Number(c.intento) || 1) + 1) + ')', {});
       }
       ov.remove();
       guardarTareas();
@@ -477,6 +494,93 @@
       var ovC = document.getElementById('overlay-cobranza'); if (ovC && ovC.style.display !== 'none') render();
     };
   }
+  // ── Bitácora permanente de cobranza (D.cobranzaBitacora) ──────────────
+  // Las tareas resueltas se borran solas a los 2 días; la bitácora no.
+  function bitacora(){ try { if (typeof D !== 'undefined' && D) { if (!Array.isArray(D.cobranzaBitacora)) D.cobranzaBitacora = []; return D.cobranzaBitacora; } } catch(e){} return []; }
+  function bitacoraDe(folio){ return bitacora().filter(function(b){ return b && String(b.folio) === String(folio); }).sort(function(a, b){ return String(a.fecha).localeCompare(String(b.fecha)); }); }
+  function anotar(folio, tipo, texto, extra){
+    var ahora = new Date().toISOString();
+    bitacora().push(Object.assign({ id: 'CB-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), folio: folio, tipo: tipo, texto: texto, por: quien(), fecha: ahora, fechaMod: ahora }, extra || {}));
+  }
+  // ── Estado del botón 📞 según tareas actuales + bitácora ───────────────
+  function estadoBoton(x, dest){
+    var B = function(id, txt, activo, fondo, color, borde, tip){ return { id: id, txt: txt, activo: activo, fondo: fondo, color: color, borde: borde, tip: tip }; };
+    var normal = B('llamar', '📞 Llamar', true, '#fff', '#1a4a8a', '1px solid #1a4a8a', 'Crear tarea para que la secretaria llame a ' + (dest.nombre || x.nombre));
+    if (!dest.tel) return B('sin-tel', '📞 Llamar', false, '#fff', '#aaa', '1px solid #ccc', 'Sin teléfono registrado');
+    var hoy = hoyStr(0);
+    var ts = tareas().filter(function(t){ return t && t.estado !== 'resuelta' && t.cobranza && String(t.cobranza.folio) === String(x.folio); });
+    var ll = ts.filter(function(t){ return t.tipo === 'cobranza-llamada'; })[0];
+    if (ll && (!ll.fechaProgramada || ll.fechaProgramada <= hoy))
+      return B('en-tareas', '📋 En tareas', false, '#fdf0dc', '#9a5a10', '1px solid #e8c48a', 'Ya está en Tareas para hoy desde el ' + fCorta(ll.fechaCreacion) + '; falta que la secretaria anote el resultado.');
+    if (ll) return B('programada', '📅 Programada ' + fCorta(ll.fechaProgramada), false, '#e6f1fb', '#185fa5', '1px solid #b5d4f4', 'Se volverá a llamar el ' + fCorta(ll.fechaProgramada) + ' (intento ' + ((ll.cobranza && ll.cobranza.intento) || 2) + ').');
+    var pr = ts.filter(function(t){ return t.tipo === 'cobranza-promesa'; }).sort(function(a, b){ return String(b.fechaProgramada).localeCompare(String(a.fechaProgramada)); })[0];
+    if (pr) return pr.fechaProgramada >= hoy
+      ? B('promesa', '📅 Promesa ' + fCorta(pr.fechaProgramada), false, '#eaf3de', '#3b6d11', '1px solid #c0dd97', 'Se comprometió a pagar el ' + fCorta(pr.fechaProgramada) + '.')
+      : B('vencida', '📞 Llamar de nuevo', true, '#fff', '#a32d2d', '1.5px solid #a32d2d', 'Venció su promesa de pago del ' + fCorta(pr.fechaProgramada) + ' y no ha pagado.');
+    // Sin tareas en curso: se usa la última anotación de la bitácora
+    var bs = bitacoraDe(x.folio).filter(function(b){ return /^(promesa|numero|ya-pago|pago|eliminada-promesa)$/.test(b.tipo); });
+    var u = bs[bs.length - 1];
+    if (!u || u.tipo === 'pago') return normal;
+    if (u.tipo === 'promesa' || u.tipo === 'eliminada-promesa') {
+      var fp = u.fechaPromesa || '';
+      if (fp && fp >= hoy) return B('promesa', '📅 Promesa ' + fCorta(fp) + ' (sin recordatorio)', false, '#eaf3de', '#3b6d11', '1px solid #c0dd97', 'Prometió pagar el ' + fCorta(fp) + '. Su tarea de recordatorio fue eliminada.');
+      if (fp) return B('vencida', '📞 Llamar de nuevo', true, '#fff', '#a32d2d', '1.5px solid #a32d2d', 'Venció su promesa de pago del ' + fCorta(fp) + ' y no ha pagado.');
+      return normal;
+    }
+    if (u.tipo === 'numero') return (soloDigitos(u.tel) && soloDigitos(u.tel) === soloDigitos(dest.tel))
+      ? B('revisar-numero', '☎ Revisar número', false, '#f1efe8', '#5f5e5a', '1px solid #d3d1c7', 'El número ' + dest.tel + ' estaba equivocado o sin servicio. Corrige el teléfono en el recibo para poder llamar.')
+      : normal;
+    if (u.tipo === 'ya-pago') return B('verificar', '💬 Verificar pago', true, '#fff', '#185fa5', '1px solid #185fa5', 'Dijo que ya pagó (' + fCorta(u.fecha) + '). Revisa antes de volver a llamar.');
+    return normal;
+  }
+  // ── Ver bitácora de un folio ──
+  function verBitacora(x){
+    var bs = bitacoraDe(x.folio).slice().reverse();
+    var viejo = document.getElementById('cob-bit-ov'); if (viejo) viejo.remove();
+    var ov = document.createElement('div'); ov.id = 'cob-bit-ov';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:2147482000;background:rgba(26,16,8,0.55);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Helvetica,Arial,sans-serif;';
+    var ico = { llamada: '📞', promesa: '📅', 'no-contesto': '📵', reintento: '🔁', numero: '☎', 'ya-pago': '💬', pago: '✅', eliminada: '🗑', 'eliminada-promesa': '🗑' };
+    var hora = function(iso){ var d = new Date(iso); return isNaN(d) ? '' : fCorta(iso) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+    ov.innerHTML = '<div style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:560px;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(0,0,0,0.45);">'
+      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.72rem;letter-spacing:0.1em;font-family:monospace;display:flex;justify-content:space-between;align-items:center;"><span>🕑 BITÁCORA DE COBRANZA · FOLIO ' + esc(x.folio) + esc(x.letra) + '</span><button type="button" id="cob-bit-x" style="background:none;border:none;color:#e8c875;font-size:1.1rem;cursor:pointer;">✕</button></div>'
+      + '<div style="padding:10px 16px 4px;font-weight:600;font-size:0.84rem;color:#2a1c08;">' + esc(x.nombre) + '</div>'
+      + '<div style="padding:4px 16px 14px;overflow-y:auto;">'
+      + (bs.length ? bs.map(function(b){
+          return '<div style="display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid #eadfbf;border-radius:7px;padding:7px 10px;margin-bottom:6px;font-size:0.78rem;color:#2a1c08;">'
+            + '<span style="font-size:1rem;line-height:1.2;">' + (ico[b.tipo] || '•') + '</span>'
+            + '<div style="flex:1;min-width:0;"><div>' + esc(b.texto) + '</div><div style="font-size:0.66rem;color:#9a6e18;margin-top:2px;">' + esc(hora(b.fecha)) + ' · ' + esc(b.por || '') + '</div></div></div>';
+        }).join('') : '<div style="text-align:center;color:#7a6a4a;padding:24px;font-size:0.8rem;">Todavía no hay movimientos de cobranza en este folio.</div>')
+      + '</div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('#cob-bit-x').onclick = function(){ ov.remove(); };
+    ov.onclick = function(ev){ if (ev.target === ov) ov.remove(); };
+  }
+  // ── Eliminar una tarea de cobranza: aviso y registro en la bitácora ──
+  (function engancharEliminar(){
+    if (typeof window.eliminarTareaHoy !== 'function' || window.eliminarTareaHoy._cob) return;
+    var orig = window.eliminarTareaHoy;
+    var envuelta = function(){
+      var id = null; try { id = _tareaEdId; } catch(e){}
+      var t = id ? tareas().filter(function(x){ return x && x.id === id; })[0] : null;
+      if (!t || !t.cobranza || !/^cobranza-/.test(t.tipo || '')) return orig.apply(this, arguments);
+      var c = t.cobranza;
+      if (!window.confirm('Esta tarea es de cobranza (folio ' + c.folio + (c.letra || '') + ' — ' + c.nombre + ').\n\nSi la eliminas, quedará anotado en la bitácora del folio.\n\n¿Continuar?')) return;
+      var esProm = t.tipo === 'cobranza-promesa';
+      anotar(c.folio, esProm ? 'eliminada-promesa' : 'eliminada',
+        (esProm ? 'Se eliminó el recordatorio de la promesa de pago del ' + fCorta(t.fechaProgramada) : 'Se eliminó la tarea de llamada') + (t.estado === 'resuelta' ? ' (ya resuelta)' : ''),
+        esProm ? { fechaPromesa: t.fechaProgramada } : {});
+      if (typeof _lexLapidaTareas === 'function') _lexLapidaTareas([t.id]);
+      if (typeof D !== 'undefined' && D) D.tareasHoy = tareas().filter(function(x){ return x && x.id !== t.id; });
+      try { if (typeof cerrar === 'function') cerrar('mTareaEditar'); } catch(e){}
+      guardarTareas();
+      if (typeof toast === 'function') toast('🗑 Tarea eliminada — quedó anotado en la bitácora del folio ' + c.folio, 'ok');
+    };
+    envuelta._cob = true;
+    window.eliminarTareaHoy = envuelta;
+  })();
+  window._cobranzaBitacora = bitacoraDe;
+  window._cobranzaEstadoBoton = function(folio){ var x = datosCobranza().filter(function(y){ return String(y.folio) === String(folio); })[0]; return x ? estadoBoton(x, destinoLlamada(x)) : null; };
+
   // Las tareas de llamada piden el resultado; el resto se resuelve como siempre
   (function engancharTareas(){
     if (typeof window.marcarTareaResuelta !== 'function' || window.marcarTareaResuelta._cob) return;

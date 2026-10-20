@@ -1986,7 +1986,9 @@ let _lexPollingTimer = null;
 // con una base de datos de apenas 46MB — es decir, se estaba re-descargando
 // el mismo estado cientos de veces). 120s sigue siendo una red de seguridad
 // razonable y reduce el consumo ~4x.
-const _LEX_POLLING_MS = 120000;
+// Oct-2026: 30 s otra vez — ahora cada revisión solo pregunta el número de
+// versión (rev, unos bytes); los datos completos se bajan solo si cambió algo.
+const _LEX_POLLING_MS = 30000;
 /* Movido a modules/core/index.js: lexPollingIniciar */
 /* Movido a modules/recibos/index.js: _lexPollingTick */
 // ═══ FIN REALTIME ═══

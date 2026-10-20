@@ -702,6 +702,8 @@
   };
   // Para pruebas
   window._cobranzaDatos = datosCobranza;
+  // Oct-2026: repintar el panel si está abierto (sincronización en vivo)
+  window._cobranzaRefrescar = function(){ var o = document.getElementById('overlay-cobranza'); if (o && o.style.display !== 'none') render(); };
   window._cobranzaMensaje = mensaje;
   window._cobranzaPais = paisDetectado;
   window._cobranzaCategoria = categoriaDe;

@@ -3108,9 +3108,18 @@ function lexRealtimeConectar() {
   _lexRealtimeChannel = window.SB.channel(canal, {
     config: { broadcast: { self: false } } // no recibir los propios mensajes
   });
+  const _lexCanalEste = _lexRealtimeChannel;
   _lexRealtimeChannel
     // ── BROADCAST: otro usuario guardó (self:false = nunca somos nosotros) ──
     .on('broadcast', { event: 'estado_actualizado' }, function(payload) {
+      // Oct-2026: sincronización en vivo — ningún aviso de otra computadora
+      // se descarta; se juntan y se bajan en cuanto se puede (sync-vivo.js).
+      if (typeof lexPedirSync === 'function') {
+        // self:false ya garantiza que no es ESTA pestaña; otra pestaña del
+        // mismo usuario (otra computadora con la misma cuenta) sí cuenta.
+        lexPedirSync('broadcast');
+        return;
+      }
       const ahora = Date.now();
       if (ahora - _lexRealtimeUltimaRecarga < _LEX_REALTIME_COOLDOWN) return;
       _lexRealtimeUltimaRecarga = ahora;
@@ -3151,6 +3160,13 @@ function lexRealtimeConectar() {
       table: 'app_state',
       filter: 'despacho_id=eq.' + window.SB_DESPACHO_ID
     }, function(payload) {
+      // Oct-2026: sincronización en vivo (sync-vivo.js)
+      if (typeof lexPedirSync === 'function') {
+        const _updByV = payload && payload.new && payload.new.updated_by;
+        if (_updByV && _updByV === window._miUserId) return; // fue nuestro guardado
+        lexPedirSync('postgres');
+        return;
+      }
       const ahora = Date.now();
       if (ahora - _lexRealtimeUltimaRecarga < _LEX_REALTIME_COOLDOWN) return;
       _lexRealtimeUltimaRecarga = ahora;
@@ -3278,7 +3294,13 @@ function lexRealtimeConectar() {
     })
     .subscribe(function(status) {
       console.log('[Realtime] Estado canal:', status);
-      if (status === 'SUBSCRIBED') lexPollingIniciar();
+      if (status === 'SUBSCRIBED') {
+        lexPollingIniciar();
+        if (typeof lexRealtimeConectado === 'function') lexRealtimeConectado();
+      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        // Oct-2026: si el canal en vivo se cae, reconectarlo solo
+        if (typeof lexRealtimeReconectar === 'function') lexRealtimeReconectar(_lexCanalEste);
+      }
     });
   console.log('[Realtime] Conectado al canal:', canal);
 }

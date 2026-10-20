@@ -63,7 +63,12 @@
   // Compatible con adeudos viejos: si el adeudo completo está "cobrado", todos
   // sus conceptos cuentan como cobrados.
   function conceptoCobrado(a, c){ return a.estado === 'cobrado' || !!(c && c.cobrado); }
-  function pendientes(a){ return (a.conceptos||[]).filter(function(c){ return !conceptoCobrado(a, c); }); }
+  // "Incluido en lo pactado": costo que el despacho absorbe dentro del precio
+  // del folio — NO se le cobra aparte al cliente (solo registra la salida).
+  function esIncluido(c){ return !!(c && c.tipoGasto === 'incluido'); }
+  function reembolsables(a){ return (a.conceptos||[]).filter(function(c){ return !esIncluido(c); }); }
+  function pendientes(a){ return reembolsables(a).filter(function(c){ return !conceptoCobrado(a, c); }); }
+  function totalReembolso(a){ return r2(reembolsables(a).reduce(function(s,c){ return s + (parseFloat(c.monto)||0); }, 0)); }
   function totalPendiente(a){ return r2(pendientes(a).reduce(function(s,c){ return s + (parseFloat(c.monto)||0); }, 0)); }
   window._adeudoTotal = function(a){ return r2((a.conceptos||[]).reduce(function(s,c){ return s + (parseFloat(c.monto)||0); }, 0)); };
 
@@ -132,21 +137,36 @@
     var st = 'padding:7px 9px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;' + (bloq ? 'background:#f5f0e4;color:#6a5a3a;' : '');
     var hoy = hoyL();
     var marcado = c.movEgresoId ? true : (c.pagadoDespacho != null ? !!c.pagadoDespacho : ((c.fecha || hoy).slice(0,10) === hoy));
+    var incl = esIncluido(c);
+    var selTipo = '<select class="ac-tipo" onchange="_lexAdeudoTipoCambio(this)"' + (bloq ? ' disabled' : '') + ' title="¿Se le cobra aparte al cliente o ya va dentro del precio pactado del folio?" style="flex:0 0 190px;padding:7px 6px;border:1px solid ' + (incl ? '#7fae7f' : '#e3b27a') + ';border-radius:6px;font-size:0.74rem;background:' + (incl ? '#eef8f0' : '#fff6ea') + ';color:' + (incl ? '#1a6a3a' : '#8a4a10') + ';">'
+      + '<option value="reembolso"' + (incl ? '' : ' selected') + '>↩ Reembolso (se cobra aparte)</option>'
+      + '<option value="incluido"' + (incl ? ' selected' : '') + '>✓ Incluido en lo pactado</option></select>';
     var casilla;
     if (c.movEgresoId) casilla = '<span style="color:#8a4a10;">✓ 💵 Lo pagó el despacho — salida de caja registrada' + (c.egresoFecha ? ' el ' + E(fC(c.egresoFecha)) : '') + '</span>';
     else if (a && conceptoCobrado(a, c)) casilla = '<span style="color:#3b6d11;">✓ Cobrado' + (c.cobradoFecha ? ' el ' + E(fC(c.cobradoFecha)) : '') + '</span>';
-    else casilla = '<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;"><input type="checkbox" class="ac-pagado"' + (marcado ? ' checked' : '') + ' onchange="this.setAttribute(\'data-tocado\',\'1\')" style="width:15px;height:15px;accent-color:#c8781a;"> 💵 Lo pagó el despacho — registrar <b>salida de caja</b></label>';
+    else casilla = '<label style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;"><input type="checkbox" class="ac-pagado"' + ((marcado || incl) ? ' checked' : '') + (incl ? ' disabled' : '') + ' onchange="this.setAttribute(\'data-tocado\',\'1\')" style="width:15px;height:15px;accent-color:#c8781a;"> 💵 Lo pagó el despacho — registrar <b>salida de caja</b></label>';
+    casilla += '<span class="ac-tipo-nota" style="margin-left:10px;color:' + (incl ? '#1a6a3a' : '#8a4a10') + ';">' + (incl ? '· Va dentro de lo pactado: NO se le cobra aparte al cliente' : '· Se le cobra aparte al cliente') + '</span>';
     return '<div class="adeudo-concepto-row" data-cid="' + E(c.id) + '"' + (bloq ? ' data-bloq="1"' : '') + ' style="margin-bottom:8px;">'
       + '<div style="display:flex;gap:6px;align-items:center;">'
       + '<input type="text" class="ac-desc" value="' + E(c.descripcion||'') + '" placeholder="Descripción" style="flex:1;min-width:0;' + st + '"' + ro + '>'
       + '<input type="date" class="ac-fecha" value="' + E((c.fecha||'').slice(0,10)) + '" onchange="_lexAdeudoFechaCambio(this)" style="flex:0 0 150px;' + st + '"' + ro + '>'
       + '<input type="number" class="ac-monto" value="' + (c.monto != null && c.monto !== '' ? c.monto : '') + '" placeholder="Monto" step="0.01" min="0" style="flex:0 0 120px;' + st + '"' + ro + '>'
+      + selTipo
       + (bloq ? '<span style="width:28px;text-align:center;color:#c4b48a;" title="No se puede quitar: ya está en caja o cobrado">🔒</span>'
               : '<button type="button" onclick="quitarConceptoAdeudo(this)" title="Quitar concepto" style="background:none;border:none;color:var(--rojo,#b91c1c);font-size:1rem;cursor:pointer;padding:2px 6px;width:28px;">✕</button>')
       + '</div>'
       + '<div class="ac-casilla" style="margin:4px 0 0 2px;font-size:0.72rem;color:#8a4a10;">' + casilla + '</div>'
       + '</div>';
   }
+  window._lexAdeudoTipoCambio = function(sel){
+    var row = sel.closest('.adeudo-concepto-row'); if (!row) return;
+    var incl = sel.value === 'incluido';
+    sel.style.borderColor = incl ? '#7fae7f' : '#e3b27a'; sel.style.background = incl ? '#eef8f0' : '#fff6ea'; sel.style.color = incl ? '#1a6a3a' : '#8a4a10';
+    var cb = row.querySelector('.ac-pagado');
+    if (cb) { if (incl) { cb.checked = true; cb.disabled = true; } else { cb.disabled = false; } }
+    var nota = row.querySelector('.ac-tipo-nota');
+    if (nota) { nota.textContent = incl ? '· Va dentro de lo pactado: NO se le cobra aparte al cliente' : '· Se le cobra aparte al cliente'; nota.style.color = incl ? '#1a6a3a' : '#8a4a10'; }
+  };
   window._lexAdeudoFechaCambio = function(inp){
     var row = inp.closest('.adeudo-concepto-row'); if (!row) return;
     var cb = row.querySelector('.ac-pagado');
@@ -241,7 +261,8 @@
       var cid = row.getAttribute('data-cid');
       var prev = cid ? previos[cid] : null;
       if (row.getAttribute('data-bloq') && prev) { out.push(prev); return; } // bloqueado: se conserva tal cual
-      var elD = row.querySelector('.ac-desc'), elM = row.querySelector('.ac-monto'), cb = row.querySelector('.ac-pagado');
+      var elD = row.querySelector('.ac-desc'), elM = row.querySelector('.ac-monto'), cb = row.querySelector('.ac-pagado'), elT = row.querySelector('.ac-tipo');
+      var tipoG = (elT && elT.value === 'incluido') ? 'incluido' : 'reembolso';
       var desc = elD ? elD.value.trim() : '';
       var fecha = (row.querySelector('.ac-fecha')||{}).value || '';
       var montoRaw = elM ? elM.value.trim() : '';
@@ -251,7 +272,7 @@
       if (!desc) { if (elD) elD.style.borderColor = 'var(--rojo,#b91c1c)'; fn.error = fn.error || 'Falta la descripción de un concepto'; return; }
       if (!(monto > 0)) { if (elM) elM.style.borderColor = 'var(--rojo,#b91c1c)'; fn.error = fn.error || 'El monto de «' + desc + '» debe ser mayor a $0'; return; }
       if (!cid) cid = 'C-' + Date.now() + '-' + (_adeudoConceptoSeq++);
-      out.push(Object.assign({}, prev || {}, { id: cid, descripcion: desc, fecha: fecha, monto: monto, pagadoDespacho: !!(cb && cb.checked) }));
+      out.push(Object.assign({}, prev || {}, { id: cid, descripcion: desc, fecha: fecha, monto: monto, tipoGasto: tipoG, pagadoDespacho: tipoG === 'incluido' ? true : !!(cb && cb.checked) }));
     });
     return out;
   };
@@ -294,6 +315,7 @@
     if (!conceptos.length) { if (typeof toast === 'function') toast('Agrega al menos un concepto','err'); return; }
     // Folio ligado (opcional)
     var fv = String(((document.getElementById('adeudoFolio')||{}).value) || '').replace(/[^0-9]/g,'');
+    if (!fv && conceptos.some(esIncluido)) { if (typeof toast === 'function') toast('⚠ Para marcar un concepto como "Incluido en lo pactado" escribe el folio del trámite.','err'); try { document.getElementById('adeudoFolio').focus(); } catch(e){} return; }
     var folio = null;
     if (fv) {
       if (!ultimasVersiones()[fv]) { if (typeof toast === 'function') toast('⚠ No existe el folio ' + fv + '. Corrígelo o déjalo vacío.','err'); return; }
@@ -444,12 +466,13 @@
     var q = N((document.getElementById('adeudosBuscar')||{}).value || '');
     var todos = activos();
     var verCob = (typeof _adeudosVerCobrados !== 'undefined') && _adeudosVerCobrados;
-    var lst = todos.filter(function(a){ return verCob ? a.estado === 'cobrado' : a.estado !== 'cobrado'; });
+    var porCobrar = function(a){ return a.estado !== 'cobrado' && totalPendiente(a) > 0.005; };
+    var lst = todos.filter(function(a){ return verCob ? !porCobrar(a) : porCobrar(a); });
     if (q) lst = lst.filter(function(a){
       return N(a.cliente).indexOf(q) >= 0 || String(a.folioVinculado == null ? '' : a.folioVinculado) === q.replace(/[^0-9]/g,'') && q.replace(/[^0-9]/g,'') !== ''
         || (a.conceptos||[]).some(function(c){ return N(c.descripcion).indexOf(q) >= 0; });
     });
-    var orden = todos.filter(function(x){ return x.estado !== 'cobrado'; }).slice().sort(function(a,b){ var ka=a.fechaCreacion||'', kb=b.fechaCreacion||''; return ka<kb?-1:ka>kb?1:0; });
+    var orden = todos.filter(porCobrar).slice().sort(function(a,b){ var ka=a.fechaCreacion||'', kb=b.fechaCreacion||''; return ka<kb?-1:ka>kb?1:0; });
     var mapa = new Map(); orden.forEach(function(x,i){ mapa.set(x, i+1); });
     lst = lst.slice().sort(function(a,b){
       var ka = verCob ? (a.fechaResolucion||'') : (a.fechaCreacion||''), kb = verCob ? (b.fechaResolucion||'') : (b.fechaCreacion||'');
@@ -460,40 +483,47 @@
       cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.82rem;">' + (q ? 'Ningún adeudo coincide con la búsqueda.' : (verCob ? 'No hay adeudos cobrados todavía.' : 'No hay adeudos pendientes.')) + '</div>';
       return;
     }
-    var totalLista = lst.reduce(function(s,a){ return s + (verCob ? window._adeudoTotal(a) : totalPendiente(a)); }, 0);
+    var totalLista = lst.reduce(function(s,a){ return s + (verCob ? totalReembolso(a) : totalPendiente(a)); }, 0);
     var resumen = '<div style="display:flex;justify-content:flex-end;align-items:baseline;gap:8px;margin:0 2px 10px;font-size:0.74rem;color:var(--muted);">'
       + (verCob ? 'Total cobrado en esta lista:' : 'Total por cobrar:')
       + ' <strong style="font-family:monospace;font-size:0.95rem;color:' + ACOL + ';">' + $m(totalLista) + '</strong></div>';
     cont.innerHTML = resumen + lst.map(function(a){
-      var cobrado = a.estado === 'cobrado';
+      var soloIncl = !reembolsables(a).length;
+      var cobrado = !porCobrar(a);
       var num = cobrado ? '' : (mapa.get(a) || '');
-      var badge = cobrado
+      var badge = (cobrado && soloIncl)
+        ? '<span title="Solo tiene costos incluidos en lo pactado: no hay nada que cobrarle aparte" style="background:#1a6a3a;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">INCLUIDO EN LO PACTADO</span>'
+        : cobrado
         ? '<span style="background:' + ACOL + ';color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">COBRADO</span>'
         : '<span style="background:#8c6518;color:#fff;font-size:0.62rem;font-weight:700;padding:3px 9px;border-radius:12px;white-space:nowrap;">PENDIENTE</span>';
-      var circulo = cobrado
+      var circulo = (cobrado && soloIncl)
+        ? '<div title="Incluido en lo pactado" style="width:20px;height:20px;border-radius:50%;background:#1a6a3a;flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;">✓</div>'
+        : cobrado
         ? '<div onclick="event.stopPropagation();reabrirAdeudo(\'' + a.id + '\')" title="Reabrir" style="width:20px;height:20px;border-radius:50%;background:' + ACOL + ';flex-shrink:0;color:#fff;text-align:center;line-height:20px;font-size:12px;cursor:pointer;">✓</div>'
         : '<div onclick="event.stopPropagation();lexCobrarAdeudo(\'' + a.id + '\')" title="Cobrar" style="width:20px;height:20px;border-radius:50%;border:2px solid ' + ACOL + ';flex-shrink:0;cursor:pointer;"></div>';
       var ficha = num ? '<div title="N° de ficha — posición entre los adeudos activos, se recalcula solo" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Adeudo</span><span style="color:' + ACOL + ';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">' + num + '</span></div>' : '';
       var tit = cobrado ? 'text-decoration:line-through;color:var(--muted);' : 'color:' + ACOL + ';';
       var cs = a.conceptos || [];
       var csHtml = cs.map(function(c){
-        var cob = conceptoCobrado(a, c);
+        var cob = conceptoCobrado(a, c) && !esIncluido(c);
         return '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.76rem;color:var(--ink);padding:2px 0;' + (cob && !cobrado ? 'opacity:0.6;' : '') + '">'
           + '<span>' + (cob && !cobrado ? '<s>' : '') + E(c.descripcion||'(sin descripción)') + (cob && !cobrado ? '</s>' : '') + (c.fecha ? ' <span style="color:var(--muted);">· ' + E(String(c.fecha).slice(0,10)) + '</span>' : '')
           + (c.movEgresoId ? ' <span title="Salida de caja registrada" style="font-size:0.64rem;background:#fdf0dc;color:#8a4a10;border-radius:4px;padding:0 5px;">💵 lo pagó el despacho</span>' : '')
+          + (esIncluido(c) ? ' <span title="Va dentro del precio pactado del folio: no se le cobra aparte" style="font-size:0.64rem;background:#eef8f0;color:#1a6a3a;border-radius:4px;padding:0 5px;">✓ incluido en lo pactado</span>' : '')
           + (cob && !cobrado ? ' <span style="font-size:0.64rem;color:#3b6d11;">✓ cobrado ' + E(fC(c.cobradoFecha)) + '</span>' : '')
-          + '</span><span style="white-space:nowrap;font-family:monospace;">' + $m(c.monto) + '</span></div>';
+          + '</span><span style="white-space:nowrap;font-family:monospace;' + (esIncluido(c) ? 'color:#7a8a7a;' : '') + '">' + $m(c.monto) + '</span></div>';
       }).join('');
       var pendT = totalPendiente(a);
-      var hayParcial = !cobrado && pendT < window._adeudoTotal(a) - 0.005;
-      var totHtml = (cs.length >= 2 || hayParcial)
-        ? '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.78rem;font-weight:700;border-top:1px solid rgba(200,149,42,0.25);margin-top:4px;padding-top:4px;"><span>' + (cobrado ? 'TOTAL' : 'PENDIENTE') + '</span><span style="font-family:monospace;">' + $m(cobrado ? window._adeudoTotal(a) : pendT) + '</span></div>'
+      var hayParcial = !cobrado && pendT < totalReembolso(a) - 0.005;
+      var totHtml = (!soloIncl && (cs.length >= 2 || hayParcial))
+        ? '<div style="display:flex;justify-content:space-between;gap:10px;font-size:0.78rem;font-weight:700;border-top:1px solid rgba(200,149,42,0.25);margin-top:4px;padding-top:4px;"><span>' + (cobrado ? 'TOTAL COBRADO' : 'POR COBRAR') + '</span><span style="font-family:monospace;">' + $m(cobrado ? totalReembolso(a) : pendT) + '</span></div>'
         : '';
       var folioChip = a.folioVinculado != null ? '<span style="font-size:0.62rem;background:#e6f1fb;color:#185fa5;border-radius:10px;padding:2px 8px;margin-left:8px;white-space:nowrap;">📂 Folio ' + E(a.folioVinculado) + '</span>' : '';
       var acciones = cobrado
         ? '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
-          + '<div style="font-size:0.62rem;color:var(--muted);">Cobrado: ' + E(_adeudoFechaLocal(a.fechaResolucion)) + (a.cobradoPor ? ' · ' + E(a.cobradoPor) : '') + '</div>'
-          + '<button onclick="reabrirAdeudo(\'' + a.id + '\')" style="background:none;border:1px solid var(--border-l);color:var(--muted);font-size:0.66rem;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;">↩ REABRIR</button></div>'
+          + '<div style="font-size:0.62rem;color:var(--muted);">' + (soloIncl ? 'Costos del despacho dentro de lo pactado' : 'Cobrado: ' + E(_adeudoFechaLocal(a.fechaResolucion)) + (a.cobradoPor ? ' · ' + E(a.cobradoPor) : '')) + '</div>'
+          + (soloIncl ? '<button onclick="abrirEditarAdeudo(\'' + a.id + '\')" style="background:#e6f1fb;color:#185fa5;font-size:0.66rem;font-weight:700;padding:4px 9px;border:none;border-radius:6px;cursor:pointer;">EDITAR</button></div>' : '')
+          + (soloIncl ? '' : '<button onclick="reabrirAdeudo(\'' + a.id + '\')" style="background:none;border:1px solid var(--border-l);color:var(--muted);font-size:0.66rem;font-weight:700;padding:4px 9px;border-radius:6px;cursor:pointer;">↩ REABRIR</button></div>')
         : '<div style="display:flex;justify-content:space-between;align-items:center;margin-left:30px;border-top:1px solid rgba(200,149,42,0.15);padding-top:8px;margin-top:8px;">'
           + '<div style="font-size:0.62rem;color:var(--muted);">' + E(a.creadoPor||'') + ' · ' + E(_adeudoFechaLocal(a.fechaCreacion)) + '</div>'
           + '<div style="display:flex;gap:6px;">'
@@ -521,9 +551,10 @@
     var ads = gastosDeFolio(recibo.folio);
     var nombre = recibo.nombre || ((recibo.clientes||[])[0]||{}).nombre || '';
     var sueltos = pendientesSinFolioDe(nombre);
-    var filas = [];
-    ads.forEach(function(a){ (a.conceptos||[]).forEach(function(c){ filas.push({ a: a, c: c }); }); });
-    if (!filas.length && !sueltos.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+    var filas = [], incluidos = [];
+    ads.forEach(function(a){ (a.conceptos||[]).forEach(function(c){ (esIncluido(c) ? incluidos : filas).push({ a: a, c: c }); }); });
+    if (!filas.length && !incluidos.length && !sueltos.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+    incluidos.sort(function(x,y){ return String(x.c.fecha||'').localeCompare(String(y.c.fecha||'')); });
     filas.sort(function(x,y){ return String(x.c.fecha||'').localeCompare(String(y.c.fecha||'')); });
     var pend = r2(ads.reduce(function(s,a){ return s + totalPendiente(a); }, 0));
     // Saldo de la versión MÁS RECIENTE del folio (la ficha puede recibir cualquier letra)
@@ -547,6 +578,17 @@
         + (pend > 0.005 && conSaldo ? ' &nbsp;·&nbsp; Total para liquidar (saldo ' + $m(saldo) + ' + gastos): <b style="font-family:monospace;">' + $m(r2(saldo + pend)) + '</b>' : '') + '</span>'
         + (pend > 0.005 ? '<button type="button" onclick="lexCobrarGastosFolio(' + Number(recibo.folio) + ')" style="font-size:0.7rem;border:none;background:#c8781a;color:#fff;border-radius:5px;padding:5px 11px;cursor:pointer;font-weight:700;">💰 Cobrar gastos</button>' : '')
         + '</div>';
+    }
+    if (incluidos.length) {
+      var ti = r2(incluidos.reduce(function(s,f){ return s + (parseFloat(f.c.monto)||0); }, 0));
+      html += '<div style="margin-top:10px;font-size:0.6rem;font-family:\'DM Mono\',monospace;font-weight:700;color:#1a6a3a;text-transform:uppercase;letter-spacing:0.1em;">✓ Costos incluidos en lo pactado <span style="text-transform:none;letter-spacing:0;font-weight:400;color:#5a7a5a;">(los pagó el despacho — no se cobran aparte)</span></div>'
+        + '<div style="background:#fff;border:1px solid #cfe3cf;border-radius:6px;overflow:hidden;margin-top:4px;">' + incluidos.map(function(f){
+          return '<div style="display:grid;grid-template-columns:62px 1fr 150px 92px;gap:6px;padding:5px 10px;border-bottom:1px solid #e3efe3;font-size:0.74rem;align-items:center;">'
+            + '<span>' + E(fC(f.c.fecha)) + '</span><span>' + E(f.c.descripcion) + '</span>'
+            + '<span style="font-size:0.66rem;color:#1a6a3a;">' + (f.c.movEgresoId ? 'salida de caja ' + E(fC(f.c.egresoFecha)) : 'incluido') + '</span>'
+            + '<span style="text-align:right;font-family:monospace;">' + $m(f.c.monto) + '</span></div>';
+        }).join('') + '</div>'
+        + '<div style="font-size:0.72rem;margin-top:4px;color:#1a6a3a;">Total que absorbió el despacho dentro de lo pactado: <b style="font-family:monospace;">' + $m(ti) + '</b></div>';
     }
     if (sueltos.length) {
       var ts = r2(sueltos.reduce(function(s,a){ return s + totalPendiente(a); }, 0));

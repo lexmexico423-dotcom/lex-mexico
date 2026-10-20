@@ -193,11 +193,15 @@
       var eb = esAdm ? estadoBoton(x, dest) : null;
       var nBit = bitacoraDe(x.folio).length;
       var ep = (x.categoria === 'placas') ? estadoPlacas(x.folio) : null;
+      // Oct-2026: gastos extra (lo que pagó el despacho por el cliente) ligados al folio
+      var gx = (typeof window.lexGastosFolio === 'function') ? window.lexGastosFolio(x.folio) : null;
+      if (gx && !(gx.total > 0.005)) gx = null;
       return '<div class="cob-row" data-f="' + esc(x.folio) + '" style="display:grid;grid-template-columns:52px minmax(0,1fr) 110px 78px ' + '34px ' + (esAdm ? '118px ' : '') + '132px;gap:10px;align-items:center;padding:8px 10px;background:' + (sel ? '#fff8e4' : '#fff') + ';border:1px solid ' + (sel ? '#c8951a' : '#eadfbf') + ';border-radius:7px;margin-bottom:6px;font-size:0.8rem;">'
         + '<span class="cob-folio" data-f="' + esc(x.folio) + '" title="Abrir la ficha del folio ' + esc(x.folio) + '" style="color:#1a4a8a;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">#' + esc(x.folio) + esc(x.letra) + '</span>'
         + '<div style="min-width:0;"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(x.nombre || '(sin nombre)') + '</div>'
         + '<div style="font-size:0.7rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(oracion(x.concepto)) + ' · ' + (x.tel ? esc(x.tel) : '<span style="color:#a32d2d;">sin teléfono</span>') + (x.personas.length > 1 ? ' · <b style="color:#1a4a8a;">👥 ' + x.personas.length + ' personas</b>' : '') + '</div>'
         + (ep ? '<div style="margin-top:3px;"><span style="display:inline-block;font-size:0.66rem;font-weight:600;border-radius:10px;padding:1px 8px;background:' + ep.fondo + ';color:' + ep.color + ';" title="' + esc(ep.tip || '') + '">' + esc(ep.txt) + '</span></div>' : '')
+        + (gx ? '<div style="margin-top:3px;"><span title="Gastos extra que pagó el despacho por el cliente (fuera de lo pactado). Se cobran aparte." style="display:inline-block;font-size:0.66rem;font-weight:600;border-radius:10px;padding:1px 8px;background:#fdf0dc;color:#8a4a10;">💸 + gastos ' + dinero(gx.total) + '</span></div>' : '')
         + '</div>'
         + '<span style="text-align:right;font-weight:700;color:#a32d2d;">' + dinero(x.saldo) + '</span>'
         + '<span style="font-size:0.68rem;padding:3px 6px;border-radius:10px;text-align:center;background:' + g.fondo + ';color:' + g.color + ';">' + x.dias + ' días</span>'

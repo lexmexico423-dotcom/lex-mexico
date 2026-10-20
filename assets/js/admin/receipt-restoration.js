@@ -14162,9 +14162,9 @@ function _renderAdeudoConceptosLista(conceptos){
   }
   cont.innerHTML = conceptos.map(function(c){
     return '<div class="adeudo-concepto-row" data-cid="'+c.id+'" style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">'
-      + '<input type="text" class="ac-desc" value="'+esc(c.descripcion||'')+'" placeholder="Descripción" style="flex:2;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
-      + '<input type="date" class="ac-fecha" value="'+esc((c.fecha||'').slice(0,10))+'" style="flex:1;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
-      + '<input type="number" class="ac-monto" value="'+(c.monto!=null?c.monto:'')+'" placeholder="Monto" step="0.01" style="width:90px;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+      + '<input type="text" class="ac-desc" value="'+esc(c.descripcion||'')+'" placeholder="Descripción" style="flex:1;min-width:0;padding:7px 9px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+      + '<input type="date" class="ac-fecha" value="'+esc((c.fecha||'').slice(0,10))+'" style="flex:0 0 150px;padding:7px 9px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+      + '<input type="number" class="ac-monto" value="'+(c.monto!=null?c.monto:'')+'" placeholder="Monto" step="0.01" style="flex:0 0 120px;padding:7px 9px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
       + '<button type="button" onclick="quitarConceptoAdeudo(this)" style="background:none;border:none;color:var(--rojo,#b91c1c);font-size:1rem;cursor:pointer;padding:2px 6px;">✕</button>'
       + '</div>';
   }).join('');
@@ -14179,9 +14179,9 @@ function agregarConceptoAdeudo(){
   row.className = 'adeudo-concepto-row';
   row.setAttribute('data-cid', id);
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px;';
-  row.innerHTML = '<input type="text" class="ac-desc" placeholder="Descripción" style="flex:2;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
-    + '<input type="date" class="ac-fecha" value="'+_adeudoHoy()+'" style="flex:1;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
-    + '<input type="number" class="ac-monto" placeholder="Monto" step="0.01" min="0" style="width:90px;padding:6px 8px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+  row.innerHTML = '<input type="text" class="ac-desc" placeholder="Descripción" style="flex:1;min-width:0;padding:7px 9px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+    + '<input type="date" class="ac-fecha" value="'+_adeudoHoy()+'" style="flex:0 0 150px;padding:7px 9px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
+    + '<input type="number" class="ac-monto" placeholder="Monto" step="0.01" min="0" style="flex:0 0 120px;padding:7px 9px;border:1px solid var(--border-l);border-radius:6px;font-size:0.78rem;">'
     + '<button type="button" onclick="quitarConceptoAdeudo(this)" style="background:none;border:none;color:var(--rojo,#b91c1c);font-size:1rem;cursor:pointer;padding:2px 6px;">✕</button>';
   cont.appendChild(row);
   const d = row.querySelector('.ac-desc'); if(d) setTimeout(function(){ d.focus(); }, 30);

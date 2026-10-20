@@ -6618,8 +6618,16 @@ function _lexPollingTick() {
     if (_syncEnCurso) return;
     if ((Date.now() - (_ultimoSyncPropio || 0)) < 10000) return;
     if (typeof sincronizarFolio !== 'function') return;
+    // Oct-2026: lo principal es el AVISO EN VIVO (cada computadora avisa al
+    // guardar). Esta revisión es solo red de seguridad: si el aviso en vivo
+    // está conectado, se revisa cada 5 min; si está caído, cada 30 s.
+    var _rtOkPoll = (typeof _lexRealtimeChannel !== 'undefined' && _lexRealtimeChannel && _lexRealtimeChannel.state === 'joined');
+    if (_rtOkPoll && (Date.now() - (window._lexUltRevisionPoll || 0)) < 300000) return;
+    window._lexUltRevisionPoll = Date.now();
     _lexHayCambiosPendientes().then(function(hayCambios){
       if(!hayCambios) return; // nada nuevo desde el último pull — no bajar todo otra vez
+      // Oct-2026: sincronización en vivo — baja y repinta TODAS las vistas
+      if (typeof lexPedirSync === 'function') { lexPedirSync('polling'); return; }
       sincronizarFolio(true).then(function () {
         safeExec('renderHistorial',    () => typeof renderHistorial   === 'function' && renderHistorial());
         safeExec('renderCaja',         () => typeof renderCaja        === 'function' && renderCaja());

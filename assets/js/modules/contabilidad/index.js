@@ -2127,6 +2127,9 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     _ultimoSyncPropio = Date.now();
     _syncEnCurso = false;
     try { _lexPendBaseFijar(estado.pendientes); } catch(_eBase){ if(typeof _lexSil==="function")_lexSil(_eBase); }
+    // Oct-2026: recordar la versión que acabamos de escribir (ya incluye lo de
+    // los demás, porque se fusionó antes) para no volver a bajarla por gusto.
+    try { if (_updRows && _updRows[0] && typeof _updRows[0].rev === 'number' && typeof _lexUltimaRevConocida !== 'undefined') _lexUltimaRevConocida = _updRows[0].rev; } catch(_eRv){}
     syncEnd(true);
     try { if(typeof _pendMovsLimpiar === 'function') _pendMovsLimpiar(_idsSubidosEstaVez); } catch(_ePend){ if(typeof _lexSil==="function")_lexSil(_ePend); }
     lexRealtimeBroadcast();
@@ -2147,6 +2150,8 @@ async function syncEstadoSupabase(_intentoConcurrencia){
 }
 
 function _realtimeSincronizar() {
+  // Oct-2026: sincronización en vivo (sync-vivo.js) — no se descarta nada
+  if (typeof lexPedirSync === 'function') { lexPedirSync('realtime'); return; }
   // Si hay sync propio en curso o fue reciente — esperar
   if (_syncEnCurso) {
     setTimeout(_realtimeSincronizar, 2000);

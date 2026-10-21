@@ -129,9 +129,17 @@
       + '</div>'
       + (d.sigue ? '<div style="margin-top:8px;font-size:0.84rem;color:' + (d.atencion ? '#a32d2d' : '#8a3a10') + ';">👉 Qué sigue: <b style="font-weight:600;">' + E(d.sigue) + '</b></div>' : '')
       + '<div style="display:flex;align-items:flex-start;margin-top:10px;">' + barra + '</div>'
-      + '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;">'
-      + '<div></div>'
-      + '<div style="display:flex;gap:6px;align-items:center;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:10px;">'
+      // Oct-2026: observación inicial del trámite (la misma del expediente:
+      // e.bitacora[0].texto), discreta y en máximo 2 líneas; completa al pasar el mouse.
+      + (function(){
+          var obs = String((Array.isArray(e.bitacora) && e.bitacora[0] && e.bitacora[0].texto) || '').trim();
+          if (!obs) return '<div style="flex:1;"></div>';
+          return '<div title="' + E(obs) + '" style="display:flex;gap:8px;align-items:flex-start;flex:1;min-width:0;">'
+            + '<span style="font-size:0.95rem;line-height:1;">📄</span>'
+            + '<div style="font-size:0.72rem;line-height:1.4;color:#8a7a5a;font-style:italic;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + E(obs) + '</div></div>';
+        })()
+      + '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">'
       // Oct-2026: número de carpeta junto al teléfono (si tiene)
       + (String(e.num || '').trim() ? '<span title="Número de carpeta" style="display:inline-flex;align-items:center;gap:5px;background:#fff8e6;border:1px solid #c8951a;color:#6a4a10;border-radius:6px;padding:5px 10px;font-size:0.72rem;font-weight:700;font-family:monospace;white-space:nowrap;">📁 ' + E(/^carp/i.test(String(e.num).trim()) ? String(e.num).trim() : 'CARP.- ' + String(e.num).trim()) + '</span>' : '')
       + ((typeof lexBtnLlamada === 'function' && e.estado !== 'cancelado') ? lexBtnLlamada('esc', e.id, 'padding:5px 9px;', 'ESCRITURA ' + (d.acto ? '· ' + String(d.acto).toUpperCase() : '')) : '')

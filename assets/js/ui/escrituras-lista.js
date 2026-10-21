@@ -69,11 +69,25 @@
     if (e.estado === 'proceso' || !e.estado || e.estado === 'espera') {
       if (activo === -1) sigue = e.notaFinal ? String(e.notaFinal) : 'Pasar a "Listo para entregar"';
       else if (pAct && pAct.notas) sigue = String(pAct.notas);
-      else sigue = (pAct && pAct.estado === 'activo' ? 'Dar seguimiento a ' : 'Iniciar ') + PASOS[activo].toLowerCase();
+      else sigue = (pAct && pAct.estado === 'activo' ? 'Dar seguimiento a ' : 'Iniciar ') + (({'FIRMA NOTARIAL':'la firma notarial','CATASTRO':'Catastro','TRASLADO MPL':'Traslado MPL','ISR':'ISR','IFREO':'IFREO'})[PASOS[activo]] || PASOS[activo].toLowerCase());
     } else if (e.estado === 'listo') sigue = 'Avisar al cliente y entregar la escritura';
     var fechaFirma = e.fechaFirma ? (function(){ try { return new Date(e.fechaFirma + 'T12:00:00').toLocaleDateString('es-MX', { day:'numeric', month:'short', year:'numeric' }); } catch(_){ return e.fechaFirma; } })() : (e.fechaFirmaTexto || '');
     return { pasos: pasos, PASOS: PASOS, activo: activo, dias: dias, umbral: umbral, atencion: atencion, acto: acto,
       compradores: compradores, vendedores: vendedores, estaEn: estaEn, estaSub: estaSub, sigue: sigue, fechaFirma: fechaFirma };
+  }
+  // Oct-2026: cada paso con su propio color (etiqueta), para distinguir el
+  // avance de un vistazo: Firma gris · Catastro ámbar · Traslado morado ·
+  // ISR azul · IFREO verde agua · Listo verde.
+  var COLOR_PASO = ['#5f5e5a', '#b06a10', '#534ab7', '#185fa5', '#0f6e56'];
+  function colorEstaEn(e, d){
+    if (e.estado === 'listo' || d.activo === -1) return '#1a7a3a';
+    if (e.estado === 'archivado') return '#7a6840';
+    if (e.estado === 'cancelado') return '#6b6b6b';
+    if (e.estado === 'noprocedio') return '#7a2020';
+    return COLOR_PASO[d.activo] || '#5f5e5a';
+  }
+  function chipEstaEn(e, d, grande){
+    return '<span style="display:inline-block;background:' + colorEstaEn(e, d) + ';color:#fff;font-size:' + (grande ? '0.8rem' : '0.7rem') + ';font-weight:700;letter-spacing:0.02em;border-radius:12px;padding:' + (grande ? '2px 11px' : '3px 10px') + ';white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;">' + E(d.estaEn) + '</span>';
   }
   function semaforo(d, e){
     if (d.dias === null || !(e.estado === 'proceso' || !e.estado || e.estado === 'espera') || d.activo === -1) return '<span style="color:#9a8a6a;font-size:0.7rem;">—</span>';
@@ -162,7 +176,7 @@
     try { if (typeof _escFoliosHtml === 'function') { var fh = _escFoliosHtml(e, 'escAbrirRecibo', ' · '); if (fh) folios = '<span style="font-size:0.72rem;color:#1a4a8a;">🧾 Recibo: ' + fh + '</span>'; } } catch(_){}
     return '<div style="background:#fffdf6;border-top:1px dashed #d8c08a;padding:12px 16px 14px 16px;">'
       + '<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;">'
-      + '<span style="font-size:0.82rem;">Está en: <b style="background:#1a1008;color:#e8c875;padding:2px 10px;border-radius:12px;font-weight:600;">' + E(d.estaEn) + '</b>'
+      + '<span style="font-size:0.82rem;">Está en: ' + chipEstaEn(e, d, true)
       + (d.activo >= 0 && /^\d/.test(d.estaEn) ? ' <span style="font-size:0.7rem;color:#7a6a4a;">(paso ' + (d.activo + 1) + ' de 5' + (d.estaSub ? ', ' + E(d.estaSub) : '') + ')</span>' : '') + '</span>'
       + (d.dias !== null && d.activo >= 0 ? '<span style="font-size:0.74rem;color:#5a4a2a;">Lleva ' + semaforo(d, e) + ' en este paso</span>' : '')
       + '</div>'
@@ -220,7 +234,7 @@
     var NUM = mapaNumeros();
     var GRID = 'display:grid;grid-template-columns:46px minmax(0,2.6fr) minmax(0,1.2fr) minmax(0,2.3fr) 92px 104px;gap:10px;align-items:center;';
     var resumen = '<div style="display:flex;justify-content:flex-end;padding:0 2px 6px;font-size:0.72rem;color:#c8b68a;">Trámites en curso (En proceso + Listo p/entregar): <b style="color:#e8c875;margin-left:5px;font-family:monospace;font-size:0.85rem;">' + NUM.total + '</b></div>';
-    var head = resumen + '<div style="' + GRID + 'background:#1a1008;color:#e8c875;padding:8px 14px;border-radius:8px 8px 0 0;font-size:0.64rem;letter-spacing:0.08em;font-family:monospace;">'
+    var head = '<div style="' + GRID + 'background:#1a1008;color:#e8c875;padding:8px 14px;border-radius:8px 8px 0 0;font-size:0.64rem;letter-spacing:0.08em;font-family:monospace;">'
       + '<span style="text-align:center;">N°</span><span>CLIENTE</span><span>ESTÁ EN</span><span>QUÉ SIGUE</span><span>TIEMPO</span><span></span></div>';
     var rows = lst.map(function(x){
       var e = x.e, d = x.d, idx = D.escrituras.indexOf(e);
@@ -234,7 +248,7 @@
             return '<div style="min-width:0;"><div title="' + E(tit) + '" style="font-size:0.86rem;font-weight:700;color:#1a1008;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:0.66rem;color:#7a6a4a;">+' + (d.compradores.length - 1) + '</span>' : '')
               + (rel ? ' <span style="font-size:0.72rem;font-weight:400;color:#9a8a6a;">' + E(verboRel(d)) + '</span> <span style="font-size:0.8rem;font-weight:400;color:#185fa5;">' + E(d.vendedores.map(nombrePropio).join(', ')) + '</span>' : '') + '</div>'; })()
         + '<div style="font-size:0.68rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + datosSecundarios(e, d) + '</div></div>'
-        + '<div style="min-width:0;"><div style="font-size:0.78rem;font-weight:700;color:#2a1c08;">' + E(d.estaEn) + '</div>' + (d.estaSub ? '<div style="font-size:0.64rem;color:#7a6a4a;">' + E(d.estaSub) + '</div>' : '') + '</div>'
+        + '<div style="min-width:0;">' + chipEstaEn(e, d) + (d.estaSub ? '<div style="font-size:0.64rem;color:#7a6a4a;margin-top:2px;">' + E(d.estaSub) + '</div>' : '') + '</div>'
         + '<div style="min-width:0;font-size:0.76rem;color:' + (d.atencion ? '#a32d2d' : '#8a3a10') + ';display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (d.atencion ? '⚠ ' : '') + E(d.sigue || '—') + '</div>'
         + '<div>' + semaforo(d, e) + '</div>'
         + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'

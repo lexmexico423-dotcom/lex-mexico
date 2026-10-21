@@ -6246,6 +6246,12 @@ async function escEliminar(){
   const _c0=(e.compradores||[])[0];
   const _c0nom=typeof _c0==='string'?_c0:(_c0?.nombre||'Sin nombre');
   if(!confirm('¿Eliminar escritura '+e.num+' — '+_c0nom+'?\n\nNo se puede deshacer.'))return;
+  // Oct-2026: lápida — sin esto, al guardar se fusionaba con la copia del
+  // servidor (que aún la tenía) y la escritura "regresaba".
+  if(e && e.id){
+    if(!Array.isArray(D.escriturasEliminadas)) D.escriturasEliminadas = [];
+    if(D.escriturasEliminadas.indexOf(e.id) < 0) D.escriturasEliminadas.push(e.id);
+  }
   D.escrituras.splice(_escIdx,1);
   escSyncYRefrescar();
   cerrar('mEscritura');

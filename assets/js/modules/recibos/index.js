@@ -606,6 +606,10 @@ async function sincronizarFolio(forzarSB){
           D.escrituras = (typeof _lexFusionarEscrituras === 'function')
             ? _lexFusionarEscrituras(_localEscrituras, _sbEscrituras)
             : [..._fusionadasEsc, ..._soloLocalesEsc];
+          // Oct-2026: lápidas de escrituras eliminadas (no resucitar)
+          const _lapE = new Set([].concat(Array.isArray(data.data.escriturasEliminadas) ? data.data.escriturasEliminadas : [], Array.isArray(D.escriturasEliminadas) ? D.escriturasEliminadas : []));
+          D.escriturasEliminadas = Array.from(_lapE).slice(-3000);
+          D.escrituras = D.escrituras.filter(function(x){ return !(x && x.id && _lapE.has(x.id)); });
         })();
         // Merge tareas para hoy (recordatorios libres del día — módulo aparte
         // de Pendientes) — mismo patrón que escrituras: se compara fechaMod y
@@ -6515,6 +6519,7 @@ async function backupAppData() {
         tareasHoy:             (D && D.tareasHoy)               || [],
         cobranzaBitacora:      (D && D.cobranzaBitacora)        || [],
         tareasHoyEliminadas:   (D && D.tareasHoyEliminadas)     || [],
+        escriturasEliminadas:  (D && D.escriturasEliminadas)    || [],
         adeudosSinRecibo:      (D && D.adeudosSinRecibo)        || [],
         escrituras:            (D && D.escrituras)              || [],
         recibosExcluidosCaja:  (D && D.recibosExcluidosCaja)    || [],

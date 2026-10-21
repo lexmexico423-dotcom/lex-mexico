@@ -81,12 +81,25 @@
     return '<span title="Días en este paso (se marca en rojo a los ' + d.umbral + ')" style="display:inline-block;font-size:0.7rem;font-weight:700;border-radius:10px;padding:2px 9px;background:' + col[0] + ';color:' + col[1] + ';white-space:nowrap;">' + (d.dias >= d.umbral ? '⚠ ' : '') + d.dias + ' día' + (d.dias === 1 ? '' : 's') + '</span>';
   }
   // "compra a" / "recibe en donación de" / "con" según el acto
+  function verboRel(d){
+    var a = String(d.acto || '').toUpperCase();
+    return /COMPRAVENTA|COMPRA/.test(a) ? 'compra a' : /DONACI/.test(a) ? 'recibe en donación de' : /ADJUDICA|HERENCIA|SUCESI/.test(a) ? 'recibe de' : 'con';
+  }
   function relacion(d){
     if (!d.vendedores.length) return '';
-    var a = String(d.acto || '').toUpperCase();
-    var verbo = /COMPRAVENTA|COMPRA/.test(a) ? 'compra a' : /DONACI/.test(a) ? 'recibe en donación de' : /ADJUDICA|HERENCIA|SUCESI/.test(a) ? 'recibe de' : 'con';
-    return verbo + ' ' + d.vendedores.join(', ');
+    return verboRel(d) + ' ' + d.vendedores.join(', ');
   }
+  // Oct-2026: colores — la otra parte en AZUL; el acto en etiqueta de color
+  // según el tipo; solo los NÚMEROS (instrumento, volumen, firma, carpeta) en verde.
+  var VERDE = '#1a7a3a';
+  function colorActo(a){
+    a = String(a || '').toUpperCase();
+    if (/COMPRAVENTA|COMPRA/.test(a)) return ['#e6f1fb', '#0c447c'];
+    if (/DONACI/.test(a)) return ['#eeedfe', '#3c3489'];
+    if (/ADJUDICA|HERENCIA|SUCESI|TESTAMENT/.test(a)) return ['#e1f5ee', '#085041'];
+    return ['#f1efe8', '#444441'];
+  }
+  function num(v){ return '<b style="font-weight:700;color:' + VERDE + ';font-family:monospace;">' + E(v) + '</b>'; }
   // N° de trámite por CONTEO (igual que el antiguo "ESCRITURA 98"): se
   // numeran las escrituras EN CURSO (En proceso + Listo p/Entregar + recién
   // creadas sin estatus) por fecha de firma — la más antigua es la 1 y la más
@@ -101,11 +114,11 @@
   }
   function datosSecundarios(e, d){
     var partes = [];
-    if (d.acto) partes.push(E(d.acto));
-    if (e.instrumento) partes.push('Instr. ' + E(e.instrumento));
-    if (e.volumen) partes.push('Vol. ' + E(e.volumen));
-    if (d.fechaFirma) partes.push('Firma ' + E(d.fechaFirma));
-    if (e.num) partes.push(/^carp/i.test(String(e.num).trim()) ? E(e.num) : 'CARP.- ' + E(e.num));
+    if (d.acto) { var ca = colorActo(d.acto); partes.push('<span style="display:inline-block;font-size:0.62rem;font-weight:700;letter-spacing:0.03em;border-radius:10px;padding:0 7px;background:' + ca[0] + ';color:' + ca[1] + ';">' + E(String(d.acto).toUpperCase()) + '</span>'); }
+    if (e.instrumento) partes.push('Instr. ' + num(e.instrumento));
+    if (e.volumen) partes.push('Vol. ' + num(e.volumen));
+    if (d.fechaFirma) partes.push('Firma ' + num(d.fechaFirma));
+    if (e.num) { var cn = String(e.num).trim(); partes.push(/^carp/i.test(cn) ? 'CARP.- ' + num(cn.replace(/^carp\.?-?\s*/i, '')) : 'CARP.- ' + num(cn)); }
     return partes.join(' · ');
   }
 
@@ -193,7 +206,7 @@
         + (function(){ var n = NUM.mapa.get(e); return '<div title="N° de trámite en curso (se cuenta de la más antigua a la más reciente)" style="text-align:center;line-height:1.05;"><div style="font-size:0.5rem;color:#9a8a6a;letter-spacing:0.05em;font-family:monospace;">TRÁMITE</div><div style="font-size:1.05rem;font-weight:800;color:' + (n ? '#8c6518' : '#b4a88a') + ';font-family:monospace;">' + (n || '—') + '</div></div>'; })()
         + (function(){ var rel = relacion(d); var nomC = (d.compradores[0] || 'Sin comprador').toUpperCase(); var tit = d.compradores.join(', ') + (rel ? ' ' + rel : '');
             return '<div style="min-width:0;"><div title="' + E(tit) + '" style="font-size:0.86rem;font-weight:700;color:#1a1008;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:0.66rem;color:#7a6a4a;">+' + (d.compradores.length - 1) + '</span>' : '')
-              + (rel ? ' <span style="font-size:0.74rem;font-weight:400;color:#7a6a4a;">' + E(rel) + '</span>' : '') + '</div>'; })()
+              + (rel ? ' <span style="font-size:0.72rem;font-weight:400;color:#9a8a6a;">' + E(verboRel(d)) + '</span> <span style="font-size:0.8rem;font-weight:600;color:#185fa5;">' + E(d.vendedores.join(', ')) + '</span>' : '') + '</div>'; })()
         + '<div style="font-size:0.68rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + datosSecundarios(e, d) + '</div></div>'
         + '<div style="min-width:0;"><div style="font-size:0.78rem;font-weight:700;color:#2a1c08;">' + E(d.estaEn) + '</div>' + (d.estaSub ? '<div style="font-size:0.64rem;color:#7a6a4a;">' + E(d.estaSub) + '</div>' : '') + '</div>'
         + '<div style="min-width:0;font-size:0.76rem;color:' + (d.atencion ? '#a32d2d' : '#8a3a10') + ';display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (d.atencion ? '⚠ ' : '') + E(d.sigue || '—') + '</div>'

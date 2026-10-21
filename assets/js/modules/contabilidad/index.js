@@ -1724,6 +1724,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       // Oct-2026: bitácora permanente de cobranza (llamadas, promesas, pagos)
       cobranzaBitacora:      Array.isArray(D.cobranzaBitacora) ? D.cobranzaBitacora : [],
       tareasHoyEliminadas:   Array.isArray(D.tareasHoyEliminadas) ? D.tareasHoyEliminadas : [],
+      escriturasEliminadas:  Array.isArray(D.escriturasEliminadas) ? D.escriturasEliminadas : [],
       saldoAcumulado:        D.saldoAcumulado        || 0,
       escrituras:            D.escrituras            || [],
       recibosExcluidosCaja:  D.recibosExcluidosCaja  || [],
@@ -1819,6 +1820,14 @@ async function syncEstadoSupabase(_intentoConcurrencia){
       // fechaMod, mismo criterio que ya usa la descarga.
       const _sbEscriturasPreSync = Array.isArray(_sbDataPreSync.escrituras) ? _sbDataPreSync.escrituras : [];
       estado.escrituras = _lexFusionarEscrituras(D.escrituras, _sbEscriturasPreSync);
+      // Oct-2026: lápidas de escrituras eliminadas (unión local + servidor):
+      // una escritura borrada en cualquier computadora ya no regresa.
+      (function(){
+        var _lapE = new Set([].concat(Array.isArray(D.escriturasEliminadas) ? D.escriturasEliminadas : [], Array.isArray(_sbDataPreSync.escriturasEliminadas) ? _sbDataPreSync.escriturasEliminadas : []));
+        estado.escriturasEliminadas = Array.from(_lapE).slice(-3000);
+        D.escriturasEliminadas = estado.escriturasEliminadas;
+        estado.escrituras = estado.escrituras.filter(function(x){ return !(x && x.id && _lapE.has(x.id)); });
+      })();
       D.escrituras = estado.escrituras;
       // Cierres/cortes de caja: fusionar con el servidor antes de subir (ver
       // _lexFusionarCierres) — una pestaña vieja ya no puede borrar un corte.

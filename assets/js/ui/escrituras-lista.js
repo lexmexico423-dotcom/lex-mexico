@@ -81,6 +81,32 @@
     return '<span title="Días en este paso (se marca en rojo a los ' + d.umbral + ')" style="display:inline-block;font-size:0.7rem;font-weight:700;border-radius:10px;padding:2px 9px;background:' + col[0] + ';color:' + col[1] + ';white-space:nowrap;">' + (d.dias >= d.umbral ? '⚠ ' : '') + d.dias + ' día' + (d.dias === 1 ? '' : 's') + '</span>';
   }
   // "compra a" / "recibe en donación de" / "con" según el acto
+  // "ELSA LUCILA SANTIBAÑEZ" → "Elsa Lucila Santibañez" (partículas en minúscula)
+  var PARTICULAS = { de:1, del:1, la:1, las:1, los:1, y:1, e:1, vda:1, 'vda.':1 };
+  // Acentos de nombres y apellidos comunes que suelen capturarse sin acento
+  // (solo para MOSTRAR; el dato guardado no cambia). Si la palabra ya trae
+  // acento o no está en la lista, se deja como se capturó.
+  var ACENTOS = {};
+  ('gonzález hernández martínez pérez lópez sánchez ramírez rodríguez chávez gómez díaz jiménez álvarez juárez vázquez '
+  + 'velázquez domínguez fernández gutiérrez márquez benítez méndez núñez suárez ibáñez yáñez narváez peláez sáenz '
+  + 'santibáñez montaño rendón garcía guzmán román león simón rincón calderón colón obregón muñiz solís ríos avilés '
+  + 'maría josé jesús ramón martín andrés inés raúl ángel ángela ángeles héctor víctor mónica verónica lucía sofía rocío '
+  + 'concepción asunción adrián julián fabián sebastián cristóbal nicolás tomás matías elías efraín joaquín germán '
+  + 'agustín valentín máximo fermín darío rubén noé isaías zacarías ezequías zoé dámaso tobías baltazar óscar '
+  + 'hipólita hipólito eulalia natalia patricia régulo félix abigaíl apolinar porfirio teófilo crisóstomo eusebio '
+  + 'nazario cipriano anastasio acevedo cervantes ambrocia bermúdez echeverría ordóñez córdova córdoba').split(' ').forEach(function(w){
+    if (!w) return; var sin = w.normalize('NFD').replace(/\u0301/g, '').normalize('NFC'); // quita solo el acento (conserva la ñ)
+    if (sin !== w) ACENTOS[sin] = w;
+  });
+  function nombrePropio(t){
+    return String(t || '').trim().toLocaleLowerCase('es-MX').split(/\s+/).map(function(w, i){
+      if (!w) return w;
+      if (i > 0 && PARTICULAS[w]) return w;
+      var k = w.normalize('NFD').replace(/\u0301/g, '').normalize('NFC');
+      if (k === w && ACENTOS[k]) w = ACENTOS[k];
+      return w.charAt(0).toLocaleUpperCase('es-MX') + w.slice(1);
+    }).join(' ');
+  }
   function verboRel(d){
     var a = String(d.acto || '').toUpperCase();
     return /COMPRAVENTA|COMPRA/.test(a) ? 'compra a' : /DONACI/.test(a) ? 'recibe en donación de' : /ADJUDICA|HERENCIA|SUCESI/.test(a) ? 'recibe de' : 'con';
@@ -206,7 +232,7 @@
         + (function(){ var n = NUM.mapa.get(e); return '<div title="N° de trámite en curso (se cuenta de la más antigua a la más reciente)" style="text-align:center;line-height:1.05;"><div style="font-size:0.5rem;color:#9a8a6a;letter-spacing:0.05em;font-family:monospace;">TRÁMITE</div><div style="font-size:1.05rem;font-weight:800;color:' + (n ? '#8c6518' : '#b4a88a') + ';font-family:monospace;">' + (n || '—') + '</div></div>'; })()
         + (function(){ var rel = relacion(d); var nomC = (d.compradores[0] || 'Sin comprador').toUpperCase(); var tit = d.compradores.join(', ') + (rel ? ' ' + rel : '');
             return '<div style="min-width:0;"><div title="' + E(tit) + '" style="font-size:0.86rem;font-weight:700;color:#1a1008;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:0.66rem;color:#7a6a4a;">+' + (d.compradores.length - 1) + '</span>' : '')
-              + (rel ? ' <span style="font-size:0.72rem;font-weight:400;color:#9a8a6a;">' + E(verboRel(d)) + '</span> <span style="font-size:0.8rem;font-weight:600;color:#185fa5;">' + E(d.vendedores.join(', ')) + '</span>' : '') + '</div>'; })()
+              + (rel ? ' <span style="font-size:0.72rem;font-weight:400;color:#9a8a6a;">' + E(verboRel(d)) + '</span> <span style="font-size:0.8rem;font-weight:400;color:#185fa5;">' + E(d.vendedores.map(nombrePropio).join(', ')) + '</span>' : '') + '</div>'; })()
         + '<div style="font-size:0.68rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + datosSecundarios(e, d) + '</div></div>'
         + '<div style="min-width:0;"><div style="font-size:0.78rem;font-weight:700;color:#2a1c08;">' + E(d.estaEn) + '</div>' + (d.estaSub ? '<div style="font-size:0.64rem;color:#7a6a4a;">' + E(d.estaSub) + '</div>' : '') + '</div>'
         + '<div style="min-width:0;font-size:0.76rem;color:' + (d.atencion ? '#a32d2d' : '#8a3a10') + ';display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (d.atencion ? '⚠ ' : '') + E(d.sigue || '—') + '</div>'
@@ -246,8 +272,10 @@
   var original = window.escRender;
   if (typeof original !== 'function') return;
   window.escRender = function(){
-    try { pintarSelector(); } catch(e){}
-    if (vista() === 'tarjetas' || typeof D === 'undefined' || !Array.isArray(D.escrituras)) return original.apply(this, arguments);
+    // Oct-2026: se quitó la "Vista anterior (tarjetas)" a petición del Lic.
+    // Nahúm — siempre se usa la Lista de trabajo.
+    try { var _sv = document.getElementById('lex-esc-vista-sel'); if (_sv) _sv.remove(); } catch(e){}
+    if (typeof D === 'undefined' || !Array.isArray(D.escrituras)) return original.apply(this, arguments);
     try { pintarLista(); }
     catch(err) { console.warn('[Escrituras lista] se usa la vista anterior:', err); return original.apply(this, arguments); }
   };

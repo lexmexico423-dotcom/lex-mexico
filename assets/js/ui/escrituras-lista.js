@@ -80,6 +80,25 @@
     var col = d.dias >= d.umbral ? ['#fcebeb','#a32d2d'] : d.dias >= d.umbral / 2 ? ['#fdf0dc','#8a4a10'] : ['#eaf3de','#3b6d11'];
     return '<span title="Días en este paso (se marca en rojo a los ' + d.umbral + ')" style="display:inline-block;font-size:0.7rem;font-weight:700;border-radius:10px;padding:2px 9px;background:' + col[0] + ';color:' + col[1] + ';white-space:nowrap;">' + (d.dias >= d.umbral ? '⚠ ' : '') + d.dias + ' día' + (d.dias === 1 ? '' : 's') + '</span>';
   }
+  // "compra a" / "recibe en donación de" / "con" según el acto
+  function relacion(d){
+    if (!d.vendedores.length) return '';
+    var a = String(d.acto || '').toUpperCase();
+    var verbo = /COMPRAVENTA|COMPRA/.test(a) ? 'compra a' : /DONACI/.test(a) ? 'recibe en donación de' : /ADJUDICA|HERENCIA|SUCESI/.test(a) ? 'recibe de' : 'con';
+    return verbo + ' ' + d.vendedores.join(', ');
+  }
+  // N° de trámite por CONTEO (igual que el antiguo "ESCRITURA 98"): se
+  // numeran las escrituras EN CURSO (En proceso + Listo p/Entregar + recién
+  // creadas sin estatus) por fecha de firma — la más antigua es la 1 y la más
+  // reciente el número más alto. Se calcula sobre TODAS las escrituras (no
+  // solo las filtradas) para que el número no cambie al buscar o filtrar.
+  function mapaNumeros(){
+    var act = (D.escrituras || []).filter(function(x){ return x && (!x.estado || x.estado === 'proceso' || x.estado === 'listo'); })
+      .slice().sort(function(a, b){ return String(b.fechaFirma || '9999-99-99').localeCompare(String(a.fechaFirma || '9999-99-99')); });
+    var m = new Map(), tot = act.length;
+    act.forEach(function(x, i){ m.set(x, tot - i); });
+    return { mapa: m, total: tot };
+  }
   function datosSecundarios(e, d){
     var partes = [];
     if (d.acto) partes.push(E(d.acto));
@@ -111,8 +130,10 @@
       + (d.sigue ? '<div style="margin-top:8px;font-size:0.84rem;color:' + (d.atencion ? '#a32d2d' : '#8a3a10') + ';">👉 Qué sigue: <b style="font-weight:600;">' + E(d.sigue) + '</b></div>' : '')
       + '<div style="display:flex;align-items:flex-start;margin-top:10px;">' + barra + '</div>'
       + '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-top:10px;">'
-      + '<div style="font-size:0.74rem;color:#5a4a2a;">' + (d.compradores.length ? '👤 ' + E(d.compradores.join(', ')) : '') + (d.vendedores.length ? ' &nbsp;↔ ' + E(d.vendedores.join(', ')) : '') + (folios ? ' &nbsp; ' + folios : '') + '</div>'
+      + '<div></div>'
       + '<div style="display:flex;gap:6px;align-items:center;">'
+      // Oct-2026: número de carpeta junto al teléfono (si tiene)
+      + (String(e.num || '').trim() ? '<span title="Número de carpeta" style="display:inline-flex;align-items:center;gap:5px;background:#fff8e6;border:1px solid #c8951a;color:#6a4a10;border-radius:6px;padding:5px 10px;font-size:0.72rem;font-weight:700;font-family:monospace;white-space:nowrap;">📁 ' + E(/^carp/i.test(String(e.num).trim()) ? String(e.num).trim() : 'CARP.- ' + String(e.num).trim()) + '</span>' : '')
       + ((typeof lexBtnLlamada === 'function' && e.estado !== 'cancelado') ? lexBtnLlamada('esc', e.id, 'padding:5px 9px;', 'ESCRITURA ' + (d.acto ? '· ' + String(d.acto).toUpperCase() : '')) : '')
       + '<button type="button" onclick="event.stopPropagation();escAbrirDetalle(' + idx + ')" style="background:#9a6e18;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:0.72rem;font-weight:700;cursor:pointer;">Abrir expediente completo ›</button>'
       + '</div></div></div>';
@@ -149,9 +170,11 @@
     });
     var cnt = document.getElementById('escCountNum'); if (cnt) cnt.textContent = lst.length;
     if (!lst.length) { cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.8rem;">Sin escrituras en este filtro.</div>'; return; }
-    var GRID = 'display:grid;grid-template-columns:minmax(0,2.3fr) minmax(0,1.3fr) minmax(0,2.6fr) 92px 92px;gap:10px;align-items:center;';
-    var head = '<div style="' + GRID + 'background:#1a1008;color:#e8c875;padding:8px 14px;border-radius:8px 8px 0 0;font-size:0.64rem;letter-spacing:0.08em;font-family:monospace;">'
-      + '<span>CLIENTE</span><span>ESTÁ EN</span><span>QUÉ SIGUE</span><span>TIEMPO</span><span></span></div>';
+    var NUM = mapaNumeros();
+    var GRID = 'display:grid;grid-template-columns:46px minmax(0,2.6fr) minmax(0,1.2fr) minmax(0,2.3fr) 92px 104px;gap:10px;align-items:center;';
+    var resumen = '<div style="display:flex;justify-content:flex-end;padding:0 2px 6px;font-size:0.72rem;color:#c8b68a;">Trámites en curso (En proceso + Listo p/entregar): <b style="color:#e8c875;margin-left:5px;font-family:monospace;font-size:0.85rem;">' + NUM.total + '</b></div>';
+    var head = resumen + '<div style="' + GRID + 'background:#1a1008;color:#e8c875;padding:8px 14px;border-radius:8px 8px 0 0;font-size:0.64rem;letter-spacing:0.08em;font-family:monospace;">'
+      + '<span style="text-align:center;">N°</span><span>CLIENTE</span><span>ESTÁ EN</span><span>QUÉ SIGUE</span><span>TIEMPO</span><span></span></div>';
     var rows = lst.map(function(x){
       var e = x.e, d = x.d, idx = D.escrituras.indexOf(e);
       var id = String(e.id || idx);
@@ -159,14 +182,21 @@
       var apagada = e.estado === 'cancelado' || e.estado === 'archivado';
       return '<div class="lex-esc-fila" data-id="' + E(id) + '" style="background:' + (abierta ? '#fff8e4' : '#fbf6ea') + ';border:1px solid ' + (d.atencion ? '#e8a0a0' : '#e3d3a8') + ';border-left:4px solid ' + (d.atencion ? '#c81e1e' : apagada ? '#9a9a9a' : '#c8951a') + ';border-radius:0;margin-top:6px;' + (apagada ? 'opacity:0.75;' : '') + '">'
         + '<div class="lex-esc-cab" style="' + GRID + 'padding:9px 14px;cursor:pointer;" title="Toca para ver el detalle">'
-        + '<div style="min-width:0;"><div style="font-size:0.86rem;font-weight:700;color:#1a1008;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + E((d.compradores[0] || 'Sin comprador').toUpperCase()) + (d.compradores.length > 1 ? ' <span style="font-size:0.66rem;color:#7a6a4a;">+' + (d.compradores.length - 1) + '</span>' : '') + '</div>'
+        + (function(){ var n = NUM.mapa.get(e); return '<div title="N° de trámite en curso (se cuenta de la más antigua a la más reciente)" style="text-align:center;line-height:1.05;"><div style="font-size:0.5rem;color:#9a8a6a;letter-spacing:0.05em;font-family:monospace;">TRÁMITE</div><div style="font-size:1.05rem;font-weight:800;color:' + (n ? '#8c6518' : '#b4a88a') + ';font-family:monospace;">' + (n || '—') + '</div></div>'; })()
+        + (function(){ var rel = relacion(d); var nomC = (d.compradores[0] || 'Sin comprador').toUpperCase(); var tit = d.compradores.join(', ') + (rel ? ' ' + rel : '');
+            return '<div style="min-width:0;"><div title="' + E(tit) + '" style="font-size:0.86rem;font-weight:700;color:#1a1008;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:0.66rem;color:#7a6a4a;">+' + (d.compradores.length - 1) + '</span>' : '')
+              + (rel ? ' <span style="font-size:0.74rem;font-weight:400;color:#7a6a4a;">' + E(rel) + '</span>' : '') + '</div>'; })()
         + '<div style="font-size:0.68rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + datosSecundarios(e, d) + '</div></div>'
         + '<div style="min-width:0;"><div style="font-size:0.78rem;font-weight:700;color:#2a1c08;">' + E(d.estaEn) + '</div>' + (d.estaSub ? '<div style="font-size:0.64rem;color:#7a6a4a;">' + E(d.estaSub) + '</div>' : '') + '</div>'
         + '<div style="min-width:0;font-size:0.76rem;color:' + (d.atencion ? '#a32d2d' : '#8a3a10') + ';display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (d.atencion ? '⚠ ' : '') + E(d.sigue || '—') + '</div>'
         + '<div>' + semaforo(d, e) + '</div>'
-        + '<div style="display:flex;gap:5px;justify-content:flex-end;align-items:center;">'
+        + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'
+        // Oct-2026: folio del recibo arriba a la derecha (como en Pendientes)
+        + (function(){ var fh = ''; try { if (typeof _escFoliosHtml === 'function') fh = _escFoliosHtml(e, 'escAbrirRecibo', '<br>'); } catch(_){}
+            return fh ? '<div title="Folio del recibo — clic para abrirlo" style="text-align:right;line-height:1.1;"><div style="font-family:serif;font-size:0.52rem;letter-spacing:0.12em;color:#8c6518;font-weight:700;">FOLIO</div><div style="font-family:serif;font-size:0.95rem;color:#1a4a8a;font-weight:800;">' + fh + '</div></div>' : ''; })()
+        + '<div style="display:flex;gap:5px;align-items:center;">'
         + ((typeof lexBtnLlamada === 'function' && e.estado !== 'cancelado') ? lexBtnLlamada('esc', e.id, '', 'ESCRITURA' + (d.acto ? ' · ' + String(d.acto).toUpperCase() : '')) : '')
-        + '<span style="font-size:0.9rem;color:#9a6e18;">' + (abierta ? '▴' : '▾') + '</span></div>'
+        + '<span style="font-size:0.9rem;color:#9a6e18;">' + (abierta ? '▴' : '▾') + '</span></div></div>'
         + '</div>'
         + (abierta ? tarjeta(e, idx, d) : '')
         + '</div>';

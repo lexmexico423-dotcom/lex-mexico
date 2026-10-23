@@ -9399,6 +9399,8 @@ function abrirFichaFolio(){
   } catch(_eLl){ if(typeof _lexSil==="function")_lexSil(_eLl); }
   // Oct-2026 · Gastos extra por cuenta del cliente ligados a este folio
   try { if (typeof lexPintarGastosFicha === 'function') lexPintarGastosFicha(recibo); } catch(_eGx){ if(typeof _lexSil==="function")_lexSil(_eGx); }
+  // Oct-2026 · Antecedentes de papel (saldo de años anteriores convertido en este folio)
+  try { if (typeof lexPintarAntecedentesFicha === 'function') lexPintarAntecedentesFicha(recibo); } catch(_eAn){ if(typeof _lexSil==="function")_lexSil(_eAn); }
 
   // Badge tipo de trámite
   var _badgeTipo = document.getElementById('ficha-badge-tipo-tramite');

@@ -20,7 +20,7 @@
   // ── 1. Repintar todo lo visible ───────────────────────────────────────
   var VISTAS = ['renderHistorial','renderCaja','renderContab','badges','hjRenderTerminos','hjRenderLista',
     'renderVencimientos','renderPend','renderJuicios','renderCitas','gestFiltrar','escRender',
-    'renderTareasHoyLista','renderTareasHoyCount','renderAdeudosLista','_cobranzaRefrescar'];
+    'renderTareasHoyLista','renderTareasHoyCount','renderAdeudosLista','_cobranzaRefrescar','_lexRAPintar'];
   // ¿El usuario está escribiendo en un campo? (no se repinta para no borrarle nada)
   function escribiendo(){
     var el = document.activeElement;

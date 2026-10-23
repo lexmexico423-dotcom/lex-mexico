@@ -36,6 +36,7 @@
   function refrescar(){
     try { if (typeof window._cobranzaRefrescar === 'function') window._cobranzaRefrescar(); } catch(e){}
     try { if (typeof reciboEnConsulta !== 'undefined' && reciboEnConsulta) window.lexPintarAntecedentesFicha(reciboEnConsulta); } catch(e){}
+    try { if (typeof window._lexRAPintar === 'function') window._lexRAPintar(); } catch(e){}
   }
   function preguntar(t, m, si, no){ return (typeof confirmarBonito === 'function') ? confirmarBonito({ titulo: t, mensaje: m, btnSi: si || 'Sí', btnNo: no || 'Cancelar' }) : Promise.resolve(confirm(m)); }
   function toastS(m, t){ try { if (typeof toast === 'function') toast(m, t); } catch(e){} }
@@ -89,7 +90,7 @@
     ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
     var convertido = sa && sa.estado === 'convertido';
     ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:820px;max-height:94vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#2a1c08;">'
-      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.76rem;letter-spacing:0.1em;font-family:monospace;display:flex;justify-content:space-between;"><span>🗂 ' + (sa ? 'SALDO DE AÑOS ANTERIORES' : 'NUEVO SALDO DE AÑOS ANTERIORES') + '</span><span id="sa-x" style="cursor:pointer;">✕</span></div>'
+      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.76rem;letter-spacing:0.1em;font-family:monospace;display:flex;justify-content:space-between;"><span>🗂 ' + (sa ? 'RECIBO ANTERIOR' : 'NUEVO RECIBO ANTERIOR') + '</span><span id="sa-x" style="cursor:pointer;">✕</span></div>'
       + '<div style="padding:12px 16px;">'
       + (convertido ? '<div style="background:#eaf3de;border:1px solid #9fc58a;color:#27500a;border-radius:6px;padding:7px 10px;font-size:0.76rem;margin-bottom:6px;">✓ Ya tiene folio en el sistema: <b>' + E(sa.folioConvertido) + 'A</b>. Los siguientes pagos se hacen desde ese folio (Pago parcial / Pago total).</div>' : '')
       + '<div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">' + campo('sa-cliente', 'CLIENTE *', v.cliente) + campo('sa-tel', 'TELÉFONO', v.tel) + '</div>'
@@ -166,7 +167,7 @@
         lista().unshift(Object.assign({ id: idGuardado, tipo: 'anterior', estado: 'pendiente',
           clave: nuevaClave(v2.folioPapel), pagosSistema: [], creadoPor: usuario(), fechaCreacion: ahora, fechaMod: ahora }, v2));
       }
-      cerrarOv(); guardar(); toastS('✅ Saldo de años anteriores guardado');
+      cerrarOv(); guardar(); toastS('✅ Recibo anterior guardado');
       // Oct-2026: al guardar se abre su Ficha del saldo
       setTimeout(function(){ try { window.lexFichaSaldoAnterior(idGuardado); } catch(e){} }, 50);
     };
@@ -191,7 +192,7 @@
     var ov = document.createElement('div'); ov.id = 'lex-sa-cob';
     ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
     ov.innerHTML = '<div style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:540px;overflow:hidden;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#2a1c08;">'
-      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.74rem;letter-spacing:0.1em;font-family:monospace;display:flex;justify-content:space-between;"><span>💰 COBRAR SALDO DE AÑOS ANTERIORES · ' + E(String(sa.cliente).toUpperCase()) + '</span><span id="sac-x" style="cursor:pointer;">✕</span></div>'
+      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.74rem;letter-spacing:0.1em;font-family:monospace;display:flex;justify-content:space-between;"><span>💰 COBRAR RECIBO ANTERIOR · ' + E(String(sa.cliente).toUpperCase()) + '</span><span id="sac-x" style="cursor:pointer;">✕</span></div>'
       + '<div style="padding:12px 16px;font-size:0.8rem;">'
       + '<div style="color:#5a4a2a;font-size:0.74rem;">' + E(sa.concepto) + (sa.folioPapel ? ' · 📄 papel ' + E(sa.folioPapel) : '') + (sa.anio ? ' · ' + E(sa.anio) : '') + '</div>'
       + '<div style="margin-top:8px;">Debe: <b style="color:#a32d2d;">' + $m(d) + '</b> · ¿Cuánto paga hoy? <input id="sac-monto" type="number" step="0.01" min="0" max="' + d + '" value="' + d + '" style="width:130px;padding:6px 8px;border:1px solid #c8951a;border-radius:6px;font-size:0.82rem;"></div>'
@@ -217,7 +218,7 @@
       if (!resp) { ov.style.display = 'flex'; return; }
       var mov = { id: 'M-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), folioCaja: (typeof generarFolioMovCaja === 'function' ? generarFolioMovCaja() : ''),
         fecha: (typeof hoy === 'function' ? hoy() : hoyISO()), hora: (typeof hora === 'function' ? hora() : ''),
-        descripcion: 'Abono a saldo de años anteriores · ' + String(sa.cliente).toUpperCase() + ' · ' + sa.concepto + (sa.folioPapel ? ' (folio de papel ' + sa.folioPapel + ')' : ''),
+        descripcion: 'Abono a recibo anterior · ' + String(sa.cliente).toUpperCase() + ' · ' + sa.concepto + (sa.folioPapel ? ' (folio de papel ' + sa.folioPapel + ')' : ''),
         monto: m, tipo: 'ingreso', cat: 'otro', fuente: 'caja', responsable: resp, saldoAnteriorId: sa.id };
       var ok = false;
       try { ok = (typeof _registrarMovimiento === 'function') ? _registrarMovimiento(mov) !== false : (D.movimientos.push(mov), true); } catch(e){ ok = false; }
@@ -257,7 +258,7 @@
         }
         var elA = document.getElementById('anticipo');
         if (elA) { elA.value = String(montoHoy); try { elA.dispatchEvent(new Event('input')); } catch(e){} try { if (typeof calcTotales === 'function') calcTotales(); } catch(e){} }
-        toastS('✓ Recibo pre-llenado con el saldo de años anteriores — revisa y pulsa Imprimir', 'ok');
+        toastS('✓ Recibo pre-llenado con el recibo anterior — revisa y pulsa Imprimir', 'ok');
       } catch(e){ console.warn('[SaldosAnteriores] pre-llenado:', e); }
     }, 700);
   }
@@ -372,7 +373,7 @@
     var btn = function(id2, txt, est){ return '<button type="button" id="' + id2 + '" style="width:100%;border-radius:7px;padding:9px 8px;font-size:0.72rem;font-weight:700;letter-spacing:0.04em;cursor:pointer;font-family:monospace;' + est + '">' + txt + '</button>'; };
     ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:960px;max-height:94vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#2a1c08;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #e3d3a8;flex-wrap:wrap;">'
-      + '<div style="font-size:0.72rem;letter-spacing:0.08em;color:#7a5410;font-family:monospace;">📋 FICHA DEL SALDO <span style="background:#f1efe8;color:#5f5e5a;border-radius:10px;padding:2px 9px;margin-left:6px;">🗂 AÑOS ANTERIORES · SIN FOLIO</span></div>'
+      + '<div style="font-size:0.72rem;letter-spacing:0.08em;color:#7a5410;font-family:monospace;">📋 FICHA DEL RECIBO ANTERIOR <span style="background:#f1efe8;color:#5f5e5a;border-radius:10px;padding:2px 9px;margin-left:6px;">🗂 RECIBO ANTERIOR · SIN FOLIO</span></div>'
       + '<div style="display:flex;gap:8px;align-items:center;">' + (sa.folioPapel ? '<span style="font-size:0.72rem;background:#fdf0dc;color:#8a4a10;border-radius:10px;padding:2px 9px;">📄 papel N° ' + E(sa.folioPapel) + (sa.anio ? ' · ' + E(sa.anio) : '') + '</span>' : '')
       + '<span id="saf-x" style="cursor:pointer;font-size:1.1rem;color:#7a5410;">✕</span></div></div>'
       + '<div style="display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px;padding:12px 16px;">'
@@ -469,7 +470,7 @@
   function pdfVistaPrevia(sa){
     var doc = nuevoDoc(), W = doc.internal.pageSize.getWidth();
     var ult = todosLosPagos(sa).map(function(p){ return p.fecha; }).filter(Boolean).pop() || '';
-    var y = encabezado(doc, 'VISTA PREVIA — SALDO DE AÑOS ANTERIORES', ult ? fLarga(ult) + ' (último pago registrado)' : 'sin pagos registrados');
+    var y = encabezado(doc, 'VISTA PREVIA — RECIBO ANTERIOR', ult ? fLarga(ult) + ' (último pago registrado)' : 'sin pagos registrados');
     y = bloqueCliente(doc, sa, y + 2);
     var cols = [{ x: 16 }, { x: W - 16, right: true }];
     y = filaTabla(doc, y + 2, cols, ['CONCEPTO', 'IMPORTE'], { bold: true, fondo: [245, 236, 214], color: [122, 84, 16], size: 8 });
@@ -485,7 +486,7 @@
   }
   function pdfEstadoCuenta(sa){
     var doc = nuevoDoc(), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
-    var y = encabezado(doc, 'ESTADO DE CUENTA — SALDO DE AÑOS ANTERIORES', fLarga(hoyISO()));
+    var y = encabezado(doc, 'ESTADO DE CUENTA — RECIBO ANTERIOR', fLarga(hoyISO()));
     y = bloqueCliente(doc, sa, y + 2);
     var cols = [{ x: 16 }, { x: 44 }, { x: 110 }, { x: W - 46, right: true }, { x: W - 16, right: true }];
     y = filaTabla(doc, y + 2, cols, ['FECHA', 'CONCEPTO', 'COMPROBANTE', 'ABONO', 'SALDO'], { bold: true, fondo: [245, 236, 214], color: [122, 84, 16], size: 8 });
@@ -516,5 +517,65 @@
     ov.querySelector('#sap-print').onclick = function(){ try { ov.querySelector('#sap-frame').contentWindow.print(); } catch(e){ window.open(url, '_blank'); } };
   }
   window._lexSAPdfVistaPrevia = pdfVistaPrevia;
+
+  // ════════════════════════════════════════════════════════════════════
+  // MENÚ "🗂 Recibos Anteriores": lista de todos + contador de pendientes
+  // ════════════════════════════════════════════════════════════════════
+  var _verPagadosRA = false;
+  function pendientesRA(){ return todos().filter(function(a){ return a.estado !== 'convertido' && debe(a) > 0.005; }); }
+  window.lexBadgeRecibosAnteriores = function(){
+    var b = document.getElementById('badgeRecibosAnteriores'); if (!b) return;
+    var n = pendientesRA().length;
+    b.textContent = n; b.style.display = n ? '' : 'none';
+  };
+  window.lexListaRecibosAnteriores = function(){
+    try { window.lexVincularSaldosAnteriores(); } catch(e){}
+    var ov = document.getElementById('lex-ra-lista');
+    if (!ov) {
+      ov = document.createElement('div'); ov.id = 'lex-ra-lista';
+      ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(10,7,3,0.75);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
+      ov.innerHTML = '<div style="background:#fbf6ea;border:2px solid #c8951a;border-radius:12px;width:98%;max-width:1100px;max-height:94vh;display:flex;flex-direction:column;overflow:hidden;color:#2a1c08;">'
+        + '<div style="background:#1a1008;padding:12px 18px;display:flex;align-items:center;gap:10px;"><span style="font-size:1.2rem;">🗂</span><div style="flex:1;"><div style="font-family:serif;font-size:1.05rem;color:#e8c875;">Recibos anteriores</div><div id="ra-sub" style="font-size:0.62rem;color:rgba(232,200,117,0.65);font-family:monospace;letter-spacing:0.06em;"></div></div>'
+        + '<button type="button" id="ra-x" style="background:none;border:none;color:rgba(232,200,117,0.75);font-size:1.3rem;cursor:pointer;">✕</button></div>'
+        + '<div style="display:flex;gap:8px;align-items:center;padding:12px 18px 6px;flex-wrap:wrap;">'
+        + '<input id="ra-busca" type="text" placeholder="🔍 Buscar por cliente, folio de papel, trámite o año" style="flex:1;min-width:220px;border:1px solid #d9c38a;border-radius:20px;padding:8px 14px;font-size:0.8rem;background:#fff;">'
+        + '<button type="button" id="ra-pagados" style="border:1px solid #c8951a;background:#fff;color:#9a6e18;border-radius:20px;padding:7px 14px;font-size:0.74rem;cursor:pointer;"></button>'
+        + '<button type="button" id="ra-nuevo" style="border:none;background:#9a6e18;color:#fff;border-radius:20px;padding:8px 16px;font-size:0.76rem;font-weight:700;cursor:pointer;">＋ Nuevo recibo anterior</button></div>'
+        + '<div id="ra-lista" style="overflow-y:auto;padding:4px 18px 16px;min-height:120px;"></div></div>';
+      document.body.appendChild(ov);
+      ov.querySelector('#ra-x').onclick = function(){ ov.style.display = 'none'; };
+      ov.addEventListener('click', function(ev){ if (ev.target === ov) ov.style.display = 'none'; });
+      ov.querySelector('#ra-busca').addEventListener('input', pintarListaRA);
+      ov.querySelector('#ra-nuevo').onclick = function(){ window.lexNuevoSaldoAnterior(); };
+      ov.querySelector('#ra-pagados').onclick = function(){ _verPagadosRA = !_verPagadosRA; pintarListaRA(); };
+    }
+    ov.style.display = 'flex';
+    pintarListaRA();
+  };
+  function pintarListaRA(){
+    var ov = document.getElementById('lex-ra-lista'); if (!ov || ov.style.display === 'none') { window.lexBadgeRecibosAnteriores(); return; }
+    var q = N((ov.querySelector('#ra-busca') || {}).value || '');
+    var pend = pendientesRA();
+    var base = _verPagadosRA ? todos().filter(function(a){ return pend.indexOf(a) < 0; }) : pend;
+    var lst = base.filter(function(a){ return !q || N([a.cliente, a.folioPapel, a.concepto, a.anio, a.tel, a.folioConvertido].join(' ')).indexOf(q) >= 0; })
+      .sort(function(a, b){ return String(ultimaFecha(a)).localeCompare(String(ultimaFecha(b))); });
+    ov.querySelector('#ra-pagados').textContent = _verPagadosRA ? '← Pendientes' : '✓ Con folio / pagados';
+    ov.querySelector('#ra-sub').textContent = pend.length + ' pendiente' + (pend.length === 1 ? '' : 's') + ' · debe en total ' + $m(pend.reduce(function(s, a){ return s + debe(a); }, 0));
+    var cont = ov.querySelector('#ra-lista');
+    if (!lst.length) { cont.innerHTML = '<div style="text-align:center;color:#7a6a4a;padding:30px;font-size:0.82rem;">' + (q ? 'Ninguno coincide con la búsqueda.' : (_verPagadosRA ? 'Todavía no hay recibos anteriores con folio o pagados.' : 'No hay recibos anteriores pendientes. Usa <b>＋ Nuevo recibo anterior</b>.')) + '</div>'; window.lexBadgeRecibosAnteriores(); return; }
+    cont.innerHTML = lst.map(function(a){
+      var d = debe(a), conv = a.estado === 'convertido';
+      return '<div class="ra-fila" data-id="' + E(a.id) + '" style="display:grid;grid-template-columns:70px minmax(0,1fr) 120px 110px;gap:12px;align-items:center;background:#fff;border:1px solid #eadfbf;border-left:4px solid ' + (conv ? '#1a7a3a' : '#7a6840') + ';padding:9px 12px;margin-top:6px;cursor:pointer;" title="Abrir ficha">'
+        + '<div style="text-align:center;line-height:1.1;color:#5f5e5a;"><div style="font-size:0.58rem;letter-spacing:0.05em;font-family:monospace;">AÑO ' + E(a.anio || '—') + '</div><div style="font-weight:700;font-size:0.8rem;">📄 ' + E(a.folioPapel || 'S/N') + '</div></div>'
+        + '<div style="min-width:0;"><div style="font-weight:700;font-size:0.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + E(String(a.cliente || '').toUpperCase()) + '</div><div style="font-size:0.72rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + E(a.concepto || '') + (a.tel ? ' · ' + E(a.tel) : '') + '</div></div>'
+        + '<div style="text-align:right;"><div style="font-size:0.6rem;color:#9a8a6a;font-family:monospace;">' + (conv ? 'FOLIO' : 'DEBE') + '</div><div style="font-weight:700;color:' + (conv ? '#1a4a8a' : (d > 0.005 ? '#a32d2d' : '#1a7a3a')) + ';">' + (conv ? E(a.folioConvertido) + 'A' : (d > 0.005 ? $m(d) : '✓ Pagado')) + '</div></div>'
+        + '<div style="font-size:0.68rem;color:#7a6a4a;text-align:right;">Último pago<br><b style="color:#2a1c08;">' + E(fL(ultimaFecha(a))) + '</b></div></div>';
+    }).join('');
+    cont.querySelectorAll('.ra-fila').forEach(function(f){ f.onclick = function(){ window.lexFichaSaldoAnterior(f.getAttribute('data-id')); }; });
+    window.lexBadgeRecibosAnteriores();
+  }
+  window._lexRAPintar = pintarListaRA;
+  setTimeout(window.lexBadgeRecibosAnteriores, 4000);
+  setInterval(function(){ try { window.lexBadgeRecibosAnteriores(); } catch(e){} }, 30000);
   window._lexSAPdfEstado = pdfEstadoCuenta;
 })();

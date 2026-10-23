@@ -357,7 +357,7 @@ function _prAbrirFormulario(id) {
   const esNuevo = !id;
   // Cambiar texto del botón header
   const _btnGen = document.getElementById('pr-btn-generar');
-  if (_btnGen) _btnGen.textContent = '＋ Generar Otro Pre-Recibo';
+  if (_btnGen) _btnGen.textContent = '＋ Nueva Cotización';
   const pr = esNuevo ? {
     id: 'PR-' + Date.now(),
     nombre: '', telefono: '', concepto: '', honorarios: '',
@@ -382,7 +382,7 @@ function _prAbrirFormulario(id) {
   wrap.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
       <button onclick="_prVolverLista()" style="font-size:0.68rem;padding:4px 10px;border:1px solid var(--border-l);border-radius:5px;background:none;color:var(--muted);cursor:pointer;">← Volver</button>
-      <span style="font-size:0.8rem;font-weight:700;color:var(--ink);">${esNuevo ? 'Nuevo Pre-Recibo' : 'Editar Pre-Recibo'}</span>
+      <span style="font-size:0.8rem;font-weight:700;color:var(--ink);">${esNuevo ? 'Nueva Cotización' : 'Editar Cotización'}</span>
       ${!esNuevo && pr.fechaInicio ? `<span style="font-size:0.62rem;color:var(--muted);">· iniciado el ${escHTML(pr.fechaInicio)}</span>` : ''}
     </div>
 
@@ -500,7 +500,7 @@ function _prGuardarFormulario(prId, esNuevo, opts) {
   if (!Array.isArray(pr.gastos)) pr.gastos = [];
   _prTocar(pr);
   _prGuardar();
-  if (!opts.silencioso && typeof toast === 'function') toast('✓ Pre-Recibo guardado', 'ok');
+  if (!opts.silencioso && typeof toast === 'function') toast('✓ Cotización guardada', 'ok');
   if (!opts.quedarse) _prRenderLista();
   return pr;
 }

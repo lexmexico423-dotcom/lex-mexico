@@ -10818,14 +10818,14 @@ async function abrirPreRecibo() {
 
 function _prVolverLista() {
   const btn = document.getElementById('pr-btn-generar');
-  if (btn) btn.textContent = '＋ Generar Pre-Recibo';
+  if (btn) btn.textContent = '＋ Nueva Cotización';
   _prRenderLista();
 }
 
 function _prRenderLista() {
   // Restaurar texto del botón
   const btn = document.getElementById('pr-btn-generar');
-  if (btn) btn.textContent = '＋ Generar Pre-Recibo';
+  if (btn) btn.textContent = '＋ Nueva Cotización';
   const el = document.getElementById('pr-panel-contenido');
   const badge = document.getElementById('pr-badge-count');
   if (!el) return;
@@ -10833,7 +10833,7 @@ function _prRenderLista() {
   if (badge) badge.textContent = lista.length + (lista.length === 1 ? ' pendiente' : ' pendientes');
 
   if (!lista.length) {
-    el.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:0.78rem;line-height:1.8;">Sin pre-recibos activos.<br>Usa <strong>＋ Generar Pre-Recibo</strong> para comenzar.</div>';
+    el.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:0.78rem;line-height:1.8;">Sin cotizaciones activas.<br>Usa <strong>＋ Nueva Cotización</strong> para comenzar.</div>';
     return;
   }
 
@@ -10925,14 +10925,14 @@ function _prConfirmarGasto(prId) {
 function _prEliminar(prId) {
   const pr = _prById(prId);
   if (!pr) return;
-  if (!confirm('¿Eliminar el pre-recibo de «' + (pr.nombre || 'sin nombre') + '»?')) return;
+  if (!confirm('¿Eliminar la cotización de «' + (pr.nombre || 'sin nombre') + '»?')) return;
   // Se marca como eliminado (con su sello de tiempo) en vez de borrarlo de la
   // lista: así la eliminación también llega a las otras computadoras. Antes,
   // al borrarlo de la lista, la sincronización lo volvía a traer.
   pr.eliminado = true;
   _prTocar(pr);
   _prGuardar();
-  if(typeof toast==='function') toast('Pre-Recibo eliminado', 'ok');
+  if(typeof toast==='function') toast('Cotización eliminada', 'ok');
   _prRenderLista();
 }
 
@@ -10943,7 +10943,7 @@ function _prConvertirARecibo(prId) {
     ? _prGuardarFormulario(prId, true, { silencioso: true, quedarse: true })
     : _prById(prId);
   if (!pr) return;
-  if (pr.convertido) { if (typeof toast === 'function') toast('Este pre-recibo ya se cobró' + (pr.folioRecibo ? ' (folio ' + pr.folioRecibo + ')' : ''), 'err'); return; }
+  if (pr.convertido) { if (typeof toast === 'function') toast('Esta cotización ya se cobró' + (pr.folioRecibo ? ' (folio ' + pr.folioRecibo + ')' : ''), 'err'); return; }
   // Ir al panel de nuevo recibo (ir() limpia el formulario al entrar)
   if (typeof ir === 'function') ir('nuevo-recibo');
   // Esperar a que el panel de nuevo recibo esté listo y pre-llenar con selectores reales

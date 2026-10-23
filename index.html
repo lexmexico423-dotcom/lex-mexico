@@ -89,6 +89,7 @@
       <div class="nav-item" id="nav-placas" data-panel="pendientes" onclick="ir(&#39;pendientes&#39;);setPSec(&#39;placas&#39;,document.querySelector(&#39;#panel-pendientes .pend-sec-btn[data-sec=\&#39;placas\&#39;]&#39;));document.getElementById(&#39;nav-pendientes-gen&#39;).classList.remove(&#39;active&#39;);"><span class="ni">🚗</span><span>Placas</span><span class="nav-badge amarillo" id="badgePlacas" style="display:none;"></span></div>
       <div class="nav-item" onclick="ir(&#39;escrituras&#39;)" id="nav-escrituras"><span class="ni">📄</span><span>Escrituras</span><span class="nav-badge amarillo" id="badgeEscrituras" style="display:none;"></span></div>
       <div class="nav-item" onclick="ir(&#39;citas&#39;)" id="nav-citas"><span class="ni">📅</span><span>Citas</span><span class="nav-badge amarillo" id="badgeCitas" style="display:none;"></span></div>
+      <div class="nav-item" onclick="if(window.lexListaRecibosAnteriores) lexListaRecibosAnteriores();" id="nav-recibos-anteriores" title="Trámites de años anteriores con saldo pendiente (folio de papel)"><span class="ni">🗂</span><span>Recibos Anteriores</span><span class="nav-badge amarillo" id="badgeRecibosAnteriores" style="display:none;"></span></div>
       <div id="nav-scansys" style="display: none;">
         <div class="nav-item" onclick="if(window.LEXPANEL&amp;&amp;LEXPANEL.abrir) LEXPANEL.abrir();" style="border-color:rgba(192,22,26,0.35);position:relative;" title="SCANSYS PRO — Diagnóstico forense de folios">
           <span class="ni">🔍</span><span>ScanSys</span>
@@ -1167,7 +1168,7 @@
         </button>
         <button class="caja-accion-btn" onclick="ir(&#39;pre-recibo&#39;)">
           <span class="caja-accion-icon">📋</span>
-          <span class="caja-accion-texto">Pre-Recibo</span>
+          <span class="caja-accion-texto">Control de Cotizaciones</span>
         </button>
         <button class="caja-accion-btn" onclick="abrirAdeudosSinRecibo()">
           <span class="caja-accion-icon">💰</span>
@@ -15773,10 +15774,10 @@ Recibo original im…</td>
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border-l);flex-shrink:0;background:var(--surface);">
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:1rem;">📋</span>
-          <span style="font-family:&#39;JetBrains Mono&#39;,monospace;font-size:0.8rem;font-weight:700;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;">Pre-Recibos</span>
+          <span style="font-family:&#39;JetBrains Mono&#39;,monospace;font-size:0.8rem;font-weight:700;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;">Control de Cotizaciones</span>
           <span id="pr-badge-count" style="font-size:0.58rem;padding:2px 8px;border-radius:10px;background:rgba(200,149,42,0.2);color:var(--muted);font-family:&#39;JetBrains Mono&#39;,monospace;"></span>
         </div>
-        <button id="pr-btn-generar" onclick="_prNuevo()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:5px;border:1.5px solid var(--gold);background:rgba(200,149,42,0.08);color:var(--muted);font-size:0.68rem;font-family:&#39;JetBrains Mono&#39;,monospace;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;font-weight:700;">＋ Generar Pre-Recibo</button>
+        <button id="pr-btn-generar" onclick="_prNuevo()" style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:5px;border:1.5px solid var(--gold);background:rgba(200,149,42,0.08);color:var(--muted);font-size:0.68rem;font-family:&#39;JetBrains Mono&#39;,monospace;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;font-weight:700;">＋ Nueva Cotización</button>
       </div>
       <div id="pr-panel-contenido" style="flex:1;overflow-y:auto;padding:20px 28px;"></div>
     </div>
@@ -17495,18 +17496,18 @@ Recibo original im…</td>
 <!-- ═══ FIN EXPEDIENTE DIGITAL VEHICULAR ═══ -->
 
 <script src="assets/js/config/public-config.js?v=20261004a"></script>
-<script src="assets/js/modules/recibos/index.js?v=20261023a"></script>
+<script src="assets/js/modules/recibos/index.js?v=20261023d"></script>
 <script src="assets/js/modules/caja/index.js?v=20261018c"></script>
 <script src="assets/js/modules/contabilidad/index.js?v=20261021j"></script>
 <script src="assets/js/modules/clientes/index.js?v=20261018b"></script>
-<script src="assets/js/modules/directorio/index.js?v=20261007c"></script>
+<script src="assets/js/modules/directorio/index.js?v=20261023d"></script>
 <script src="assets/js/modules/expedientes/index.js?v=20261019i"></script>
 <script src="assets/js/modules/documentos/index.js?v=20261018c"></script>
 <script src="assets/js/modules/integraciones/index.js?v=20261018c"></script>
 <script src="assets/js/modules/administracion/index.js?v=20261020a"></script>
 <script src="assets/js/modules/core/index.js?v=20261019h"></script>
 <script src="assets/js/compat/receipts-and-supabase.compat.js?v=20261002a"></script>
-<script src="assets/js/compat/operations-and-accounting.compat.js?v=20261020a"></script>
+<script src="assets/js/compat/operations-and-accounting.compat.js?v=20261023d"></script>
 <!-- PANEL FLOTANTE: Botones de actualización en esquina inferior derecha (fuera de la hoja del recibo) -->
     </div>
     <div id="panel-configuracion" class="panel">
@@ -19463,11 +19464,11 @@ Recibo original im…</td>
 </div>
 <script src="assets/js/ui/accounting-scroll.js?v=20260904d"></script>
 <script src="assets/js/ui/back-navigation.js?v=20261010a"></script>
-<script src="assets/js/ui/cobranza.js?v=20261023c"></script>
+<script src="assets/js/ui/cobranza.js?v=20261023e"></script>
 <script src="assets/js/ui/mandar-llamada.js?v=20261019j"></script>
-<script src="assets/js/ui/sync-vivo.js?v=20261020a"></script>
+<script src="assets/js/ui/sync-vivo.js?v=20261023e"></script>
 <script src="assets/js/ui/gastos-cliente.js?v=20261023a"></script>
 <script src="assets/js/ui/escrituras-lista.js?v=20261021m"></script>
-<script src="assets/js/ui/saldos-anteriores.js?v=20261023c"></script>
+<script src="assets/js/ui/saldos-anteriores.js?v=20261023e"></script>
 
 </body></html>

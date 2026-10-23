@@ -295,6 +295,7 @@
       +   '<span style="flex:1"></span>'
       +   '<button onclick="_lexCotEditar(\'' + pr.id + '\')" style="font-size:0.68rem;padding:5px 12px;border:1px solid var(--border-l);border-radius:5px;background:none;color:var(--ink);cursor:pointer;">✏ Editar</button>'
       +   '<button onclick="_prEliminar(\'' + pr.id + '\')" title="Eliminar cotización" style="font-size:0.72rem;padding:5px 10px;border:1px solid rgba(192,22,26,0.3);border-radius:5px;background:none;color:var(--rojo);cursor:pointer;">🗑</button>'
+      +   '<button id="cot-cerrar-ficha" onclick="_prVolverLista()" title="Cerrar y volver a la lista" aria-label="Cerrar cotización" style="width:32px;height:32px;margin-left:4px;border:1px solid var(--border-l);border-radius:50%;background:var(--surface);color:var(--muted);font-size:1rem;line-height:1;cursor:pointer;" onmouseover="this.style.color=\'var(--rojo)\';this.style.borderColor=\'var(--rojo)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border-l)\'">✕</button>'
       + '</div>'
       // Hoja
       + '<div style="max-width:620px;margin:0 auto;background:#fff;color:#1a1008;border:1px solid #d9cdb0;border-radius:10px;padding:22px 26px;">'

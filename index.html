@@ -89,7 +89,7 @@
       <div class="nav-item" id="nav-placas" data-panel="pendientes" onclick="ir(&#39;pendientes&#39;);setPSec(&#39;placas&#39;,document.querySelector(&#39;#panel-pendientes .pend-sec-btn[data-sec=\&#39;placas\&#39;]&#39;));document.getElementById(&#39;nav-pendientes-gen&#39;).classList.remove(&#39;active&#39;);"><span class="ni">🚗</span><span>Placas</span><span class="nav-badge amarillo" id="badgePlacas" style="display:none;"></span></div>
       <div class="nav-item" onclick="ir(&#39;escrituras&#39;)" id="nav-escrituras"><span class="ni">📄</span><span>Escrituras</span><span class="nav-badge amarillo" id="badgeEscrituras" style="display:none;"></span></div>
       <div class="nav-item" onclick="ir(&#39;citas&#39;)" id="nav-citas"><span class="ni">📅</span><span>Citas</span><span class="nav-badge amarillo" id="badgeCitas" style="display:none;"></span></div>
-      <div class="nav-item" onclick="if(window.lexListaRecibosAnteriores) lexListaRecibosAnteriores();" id="nav-recibos-anteriores" title="Trámites de años anteriores con saldo pendiente (folio de papel)"><span class="ni">🗂</span><span>Recibos Anteriores</span><span class="nav-badge amarillo" id="badgeRecibosAnteriores" style="display:none;"></span></div>
+      <div class="nav-item" onclick="ir('recibos-anteriores')" id="nav-recibos-anteriores" title="Trámites de años anteriores con saldo pendiente (folio de papel)"><span class="ni">🗂</span><span>Recibos Anteriores</span><span class="nav-badge amarillo" id="badgeRecibosAnteriores" style="display:none;"></span></div>
       <div id="nav-scansys" style="display: none;">
         <div class="nav-item" onclick="if(window.LEXPANEL&amp;&amp;LEXPANEL.abrir) LEXPANEL.abrir();" style="border-color:rgba(192,22,26,0.35);position:relative;" title="SCANSYS PRO — Diagnóstico forense de folios">
           <span class="ni">🔍</span><span>ScanSys</span>
@@ -14841,6 +14841,21 @@ Recibo original im…</td>
       <div id="citas-lista" style="padding:12px 16px 32px;display:flex;flex-direction:column;gap:10px;"></div>
     </div><!-- fin panel-citas -->
 
+    <!-- ══ PANEL: RECIBOS ANTERIORES (oct-2026) — saldos de trámites de años anteriores ══ -->
+    <div id="panel-recibos-anteriores" class="panel">
+      <div class="search-row">
+        <input class="search-inp" placeholder="🔍 Buscar por cliente, folio de papel, trámite o año..." id="raQ" oninput="if(window._lexRAPintar)_lexRAPintar()">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);border:1.5px solid var(--border-l);border-radius:var(--radius-sm);padding:6px 20px;flex-shrink:0;line-height:1.15;">
+          <span id="raCountNum" style="font-size:1.3rem;font-weight:800;color:var(--gold-d);font-family:monospace;">0</span>
+          <span style="font-size:0.62rem;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Pendientes</span>
+        </div>
+        <button id="raBtnPagados" class="btn" onclick="if(window.lexRAToggle)lexRAToggle()" style="border:1.5px solid var(--border-l);background:var(--surface);color:var(--muted);font-size:0.78rem;flex-shrink:0;">✓ Con folio / pagados</button>
+        <button class="btn btn-primary" onclick="if(window.lexNuevoSaldoAnterior)lexNuevoSaldoAnterior()">＋ Nuevo recibo anterior</button>
+      </div>
+      <div id="ra-resumen" style="padding:6px 18px 0;font-size:0.76rem;color:var(--muted);text-align:right;"></div>
+      <div id="ra-panel-lista" style="padding:10px 16px 32px;"></div>
+    </div><!-- fin panel-recibos-anteriores -->
+
     <!-- ══════════════════════════════════════════════════════
          MODAL: AGENDAR CITA
     ═══════════════════════════════════════════════════════════ -->
@@ -17507,7 +17522,7 @@ Recibo original im…</td>
 <script src="assets/js/modules/administracion/index.js?v=20261020a"></script>
 <script src="assets/js/modules/core/index.js?v=20261019h"></script>
 <script src="assets/js/compat/receipts-and-supabase.compat.js?v=20261002a"></script>
-<script src="assets/js/compat/operations-and-accounting.compat.js?v=20261023d"></script>
+<script src="assets/js/compat/operations-and-accounting.compat.js?v=20261023f"></script>
 <!-- PANEL FLOTANTE: Botones de actualización en esquina inferior derecha (fuera de la hoja del recibo) -->
     </div>
     <div id="panel-configuracion" class="panel">
@@ -19465,10 +19480,10 @@ Recibo original im…</td>
 <script src="assets/js/ui/accounting-scroll.js?v=20260904d"></script>
 <script src="assets/js/ui/back-navigation.js?v=20261010a"></script>
 <script src="assets/js/ui/cobranza.js?v=20261023e"></script>
-<script src="assets/js/ui/mandar-llamada.js?v=20261019j"></script>
+<script src="assets/js/ui/mandar-llamada.js?v=20261023g"></script>
 <script src="assets/js/ui/sync-vivo.js?v=20261023e"></script>
 <script src="assets/js/ui/gastos-cliente.js?v=20261023a"></script>
 <script src="assets/js/ui/escrituras-lista.js?v=20261021m"></script>
-<script src="assets/js/ui/saldos-anteriores.js?v=20261023e"></script>
+<script src="assets/js/ui/saldos-anteriores.js?v=20261023g"></script>
 
 </body></html>

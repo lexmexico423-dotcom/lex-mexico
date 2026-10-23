@@ -28,6 +28,7 @@
     if (tipo === 'esc')  return lista('escrituras').filter(function(e){ return e && String(e.id) === String(id); })[0] || null;
     if (tipo === 'jui')  return lista('juicios').filter(function(j){ return j && String(j.id) === String(id); })[0] || null;
     if (tipo === 'cita') return lista('citas').filter(function(c){ return c && String(c.id) === String(id); })[0] || null;
+    if (tipo === 'ra')   return lista('adeudosSinRecibo').filter(function(a){ return a && a.tipo === 'anterior' && !a.eliminado && String(a.id) === String(id); })[0] || null;
     if (tipo === 'folio') {
       // Versión más reciente (letra mayor) del folio
       var recs = []; try { recs = (typeof appData !== 'undefined' && appData && Array.isArray(appData.recibos)) ? appData.recibos : []; } catch(e){}
@@ -89,7 +90,7 @@
   function personasDe(tipo, o){
     var ns = [];
     if (tipo === 'pend') { ns = [o.persona, o.juiCliente]; }
-    else if (tipo === 'jui' || tipo === 'cita') { ns = [o.cliente]; }
+    else if (tipo === 'jui' || tipo === 'cita' || tipo === 'ra') { ns = [o.cliente]; }
     else if (tipo === 'folio') {
       // Personas del recibo, con su propio teléfono
       var vf = {}, outF = [];
@@ -105,7 +106,7 @@
     ns.forEach(function(nm, i){
       nm = String(nm || '').trim(); var k = norm(nm); if (!k || vistos[k]) return; vistos[k] = 1;
       // En juicios el teléfono del cliente viene en el propio expediente
-      var propio = (tipo === 'jui' && i === 0 && o.tel) ? String(o.tel).trim() : '';
+      var propio = ((tipo === 'jui' || tipo === 'ra') && i === 0 && o.tel) ? String(o.tel).trim() : '';
       out.push({ nombre: nm, tel: propio || telDe(nm, o) });
     });
     return out;
@@ -115,6 +116,7 @@
       var n = String(o.num || '').replace(/^carp\.?-?\s*/i, '').trim();
       return 'ESCRITURA' + (n ? ' ' + n : '');
     }
+    if (tipo === 'ra') return 'RECIBO ANTERIOR' + (o.folioPapel ? ' · PAPEL ' + String(o.folioPapel).trim() : '') + (o.anio ? ' (' + String(o.anio).trim() + ')' : '');
     if (tipo === 'cita') {
       var h = String(o.hora || '').slice(0, 5);
       return 'CITA' + (o.fecha ? ' ' + fCorta(o.fecha).toUpperCase() : '') + (h ? ' ' + h : '') + (o.titulo ? ' · ' + String(o.titulo).trim().toUpperCase() : '');
@@ -155,8 +157,8 @@
     var personas = personasDe(tipo, o);
     if (!personas.length) personas = [{ nombre: '', tel: '' }];
     var origenTxt = String(etiqueta || '').trim() || etiquetaOrigen(tipo, o);
-    var telOpcional = (tipo === 'cita');
-    var resumen = tipo === 'cita' ? String(o.lugar || '').trim() : tipo === 'folio' ? String(o.nombre || '').trim() : tipo === 'esc' ? String(o.tipo || o.tramite || '').trim() : tipo === 'jui' ? String(o.juzgado || '').trim() : String(o.texto || '').trim();
+    var telOpcional = (tipo === 'cita' || tipo === 'ra');
+    var resumen = tipo === 'ra' ? String(o.concepto || '').trim() : tipo === 'cita' ? String(o.lugar || '').trim() : tipo === 'folio' ? String(o.nombre || '').trim() : tipo === 'esc' ? String(o.tipo || o.tramite || '').trim() : tipo === 'jui' ? String(o.juzgado || '').trim() : String(o.texto || '').trim();
     var viejo = document.getElementById('lex-llam-ov'); if (viejo) viejo.remove();
     var ov = document.createElement('div');
     ov.id = 'lex-llam-ov';
@@ -248,6 +250,7 @@
       try { if (tipo === 'esc' && typeof escRender === 'function') escRender(); } catch(e){}
       try { if (tipo === 'jui' && typeof renderJuicios === 'function') renderJuicios(); } catch(e){}
       try { if (tipo === 'cita' && typeof renderCitas === 'function') renderCitas(); } catch(e){}
+      try { if (tipo === 'ra' && typeof window._lexRAPintar === 'function') window._lexRAPintar(); } catch(e){}
       // Repintar el icono donde esté (ej. Ficha del folio) para que muestre la ✓
       try {
         document.querySelectorAll('.lex-btn-llamada').forEach(function(b){

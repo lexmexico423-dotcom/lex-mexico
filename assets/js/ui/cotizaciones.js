@@ -93,21 +93,18 @@
     var el = wrap();
     var badge = document.getElementById('pr-badge-count');
     var activas = todas().filter(function(p){ return p && !p.convertido && !p.eliminado; });
-    if (badge) badge.textContent = activas.length + (activas.length === 1 ? ' pendiente' : ' pendientes');
+    if (badge) { badge.textContent = ''; badge.style.display = 'none'; } // el número va en el recuadro grande
     if (!el) return;
-    if (!activas.length) {
-      el.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--muted);font-size:0.78rem;line-height:1.8;">Sin cotizaciones activas.<br>Usa <strong>＋ Nueva Cotización</strong> para comenzar.</div>';
-      return;
-    }
     var qEl = document.getElementById('prQ'), q = qEl ? N(qEl.value) : '';
     var cuenta = { todas: activas.length };
     activas.forEach(function(p){ var t = tipoDe(p); cuenta[t] = (cuenta[t] || 0) + 1; });
+    // Botones de tipo con el estilo de Oaxaca / Edo. Méx. / CDMX de Pendientes
+    var BOTON = { todas: ['#4a3a12','#9a7a2a','#f0d48a'], placas: ['#1a3a6a','#2a5aaa','#7ab8f0'], escrituras: ['#124a3a','#1f8a68','#7fe0bd'],
+                  juicio: ['#2e2766','#5a50b8','#c3bdf5'], sucesion: ['#5a2412','#a8502c','#f5b393'], otro: ['#3a3934','#6e6c64','#d9d6cc'] };
     var chips = [['todas','Todas']].concat(TIPOS).map(function(t){
-      var n = cuenta[t[0]] || 0;
-      var on = _filtroTipo === t[0], k = colorTipo(t[0]);
-      var est = t[0] === 'todas' ? (on ? CHIP_ON : CHIP) : (on ? chipTipo(t[0]) : CHIP);
-      var punto = t[0] === 'todas' ? '' : '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:' + k.c + ';margin-right:5px;vertical-align:1px;"></span>';
-      return '<span role="button" onclick="_lexCotFiltro(\'' + t[0] + '\')" style="cursor:pointer;' + est + '">' + punto + t[1] + (n ? ' ' + n : '') + '</span>';
+      var n = cuenta[t[0]] || 0, on = _filtroTipo === t[0], c = BOTON[t[0]];
+      return '<button type="button" onclick="_lexCotFiltro(\'' + t[0] + '\')" style="font-size:0.72rem;padding:6px 13px;background:' + c[0] + ';border:1px solid ' + c[1] + ';color:' + c[2] + ';border-radius:7px;cursor:pointer;font-family:\'JetBrains Mono\',monospace;letter-spacing:0.06em;text-transform:uppercase;font-weight:700;white-space:nowrap;'
+        + (on ? 'box-shadow:0 0 0 2px var(--gold);' : 'opacity:' + (_filtroTipo === 'todas' ? '1' : '0.55') + ';') + '">' + t[1] + (n ? ' · ' + n : '') + '</button>';
     }).join('');
     var lista = activas.filter(function(p){
       if (_filtroTipo !== 'todas' && tipoDe(p) !== _filtroTipo) return false;
@@ -129,9 +126,15 @@
         + '<button onclick="event.stopPropagation();_prConvertirARecibo(\'' + pr.id + '\')" title="Convertir en recibo oficial" style="' + btn('border:1.5px solid #2a7a3a;color:#2a7a3a;padding:7px 14px;') + '">Cobrar</button>'
         + '</div>';
     }).join('');
-    el.innerHTML = '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px;">' + chips
-      + '<span style="flex:1"></span><input id="prQ" type="search" placeholder="🔍 Buscar cliente…" value="' + E(qEl ? qEl.value : '') + '" oninput="_prRenderListaQ()" style="' + INP + 'width:200px;padding:5px 10px;border-radius:999px;font-size:0.72rem;"></div>'
-      + (tarjetas || '<div style="text-align:center;padding:30px;color:var(--muted);font-size:0.75rem;">Ninguna cotización coincide.</div>');
+    el.innerHTML = '<div class="search-row" style="flex-wrap:wrap;margin-bottom:14px;">'
+      +   '<input id="prQ" class="search-inp" type="search" placeholder="🔍 Buscar cotización (cliente, trámite o teléfono)…" value="' + E(qEl ? qEl.value : '') + '" oninput="_prRenderListaQ()" style="min-width:220px;">'
+      +   '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);border:1.5px solid var(--border-l);border-radius:var(--radius-sm);padding:6px 20px;flex-shrink:0;line-height:1.15;">'
+      +     '<span style="font-size:1.3rem;font-weight:800;color:var(--gold-d);font-family:monospace;">' + lista.length + '</span>'
+      +     '<span style="font-size:0.62rem;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">' + (lista.length === 1 ? 'Cotización' : 'Cotizaciones') + '</span>'
+      +   '</div>'
+      +   '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">' + chips + '</div>'
+      + '</div>'
+      + (tarjetas || '<div style="text-align:center;padding:30px;color:var(--muted);font-size:0.78rem;line-height:1.8;">' + (activas.length ? 'Ninguna cotización coincide.' : 'Sin cotizaciones activas.<br>Usa <strong>＋ Nueva Cotización</strong> para comenzar.') + '</div>');
   };
   window._prRenderListaQ = function(){
     var qEl = document.getElementById('prQ'), pos = qEl ? qEl.selectionStart : 0;
@@ -146,10 +149,12 @@
     return '<div class="cot-fila" style="display:grid;grid-template-columns:22px 1fr 130px 26px;gap:6px;align-items:center;margin-bottom:6px;">'
       + '<span class="cot-num" style="font-size:0.7rem;color:var(--muted);text-align:center;">' + (i + 1) + '</span>'
       + '<input class="cot-c" type="text" value="' + E(c.concepto || '') + '" placeholder="Concepto (ej. Trámite de baja)" style="' + INP + '">'
-      + '<input class="cot-i" type="text" inputmode="decimal" value="' + (r2(c.importe) ? r2(c.importe).toFixed(2) : '') + '" placeholder="0.00" oninput="_lexCotTotalVivo()" onfocus="this.select()" style="' + INP + 'text-align:right;' + MONO + '">'
+      + '<input class="cot-i" type="text" inputmode="decimal" value="' + (r2(c.importe) ? $m(c.importe) : '') + '" placeholder="$0.00" oninput="_lexCotTotalVivo()" onfocus="this.select()" onblur="_lexCotFmt(this)" style="' + INP + 'text-align:right;' + MONO + '">'
       + '<button type="button" onclick="_lexCotQuitarFila(this)" title="Quitar renglón" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:0.9rem;">✕</button>'
       + '</div>';
   }
+  // $10,000.00 al salir del campo (se puede escribir 10000, 10,000 o $10000)
+  window._lexCotFmt = function(inp){ var v = String(inp.value || '').trim(); if (!v) return; var n = r2(v); inp.value = isNaN(n) ? v : $m(n); window._lexCotTotalVivo(); };
   function renumerar(){ document.querySelectorAll('#cot-filas .cot-num').forEach(function(s, i){ s.textContent = i + 1; }); }
   window._lexCotAgregarFila = function(){
     var cont = document.getElementById('cot-filas'); if (!cont) return;
@@ -187,6 +192,8 @@
       +   '<button onclick="' + (esNuevo ? '_prVolverLista()' : '_prAbrirFormulario(\'' + pr.id + '\')') + '" style="font-size:0.68rem;padding:4px 10px;border:1px solid var(--border-l);border-radius:5px;background:none;color:var(--muted);cursor:pointer;">← Volver</button>'
       +   '<span style="font-size:0.84rem;font-weight:700;color:var(--ink);">' + (esNuevo ? 'Nueva cotización' : 'Editar cotización') + '</span>'
       +   '<span style="font-size:0.62rem;color:var(--muted);">· ' + E(fLarga(pr.fechaInicio)) + '</span>'
+      +   '<span style="flex:1"></span>'
+      +   '<button onclick="' + (esNuevo ? '_prVolverLista()' : '_prAbrirFormulario(\'' + pr.id + '\')') + '" id="cot-cerrar" title="Cerrar sin guardar" aria-label="Cerrar formulario" style="width:32px;height:32px;border:1px solid var(--border-l);border-radius:50%;background:var(--surface);color:var(--muted);font-size:1rem;line-height:1;cursor:pointer;" onmouseover="this.style.color=\'var(--rojo)\';this.style.borderColor=\'var(--rojo)\'" onmouseout="this.style.color=\'var(--muted)\';this.style.borderColor=\'var(--border-l)\'">✕</button>'
       + '</div>'
       + '<label style="' + LBL + '">Tipo de trámite *</label>'
       + '<input type="hidden" id="pr-f-tipo" value="' + E(tipo) + '">'
@@ -476,6 +483,24 @@
   // Gastos sueltos (formato anterior): ya no se usan en pantalla
   window._prRenderGastos = function(){};
   window._prActualizarTotalesForm = function(){ if (document.getElementById('cot-total')) window._lexCotTotalVivo(); };
+
+  // ── Barra de búsqueda general (arriba): se borra al cambiar de sección ──
+  // Antes lo escrito (ej. "SEVERINO") se quedaba en todas las pantallas.
+  (function(){
+    if (typeof window.ir !== 'function' || window.ir._lexLimpiaBusqueda) return;
+    var orig = window.ir;
+    var env = function(){
+      try {
+        var inp = document.getElementById('global-search-inp');
+        if (inp && inp.value) { if (typeof globalSearchCerrar === 'function') globalSearchCerrar(); else inp.value = ''; }
+        var res = document.getElementById('global-search-results'); if (res) res.classList.remove('show');
+      } catch(e){}
+      return orig.apply(this, arguments);
+    };
+    for (var k in orig) { try { env[k] = orig[k]; } catch(e){} }
+    env._lexLimpiaBusqueda = true;
+    window.ir = env;
+  })();
 
   // Repintar cuando llegan cambios de otra computadora (sin tocar el formulario)
   window._lexCotPintar = function(){

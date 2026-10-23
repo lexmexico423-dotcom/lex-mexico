@@ -32,7 +32,8 @@
   function fC(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||'')); if (!m && iso) { try { var l = _adeudoFechaLocal(iso); m = /^(\d{4})-(\d{2})-(\d{2})/.exec(l); } catch(e){} } return m ? (+m[3]) + '-' + MES[+m[2]-1] : ''; }
   function usuario(){ try { return _adeudoUsuario(); } catch(e){ return ''; } }
   function lista(){ try { if (!Array.isArray(D.adeudosSinRecibo)) D.adeudosSinRecibo = []; return D.adeudosSinRecibo; } catch(e){ return []; } }
-  function activos(){ return lista().filter(function(a){ return a && !a.eliminado; }); }
+  // Los 'Saldos de años anteriores' (tipo:'anterior') viven en la misma lista pero se manejan aparte (saldos-anteriores.js)
+  function activos(){ return lista().filter(function(a){ return a && !a.eliminado && a.tipo !== 'anterior'; }); }
   function guardar(){ try { _adeudoGuardarYSincronizar(); } catch(e){ try { save(); } catch(_){} } }
   function preguntar(titulo, msg, si, no){
     if (typeof confirmarBonito === 'function') return confirmarBonito({ titulo: titulo, mensaje: msg, btnSi: si || 'Sí', btnNo: no || 'Cancelar' });

@@ -71,6 +71,11 @@
         categoria: categoriaDe(r, (Array.isArray(r.conceptos) ? r.conceptos.map(function(c){ return (c && c.concepto) || ''; }).join(' ') : '') + ' ' + (r.tramites || '')),
       });
     });
+    // Oct-2026: saldos de años anteriores (aún sin folio) y marca de antecedentes de papel
+    try {
+      if (typeof window.lexSaldosAnterioresCobranza === 'function') window.lexSaldosAnterioresCobranza().forEach(function(x){ x.dias = diasDesde(x.fecha); lista.push(x); });
+      if (typeof window.lexAntecedentesDeFolio === 'function') lista.forEach(function(x){ if (!x.esAnterior) { var a = window.lexAntecedentesDeFolio(x.folio); if (a) { x.papel = a.folioPapel || ''; x.anioPapel = a.anio || ''; } } });
+    } catch(e){}
     lista.sort(function(a, b){ return b.dias - a.dias; });
     return lista;
   }
@@ -95,7 +100,8 @@
   var numMensaje = 0;
   function mensaje(x, i){
     var m = MENSAJES[(typeof i === 'number') ? i : numMensaje] || MENSAJES[0];
-    return m.txt(titulo(x.nombre), '«' + nombreTramite(x.concepto) + '»', String(x.folio), dinero(x.saldo)) + FIRMA;
+    var fTxt = x.esAnterior ? (x.folioPapel ? 'de papel ' + x.folioPapel : 'de ' + (x.anio || 'años anteriores')) : String(x.folio);
+    return m.txt(titulo(x.nombre), '«' + nombreTramite(x.concepto) + '»', fTxt, dinero(x.saldo)) + FIRMA;
   }
 
   // ── Teléfono → número internacional para WhatsApp ──
@@ -170,12 +176,13 @@
       catsBox.innerHTML = chip(null, '📋', 'Todas', todosSinCat) + CATEGORIAS.map(function(c){
         var rs = todosSinCat.filter(function(x){ return x.categoria === c.id; });
         return rs.length ? chip(c.id, c.ico, c.txt, rs) : '';
-      }).join('');
+      }).join('') + (function(){ var rs = todosSinCat.filter(function(x){ return x.esAnterior; }); return rs.length ? chip('anteriores', '🗂', 'Años anteriores', rs) : ''; })()
+        + '<button type="button" onclick="lexNuevoSaldoAnterior()" style="margin-left:auto;border:1px dashed #9a6e18;background:#fff8e6;color:#6a4a10;border-radius:20px;padding:5px 12px;font-size:0.72rem;cursor:pointer;white-space:nowrap;">＋ Saldo de años anteriores</button>';
       catsBox.querySelectorAll('.cob-cat').forEach(function(b){
         b.onclick = function(){ var c = b.getAttribute('data-c') || null; categoria = (categoria === c ? null : c); render(); };
       });
     }
-    var todos = categoria ? todosSinCat.filter(function(x){ return x.categoria === categoria; }) : todosSinCat;
+    var todos = categoria ? todosSinCat.filter(function(x){ return categoria === 'anteriores' ? x.esAnterior : x.categoria === categoria; }) : todosSinCat;
     var total = todosSinCat.reduce(function(s, x){ return s + x.saldo; }, 0);
     ov.querySelector('#cob-total').textContent = todosSinCat.length + ' folios con saldo pendiente';
     // Oct-2026: se quitaron los recuadros de antigüedad (a petición); los días siguen en cada folio
@@ -197,10 +204,14 @@
       var gx = (typeof window.lexGastosFolio === 'function') ? window.lexGastosFolio(x.folio) : null;
       if (gx && !(gx.total > 0.005)) gx = null;
       return '<div class="cob-row" data-f="' + esc(x.folio) + '" style="display:grid;grid-template-columns:52px minmax(0,1fr) 110px 78px ' + '34px ' + (esAdm ? '118px ' : '') + '132px;gap:10px;align-items:center;padding:8px 10px;background:' + (sel ? '#fff8e4' : '#fff') + ';border:1px solid ' + (sel ? '#c8951a' : '#eadfbf') + ';border-radius:7px;margin-bottom:6px;font-size:0.8rem;">'
-        + '<span class="cob-folio" data-f="' + esc(x.folio) + '" title="Abrir la ficha del folio ' + esc(x.folio) + '" style="color:#1a4a8a;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">#' + esc(x.folio) + esc(x.letra) + '</span>'
+        + (x.esAnterior
+            ? '<span class="cob-folio" data-sa="' + esc(x.saId) + '" title="Saldo de años anteriores · abrir su ficha" style="color:#5f5e5a;font-weight:700;cursor:pointer;line-height:1.1;font-size:0.72rem;"><span style="display:block;font-size:0.58rem;letter-spacing:0.04em;">AÑO ' + esc(x.anio || '—') + '</span>📄 ' + esc(x.folioPapel || 'S/N') + '</span>'
+            : '<span class="cob-folio" data-f="' + esc(x.folio) + '" title="Abrir la ficha del folio ' + esc(x.folio) + '" style="color:#1a4a8a;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:3px;">#' + esc(x.folio) + esc(x.letra) + '</span>')
         + '<div style="min-width:0;"><div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(x.nombre || '(sin nombre)') + '</div>'
         + '<div style="font-size:0.7rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(oracion(x.concepto)) + ' · ' + (x.tel ? esc(x.tel) : '<span style="color:#a32d2d;">sin teléfono</span>') + (x.personas.length > 1 ? ' · <b style="color:#1a4a8a;">👥 ' + x.personas.length + ' personas</b>' : '') + '</div>'
         + (ep ? '<div style="margin-top:3px;"><span style="display:inline-block;font-size:0.66rem;font-weight:600;border-radius:10px;padding:1px 8px;background:' + ep.fondo + ';color:' + ep.color + ';" title="' + esc(ep.tip || '') + '">' + esc(ep.txt) + '</span></div>' : '')
+        + (x.esAnterior ? '<div style="margin-top:3px;"><span style="display:inline-block;font-size:0.66rem;font-weight:600;border-radius:10px;padding:1px 8px;background:#f1efe8;color:#5f5e5a;">🗂 Saldo de años anteriores' + (x.anio ? ' · ' + esc(x.anio) : '') + '</span> <button type="button" class="cob-sa-cobrar" data-sa="' + esc(x.saId) + '" style="font-size:0.64rem;font-weight:700;border:none;background:#c8781a;color:#fff;border-radius:10px;padding:2px 9px;cursor:pointer;">💰 Cobrar</button></div>' : '')
+        + (x.papel ? '<div style="margin-top:3px;"><span title="Trámite iniciado antes del sistema" style="display:inline-block;font-size:0.66rem;font-weight:600;border-radius:10px;padding:1px 8px;background:#f1efe8;color:#5f5e5a;">📄 papel ' + esc(x.papel) + (x.anioPapel ? ' · ' + esc(x.anioPapel) : '') + '</span></div>' : '')
         + (gx ? '<div style="margin-top:3px;"><span title="Gastos extra que pagó el despacho por el cliente (fuera de lo pactado). Se cobran aparte." style="display:inline-block;font-size:0.66rem;font-weight:600;border-radius:10px;padding:1px 8px;background:#fdf0dc;color:#8a4a10;">💸 + gastos ' + dinero(gx.total) + '</span></div>' : '')
         + '</div>'
         + '<span style="text-align:right;font-weight:700;color:#a32d2d;">' + dinero(x.saldo) + '</span>'
@@ -213,8 +224,10 @@
         + '</div>';
     }).join('') : '<div style="text-align:center;color:#7a6a4a;padding:30px;font-size:0.82rem;">No hay folios con saldo en este filtro.</div>';
     // Clic en el folio → cierra Cobranza y abre la Ficha del Folio (misma ruta que Contabilidad)
+    ov.querySelectorAll('.cob-sa-cobrar').forEach(function(b){ b.onclick = function(){ if (typeof lexCobrarSaldoAnterior === 'function') lexCobrarSaldoAnterior(b.getAttribute('data-sa')); }; });
     ov.querySelectorAll('.cob-folio').forEach(function(el){
       el.onclick = function(){
+        if (el.getAttribute('data-sa')) { if (typeof lexFichaSaldoAnterior === 'function') lexFichaSaldoAnterior(el.getAttribute('data-sa')); return; }
         var n = parseInt(el.getAttribute('data-f'), 10);
         if (!n) return;
         window.cerrarCobranza();
@@ -436,6 +449,11 @@
   function saldoActual(folio){
     var d = datosCobranza().filter(function(y){ return String(y.folio) === String(folio); })[0];
     if (d) return { saldo: d.saldo, letra: d.letra };
+    // Oct-2026: saldo de años anteriores (clave P…): si ya se convirtió en folio, usar ese folio
+    if (/^P/.test(String(folio)) && typeof window.lexSaldoAnteriorPorClave === 'function') {
+      var sa = window.lexSaldoAnteriorPorClave(String(folio));
+      if (sa) return sa.folioConvertido != null ? saldoActual(sa.folioConvertido) : { saldo: sa.debe, letra: '' };
+    }
     var recs = (typeof appData !== 'undefined' && appData && Array.isArray(appData.recibos)) ? appData.recibos : [];
     var vs = recs.filter(function(r){ return r && String(r.folio) === String(folio) && !r.esComplemento; });
     if (!vs.length || vs.some(function(r){ return r.cancelado; })) return null;

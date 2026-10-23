@@ -1492,14 +1492,41 @@ function _lexFusionarListaPorId(local, remoto){
   const _fusionadas = _remoto.map(function(x){
     const _loc = x && x.id ? _mapaLocal[x.id] : null;
     if(_loc){
-      const tsLoc = Date.parse(_loc.fechaMod || 0) || 0;
-      const tsRem = Date.parse(x.fechaMod || 0) || 0;
+      const tsLoc = _lexTsMod(_loc.fechaMod);
+      const tsRem = _lexTsMod(x.fechaMod);
       if(tsLoc > tsRem) return _loc;
     }
     return x;
   });
   const _soloLocales = _local.filter(function(x){ return x && x.id && !_remotoIds.has(x.id); });
   return _fusionadas.concat(_soloLocales);
+}
+// 23-oct-2026 · fechaMod puede venir como número (Date.now()) o como texto ISO.
+// Date.parse(número) da NaN → antes la copia local más nueva podía perder.
+function _lexTsMod(v){
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  if (v == null || v === '') return 0;
+  if (/^\d{10,}$/.test(String(v))) return Number(v);
+  return Date.parse(v) || 0;
+}
+// 23-oct-2026 · COTIZACIONES (preRecibos): se subían tal cual estaban en
+// memoria, sin compararse con el servidor. Una pestaña/computadora con copia
+// vieja borraba al guardar las cotizaciones creadas en otra. Ahora se unen
+// por id; por cada una gana la modificada más reciente; "convertido" nunca se
+// revierte (ya tiene folio real) y "eliminado" se respeta (no revive).
+function _lexFusionarPreRecibos(local, remoto){
+  const mapa = {}, orden = [];
+  (Array.isArray(remoto) ? remoto : []).concat(Array.isArray(local) ? local : []).forEach(function(p){
+    if (!p || !p.id) return;
+    const prev = mapa[p.id];
+    if (!prev) { mapa[p.id] = p; orden.push(p.id); return; }
+    let gana = (_lexTsMod(p.fechaMod) > _lexTsMod(prev.fechaMod)) ? p : prev;
+    if ((prev.convertido || p.convertido) && !gana.convertido) {
+      gana = Object.assign({}, gana, { convertido: true, folioRecibo: prev.folioRecibo || p.folioRecibo });
+    }
+    mapa[p.id] = gana;
+  });
+  return orden.map(function(id){ return mapa[id]; });
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1778,11 +1805,13 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     // antes de escribir, contra lo que esta pestaña está a punto de subir.
     let _sbRecibosCountGuard = null, _sbMovsCountGuard = null;
     let _sbTareasCountGuard = null, _sbAdeudosCountGuard = null;
+    let _preLecturaOk = false;
     try {
       const { data: _sbPreSync } = await _sbConTimeout(window.SB
         .from('app_state').select('recibos, data, rev')
         .eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle(), 10000, 'pre-lectura estado');
       _revPreSync = (_sbPreSync && typeof _sbPreSync.rev === 'number') ? _sbPreSync.rev : null;
+      _preLecturaOk = !!_sbPreSync;
       const _sbTombsPreSync = (_sbPreSync && _sbPreSync.recibos && _sbPreSync.recibos.folios_eliminados) || [];
       const _sbRecibosPreSync = (_sbPreSync && _sbPreSync.recibos && Array.isArray(_sbPreSync.recibos.recibos)) ? _sbPreSync.recibos.recibos : [];
       _sbRecibosCountGuard = _sbRecibosPreSync.length;
@@ -1808,6 +1837,9 @@ async function syncEstadoSupabase(_intentoConcurrencia){
         // resueltas viejas bloqueaba todos los guardados).
         _sbTareasCountGuard = _sbTareasPreSync.filter(function(t){ return !(t && _lap.has(t.id)); }).length;
       })();
+      // 23-oct-2026 · Cotizaciones: fusionar con el servidor antes de subir
+      estado.preRecibos = _lexFusionarPreRecibos(D.preRecibos, Array.isArray(_sbDataPreSync.preRecibos) ? _sbDataPreSync.preRecibos : []);
+      D.preRecibos = estado.preRecibos;
       D.cobranzaBitacora = estado.cobranzaBitacora;
       D.tareasHoy        = estado.tareasHoy;
       D.adeudosSinRecibo = estado.adeudosSinRecibo;
@@ -2041,7 +2073,19 @@ async function syncEstadoSupabase(_intentoConcurrencia){
           }
         }
       } catch(_eMovMerge){ console.warn('[SB] merge movimientos:', _eMovMerge); }
-    } catch(_ePreSync){ /* fallo silencioso — se usarán datos locales */ }
+    } catch(_ePreSync){ console.warn('[SB] pre-lectura:', _ePreSync); }
+    // 23-oct-2026 · Si NO se pudo leer el servidor (internet lento, caída), NO
+    // se sube nada: antes se subía la copia local sin fusionar y sin control de
+    // versión, y una pestaña vieja podía borrar cotizaciones/adeudos/tareas de
+    // otra computadora. Se reintenta solo en unos segundos.
+    if (!_preLecturaOk) {
+      _syncEnCurso = false;
+      window._lexUltimoSyncFallido = true;
+      try { syncEnd(false, 'Sin conexión con el servidor — se reintentará'); } catch(_eSE){}
+      setTimeout(function(){ if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); }, 15000);
+      return;
+    }
+    window._lexUltimoSyncFallido = false;
     const recibos = {
       folioActual:       (typeof REC !== 'undefined' && REC.folioActual) ? REC.folioActual : (appData.folioActual || 100),
       anioFolioActual:   (appData.anioFolioActual || new Date().getFullYear()),

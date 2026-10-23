@@ -655,8 +655,8 @@ async function sincronizarFolio(forzarSB){
           const _fusionadasAdeudos = _sbAdeudos.map(function(a){
             const _loc = a && a.id ? _mapaLocalAdeudos[a.id] : null;
             if (_loc) {
-              const tsLoc = Date.parse(_loc.fechaMod || 0) || 0;
-              const tsSb  = Date.parse(a.fechaMod || 0) || 0;
+              const tsLoc = (typeof _lexTsMod === 'function') ? _lexTsMod(_loc.fechaMod) : (Date.parse(_loc.fechaMod || 0) || 0);
+              const tsSb  = (typeof _lexTsMod === 'function') ? _lexTsMod(a.fechaMod)    : (Date.parse(a.fechaMod || 0) || 0);
               if (tsLoc > tsSb) return _loc;
             }
             return a;
@@ -686,11 +686,13 @@ async function sincronizarFolio(forzarSB){
         const _sbPreRecibos = data.data.preRecibos || [];
         const _localPreRecibos = Array.isArray(D.preRecibos) ? D.preRecibos : [];
         const _prMapa = {}, _prOrden = [];
+        // 23-oct-2026: fechaMod número o texto ISO → comparar como milisegundos
+        const _prTs = function(v){ return (typeof _lexTsMod === 'function') ? _lexTsMod(v) : (typeof v === 'number' ? v : (Date.parse(v) || 0)); };
         _sbPreRecibos.concat(_localPreRecibos).forEach(function(p){
           if (!p || !p.id) return;
           const prev = _prMapa[p.id];
           if (!prev) { _prMapa[p.id] = p; _prOrden.push(p.id); return; }
-          let gana = ((p.fechaMod || 0) > (prev.fechaMod || 0)) ? p : prev;
+          let gana = (_prTs(p.fechaMod) > _prTs(prev.fechaMod)) ? p : prev;
           if ((prev.convertido || p.convertido) && !gana.convertido) {
             gana = Object.assign({}, gana, { convertido: true, folioRecibo: prev.folioRecibo || p.folioRecibo });
           }
@@ -10772,7 +10774,8 @@ async function _prGuardar() {
   try { save(); } catch(e) { console.warn('[PreRecibo] Supabase error:', e); }
   // 2) R2 — respaldo permanente
   try {
-    if (typeof window.subirR2 === 'function' && window.SB_DESPACHO_ID) {
+    // 23-oct-2026: nunca reemplazar el respaldo con una lista vacía
+    if (typeof window.subirR2 === 'function' && window.SB_DESPACHO_ID && D.preRecibos.length > 0) {
       const json = JSON.stringify(D.preRecibos);
       const blob = new Blob([json], { type: 'application/json' });
       const file = new File([blob], 'data.json', { type: 'application/json' });

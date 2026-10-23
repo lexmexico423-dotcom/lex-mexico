@@ -1743,7 +1743,9 @@ window._pendMovsRecuperar = function(){
     window.syncEstadoSupabase = async function() {
       try {
         const res = await _origSyncEmerg.apply(this, arguments);
-        window._marcarGuardadoOk();
+        // 23-oct-2026: si no se pudo subir (sin conexión) sigue pendiente
+        if (window._lexUltimoSyncFallido) window._marcarCambiosPendientes();
+        else window._marcarGuardadoOk();
         return res;
       } catch(e) {
         window._marcarCambiosPendientes();
@@ -1756,54 +1758,17 @@ window._pendMovsRecuperar = function(){
     // ── 2. Intentar enviar a Supabase con keepalive si hay sesión válida ───
     if (!_hayPendientes) return; // nada pendiente — no interrumpir
     if (!window.SB || !window.SB_DESPACHO_ID) return;
-    try {
-      // Limpiar movimientos sintéticos antes de persistir
-      const movsLimpios = (D.movimientos||[]).filter(m => m && m.id && !/^R-\d+$/.test(m.id));
-      const estado = {
-        movimientos:    movsLimpios,
-        directorio:     D.directorio    || [],
-        carpetas:       D.carpetas      || [],
-        juicios:        D.juicios       || [],
-        pendientes:     D.pendientes    || [],
-        citas:          D.citas         || [],
-        prestamos:      D.prestamos     || [],
-        tareasHoy:      D.tareasHoy     || [],
-        adeudosSinRecibo: D.adeudosSinRecibo || [],
-        saldoAcumulado: D.saldoAcumulado || 0
-      };
-      const recibos = {
-        folioActual: (typeof REC !== 'undefined' && REC.folioActual) ? REC.folioActual : (appData.folioActual || 100),
-        recibos:     appData.recibos || []
-      };
-      // Obtener el access token actual de Supabase desde localStorage
-      const sessionKey = 'lex-supabase-auth';
-      let accessToken = '';
-      try {
-        const ses = JSON.parse(localStorage.getItem(sessionKey)||'{}');
-        accessToken = ses.access_token || (ses.currentSession && ses.currentSession.access_token) || '';
-      } catch(e){ registrarError('catch vacio', e); }
-      if(!accessToken) return;
-      const url = SUPABASE_URL + '/rest/v1/app_state?despacho_id=eq.' + window.SB_DESPACHO_ID;
-      fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': 'Bearer ' + accessToken,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          data: estado,
-          recibos: recibos,
-          folio_actual: recibos.folioActual
-        }),
-        keepalive: true
-      });
-      console.log('[Emergency] Guardado de emergencia enviado a Supabase');
-    } catch(err) {
-      console.warn('[Emergency] Error en guardado de emergencia:', err);
-    }
-    // NO llamar e.preventDefault() ni asignar e.returnValue
+    // ⚠ FIX 23-oct-2026 (pérdida de datos "de la nada"): antes aquí se mandaba
+    // un PATCH que REEMPLAZABA toda la columna data con solo 10 listas, sin
+    // comparar con el servidor. Al cerrar la pestaña con un guardado aún en
+    // curso (o bloqueado por estar desactualizada) se borraban del servidor
+    // Cotizaciones, Escrituras, cortes de caja, bitácora, etc., y se pisaban
+    // tareas/adeudos capturados en otra computadora. Ahora:
+    //  1) se intenta el guardado NORMAL (fusiona con el servidor y revisa rev);
+    //  2) el navegador pregunta "¿Salir del sitio?" para dar tiempo a que termine.
+    try { if (typeof window.syncEstadoSupabase === 'function') window.syncEstadoSupabase().catch(function(){}); } catch(err) {}
+    try { e.preventDefault(); e.returnValue = ''; } catch(err) {}
+    return '';
   });
   // Marcar como pendiente cada vez que se modifica D (intercepciones ligeras)
   const _origSave = window.save;

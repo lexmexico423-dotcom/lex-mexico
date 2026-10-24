@@ -329,6 +329,26 @@ function validarAntesDeSalvar(clientes, conceptos, total, anticipo){
   return advertencias;
 }
 
+// Oct-2026 (a petición expresa): con 2 o más clientes, al menos uno debe estar
+// marcado "¿Va a firmar?" — ya no se genera un recibo con la firma vacía.
+// Con un solo cliente la casilla está oculta y ese cliente firma siempre.
+function _lexFaltaFirmante(clientes){
+  const conNombre = (clientes || []).filter(function(c){ return c && String(c.nombre || '').trim(); });
+  return conNombre.length > 1 && !conNombre.some(function(c){ return !!c.firmante; });
+}
+function _lexAvisarFaltaFirmante(){
+  const msg = 'Marca quién va a firmar (casilla «¿Va a firmar?» en los datos del cliente)';
+  if (typeof setStatus === 'function') setStatus('err', msg, 'err');
+  if (typeof toast === 'function') toast('⚠ ' + msg, 'err');
+  try {
+    document.querySelectorAll('#clientes-wrapper [id^="firmante_"]').forEach(function(chk){
+      chk.style.outline = '2px solid #c0161a'; chk.style.outlineOffset = '2px';
+      setTimeout(function(){ chk.style.outline = ''; chk.style.outlineOffset = ''; }, 4000);
+    });
+    const w = document.getElementById('clientes-wrapper'); if (w && w.scrollIntoView) w.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } catch(e){}
+}
+
 function confirmarAntesDeGuardar(){
   if(typeof sbSession === 'undefined' || !sbSession || Date.now() >= sbExpiry){
     if(typeof mostrarDriveOverlay === 'function'){ mostrarDriveOverlay('guardarRecibo'); return; }
@@ -339,6 +359,7 @@ function confirmarAntesDeGuardar(){
     if(typeof setStatus==='function') setStatus('err','Ingresa el nombre del cliente','err');
     return;
   }
+  if(_lexFaltaFirmante(clientes)){ _lexAvisarFaltaFirmante(); return; }
   if(!conceptos.length){
     if(typeof setStatus==='function') setStatus('err','Agrega al menos un concepto','err');
     return;
@@ -369,6 +390,7 @@ async function guardarRecibo(){
   }
   const clientes=getClientes();
   if(!clientes.length||!clientes[0].nombre){ window._desactivarRegistrandoRecibo(); setStatus('err','Ingresa el nombre del cliente','err'); return; }
+  if(_lexFaltaFirmante(clientes)){ window._desactivarRegistrandoRecibo(); _lexAvisarFaltaFirmante(); return; }
   // (El modal vehicular antiguo de "descripción adicional" fue removido del flujo de creación.
   //  El modal vehicular ahora SOLO aparece en el flujo: Consultar folio → Pago Total →
   //  Imprimir Actualización, para capturar las placas generadas.)

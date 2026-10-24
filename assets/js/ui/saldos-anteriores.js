@@ -127,7 +127,7 @@
       + '<div><div style="' + EST_LB + '">Móvil</div><input class="sa-c-mov" value="' + E(c.movil || '') + '" placeholder="000-000-0000" maxlength="12" style="' + EST_IN + '"></div>'
       + '<div><div style="' + EST_LB + '">Tel. casa</div><input class="sa-c-tel" value="' + E(c.telCasa || '') + '" placeholder="000-000-0000" maxlength="12" style="' + EST_IN + '"></div>'
       + '</div><div style="margin-top:6px;display:flex;gap:12px;align-items:flex-end;"><div style="flex:1;"><div style="' + EST_LB + '">Domicilio</div><input class="sa-c-dom" value="' + E(c.domicilio || '') + '" placeholder="Calle, número, colonia, municipio…" style="' + EST_IN + '"></div>'
-      + '<label style="display:flex;align-items:center;gap:6px;font-size:0.72rem;font-family:monospace;color:#7a5410;white-space:nowrap;cursor:pointer;user-select:none;padding-bottom:8px;"><span>¿Va a firmar?</span><input type="checkbox" class="sa-c-firma" ' + ((c.firma != null ? c.firma : i === 0) ? 'checked' : '') + ' style="width:16px;height:16px;margin:0;cursor:pointer;"></label></div></div>';
+      + '<label class="sa-c-firma-lbl" style="display:flex;align-items:center;gap:6px;font-size:0.72rem;font-family:monospace;color:#7a5410;white-space:nowrap;cursor:pointer;user-select:none;padding-bottom:8px;"><span>¿Va a firmar?</span><input type="checkbox" class="sa-c-firma" ' + ((c.firma != null ? c.firma : i === 0) ? 'checked' : '') + ' style="width:16px;height:16px;margin:0;cursor:pointer;"></label></div></div>';
   }
   function filaConcepto(c){
     return '<div class="sa-con" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 130px 26px;gap:6px;margin-bottom:5px;">'
@@ -199,9 +199,10 @@
     function leerClientes(){
       var out = [];
       ov.querySelectorAll('.sa-cli').forEach(function(r){
-        var c = { nombre: r.querySelector('.sa-c-nom').value.trim().toUpperCase(), movil: r.querySelector('.sa-c-mov').value.trim(), telCasa: r.querySelector('.sa-c-tel').value.trim(), domicilio: r.querySelector('.sa-c-dom').value.trim(), firma: !!(r.querySelector('.sa-c-firma') || {}).checked };
+        var c = { nombre: r.querySelector('.sa-c-nom').value.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\./g, '').replace(/\s+/g, ' ').trim(), movil: r.querySelector('.sa-c-mov').value.trim(), telCasa: r.querySelector('.sa-c-tel').value.trim(), domicilio: r.querySelector('.sa-c-dom').value.trim(), firma: !!(r.querySelector('.sa-c-firma') || {}).checked };
         if (c.nombre || c.movil || c.telCasa || c.domicilio) out.push(c);
       });
+      if (out.length === 1) out[0].firma = true; // un solo cliente: él firma
       return out;
     }
     function leerConceptos(){
@@ -231,20 +232,29 @@
     }
     function enlazar(){
       ov.querySelectorAll('.sa-x').forEach(function(b){ b.onclick = function(){ var fila = b.parentNode, cont = fila.parentNode; fila.remove(); if (cont.id === 'sa-conceptos' && !cont.children.length) { var t = document.createElement('div'); t.innerHTML = filaConcepto({}); cont.appendChild(t.firstChild); enlazar(); } recalcular(); }; });
-      ov.querySelectorAll('.sa-cli-x').forEach(function(b){ b.onclick = function(){ b.parentNode.remove(); }; });
+      ov.querySelectorAll('.sa-cli-x').forEach(function(b){ b.onclick = function(){ b.parentNode.remove(); visFirmas(); }; });
       ov.querySelectorAll('.sa-k-pre, .sa-p-monto').forEach(function(i){ i.oninput = recalcular; i.onblur = function(){ fmtDinero(i); recalcular(); }; i.onfocus = function(){ try { i.select(); } catch(e){} }; });
       ov.querySelectorAll('.sa-c-mov, .sa-c-tel').forEach(function(i){ i.oninput = function(){ try { if (typeof formatTelefono === 'function') formatTelefono(i); } catch(e){} }; });
-      ov.querySelectorAll('.sa-c-nom, .sa-k-con').forEach(function(i){ i.oninput = function(){ var p = i.selectionStart; i.value = i.value.toUpperCase(); try { i.setSelectionRange(p, p); } catch(e){} }; });
+      // Nombre: igual que en Generar recibo → MAYÚSCULAS, sin acentos y sin puntos
+      ov.querySelectorAll('.sa-c-nom').forEach(function(i){ i.oninput = function(){ var p = i.selectionStart, antes = i.value.length; i.value = i.value.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\./g, ''); p -= (antes - i.value.length); try { i.setSelectionRange(p, p); } catch(e){} }; });
+      ov.querySelectorAll('.sa-k-con').forEach(function(i){ i.oninput = function(){ var p = i.selectionStart; i.value = i.value.toUpperCase(); try { i.setSelectionRange(p, p); } catch(e){} }; });
+    }
+    function visFirmas(){
+      var filas = ov.querySelectorAll('.sa-cli'), varios = filas.length > 1;
+      filas.forEach(function(r, i){
+        var l = r.querySelector('.sa-c-firma-lbl'); if (l) l.style.display = varios ? 'flex' : 'none';
+        if (!varios) { var c = r.querySelector('.sa-c-firma'); if (c) c.checked = true; }
+      });
     }
     function agregar(cont, html){ var t = document.createElement('div'); t.innerHTML = html; q(cont).appendChild(t.firstChild); enlazar(); var f = q(cont).lastElementChild.querySelector('input'); if (f) f.focus(); }
     q('#sa-add').onclick = function(){ agregar('#sa-pagos', filaPago({})); };
     q('#sa-add-con').onclick = function(){ agregar('#sa-conceptos', filaConcepto({})); };
-    q('#sa-add-cli').onclick = function(){ agregar('#sa-clientes', filaCliente({}, q('#sa-clientes').children.length || 1)); };
+    q('#sa-add-cli').onclick = function(){ agregar('#sa-clientes', filaCliente({ firma: false }, q('#sa-clientes').children.length || 1)); visFirmas(); };
     ov.querySelectorAll('.sa-tipo').forEach(function(b){ b.onclick = function(){
       tipoSel = b.getAttribute('data-t');
       ov.querySelectorAll('.sa-tipo').forEach(function(x){ var on = x === b; x.style.background = on ? '#fff4dd' : '#eee'; x.style.border = on ? '2px solid #b8862b' : '1px solid #c9c2b2'; x.style.color = on ? '#7a5410' : '#666'; });
     }; });
-    enlazar(); recalcular();
+    enlazar(); recalcular(); visFirmas();
     function cerrarOv(){ ov.remove(); }
     q('#sa-x').onclick = cerrarOv; q('#sa-cancel').onclick = cerrarOv;
     function leerYValidar(){

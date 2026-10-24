@@ -4944,6 +4944,32 @@ function escEditarObservacion(idx, valor){
 const ESC_DIAS_REQUIERE_ATENCION = 30;
 const ESC_DIAS_REQUIERE_ATENCION_REQUERIMIENTOS = 8;
 const ESC_DIAS_REQUIERE_ATENCION_ESPERA = 15;
+// Oct-2026 (opción A): alerta de PELIGRO para el Llamado a la Acción vencido —
+// cinta de precaución amarillo/negro arriba y abajo, ⚠ rojo que parpadea suave,
+// lo que hay que hacer en grande y los días de retraso bien visibles.
+function _escAlertaPeligro(o){
+  if(!document.getElementById('esc-peligro-css')){
+    const st=document.createElement('style'); st.id='esc-peligro-css';
+    st.textContent='@keyframes escPeligroLat{0%,100%{opacity:1}50%{opacity:.4}}.esc-peligro-lat{animation:escPeligroLat 1.4s ease-in-out infinite}@media (prefers-reduced-motion:reduce){.esc-peligro-lat{animation:none}}';
+    document.head.appendChild(st);
+  }
+  const cinta='<div style="height:12px;background:repeating-linear-gradient(-45deg,#f2c200 0 14px,#1a1008 14px 28px);"></div>';
+  const diasHtml = (o.dias===null||o.dias===undefined) ? '' : `<div style="font-family:monospace;font-size:2rem;font-weight:900;color:#a32d2d;line-height:1;">${o.dias===Infinity?'—':o.dias}</div><div style="font-family:monospace;font-size:0.6rem;color:#a32d2d;letter-spacing:0.08em;font-weight:700;">${o.dias===Infinity?'SIN FECHA':'DÍAS DE RETRASO'}</div>`;
+  return `<div style="border-radius:10px;overflow:visible;border:2px solid #a32d2d;margin-bottom:16px;box-shadow:0 4px 14px rgba(163,45,45,0.18);">
+    <div style="border-radius:8px 8px 0 0;overflow:hidden;">${cinta}</div>
+    <div style="background:#fff5f5;padding:14px 18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;color:#1a1008;">
+      <div class="esc-peligro-lat" style="width:56px;height:56px;border-radius:50%;background:#c81e1e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.8rem;flex-shrink:0;">⚠</div>
+      <div style="flex:1;min-width:220px;">
+        <div style="font-family:monospace;font-size:0.68rem;letter-spacing:0.14em;color:#a32d2d;font-weight:800;">${o.titulo}</div>
+        <div style="font-size:1.15rem;font-weight:800;color:#a32d2d;margin:3px 0 4px;line-height:1.3;">${o.que}</div>
+        <div style="font-size:0.76rem;color:#5a3a2a;">${o.sub}</div>
+        ${o.extra||''}
+      </div>
+      <div style="text-align:center;flex-shrink:0;">${diasHtml}<div style="margin-top:8px;">${o.boton}</div></div>
+    </div>
+    <div style="border-radius:0 0 8px 8px;overflow:hidden;">${cinta}</div>
+  </div>`;
+}
 function escRenderNotasEtapa(e){
   // La vista de solo-lectura (ficha) nunca debe mostrar controles editables
   // (textarea/botones) — eso queda exclusivamente en el formulario de edición.
@@ -4995,19 +5021,13 @@ function escRenderNotasEtapa(e){
       // ya se haya escrito una razón — solo cambia su presentación aquí.
       const _diasIntermedio = _escDiasRetrasoIntermedio(p);
       if(_diasIntermedio>0 && typeof _pendEstadoPorEdad==='function'){
-        const _est = _pendEstadoPorEdad(_diasIntermedio);
-        cont.innerHTML = `<div style="background:${_est.bg};border:1.5px solid ${_est.border};border-radius:10px;padding:12px 16px;margin-bottom:16px;">
-          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-            <div style="font-size:1.3rem;">🎯</div>
-            <div style="flex:1;min-width:160px;">
-              <div style="font-size:0.85rem;font-weight:700;color:${_est.fg};">Llamado a la Acción</div>
-              <div style="font-family:monospace;font-size:0.6rem;color:${_est.fg};opacity:0.8;">${i+1}. ${ESC_PASOS[i]} · ${_faseTxt} — plazo de ${ESC_DIAS_INTERMEDIO} días vencido</div>
-            </div>
-            <span style="font-family:monospace;font-size:0.62rem;font-weight:700;color:${_est.fg};background:${_est.border};padding:5px 12px;border-radius:14px;">${_est.icon} ${_est.label} · ${_diasIntermedio} día(s) de retraso</span>
-          </div>
-          <div style="font-family:sans-serif;font-size:0.72rem;color:${_est.fg};margin-top:10px;"><b>Razón:</b> ${p.notas?esc(p.notas):'Sin razón registrada — ábrelo y escribe una para poder guardar cualquier cambio.'}</div>
-          <button type="button" onclick="escAccionRapidaPaso(${i}, '${_faseActiva?'completado':'activo'}')" style="margin-top:10px;background:none;border:1px solid ${_est.border};color:${_est.fg};font-family:sans-serif;font-size:0.68rem;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;">ABRIR PASO</button>
-        </div>`;
+        cont.innerHTML = _escAlertaPeligro({
+          titulo: 'ATENCIÓN · ACCIÓN REQUERIDA',
+          que: p.notas ? esc(p.notas) : 'Sin razón registrada — ábrelo y escribe una para poder guardar cualquier cambio.',
+          sub: `Paso ${i+1} · ${ESC_PASOS[i]} · ${_faseActiva?'En proceso':'Esperando iniciar'} · plazo de ${ESC_DIAS_INTERMEDIO} días <b style="color:#a32d2d;">vencido</b>`,
+          dias: _diasIntermedio,
+          boton: `<button type="button" onclick="escAccionRapidaPaso(${i}, '${_faseActiva?'completado':'activo'}')" style="background:#c81e1e;border:none;color:#fff;font-family:sans-serif;font-size:0.76rem;font-weight:800;letter-spacing:0.05em;padding:9px 16px;border-radius:7px;cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='#a01616'" onmouseout="this.style.background='#c81e1e'">ATENDER AHORA ›</button>`
+        });
         return;
       }
       // Vista de solo lectura: si el paso activo lleva ESC_DIAS_REQUIERE_ATENCION
@@ -5026,24 +5046,21 @@ function escRenderNotasEtapa(e){
       // ya se disparó "Requiere atención").
       const _fechaActFmt = e.pasoActivoFecha ? new Date(e.pasoActivoFecha).toLocaleString('es-MX',{timeZone:'America/Mexico_City',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
       if(dias >= _umbralAtencion){
-        cont.innerHTML = `<div style="background:#fdeaea;border:1.5px solid rgba(163,45,45,0.35);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-          <div style="font-size:1.3rem;">🎯</div>
-          <div style="flex:1;min-width:160px;">
-            <div style="font-size:0.85rem;font-weight:700;color:#a32d2d;">Llamado a la Acción</div>
-            <div style="font-family:monospace;font-size:0.6rem;color:#8a5a5a;">Siguiente paso del trámite</div>
-          </div>
-          <span style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#fff;background:#c0362f;padding:5px 12px;border-radius:14px;">⏸ Detenido</span>
-          <div style="font-family:sans-serif;font-size:0.72rem;color:#7a2f2f;flex-basis:100%;"><b>Requiere atención:</b> ${p.notas?esc(p.notas):'Sin nota registrada — usa "Tomar acción" para agregar una.'}</div>
-          ${_fechaActFmt?`<div style="font-family:sans-serif;font-size:0.66rem;color:#8a5a5a;flex-basis:100%;">Última actualización: ${esc(_fechaActFmt)}</div>`:''}
-          <div style="position:relative;">
-            <button type="button" onclick="escToggleMenuAtencion(event)" style="background:none;border:1px solid #e0a0a0;color:#a32d2d;font-family:sans-serif;font-size:0.68rem;font-weight:700;padding:6px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background 0.15s;" onmouseover="this.style.background='rgba(163,45,45,0.06)'" onmouseout="this.style.background='none'">TOMAR ACCIÓN <span style="font-size:0.55rem;">▾</span></button>
-            <div id="esc-menu-atencion" style="display:none;position:absolute;left:0;top:calc(100% + 6px);background:#fff;border:1px solid rgba(0,0,0,0.1);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,0.16);z-index:50;min-width:260px;overflow:hidden;">
-              <button type="button" onclick="escAccionAtencion('espera')" onmouseover="this.style.background='#fdf3ee'" onmouseout="this.style.background='#fff'" style="display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;text-align:left;padding:10px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.74rem;color:#3a3327;cursor:pointer;transition:background 0.15s;"><span style="font-size:0.85rem;flex-shrink:0;">⏳</span> Sigue en espera sin respuesta</button>
-              <button type="button" onclick="escAccionAtencion('requerimientos')" onmouseover="this.style.background='#fdf3ee'" onmouseout="this.style.background='#fff'" style="display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;text-align:left;padding:10px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.74rem;color:#3a3327;cursor:pointer;transition:background 0.15s;border-top:1px solid #f0ece2;"><span style="font-size:0.85rem;flex-shrink:0;">📝</span> Tenemos requerimientos</button>
-              <button type="button" onclick="escAccionAtencion('resuelto')" onmouseover="this.style.background='#eef8f0'" onmouseout="this.style.background='#fff'" style="display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;text-align:left;padding:10px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.74rem;color:#1a7a3a;font-weight:600;cursor:pointer;transition:background 0.15s;border-top:1px solid #f0ece2;"><span style="font-size:0.85rem;flex-shrink:0;">✅</span> Marcar como resuelto y avanzar</button>
+        const _menuAtencion = `<div style="position:relative;display:inline-block;">
+            <button type="button" onclick="escToggleMenuAtencion(event)" style="background:#c81e1e;border:none;color:#fff;font-family:sans-serif;font-size:0.76rem;font-weight:800;letter-spacing:0.05em;padding:9px 16px;border-radius:7px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;" onmouseover="this.style.background='#a01616'" onmouseout="this.style.background='#c81e1e'">TOMAR ACCIÓN <span style="font-size:0.6rem;">▾</span></button>
+            <div id="esc-menu-atencion" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid rgba(0,0,0,0.1);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,0.16);z-index:50;min-width:260px;overflow:hidden;text-align:left;">
+              <button type="button" onclick="escAccionAtencion('espera')" onmouseover="this.style.background='#fdf3ee'" onmouseout="this.style.background='#fff'" style="display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;text-align:left;padding:10px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.74rem;color:#3a3327;cursor:pointer;"><span style="font-size:0.85rem;flex-shrink:0;">⏳</span> Sigue en espera sin respuesta</button>
+              <button type="button" onclick="escAccionAtencion('requerimientos')" onmouseover="this.style.background='#fdf3ee'" onmouseout="this.style.background='#fff'" style="display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;text-align:left;padding:10px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.74rem;color:#3a3327;cursor:pointer;border-top:1px solid #f0ece2;"><span style="font-size:0.85rem;flex-shrink:0;">📝</span> Tenemos requerimientos</button>
+              <button type="button" onclick="escAccionAtencion('resuelto')" onmouseover="this.style.background='#eef8f0'" onmouseout="this.style.background='#fff'" style="display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;text-align:left;padding:10px 14px;border:none;background:#fff;font-family:sans-serif;font-size:0.74rem;color:#1a7a3a;font-weight:600;cursor:pointer;border-top:1px solid #f0ece2;"><span style="font-size:0.85rem;flex-shrink:0;">✅</span> Marcar como resuelto y avanzar</button>
             </div>
-          </div>
-        </div>`;
+          </div>`;
+        cont.innerHTML = _escAlertaPeligro({
+          titulo: 'ATENCIÓN · TRÁMITE DETENIDO',
+          que: p.notas ? esc(p.notas) : 'Sin nota registrada — usa «Tomar acción» para agregar una.',
+          sub: `Paso ${i+1} · ${ESC_PASOS[i]} · sin movimiento en este paso` + (_fechaActFmt ? ` · última actualización ${esc(_fechaActFmt)}` : ''),
+          dias: dias===Infinity ? Infinity : Math.floor(dias),
+          boton: _menuAtencion
+        });
         return;
       }
       const _botonAccion = _faseActiva

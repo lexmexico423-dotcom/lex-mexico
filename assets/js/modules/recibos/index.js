@@ -2290,7 +2290,7 @@ async function generarPDF(datos,folio,qrDataURL){
         // cada párrafo queda alineada a la izquierda automáticamente (jsPDF
         // nunca estira la última línea), como es tipográficamente correcto.
         doc.text((c.descripcion||'')+_vTagC, margin+cW*0.38, y, {maxWidth: colDescripW, align: 'justify'});
-        doc.text('$'+fmtMXN(p), margin+cW, y, {align:'right'});
+        doc.text((p<0?'-$'+fmtMXN(-p):'$'+fmtMXN(p)), margin+cW, y, {align:'right'});
         doc.setDrawColor(_esCancelacion?200:220,_esCancelacion?200:195,_esCancelacion?195:140); doc.setLineWidth(0.3);
         // FIX (líneas "tachando" texto — caso real: folio 63A, filas con 2-3
         // líneas de CONCEPTO pero 1 sola de DESCRIPCIÓN): -1.2mm de holgura no
@@ -2307,7 +2307,7 @@ async function generarPDF(datos,folio,qrDataURL){
             const _twL = doc.getStringUnitWidth(_ln)*8/doc.internal.scaleFactor;
             doc.line(margin, y+_i*4-1.2, margin+_twL, y+_i*4-1.2);
           });
-          const _twP = doc.getStringUnitWidth('$'+fmtMXN(p))*8/doc.internal.scaleFactor;
+          const _twP = doc.getStringUnitWidth((p<0?'-$'+fmtMXN(-p):'$'+fmtMXN(p)))*8/doc.internal.scaleFactor;
           doc.line(margin+cW-_twP, y-1.2, margin+cW, y-1.2);
         }
         y += rowH;
@@ -2427,7 +2427,7 @@ async function generarPDF(datos,folio,qrDataURL){
       // A petición expresa: DESCRIPCIÓN justificada, igual que en la tabla CONCEPTO.
       doc.text((c.descripcion ? c.descripcion+' ' : '')+_vTagCE, margin+cW*0.38, y, {maxWidth: colDescripW, align: 'justify'});
       doc.setFontSize(8); doc.setTextColor(20,10,5);
-      doc.text('$'+fmtMXN(p), margin+cW, y, {align:'right'});
+      doc.text((p<0?'-$'+fmtMXN(-p):'$'+fmtMXN(p)), margin+cW, y, {align:'right'});
       doc.setDrawColor(220,180,120); doc.setLineWidth(0.2);
       // FIX (líneas "tachando" texto — mismo caso que tabla CONCEPTO): -1mm de
       // holgura no despeja el ascent del CONCEPTO del renglón siguiente.

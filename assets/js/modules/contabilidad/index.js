@@ -798,7 +798,7 @@ function renderCarp(){
     else if(e.includes('CONCLUIDO')||e.includes('ENTREGAD')){bg='rgba(26,122,58,0.1)';col='#0f5228';border='rgba(26,122,58,0.35)';}
     else if(e.includes('CANCELADO')){bg='rgba(192,22,26,0.1)';col='#8a1010';border='rgba(192,22,26,0.3)';}
     else if(e.includes('TRÁMITE')||e.includes('TRAMITE')||e.includes('PROCESO')||e==='ACTIVO'){bg='rgba(26,74,138,0.1)';col='#1a3a7a';border='rgba(26,74,138,0.3)';}
-    return `<span style="display:inline-block;padding:3px 11px;border-radius:20px;font-family:monospace;font-size:0.6rem;font-weight:700;background:${bg};color:${col};border:1.5px solid ${border};letter-spacing:0.05em;white-space:nowrap;text-transform:uppercase;">${esc(est||'—')}</span>`;
+    return `<span style="display:inline-block;padding:3px 11px;border-radius:20px;font-family:monospace;font-size:0.6rem;font-weight:700;background:${bg};color:${col};border:1.5px solid ${border};letter-spacing:0.05em;white-space:normal;line-height:1.25;max-width:100%;box-sizing:border-box;text-transform:uppercase;">${esc(est||'—')}</span>`;
   }
   const thStyle=`padding:11px 13px;text-align:left;font-family:monospace;font-size:0.58rem;font-weight:700;color:#8c6518;letter-spacing:0.14em;text-transform:uppercase;white-space:nowrap;border-bottom:2px solid #d4b870;background:linear-gradient(135deg,#fdf8ee,#f5edcc);`;
   el.innerHTML=`
@@ -811,13 +811,16 @@ function renderCarp(){
       .carp-action-btn { background:none;border:1.5px solid rgba(200,149,42,0.3);color:#b07820;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:0.8rem;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;margin:0 1px; }
       .carp-action-btn:hover { background:rgba(200,149,42,0.15);border-color:#c8952a;transform:translateY(-1px);box-shadow:0 2px 8px rgba(200,149,42,0.2); }
     </style>
-    <div style="overflow-x:auto;border:2px solid #d4b870;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(200,149,42,0.12);">
-    <table style="width:100%;border-collapse:collapse;font-family:sans-serif;">
+    <div style="border:2px solid #d4b870;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(200,149,42,0.12);">
+    <!-- Oct-2026: ancho fijo por columna y textos que bajan de renglón → la tabla
+         ya no se sale de la pantalla ni activa la barra de desplazamiento -->
+    <table style="width:100%;border-collapse:collapse;font-family:sans-serif;table-layout:fixed;">
+      <colgroup><col style="width:92px"><col style="width:30%"><col><col style="width:124px"><col style="width:128px"><col style="width:138px"></colgroup>
       <thead>
         <tr>
-          <th style="${thStyle}white-space:nowrap;padding-left:16px;">EXP.</th>
+          <th style="${thStyle}text-align:center;">CARPETA</th>
           <th style="${thStyle}">NOMBRE</th>
-          <th style="${thStyle}white-space:nowrap;">TIPO DE TRÁMITE</th>
+          <th style="${thStyle}">TIPO DE TRÁMITE</th>
           <th style="${thStyle}text-align:center;">UBICACIÓN</th>
           <th style="${thStyle}text-align:center;">ESTATUS</th>
           <th style="${thStyle}text-align:center;padding-right:14px;"></th>
@@ -836,16 +839,19 @@ function renderCarp(){
           const rowBg=rowI%2===0?'#fdfaf4':'#faf5e8';
           const tdStyle=`padding:10px 13px;font-size:0.76rem;color:#2a1a06;border-bottom:1px solid rgba(212,184,112,0.25);vertical-align:middle;`;
           return `<tr class="carp-tr" onclick="abrirDetallesCarpeta(${idx})" style="background:${rowBg};cursor:pointer;">
-            <td style="${tdStyle}padding-left:16px;">
-              <span class="carp-num-badge" style="border:1.5px solid #d4b870;padding:3px 10px;font-family:monospace;font-size:0.68rem;font-weight:700;color:#8c6518;white-space:nowrap;border-radius:6px;background:#fdfaf4;transition:all 0.15s;display:inline-block;">${fmtCarpNumHTML(c.num)}</span>
+            <td style="${tdStyle}text-align:center;">
+              <span class="carp-num-badge" title="${esc(c.num||'')}" style="border:1.5px solid #d4b870;padding:3px 0;min-width:52px;font-family:monospace;font-size:0.9rem;font-weight:800;color:#1a0f02;white-space:nowrap;border-radius:6px;background:#fdfaf4;transition:all 0.15s;display:inline-block;text-align:center;">${_carpSoloNum(c.num)}</span>
             </td>
-            <td style="${tdStyle}font-weight:600;white-space:nowrap;color:#1a0f02;">${esc(c.cliente||'—')}</td>
-            <td style="${tdStyle}font-family:monospace;font-size:0.67rem;color:#6a4a10;white-space:nowrap;">${esc(tipoTexto)}</td>
+            <td style="${tdStyle}font-weight:600;font-size:0.8rem;color:#1a0f02;line-height:1.3;word-break:break-word;">${esc(c.cliente||'—')}</td>
+            <td style="${tdStyle}line-height:1.3;" title="${esc(tipoTexto)}">
+              <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;letter-spacing:0.06em;">${esc(tipoLabel)}</div>
+              ${subTipo ? `<div style="font-size:0.72rem;color:#5a4a30;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;">${esc(subTipo)}</div>` : ''}
+            </td>
             <td style="${tdStyle}text-align:center;white-space:nowrap;" onclick="event.stopPropagation();_carpEditarUbicacion(${idx})" title="Clic para indicar dónde está archivada">${_carpUbicacionChip(c)}</td>
             <td style="${tdStyle}text-align:center;">${estatusCell(c.estatus)}</td>
-            <td style="${tdStyle}text-align:center;white-space:nowrap;padding-right:14px;" onclick="event.stopPropagation()">
+            <td style="${tdStyle}text-align:center;white-space:nowrap;padding-right:10px;padding-left:6px;" onclick="event.stopPropagation()">
               <span style="display:inline-flex;border:1.5px solid rgba(200,149,42,0.35);border-radius:7px;overflow:hidden;">
-                <button onclick="abrirDetallesCarpeta(${idx})" title="Detalles: qué contiene, imprimir o eliminar" style="background:none;border:none;padding:5px 11px;cursor:pointer;font-size:0.62rem;font-family:monospace;font-weight:700;color:#b07820;">📋 Detalles</button>
+                <button onclick="abrirDetallesCarpeta(${idx})" title="Detalles: qué contiene, imprimir o eliminar" style="background:none;border:none;padding:5px 8px;cursor:pointer;font-size:0.62rem;font-family:monospace;font-weight:700;color:#b07820;">📋 Detalles</button>
                 <button onclick="abrirCarpeta(${idx})" title="Editar" style="background:none;border:none;border-left:1.5px solid rgba(200,149,42,0.35);padding:5px 9px;cursor:pointer;font-size:0.78rem;">✏️</button>
               </span>
             </td>
@@ -856,6 +862,15 @@ function renderCarp(){
     </div>`;
 }
 
+// Número de carpeta para la tabla: solo el número ("CARP.- 143" → 143).
+// Los de archivo viejo conservan su prefijo corto ("ARCH-0012" → A-12).
+function _carpSoloNum(num){
+  var n = String(num || '').trim();
+  if (!n) return '—';
+  var m = /^CARP\.-\s*0*(\d+)$/i.exec(n); if (m) return esc(m[1]);
+  m = /^ARCH-0*(\d+)$/i.exec(n); if (m) return 'A-' + esc(m[1]);
+  return esc(n);
+}
 // ── Ubicación física de la carpeta (oct-2026) ─────────────────────────────
 // Cada carpeta está en UNA gaveta o en UNA caja (son lugares distintos). El
 // número se escribe a mano porque las gavetas y cajas van aumentando.

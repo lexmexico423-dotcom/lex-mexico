@@ -224,7 +224,7 @@
   // Sin desplegables ni documentos adjuntos. Ordenadas por N° (en orden).
   // Clic en la tarjeta → expediente completo.
   var NOMBRE_PASO = {'FIRMA NOTARIAL':'Firma notarial','CATASTRO':'Catastro','TRASLADO MPL':'Traslado MPL','ISR':'ISR','IFREO':'IFREO'};
-  var CH = 'font-size:9.5px;border-radius:3px;padding:1px 6px;font-family:monospace;white-space:nowrap;';
+  var CH = 'font-size:11.5px;border-radius:4px;padding:2px 8px;font-family:monospace;white-space:nowrap;font-weight:700;';
   function esAutomatico(e, d){
     if (!d.sigue) return true;
     var pAct = d.activo >= 0 ? (d.pasos[d.activo] || {}) : null;
@@ -232,18 +232,31 @@
   }
   function miniBarra(e, d){
     var listo = e.estado === 'listo' || e.estado === 'archivado' || d.activo === -1, colAct = colorEstaEn(e, d);
-    return '<div title="Avance: paso ' + (listo ? 5 : d.activo + 1) + ' de 5" style="display:flex;gap:2px;width:120px;">' + d.PASOS.map(function(n, i){
+    return '<div title="Avance: paso ' + (listo ? 5 : d.activo + 1) + ' de 5" style="display:flex;gap:2px;width:195px;">' + d.PASOS.map(function(n, i){
       var p = d.pasos[i] || {}, hecho = listo || p.estado === 'completado', aqui = !listo && i === d.activo;
       return '<span title="' + (i + 1) + ' · ' + E(NOMBRE_PASO[n] || n) + '" style="flex:1;height:5px;border-radius:3px;background:' + (hecho ? '#1a7a3a' : aqui ? colAct : '#e5dcc4') + ';"></span>';
     }).join('') + '</div>';
   }
-  function botonEstado(e, d){
+  // "Qué sigue" en una COLUMNA FIJA (todas las tarjetas alinean igual), sin
+  // recuadros. Solo se muestra lo que importa: lo escrito a mano y lo urgente.
+  // Los avisos automáticos ("Iniciar la firma notarial"…) ya no se muestran:
+  // el botón del paso dice lo mismo.
+  function avisoColumna(e, d){
+    var col = colorEstaEn(e, d), auto = esAutomatico(e, d);
+    var oscuro = { '#5f5e5a':'#444441', '#b06a10':'#7a4206', '#534ab7':'#3c3489', '#185fa5':'#0c447c', '#0f6e56':'#085041', '#1a7a3a':'#27500a' }[col] || '#444441';
+    var txt = '';
+    if (d.atencion) txt = '<span style="color:#a32d2d;font-weight:700;">⚠ ' + E(d.sigue || ('Lleva ' + d.dias + ' días en este paso')) + '</span>';
+    else if (!auto && d.sigue) txt = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + col + ';margin-right:7px;vertical-align:1px;"></span><span style="color:' + oscuro + ';font-weight:600;">' + E(d.sigue) + '</span>';
+    return '<div title="' + E(d.sigue || '') + '" style="width:300px;flex-shrink:0;align-self:center;padding:8px 14px;font-size:12.5px;line-height:1.4;border-left:1px dashed ' + (txt ? '#e3d3a8' : 'transparent') + ';">'
+      + (txt ? '<div style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">' + txt + '</div>' : '') + '</div>';
+  }
+  function botonEstado(e, d, pegado){
     var col = colorEstaEn(e, d), txt;
     if (/^\d/.test(d.estaEn)) txt = (d.activo + 1) + ' · ' + String(d.PASOS[d.activo]).toUpperCase();
     else txt = String(d.estaEn).replace(/^[^A-Za-zÁÉÍÓÚÑ0-9]+/, '').toUpperCase();
     var dias = (d.dias !== null && d.activo >= 0 && (e.estado === 'proceso' || !e.estado || e.estado === 'espera')) ? ' · ' + d.dias + 'd' : '';
     var borde = d.atencion ? '#c81e1e' : col;
-    return '<span title="' + E(d.estaEn + (d.estaSub ? ' (' + d.estaSub + ')' : '') + (dias ? ' — ' + d.dias + ' días en este paso' : '')) + '" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;font-family:monospace;letter-spacing:0.03em;padding:6px 12px;border-radius:7px;border:1.5px solid ' + borde + ';background:' + col + ';color:#fff;white-space:nowrap;' + (d.atencion ? 'box-shadow:0 0 0 2px #f5c4c4;' : '') + '">' + (d.atencion ? '⚠ ' : '') + E(txt) + E(dias) + '</span>';
+    return '<span title="' + E(d.estaEn + (d.estaSub ? ' (' + d.estaSub + ')' : '') + (dias ? ' — ' + d.dias + ' días en este paso' : '')) + '" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;font-family:monospace;letter-spacing:0.03em;padding:6px 10px;width:195px;justify-content:center;box-sizing:border-box;border-radius:' + (pegado ? '0 7px 7px 0' : '7px') + ';border:1.5px solid ' + borde + ';background:' + col + ';color:#fff;white-space:nowrap;">' + (d.atencion ? '⚠ ' : '') + E(txt) + E(dias) + '</span>';
   }
   function pintarLista(){
     var cont = document.getElementById('esc-lista'); if (!cont) return;
@@ -272,31 +285,34 @@
       var desc = String(e.descripcion || '').trim();
       var obs = String((Array.isArray(e.bitacora) && e.bitacora[0] && e.bitacora[0].texto) || '').trim();
       var chips = [];
-      if (d.acto) { var ca = colorActo(d.acto); chips.push('<span style="' + CH + 'background:' + ca[0] + ';color:' + ca[1] + ';font-weight:700;">📜 ' + E(acto) + '</span>'); }
       if (e.instrumento) chips.push('<span style="' + CH + 'background:#faeeda;color:#633806;font-weight:700;">Instr. ' + E(e.instrumento) + '</span>');
       if (e.volumen) chips.push('<span style="' + CH + 'background:#f1efe8;color:#444441;">Vol. ' + E(e.volumen) + '</span>');
       if (d.fechaFirma) chips.push('<span style="' + CH + 'background:rgba(26,122,58,0.08);color:#27500a;">✍ Firma ' + E(d.fechaFirma) + '</span>');
       if (String(e.num || '').trim()) { var cn = String(e.num).trim(); chips.push('<span style="' + CH + 'background:rgba(200,149,42,0.12);color:#8c6518;font-weight:700;">🗂 CARP.- ' + E(cn.replace(/^carp\.?-?\s*/i, '')) + '</span>'); }
-      if (e.notaria) chips.push('<span style="' + CH + 'background:rgba(0,0,0,0.04);color:#6a5a3a;">🔏 ' + E(String(e.notaria).length > 34 ? String(e.notaria).slice(0, 34) + '…' : e.notaria) + '</span>');
-      var auto = esAutomatico(e, d);
-      var sigue = d.sigue ? '<div style="font-size:11.5px;margin-top:6px;line-height:1.4;color:' + (d.atencion ? '#a32d2d' : auto ? '#a89c80' : (e.estado === 'listo' ? '#1a7a3a' : '#7a4a10')) + ';' + (auto && !d.atencion ? '' : 'font-weight:600;') + '">👉 ' + (d.atencion ? '⚠ ' : '') + E(d.sigue) + '</div>' : '';
+      if (e.notaria) chips.push('<span style="' + CH + 'background:rgba(0,0,0,0.05);color:#6a5a3a;font-weight:400;">🔏 ' + E(String(e.notaria).length > 34 ? String(e.notaria).slice(0, 34) + '…' : e.notaria) + '</span>');
       var fh = ''; try { if (typeof _escFoliosHtml === 'function') fh = _escFoliosHtml(e, 'escAbrirRecibo', ' · '); } catch(_){}
       return '<div class="lex-esc-card" data-idx="' + idx + '" title="Clic para abrir el expediente completo" style="position:relative;display:flex;align-items:stretch;background:var(--surface,#fdfaf4);border:1.5px solid var(--border-l,#d4b870);border-radius:8px;margin-bottom:8px;cursor:pointer;' + (apagada ? 'opacity:0.65;' : '') + 'transition:box-shadow 0.15s,border-color 0.15s;">'
         + '<div style="width:5px;background:' + franja + ';flex-shrink:0;border-radius:8px 0 0 8px;"></div>'
         + '<div style="flex:1;min-width:0;padding:10px 6px 10px 12px;">'
         +   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:3px;">'
-        +     '<div title="N° de trámite en curso (de la más antigua a la más reciente)" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;min-width:30px;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Trámite</span><span style="color:' + (n ? '#8c6518' : '#c8bb98') + ';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">' + (n || '—') + '</span></div>'
-        +     '<div style="min-width:0;font-size:14.5px;font-weight:600;color:' + colNom + ';font-family:\'Outfit\',sans-serif;letter-spacing:0.025em;text-transform:uppercase;opacity:0.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">👤 ' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:11px;color:#9a8a6a;">+' + (d.compradores.length - 1) + '</span>' : '') + '</div>'
+        +     '<div title="N° de trámite en curso (de la más antigua a la más reciente)" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;min-width:30px;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Trámite</span><span style="color:' + (n ? '#1a1008' : '#c8bb98') + ';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">' + (n || '—') + '</span></div>'
+        // Oct-2026: en UN solo renglón → 👤 CLIENTE (negro) · ACTO (verde) · — compra a Vendedor (azul)
+        +     '<div style="min-width:0;line-height:1.35;">'
+        +       '<span style="font-size:15px;font-weight:700;color:' + (apagada ? '#6a6a62' : '#1a1008') + ';font-family:\'Outfit\',sans-serif;letter-spacing:0.02em;text-transform:uppercase;">👤 ' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:11px;color:#9a8a6a;">+' + (d.compradores.length - 1) + '</span>' : '') + '</span>'
+        +       ' <span style="font-size:13.5px;font-weight:700;color:' + colNom + ';margin-left:6px;">' + E(acto) + '</span>'
+        +       (rel ? ' <span style="font-size:13px;color:#9a8a6a;">— ' + E(verboRel(d)) + '</span> <span style="font-size:13.5px;font-weight:500;color:#185fa5;">' + E(d.vendedores.map(nombrePropio).join(', ')) + '</span>' : '')
+        +     '</div>'
         +   '</div>'
-        +   '<div style="font-size:12.5px;font-weight:600;color:var(--ink,#1a1008);line-height:1.4;margin-bottom:5px;">' + E(acto) + (rel ? ' <span style="font-weight:400;color:#9a8a6a;">— ' + E(verboRel(d)) + '</span> <span style="font-weight:500;color:#185fa5;">' + E(d.vendedores.map(nombrePropio).join(', ')) + '</span>' : '') + (desc ? ' <span style="font-weight:400;color:#5a4a30;">— ' + E(desc) + '</span>' : '') + '</div>'
+        +   (desc ? '<div style="font-size:12.5px;color:#5a4a30;line-height:1.4;margin:2px 0 0 40px;">' + E(desc) + '</div>' : '')
+        +   '<div style="height:6px;"></div>'
         +   (chips.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;">' + chips.join('') + '</div>' : '')
-        +   sigue
-        +   (obs ? '<div style="font-size:10px;color:#7a4a10;font-style:italic;margin-top:5px;padding:4px 8px;background:rgba(200,149,42,0.07);border-radius:4px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="' + E(obs) + '">' + E(obs) + '</div>' : '')
+        +   (obs ? '<div style="font-size:12px;color:#1a1008;margin-top:7px;padding:5px 9px;background:rgba(200,149,42,0.08);border-radius:4px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="' + E(obs) + '">' + E(obs) + '</div>' : '')
         + '</div>'
-        + '<div class="lex-esc-acc" style="display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;padding:10px 10px 10px 4px;flex-shrink:0;gap:6px;">'
+        + avisoColumna(e, d)
+        + '<div class="lex-esc-acc" style="display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;padding:10px 10px 10px 4px;flex-shrink:0;gap:6px;width:215px;box-sizing:border-box;">'
         +   '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">'
         +     (fh ? '<div title="Folio del recibo — clic para abrirlo" style="display:flex;flex-direction:column;align-items:center;padding:2px 6px;"><span style="font-size:8px;font-weight:700;color:#8c6518;letter-spacing:0.12em;">FOLIO</span><span style="font-size:1.2rem;font-weight:800;color:#1a4a8a;line-height:1.15;font-family:monospace;">' + fh + '</span></div>' : '')
-        +     botonEstado(e, d)
+        +     botonEstado(e, d, false)
         +     miniBarra(e, d)
         +   '</div>'
         +   '<div style="display:flex;gap:4px;">' + ((typeof lexBtnLlamada === 'function' && e.estado !== 'cancelado') ? lexBtnLlamada('esc', e.id, '', 'ESCRITURA' + (d.acto ? ' · ' + String(d.acto).toUpperCase() : '')) : '') + '</div>'

@@ -206,16 +206,57 @@
       + '</div></div></div>';
   }
 
-  // ── Lista de trabajo (opción B) ──────────────────────────────────────
+  // ── Clasificación (oct-2026, opción 3: tarjetas con número grande) ────
+  //  · TODOS (café)                 → En proceso (o sin estatus) + Listo p/entregar
+  //  · EN PROCESO (verde)           → En proceso o sin estatus
+  //  · LISTO PARA ENTREGAR (verde brillante)
+  //  · CONCLUIDOS Y ENTREGADOS (azul) → Archivado
+  //  · CANCELADO (rojo)             → Cancelado + No procedió
+  //  · EN PAUSA (gris)              → En espera
+  // "Todos" NO incluye concluidos, cancelados ni en pausa.
+  var CLASIF = [
+    { k:'todos',      lbl:'Todos',                   c:'#7a4a1c', t:'#7a4a1c' },
+    { k:'proceso',    lbl:'En proceso',              c:'#2e7d32', t:'#2e7d32' },
+    { k:'listo',      lbl:'Listo para entregar',     c:'#22c55e', t:'#15803d' },
+    { k:'concluidos', lbl:'Concluidos y entregados', c:'#185fa5', t:'#185fa5' },
+    { k:'cancelado',  lbl:'Cancelado',               c:'#c81e1e', t:'#c81e1e' },
+    { k:'pausa',      lbl:'En pausa',                c:'#6b6b6b', t:'#5f5e5a' }
+  ];
+  var _cat = 'todos';
+  function grupoDe(e){
+    var st = e && e.estado;
+    if (!st || st === 'proceso') return 'proceso';
+    if (st === 'listo') return 'listo';
+    if (st === 'archivado') return 'concluidos';
+    if (st === 'cancelado' || st === 'noprocedio') return 'cancelado';
+    if (st === 'espera') return 'pausa';
+    return 'proceso';
+  }
+  function cabe(e, cat){ var gr = grupoDe(e); return cat === 'todos' ? (gr === 'proceso' || gr === 'listo') : gr === cat; }
+  window.lexEscClasif = function(cat){ _cat = cat; window.escRender(); };
+  function pintarClasificacion(){
+    var t = document.getElementById('escF-todos');
+    var barra = document.getElementById('lex-esc-clasif') || (t && t.parentNode);
+    if (!barra) return;
+    barra.id = 'lex-esc-clasif';
+    var cuenta = {}; CLASIF.forEach(function(c){ cuenta[c.k] = 0; });
+    (D.escrituras || []).forEach(function(e){ if (!e) return; CLASIF.forEach(function(c){ if (cabe(e, c.k)) cuenta[c.k]++; }); });
+    barra.style.cssText = 'display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;padding:10px 16px 14px;';
+    barra.innerHTML = CLASIF.map(function(c){
+      var on = c.k === _cat;
+      return '<button type="button" onclick="lexEscClasif(\'' + c.k + '\')" title="Ver: ' + c.lbl + '" style="text-align:left;cursor:pointer;background:#fdfaf4;border:none;border-top:5px solid ' + c.c + ';border-radius:8px;padding:9px 12px 8px;'
+        + (on ? 'box-shadow:0 0 0 3px ' + c.c + ',0 6px 16px rgba(0,0,0,0.35);transform:translateY(-1px);' : 'box-shadow:0 1px 3px rgba(0,0,0,0.25);') + 'transition:all 0.15s;">'
+        + '<div style="font-family:monospace;font-size:0.62rem;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:' + c.t + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + c.lbl + '</div>'
+        + '<div style="font-family:monospace;font-size:1.6rem;font-weight:900;color:' + c.t + ';line-height:1.15;">' + cuenta[c.k] + '</div></button>';
+    }).join('');
+  }
+
   function filtrar(){
-    var filtro = g('_escFiltro', 'todos');
     var q = String((document.getElementById('escQ') || {}).value || '').toLowerCase();
     var TM = g('ESC_TIPOS_MOVIMIENTO', {});
     return (D.escrituras || []).filter(function(e){
       if (!e) return false;
-      if (filtro === 'todos') { if (e.estado === 'espera' || e.estado === 'archivado' || e.estado === 'cancelado' || e.estado === 'noprocedio') return false; }
-      else if (filtro === 'archivado') { if (e.estado !== 'archivado' && e.estado !== 'cancelado') return false; }
-      else if (e.estado !== filtro) return false;
+      if (!cabe(e, _cat)) return false;
       if (q) {
         var txt = [e.num || '', (e.compradores || []).map(nom).join(' '), (e.vendedores || []).map(nom).join(' '), e.tipo || '', TM[e.tipoMovimiento] || '', e.notaria || '', e.descripcion || '', e.instrumento || ''].join(' ').toLowerCase();
         return txt.indexOf(q) >= 0;
@@ -357,6 +398,7 @@
     // Nahúm — siempre se usa la Lista de trabajo.
     try { var _sv = document.getElementById('lex-esc-vista-sel'); if (_sv) _sv.remove(); } catch(e){}
     if (typeof D === 'undefined' || !Array.isArray(D.escrituras)) return original.apply(this, arguments);
+    try { pintarClasificacion(); } catch(errC) { console.warn('[Escrituras clasificación]', errC); }
     try { pintarLista(); }
     catch(err) { console.warn('[Escrituras lista] se usa la vista anterior:', err); return original.apply(this, arguments); }
   };

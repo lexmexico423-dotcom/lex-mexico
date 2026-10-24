@@ -151,9 +151,28 @@
   // creadas sin estatus) por fecha de firma — la más antigua es la 1 y la más
   // reciente el número más alto. Se calcula sobre TODAS las escrituras (no
   // solo las filtradas) para que el número no cambie al buscar o filtrar.
+  // Oct-2026: fecha de firma "efectiva" para ordenar — fechaFirma (AAAA-MM-DD);
+  // si solo se capturó como texto ("2019", "9 jul 2026") se interpreta; si no hay
+  // fecha de firma (recién creada desde el recibo) se usa la fecha de alta.
+  var MES_N = { ene:1, feb:2, mar:3, abr:4, may:5, jun:6, jul:7, ago:8, sep:9, set:9, oct:10, nov:11, dic:12 };
+  function fechaOrden(x){
+    if (!x) return '0000-00-00';
+    var f = String(x.fechaFirma || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(f)) return f.slice(0, 10);
+    var t = String(x.fechaFirmaTexto || f || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var m = /(\d{1,2})\s*(?:de\s*)?([a-z]{3})[a-z]*\.?\s*(?:de\s*|del\s*)?(\d{4})/.exec(t);
+    if (m && MES_N[m[2]]) return m[3] + '-' + String(MES_N[m[2]]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+    m = /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(t);
+    if (m) return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+    m = /(\d{4})/.exec(t);
+    if (m) return m[1] + '-12-31';
+    var alta = String(x.fechaCreacion || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(alta)) return alta;
+    return '0000-00-00';
+  }
   function mapaNumeros(){
     var act = (D.escrituras || []).filter(function(x){ return x && (!x.estado || x.estado === 'proceso' || x.estado === 'listo'); })
-      .slice().sort(function(a, b){ return String(b.fechaFirma || '9999-99-99').localeCompare(String(a.fechaFirma || '9999-99-99')); });
+      .slice().sort(function(a, b){ return fechaOrden(b).localeCompare(fechaOrden(a)); });
     var m = new Map(), tot = act.length;
     act.forEach(function(x, i){ m.set(x, tot - i); });
     return { mapa: m, total: tot };
@@ -311,9 +330,10 @@
     var lst = filtrar().map(function(e){ return { e: e, d: datos(e), n: NUM.mapa.get(e) || 0 }; });
     // En orden: N° de trámite de mayor a menor (la más reciente arriba); las que
     // no tienen número (concluidas, canceladas…) al final, por fecha de firma.
+    // Por fecha de firma: la más reciente arriba, la más antigua hasta abajo
     lst.sort(function(a, b){
-      if (a.n !== b.n) return b.n - a.n;
-      return String(b.e.fechaFirma || '0').localeCompare(String(a.e.fechaFirma || '0'));
+      var c = fechaOrden(b.e).localeCompare(fechaOrden(a.e));
+      return c !== 0 ? c : (b.n - a.n);
     });
     var cnt = document.getElementById('escCountNum'); if (cnt) cnt.textContent = lst.length;
     if (!lst.length) { cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.8rem;">Sin escrituras en este filtro.</div>'; return; }

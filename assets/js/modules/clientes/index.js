@@ -874,6 +874,47 @@ async function guardarRecibo(){
             console.warn('[Auto-pendiente]', ePend);
           }
         }
+        // Oct-2026 (a petición expresa): todo recibo NUEVO hecho con el botón
+        // "Trámite de Escrituras" (la firma ante notario) registra solo la
+        // escritura en Escrituras, en el paso 1 · Firma notarial, ligada a su
+        // folio. Los datos que da el notario (instrumento, volumen, fecha) se
+        // capturan después con "▶ Siguiente etapa". No se duplica: si ya hay
+        // una escritura ligada a ese folio, no se crea otra.
+        if(typeof D !== 'undefined' && _tipoTramiteGuardado === 'escritura' && _letraGuardada === 'A' && !_esAbono){
+          try {
+            if(!Array.isArray(D.escrituras)) D.escrituras = [];
+            const _fNum = Number(_folioGuardado);
+            const _yaEsc = D.escrituras.some(function(x){
+              if(!x) return false;
+              const fs = (Array.isArray(x.foliosRecibo) ? x.foliosRecibo : []).concat(x.folioRecibo ? [x.folioRecibo] : []);
+              return fs.some(function(f){ return Number(f) === _fNum; });
+            });
+            if(!_yaEsc){
+              const _recE = (appData.recibos || []).find(function(r){ return r && Number(r.folio) === _fNum && (r.letra || 'A') === 'A'; }) || {};
+              const _cliE = (Array.isArray(_recE.clientes) && _recE.clientes.length ? _recE.clientes : [{ nombre: _nombreGuardado }])
+                .map(function(c){ return { nombre: String((c && c.nombre) || '').trim() }; }).filter(function(c){ return c.nombre; });
+              const _descE = conceptos && conceptos[0] ? [conceptos[0].concepto, conceptos[0].descripcion].filter(Boolean).join(' — ') : '';
+              const _ahoraE = new Date().toISOString();
+              D.escrituras.unshift({
+                id: (typeof _escNuevoId === 'function' ? _escNuevoId() : ('ESC-' + Date.now())),
+                num: '', notaria: '', instrumento: '', volumen: '', fechaFirma: '', fechaFirmaTexto: '',
+                ubicacion: '', descripcion: _descE,
+                foliosRecibo: [_fNum], folioRecibo: _fNum,
+                estado: 'proceso', compradores: _cliE, vendedores: [], bitacora: [],
+                pasos: [0,1,2,3,4].map(function(){ return { estado:'pendiente', notas:'', fecha:'' }; }),
+                fechaCreacion: typeof hoy === 'function' ? hoy() : _ahoraE.slice(0,10),
+                fechaMod: _ahoraE, pasoActivoFecha: _ahoraE,
+                creadoPor: typeof empNombre === 'function' ? empNombre() : '',
+                origenAuto: 'recibo', historialPasos: [{ fecha: _ahoraE, por: (typeof empNombre === 'function' ? empNombre() : ''), texto: 'Registrada automáticamente desde el recibo ' + _fNum + 'A (Trámite de Escrituras)' }]
+              });
+              console.log('[Auto-escritura] Registrada escritura para recibo #' + _fNum);
+              if(typeof toast === 'function') toast('📜 Escritura registrada automáticamente en Escrituras (folio ' + _fNum + 'A)', 'ok');
+              if(typeof escRender === 'function') { try { escRender(); } catch(eR){} }
+            }
+          } catch(eEsc) {
+            console.warn('[Auto-escritura]', eEsc);
+          }
+        }
         // 3. Persistir todo el estado
         // FIX (caso real: folio 113A — el recibo se guardó y se veía correcto en
         // Contabilidad porque D.movimientos ya lo tenía en memoria, pero el

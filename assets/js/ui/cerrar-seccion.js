@@ -45,11 +45,37 @@
     actualizar();
   }
 
+  function limpiarBusquedas(panel){
+    var campos = panel.querySelectorAll('input.search-inp, input[type="search"], input[id$="Q"]');
+    var cambiados = [];
+    campos.forEach(function(i){
+      var t = String(i.type || 'text').toLowerCase();
+      if (t !== 'text' && t !== 'search') return;
+      if (i.value) { i.value = ''; cambiados.push(i); }
+    });
+    // Repintar la lista de esa sección sin filtro (ya oculta, no se nota)
+    if (cambiados.length) setTimeout(function(){
+      cambiados.forEach(function(i){ try { i.dispatchEvent(new Event('input', { bubbles: true })); } catch(e){} });
+    }, 0);
+  }
+  window._lexLimpiarBusquedas = limpiarBusquedas;
+
   // Envolver ir() para mostrar/ocultar la ✕ al cambiar de sección
   function envolver(){
     if (typeof window.ir !== 'function' || window.ir._lexCerrarSec) return;
     var orig = window.ir;
-    var env = function(){ var r = orig.apply(this, arguments); try { actualizar(); } catch(e){} return r; };
+    var env = function(destino){
+      var antes = null; try { antes = document.querySelector('.content .panel.active'); } catch(e){}
+      var r = orig.apply(this, arguments);
+      try { actualizar(); } catch(e){}
+      // Oct-2026: al SALIR de una sección se borra lo que se haya escrito en sus
+      // buscadores (ej. "FRAN" en Escrituras); al volver aparece la lista completa.
+      try {
+        var ahora = document.querySelector('.content .panel.active');
+        if (antes && antes !== ahora) limpiarBusquedas(antes);
+      } catch(e){}
+      return r;
+    };
     for (var k in orig) { try { env[k] = orig[k]; } catch(e){} }
     env._lexCerrarSec = true;
     window.ir = env;

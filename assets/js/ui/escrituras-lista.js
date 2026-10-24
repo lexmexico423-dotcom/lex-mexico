@@ -217,54 +217,96 @@
       return true;
     });
   }
+  // ── Tarjetas estilo Pendientes de Placas (oct-2026) ───────────────────
+  // Misma forma y tamaño que las fichas de Placas: franja de color a la
+  // izquierda, N° de trámite, 👤 cliente en grande, el trámite en negritas,
+  // chips con los datos, y a la derecha FOLIO + estado del paso + 📞.
+  // Sin desplegables ni documentos adjuntos. Ordenadas por N° (en orden).
+  // Clic en la tarjeta → expediente completo.
+  var NOMBRE_PASO = {'FIRMA NOTARIAL':'Firma notarial','CATASTRO':'Catastro','TRASLADO MPL':'Traslado MPL','ISR':'ISR','IFREO':'IFREO'};
+  var CH = 'font-size:9.5px;border-radius:3px;padding:1px 6px;font-family:monospace;white-space:nowrap;';
+  function esAutomatico(e, d){
+    if (!d.sigue) return true;
+    var pAct = d.activo >= 0 ? (d.pasos[d.activo] || {}) : null;
+    return !(pAct && pAct.notas) && !(d.activo === -1 && e.notaFinal) && e.estado !== 'listo';
+  }
+  function miniBarra(e, d){
+    var listo = e.estado === 'listo' || e.estado === 'archivado' || d.activo === -1, colAct = colorEstaEn(e, d);
+    return '<div title="Avance: paso ' + (listo ? 5 : d.activo + 1) + ' de 5" style="display:flex;gap:2px;width:120px;">' + d.PASOS.map(function(n, i){
+      var p = d.pasos[i] || {}, hecho = listo || p.estado === 'completado', aqui = !listo && i === d.activo;
+      return '<span title="' + (i + 1) + ' · ' + E(NOMBRE_PASO[n] || n) + '" style="flex:1;height:5px;border-radius:3px;background:' + (hecho ? '#1a7a3a' : aqui ? colAct : '#e5dcc4') + ';"></span>';
+    }).join('') + '</div>';
+  }
+  function botonEstado(e, d){
+    var col = colorEstaEn(e, d), txt;
+    if (/^\d/.test(d.estaEn)) txt = (d.activo + 1) + ' · ' + String(d.PASOS[d.activo]).toUpperCase();
+    else txt = String(d.estaEn).replace(/^[^A-Za-zÁÉÍÓÚÑ0-9]+/, '').toUpperCase();
+    var dias = (d.dias !== null && d.activo >= 0 && (e.estado === 'proceso' || !e.estado || e.estado === 'espera')) ? ' · ' + d.dias + 'd' : '';
+    var borde = d.atencion ? '#c81e1e' : col;
+    return '<span title="' + E(d.estaEn + (d.estaSub ? ' (' + d.estaSub + ')' : '') + (dias ? ' — ' + d.dias + ' días en este paso' : '')) + '" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;font-family:monospace;letter-spacing:0.03em;padding:6px 12px;border-radius:7px;border:1.5px solid ' + borde + ';background:' + col + ';color:#fff;white-space:nowrap;' + (d.atencion ? 'box-shadow:0 0 0 2px #f5c4c4;' : '') + '">' + (d.atencion ? '⚠ ' : '') + E(txt) + E(dias) + '</span>';
+  }
   function pintarLista(){
     var cont = document.getElementById('esc-lista'); if (!cont) return;
-    var lst = filtrar().map(function(e){ return { e: e, d: datos(e) }; });
-    var activa = function(x){ return (x.e.estado === 'proceso' || !x.e.estado) && x.d.activo >= 0; };
+    var NUM = mapaNumeros();
+    var lst = filtrar().map(function(e){ return { e: e, d: datos(e), n: NUM.mapa.get(e) || 0 }; });
+    // En orden: N° de trámite de mayor a menor (la más reciente arriba); las que
+    // no tienen número (concluidas, canceladas…) al final, por fecha de firma.
     lst.sort(function(a, b){
-      if (a.d.atencion !== b.d.atencion) return a.d.atencion ? -1 : 1;
-      var aa = activa(a), bb = activa(b);
-      if (aa !== bb) return aa ? -1 : 1;
-      var da = a.d.dias === null ? -1 : a.d.dias, db = b.d.dias === null ? -1 : b.d.dias;
-      if (da !== db) return db - da;
-      return String(b.e.fechaFirma || '9999').localeCompare(String(a.e.fechaFirma || '9999'));
+      if (a.n !== b.n) return b.n - a.n;
+      return String(b.e.fechaFirma || '0').localeCompare(String(a.e.fechaFirma || '0'));
     });
     var cnt = document.getElementById('escCountNum'); if (cnt) cnt.textContent = lst.length;
     if (!lst.length) { cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.8rem;">Sin escrituras en este filtro.</div>'; return; }
-    var NUM = mapaNumeros();
-    var GRID = 'display:grid;grid-template-columns:46px minmax(0,2.6fr) minmax(0,1.2fr) minmax(0,2.3fr) 92px 104px;gap:10px;align-items:center;';
-    var resumen = '<div style="display:flex;justify-content:flex-end;padding:0 2px 6px;font-size:0.72rem;color:#c8b68a;">Trámites en curso (En proceso + Listo p/entregar): <b style="color:#e8c875;margin-left:5px;font-family:monospace;font-size:0.85rem;">' + NUM.total + '</b></div>';
-    var head = '<div style="' + GRID + 'background:#1a1008;color:#e8c875;padding:8px 14px;border-radius:8px 8px 0 0;font-size:0.64rem;letter-spacing:0.08em;font-family:monospace;">'
-      + '<span style="text-align:center;">N°</span><span>CLIENTE</span><span>ESTÁ EN</span><span>QUÉ SIGUE</span><span>TIEMPO</span><span></span></div>';
-    var rows = lst.map(function(x){
-      var e = x.e, d = x.d, idx = D.escrituras.indexOf(e);
-      var id = String(e.id || idx);
-      var abierta = !!abiertas[id];
-      var apagada = e.estado === 'cancelado' || e.estado === 'archivado';
-      return '<div class="lex-esc-fila" data-id="' + E(id) + '" style="background:' + (abierta ? '#fff8e4' : '#fbf6ea') + ';border:1px solid ' + (d.atencion ? '#e8a0a0' : '#e3d3a8') + ';border-left:4px solid ' + (d.atencion ? '#c81e1e' : apagada ? '#9a9a9a' : '#c8951a') + ';border-radius:0;margin-top:6px;' + (apagada ? 'opacity:0.75;' : '') + '">'
-        + '<div class="lex-esc-cab" style="' + GRID + 'padding:9px 14px;cursor:pointer;" title="Toca para ver el detalle">'
-        + (function(){ var n = NUM.mapa.get(e); return '<div title="N° de trámite en curso (se cuenta de la más antigua a la más reciente)" style="text-align:center;line-height:1.05;"><div style="font-size:0.5rem;color:#9a8a6a;letter-spacing:0.05em;font-family:monospace;">TRÁMITE</div><div style="font-size:1.05rem;font-weight:800;color:' + (n ? '#8c6518' : '#b4a88a') + ';font-family:monospace;">' + (n || '—') + '</div></div>'; })()
-        + (function(){ var rel = relacion(d); var nomC = (d.compradores[0] || 'Sin comprador').toUpperCase(); var tit = d.compradores.join(', ') + (rel ? ' ' + rel : '');
-            return '<div style="min-width:0;"><div title="' + E(tit) + '" style="font-size:0.86rem;font-weight:700;color:#1a1008;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:0.66rem;color:#7a6a4a;">+' + (d.compradores.length - 1) + '</span>' : '')
-              + (rel ? ' <span style="font-size:0.72rem;font-weight:400;color:#9a8a6a;">' + E(verboRel(d)) + '</span> <span style="font-size:0.8rem;font-weight:400;color:#185fa5;">' + E(d.vendedores.map(nombrePropio).join(', ')) + '</span>' : '') + '</div>'; })()
-        + '<div style="font-size:0.68rem;color:#7a6a4a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + datosSecundarios(e, d) + '</div></div>'
-        + '<div style="min-width:0;">' + chipEstaEn(e, d) + (d.estaSub ? '<div style="font-size:0.64rem;color:#7a6a4a;margin-top:2px;">' + E(d.estaSub) + '</div>' : '') + '</div>'
-        + '<div style="min-width:0;font-size:0.76rem;color:' + (d.atencion ? '#a32d2d' : '#8a3a10') + ';display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + (d.atencion ? '⚠ ' : '') + E(d.sigue || '—') + '</div>'
-        + '<div>' + semaforo(d, e) + '</div>'
-        + '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">'
-        // Oct-2026: folio del recibo arriba a la derecha (como en Pendientes)
-        + (function(){ var fh = ''; try { if (typeof _escFoliosHtml === 'function') fh = _escFoliosHtml(e, 'escAbrirRecibo', '<br>'); } catch(_){}
-            return fh ? '<div title="Folio del recibo — clic para abrirlo" style="text-align:right;line-height:1.1;"><div style="font-family:serif;font-size:0.52rem;letter-spacing:0.12em;color:#8c6518;font-weight:700;">FOLIO</div><div style="font-family:serif;font-size:0.95rem;color:#1a4a8a;font-weight:800;">' + fh + '</div></div>' : ''; })()
-        + '<div style="display:flex;gap:5px;align-items:center;">'
-        + ((typeof lexBtnLlamada === 'function' && e.estado !== 'cancelado') ? lexBtnLlamada('esc', e.id, '', 'ESCRITURA' + (d.acto ? ' · ' + String(d.acto).toUpperCase() : '')) : '')
-        + '<span style="font-size:0.9rem;color:#9a6e18;">' + (abierta ? '▴' : '▾') + '</span></div></div>'
+    var nAt = lst.filter(function(x){ return x.d.atencion; }).length;
+    var resumen = '<div style="display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;font-size:0.72rem;color:#c8b68a;">'
+      + '<span>' + (nAt ? '<b style="color:#f08a8a;">⚠ ' + nAt + (nAt === 1 ? ' requiere' : ' requieren') + ' atención</b> (franja roja)' : '') + '</span>'
+      + '<span>Trámites en curso: <b style="color:#e8c875;font-family:monospace;font-size:0.85rem;">' + NUM.total + '</b></span></div>';
+    var cards = lst.map(function(x){
+      var e = x.e, d = x.d, n = x.n, idx = D.escrituras.indexOf(e);
+      var apagada = e.estado === 'cancelado' || e.estado === 'archivado' || e.estado === 'noprocedio';
+      var franja = d.atencion ? '#c81e1e' : apagada ? '#9a9a9a' : (e.estado === 'listo' || d.activo === -1) ? '#1a7a3a' : e.estado === 'espera' ? '#8a7a5a' : '#2e7d32';
+      var colNom = apagada ? '#7a7a72' : '#2e7d32';
+      var nomC = (d.compradores[0] || 'Sin comprador').toUpperCase();
+      var rel = relacion(d);
+      var acto = d.acto ? String(d.acto).toUpperCase() : 'ESCRITURA';
+      var desc = String(e.descripcion || '').trim();
+      var obs = String((Array.isArray(e.bitacora) && e.bitacora[0] && e.bitacora[0].texto) || '').trim();
+      var chips = [];
+      if (d.acto) { var ca = colorActo(d.acto); chips.push('<span style="' + CH + 'background:' + ca[0] + ';color:' + ca[1] + ';font-weight:700;">📜 ' + E(acto) + '</span>'); }
+      if (e.instrumento) chips.push('<span style="' + CH + 'background:#faeeda;color:#633806;font-weight:700;">Instr. ' + E(e.instrumento) + '</span>');
+      if (e.volumen) chips.push('<span style="' + CH + 'background:#f1efe8;color:#444441;">Vol. ' + E(e.volumen) + '</span>');
+      if (d.fechaFirma) chips.push('<span style="' + CH + 'background:rgba(26,122,58,0.08);color:#27500a;">✍ Firma ' + E(d.fechaFirma) + '</span>');
+      if (String(e.num || '').trim()) { var cn = String(e.num).trim(); chips.push('<span style="' + CH + 'background:rgba(200,149,42,0.12);color:#8c6518;font-weight:700;">🗂 CARP.- ' + E(cn.replace(/^carp\.?-?\s*/i, '')) + '</span>'); }
+      if (e.notaria) chips.push('<span style="' + CH + 'background:rgba(0,0,0,0.04);color:#6a5a3a;">🔏 ' + E(String(e.notaria).length > 34 ? String(e.notaria).slice(0, 34) + '…' : e.notaria) + '</span>');
+      var auto = esAutomatico(e, d);
+      var sigue = d.sigue ? '<div style="font-size:11.5px;margin-top:6px;line-height:1.4;color:' + (d.atencion ? '#a32d2d' : auto ? '#a89c80' : (e.estado === 'listo' ? '#1a7a3a' : '#7a4a10')) + ';' + (auto && !d.atencion ? '' : 'font-weight:600;') + '">👉 ' + (d.atencion ? '⚠ ' : '') + E(d.sigue) + '</div>' : '';
+      var fh = ''; try { if (typeof _escFoliosHtml === 'function') fh = _escFoliosHtml(e, 'escAbrirRecibo', ' · '); } catch(_){}
+      return '<div class="lex-esc-card" data-idx="' + idx + '" title="Clic para abrir el expediente completo" style="position:relative;display:flex;align-items:stretch;background:var(--surface,#fdfaf4);border:1.5px solid var(--border-l,#d4b870);border-radius:8px;margin-bottom:8px;cursor:pointer;' + (apagada ? 'opacity:0.65;' : '') + 'transition:box-shadow 0.15s,border-color 0.15s;">'
+        + '<div style="width:5px;background:' + franja + ';flex-shrink:0;border-radius:8px 0 0 8px;"></div>'
+        + '<div style="flex:1;min-width:0;padding:10px 6px 10px 12px;">'
+        +   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:3px;">'
+        +     '<div title="N° de trámite en curso (de la más antigua a la más reciente)" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;min-width:30px;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Trámite</span><span style="color:' + (n ? '#8c6518' : '#c8bb98') + ';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">' + (n || '—') + '</span></div>'
+        +     '<div style="min-width:0;font-size:14.5px;font-weight:600;color:' + colNom + ';font-family:\'Outfit\',sans-serif;letter-spacing:0.025em;text-transform:uppercase;opacity:0.92;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">👤 ' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:11px;color:#9a8a6a;">+' + (d.compradores.length - 1) + '</span>' : '') + '</div>'
+        +   '</div>'
+        +   '<div style="font-size:12.5px;font-weight:600;color:var(--ink,#1a1008);line-height:1.4;margin-bottom:5px;">' + E(acto) + (rel ? ' <span style="font-weight:400;color:#9a8a6a;">— ' + E(verboRel(d)) + '</span> <span style="font-weight:500;color:#185fa5;">' + E(d.vendedores.map(nombrePropio).join(', ')) + '</span>' : '') + (desc ? ' <span style="font-weight:400;color:#5a4a30;">— ' + E(desc) + '</span>' : '') + '</div>'
+        +   (chips.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;">' + chips.join('') + '</div>' : '')
+        +   sigue
+        +   (obs ? '<div style="font-size:10px;color:#7a4a10;font-style:italic;margin-top:5px;padding:4px 8px;background:rgba(200,149,42,0.07);border-radius:4px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="' + E(obs) + '">' + E(obs) + '</div>' : '')
         + '</div>'
-        + (abierta ? tarjeta(e, idx, d) : '')
+        + '<div class="lex-esc-acc" style="display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;padding:10px 10px 10px 4px;flex-shrink:0;gap:6px;">'
+        +   '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;">'
+        +     (fh ? '<div title="Folio del recibo — clic para abrirlo" style="display:flex;flex-direction:column;align-items:center;padding:2px 6px;"><span style="font-size:8px;font-weight:700;color:#8c6518;letter-spacing:0.12em;">FOLIO</span><span style="font-size:1.2rem;font-weight:800;color:#1a4a8a;line-height:1.15;font-family:monospace;">' + fh + '</span></div>' : '')
+        +     botonEstado(e, d)
+        +     miniBarra(e, d)
+        +   '</div>'
+        +   '<div style="display:flex;gap:4px;">' + ((typeof lexBtnLlamada === 'function' && e.estado !== 'cancelado') ? lexBtnLlamada('esc', e.id, '', 'ESCRITURA' + (d.acto ? ' · ' + String(d.acto).toUpperCase() : '')) : '') + '</div>'
+        + '</div>'
         + '</div>';
     }).join('');
-    cont.innerHTML = head + rows;
-    cont.querySelectorAll('.lex-esc-cab').forEach(function(c){
-      c.onclick = function(){ var id = c.parentNode.getAttribute('data-id'); abiertas[id] = !abiertas[id]; pintarLista(); };
+    cont.innerHTML = resumen + cards + '<style>.lex-esc-card:hover{border-color:#c8951a !important;box-shadow:0 2px 10px rgba(200,149,42,0.18);}</style>';
+    cont.querySelectorAll('.lex-esc-card').forEach(function(f){
+      f.onclick = function(){ var i = parseInt(f.getAttribute('data-idx'), 10); if (typeof escAbrirDetalle === 'function' && i >= 0) escAbrirDetalle(i); };
+      var acc = f.querySelector('.lex-esc-acc'); if (acc) acc.addEventListener('click', function(ev){ if (ev.target.closest && (ev.target.closest('button') || ev.target.closest('span[onclick]'))) ev.stopPropagation(); });
     });
   }
 

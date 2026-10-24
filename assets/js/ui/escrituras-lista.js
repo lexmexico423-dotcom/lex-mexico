@@ -298,9 +298,9 @@
         +     '<div title="N° de trámite en curso (de la más antigua a la más reciente)" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;min-width:30px;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Trámite</span><span style="color:' + (n ? '#1a1008' : '#c8bb98') + ';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">' + (n || '—') + '</span></div>'
         // Oct-2026: en UN solo renglón → 👤 CLIENTE (negro) · ACTO (verde) · — compra a Vendedor (azul)
         +     '<div style="min-width:0;line-height:1.35;">'
-        +       '<span style="font-size:15px;font-weight:700;color:' + (apagada ? '#6a6a62' : '#1a1008') + ';font-family:\'Outfit\',sans-serif;letter-spacing:0.02em;text-transform:uppercase;">👤 ' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:11px;color:#9a8a6a;">+' + (d.compradores.length - 1) + '</span>' : '') + '</span>'
-        +       ' <span style="font-size:13.5px;font-weight:700;color:' + colNom + ';margin-left:6px;">' + E(acto) + '</span>'
-        +       (rel ? ' <span style="font-size:13px;color:#9a8a6a;">— ' + E(verboRel(d)) + '</span> <span style="font-size:13.5px;font-weight:500;color:#185fa5;">' + E(d.vendedores.map(nombrePropio).join(', ')) + '</span>' : '')
+        +       '<span style="font-size:13.5px;font-weight:700;color:' + (apagada ? '#6a6a62' : '#1a1008') + ';font-family:\'Outfit\',sans-serif;letter-spacing:0.02em;text-transform:uppercase;">👤 ' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:11px;color:#9a8a6a;">+' + (d.compradores.length - 1) + '</span>' : '') + '</span>'
+        +       ' <span style="font-size:12.5px;font-weight:700;color:' + colNom + ';margin-left:6px;">' + E(acto) + '</span>'
+        +       (rel ? ' <span style="font-size:12px;color:#9a8a6a;">— ' + E(verboRel(d)) + '</span> <span style="font-size:13px;font-weight:500;color:#185fa5;">' + E(d.vendedores.map(nombrePropio).join(', ')) + '</span>' : '')
         +     '</div>'
         +   '</div>'
         +   (desc ? '<div style="font-size:12.5px;color:#5a4a30;line-height:1.4;margin:2px 0 0 40px;">' + E(desc) + '</div>' : '')

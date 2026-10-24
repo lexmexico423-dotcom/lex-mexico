@@ -333,12 +333,54 @@
         var cont = document.getElementById('esc-notas-etapa');
         var idx = (D.escrituras || []).indexOf(e);
         if (cont && idx >= 0 && (e.estado === 'proceso' || !e.estado)) cont.insertAdjacentHTML('afterbegin', botonHtml(e, idx));
+        botonLinea();
       } catch(err){ console.warn('[Asistente escrituras]', err); }
       return r;
     };
     env._lexAsis = true;
     window.escRenderNotasEtapa = env;
   })();
+  // ── Botón "▶ Avanzar" junto a "Editar" en la línea del proceso, y los
+  // botones que antes abrían el modal del paso (círculo resaltado, "Atender
+  // ahora", "Ya inicié / Ya completé") ahora abren el asistente.
+  function botonLinea(){
+    var ed = document.getElementById('esc-btn-editar-pasos-d'); if (!ed) return;
+    var idx = (typeof _escIdx !== 'undefined') ? _escIdx : -1;
+    var e = idx >= 0 && D.escrituras ? D.escrituras[idx] : null;
+    var b = document.getElementById('esc-btn-avanzar-d');
+    var mostrar = e && (e.estado === 'proceso' || !e.estado);
+    if (!mostrar) { if (b) b.remove(); return; }
+    if (!b) {
+      b = document.createElement('button'); b.type = 'button'; b.id = 'esc-btn-avanzar-d';
+      b.title = 'Avanzar el trámite a la siguiente etapa (con preguntas)';
+      b.style.cssText = 'font-family:monospace;font-size:0.66rem;font-weight:800;letter-spacing:0.06em;padding:4px 12px;border-radius:14px;border:1.5px solid #1a7a3a;background:#1a7a3a;color:#fff;cursor:pointer;margin-right:6px;';
+      b.textContent = '▶ AVANZAR';
+      ed.parentNode.insertBefore(b, ed);
+    }
+    b.onclick = function(){ window.lexEscSiguienteEtapa(idx); };
+  }
+  (function engancharBotones(){
+    var origAR = window.escAccionRapidaPaso;
+    if (typeof origAR === 'function' && !origAR._lexAsis) {
+      var envAR = function(){ if (typeof _escIdx !== 'undefined' && _escIdx >= 0) return window.lexEscSiguienteEtapa(_escIdx); return origAR.apply(this, arguments); };
+      envAR._lexAsis = true; window.escAccionRapidaPaso = envAR;
+    }
+    var origCP = window.escClickPaso;
+    if (typeof origCP === 'function' && !origCP._lexAsis) {
+      var envCP = function(pasoIdx){
+        try {
+          var modoEd = (typeof _escModoEditarPasos !== 'undefined') && _escModoEditarPasos;
+          if (!modoEd && typeof _escIdx !== 'undefined' && _escIdx >= 0) {
+            var e = D.escrituras[_escIdx];
+            if (e && (e.estado === 'proceso' || !e.estado) && activoDe(e) === pasoIdx) return window.lexEscSiguienteEtapa(_escIdx);
+          }
+        } catch(_){}
+        return origCP.apply(this, arguments);
+      };
+      envCP._lexAsis = true; window.escClickPaso = envCP;
+    }
+  })();
+
   (function engancharLista(){
     var orig = window.escRender;
     if (typeof orig !== 'function' || orig._lexAsisN) return;

@@ -71,41 +71,120 @@
   }
 
   // ════════════════════════════════════════════════════════════════════
-  // CAPTURA / EDICIÓN
+  // CAPTURA / EDICIÓN  (Oct-2026 v2: mismo orden que "Generar recibo")
+  //  · Datos del cliente (uno o varios: nombre, móvil, tel. casa, domicilio)
+  //  · Tipo de trámite (normal / vehicular / escrituras / juicio)
+  //  · Conceptos y precios  → su suma es el COSTO PACTADO
+  //  · Pagos que ya dio, cada uno con SU folio de papel (no entran a caja)
+  //  · TOTAL DE ADEUDO bloqueado = costo − pagos (nadie lo escribe a mano)
+  // Así, al cobrar, TODO pasa tal cual al formulario de Generar recibo.
+  // Los registros capturados con la versión anterior se convierten al abrirlos.
   // ════════════════════════════════════════════════════════════════════
-  function campo(id, label, val, extra){ return '<div style="min-width:0;"><div style="font-size:0.62rem;color:#7a5410;letter-spacing:0.06em;margin:8px 0 3px;font-family:monospace;">' + label + '</div><input id="' + id + '" value="' + E(val == null ? '' : val) + '" ' + (extra || '') + ' style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #d8c08a;border-radius:6px;background:#fff;font-size:0.8rem;"></div>'; }
+  var TIPOS_T = [['normal','📄 Trámite normal'],['vehicular','🚗 Trámite vehicular'],['escritura','📜 Trámite de escrituras'],['juicio','⚖️ Trámite de juicio']];
+  function tipoDe(sa){
+    if (sa && sa.tipoTramite) return sa.tipoTramite;
+    var c = sa && sa.categoria;
+    return c === 'escrituras' ? 'escritura' : c === 'juicios' ? 'juicio' : c === 'placas' ? 'vehicular' : 'normal';
+  }
+  function catDeTipo(t, anterior){
+    if (t === 'escritura') return 'escrituras';
+    if (t === 'juicio') return 'juicios';
+    if (t === 'vehicular') return 'placas';
+    return (anterior && ['registro','contratos','otros'].indexOf(anterior) >= 0) ? anterior : 'otros';
+  }
+  function clientesDe(sa){
+    if (sa && Array.isArray(sa.clientes) && sa.clientes.length) return sa.clientes;
+    return [{ nombre: (sa && sa.cliente) || '', movil: (sa && sa.tel) || '', telCasa: '', domicilio: '' }];
+  }
+  function conceptosDe(sa){
+    if (sa && Array.isArray(sa.conceptos) && sa.conceptos.length) return sa.conceptos;
+    if (!sa) return [{ concepto: '', descripcion: '', precio: '' }];
+    var costo = (sa.costo != null && sa.costo !== '') ? r2(sa.costo) : r2(r2(sa.debeManual) + pagadoAntes(sa));
+    return [{ concepto: String(sa.concepto || '').toUpperCase(), descripcion: '', precio: costo }];
+  }
+  function pagosDe(sa){
+    return ((sa && sa.pagosAnteriores) || []).map(function(p){ return Object.assign({}, p, { folioPapel: p.folioPapel != null ? p.folioPapel : (sa.formato === 2 ? '' : (sa.folioPapel || '')) }); });
+  }
+  function foliosDe(sa){
+    var vistos = {}, out = [];
+    var add = function(txt){ String(txt || '').split(/[,;\/]+/).forEach(function(f){ f = f.trim(); if (f && !vistos[f]) { vistos[f] = 1; out.push(f); } }); };
+    pagosDe(sa).forEach(function(p){ add(p.folioPapel); });
+    if (!out.length && sa && sa.folioPapel) add(sa.folioPapel);
+    return out;
+  }
+  function listaY(arr){ return arr.length <= 1 ? (arr[0] || '') : arr.slice(0, -1).join(', ') + ' y ' + arr[arr.length - 1]; }
+  window._lexSAFolios = foliosDe;
+
+  var EST_IN = 'width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #d8c08a;border-radius:6px;background:#fff;font-size:0.8rem;color:#2a1c08;';
+  var EST_LB = 'font-size:0.6rem;color:#7a5410;letter-spacing:0.08em;margin:0 0 3px;font-family:monospace;text-transform:uppercase;';
+  var EST_SEC = 'font-size:0.62rem;color:#7a5410;letter-spacing:0.1em;margin:14px 0 6px;font-family:monospace;text-transform:uppercase;border-bottom:1px solid #e3d3a8;padding-bottom:3px;';
+  var EST_ADD = 'background:none;border:1px dashed #c8951a;color:#9a6e18;border-radius:6px;padding:5px 12px;font-size:0.68rem;cursor:pointer;font-family:monospace;letter-spacing:0.06em;';
+  function filaCliente(c, i){
+    return '<div class="sa-cli" style="background:#faf3e2;border:1px solid #e3d3a8;border-radius:8px;padding:8px 10px;margin-bottom:6px;position:relative;">'
+      + (i > 0 ? '<button type="button" class="sa-cli-x" title="Quitar cliente" style="position:absolute;top:4px;right:6px;background:none;border:none;color:#a32d2d;cursor:pointer;font-size:0.95rem;">✕</button>' : '')
+      + '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px;">'
+      + '<div><div style="' + EST_LB + '">Nombre completo' + (i === 0 ? ' *' : '') + '</div><input class="sa-c-nom" value="' + E(c.nombre || '') + '" placeholder="NOMBRE DEL CLIENTE" style="' + EST_IN + 'text-transform:uppercase;"></div>'
+      + '<div><div style="' + EST_LB + '">Móvil</div><input class="sa-c-mov" value="' + E(c.movil || '') + '" placeholder="000-000-0000" maxlength="12" style="' + EST_IN + '"></div>'
+      + '<div><div style="' + EST_LB + '">Tel. casa</div><input class="sa-c-tel" value="' + E(c.telCasa || '') + '" placeholder="000-000-0000" maxlength="12" style="' + EST_IN + '"></div>'
+      + '</div><div style="margin-top:6px;display:flex;gap:12px;align-items:flex-end;"><div style="flex:1;"><div style="' + EST_LB + '">Domicilio</div><input class="sa-c-dom" value="' + E(c.domicilio || '') + '" placeholder="Calle, número, colonia, municipio…" style="' + EST_IN + '"></div>'
+      + '<label style="display:flex;align-items:center;gap:6px;font-size:0.72rem;font-family:monospace;color:#7a5410;white-space:nowrap;cursor:pointer;user-select:none;padding-bottom:8px;"><span>¿Va a firmar?</span><input type="checkbox" class="sa-c-firma" ' + ((c.firma != null ? c.firma : i === 0) ? 'checked' : '') + ' style="width:16px;height:16px;margin:0;cursor:pointer;"></label></div></div>';
+  }
+  function filaConcepto(c){
+    return '<div class="sa-con" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 130px 26px;gap:6px;margin-bottom:5px;">'
+      + '<input class="sa-k-con" value="' + E(c.concepto || '') + '" placeholder="Concepto" style="' + EST_IN + 'text-transform:uppercase;">'
+      + '<input class="sa-k-des" value="' + E(c.descripcion || '') + '" placeholder="Descripción" style="' + EST_IN + '">'
+      + '<input class="sa-k-pre" value="' + (r2(c.precio) ? $m(c.precio) : '') + '" placeholder="$0.00" inputmode="decimal" style="' + EST_IN + 'text-align:right;font-family:monospace;">'
+      + '<button type="button" class="sa-x" title="Quitar" style="background:none;border:none;color:#a32d2d;cursor:pointer;font-size:1rem;">✕</button></div>';
+  }
   function filaPago(p){
-    return '<div class="sa-pago" data-id="' + E(p.id || '') + '" style="display:grid;grid-template-columns:150px minmax(0,1fr) 130px 28px;gap:6px;margin-bottom:5px;">'
-      + '<input type="date" class="sa-p-fecha" value="' + E(String(p.fecha || '').slice(0, 10)) + '" style="padding:6px;border:1px solid #d8c08a;border-radius:6px;font-size:0.78rem;">'
-      + '<input class="sa-p-conc" value="' + E(p.concepto || '') + '" placeholder="Anticipo, abono…" style="padding:6px 8px;border:1px solid #d8c08a;border-radius:6px;font-size:0.78rem;">'
-      + '<input class="sa-p-monto" type="number" step="0.01" min="0" value="' + E(p.monto != null ? p.monto : '') + '" placeholder="Monto" style="padding:6px 8px;border:1px solid #d8c08a;border-radius:6px;font-size:0.78rem;">'
-      + '<button type="button" class="sa-p-x" title="Quitar" style="background:none;border:none;color:#a32d2d;cursor:pointer;font-size:1rem;">✕</button></div>';
+    return '<div class="sa-pago" data-id="' + E(p.id || '') + '" style="display:grid;grid-template-columns:140px minmax(0,1fr) 120px 130px 26px;gap:6px;margin-bottom:5px;">'
+      + '<input type="date" class="sa-p-fecha" value="' + E(String(p.fecha || '').slice(0, 10)) + '" style="' + EST_IN + 'padding:6px;">'
+      + '<input class="sa-p-conc" value="' + E(p.concepto || '') + '" placeholder="Anticipo, abono…" style="' + EST_IN + '">'
+      + '<input class="sa-p-folio" value="' + E(p.folioPapel || '') + '" placeholder="Ej. 0417" style="' + EST_IN + 'font-family:monospace;">'
+      + '<input class="sa-p-monto" value="' + (r2(p.monto) ? $m(p.monto) : '') + '" placeholder="$0.00" inputmode="decimal" style="' + EST_IN + 'text-align:right;font-family:monospace;">'
+      + '<button type="button" class="sa-x" title="Quitar" style="background:none;border:none;color:#a32d2d;cursor:pointer;font-size:1rem;">✕</button></div>';
   }
   window.lexNuevoSaldoAnterior = function(){ abrirForm(null); };
   window.lexAbrirSaldoAnterior = function(id){ var sa = porId(id); if (sa) abrirForm(sa); };
   function abrirForm(sa){
-    var v = sa || { cliente: '', tel: '', concepto: '', categoria: 'escrituras', anio: String(new Date().getFullYear() - 1), folioPapel: '', costo: '', pagosAnteriores: [], debeManual: '', nota: '' };
     var viejo = document.getElementById('lex-sa-ov'); if (viejo) viejo.remove();
     var ov = document.createElement('div'); ov.id = 'lex-sa-ov';
     ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
     var convertido = sa && sa.estado === 'convertido';
-    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:820px;max-height:94vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#2a1c08;">'
-      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.76rem;letter-spacing:0.1em;font-family:monospace;display:flex;justify-content:space-between;"><span>🗂 ' + (sa ? 'RECIBO ANTERIOR' : 'NUEVO RECIBO ANTERIOR') + '</span><span id="sa-x" style="cursor:pointer;">✕</span></div>'
-      + '<div style="padding:12px 16px;">'
-      + (convertido ? '<div style="background:#eaf3de;border:1px solid #9fc58a;color:#27500a;border-radius:6px;padding:7px 10px;font-size:0.76rem;margin-bottom:6px;">✓ Ya tiene folio en el sistema: <b>' + E(sa.folioConvertido) + 'A</b>. Los siguientes pagos se hacen desde ese folio (Pago parcial / Pago total).</div>' : '')
-      + '<div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;">' + campo('sa-cliente', 'CLIENTE *', v.cliente) + campo('sa-tel', 'TELÉFONO', v.tel) + '</div>'
-      + '<div style="display:grid;grid-template-columns:2fr 1fr 0.7fr;gap:10px;">' + campo('sa-concepto', 'TRÁMITE / CONCEPTO *', v.concepto, 'placeholder="Escritura de compraventa, terreno en…"')
-      + '<div><div style="font-size:0.62rem;color:#7a5410;letter-spacing:0.06em;margin:8px 0 3px;font-family:monospace;">CATEGORÍA</div><select id="sa-cat" style="width:100%;padding:7px;border:1px solid #d8c08a;border-radius:6px;font-size:0.8rem;">' + CATS.map(function(c){ return '<option value="' + c[0] + '"' + (v.categoria === c[0] ? ' selected' : '') + '>' + c[1] + '</option>'; }).join('') + '</select></div>'
-      + campo('sa-anio', 'AÑO DEL TRÁMITE', v.anio, 'inputmode="numeric" maxlength="4"') + '</div>'
-      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">' + campo('sa-papel', 'FOLIO DE PAPEL (el que tiene el cliente)', v.folioPapel, 'placeholder="Ej. 0417"') + campo('sa-costo', 'COSTO PACTADO (opcional)', v.costo, 'type="number" step="0.01" min="0"') + campo('sa-debe', 'DEBE HOY *', sa ? debe(sa) : v.debeManual, 'type="number" step="0.01" min="0"') + '</div>'
-      + '<div id="sa-debe-nota" style="font-size:0.68rem;color:#7a6a4a;margin-top:3px;"></div>'
-      + '<div style="font-size:0.62rem;color:#7a5410;letter-spacing:0.06em;margin:12px 0 4px;font-family:monospace;">HISTORIAL DE PAGOS ANTERIORES (de antes del sistema — no entran a caja)</div>'
-      + '<div id="sa-pagos">' + (v.pagosAnteriores || []).map(filaPago).join('') + '</div>'
-      + '<button type="button" id="sa-add" style="background:none;border:1px dashed #c8951a;color:#9a6e18;border-radius:6px;padding:5px 12px;font-size:0.72rem;cursor:pointer;">＋ Agregar pago anterior</button>'
-      + ((sa && (sa.pagosSistema || []).length) ? '<div style="font-size:0.62rem;color:#7a5410;letter-spacing:0.06em;margin:12px 0 4px;font-family:monospace;">PAGOS YA EN EL SISTEMA</div>' + sa.pagosSistema.map(function(p){ return '<div style="font-size:0.76rem;padding:3px 0;">' + E(fL(p.fecha)) + ' · ' + E(p.concepto || 'Abono') + ' · <b>' + $m(p.monto) + '</b> <span style="font-size:0.66rem;background:#e6f1fb;color:#185fa5;border-radius:8px;padding:0 6px;">' + E(p.comprobante || 'Caja') + '</span></div>'; }).join('') : '')
-      + campo('sa-nota', 'NOTA', v.nota, 'placeholder="Agrega una nota para uso interno, no se imprime"')
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:8px 10px;background:#fff;border:1px solid #e3d3a8;border-radius:8px;font-size:0.8rem;"><span id="sa-resumen"></span></div>'
-      + '<div id="sa-err" style="color:#a32d2d;font-size:0.74rem;min-height:1em;margin-top:6px;"></div>'
+    var tipo = sa ? tipoDe(sa) : 'normal';
+    var sis = sa ? pagadoSistema(sa) : 0;
+    var btnTipo = function(t){ var on = t[0] === tipo; return '<button type="button" class="sa-tipo" data-t="' + t[0] + '" style="padding:8px 12px;border-radius:7px;cursor:pointer;font-family:monospace;font-size:0.68rem;letter-spacing:0.06em;text-transform:uppercase;font-weight:700;' + (on ? 'background:#fff4dd;border:2px solid #b8862b;color:#7a5410;' : 'background:#eee;border:1px solid #c9c2b2;color:#666;') + '">' + t[1] + '</button>'; };
+    var lin = function(lbl, valHtml, extra){ return '<div style="display:flex;justify-content:space-between;align-items:center;padding:2px 0;' + (extra || '') + '"><span style="' + EST_LB + 'margin:0;">' + lbl + '</span>' + valHtml + '</div>'; };
+    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:980px;max-height:94vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#2a1c08;">'
+      + '<div style="position:sticky;top:0;z-index:2;background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.76rem;letter-spacing:0.1em;font-family:monospace;display:flex;justify-content:space-between;"><span>🗂 ' + (sa ? 'RECIBO ANTERIOR' : 'NUEVO RECIBO ANTERIOR') + '</span><span id="sa-x" title="Cerrar sin guardar" style="cursor:pointer;">✕</span></div>'
+      + '<div style="padding:4px 16px 14px;">'
+      + (convertido ? '<div style="background:#eaf3de;border:1px solid #9fc58a;color:#27500a;border-radius:6px;padding:7px 10px;font-size:0.76rem;margin-top:10px;">✓ Ya tiene folio en el sistema: <b>' + E(sa.folioConvertido) + 'A</b>. Los siguientes pagos se hacen desde ese folio (Pago parcial / Pago total).</div>' : '')
+      + '<div style="' + EST_SEC + '">Datos del cliente</div>'
+      + '<div id="sa-clientes">' + clientesDe(sa).map(filaCliente).join('') + '</div>'
+      + '<button type="button" id="sa-add-cli" style="' + EST_ADD + '">＋ AGREGAR CLIENTE</button>'
+      + '<div style="' + EST_SEC + '">Tipo de trámite</div>'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;"><div id="sa-tipos" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;">' + TIPOS_T.map(btnTipo).join('') + '</div>'
+      + '<div style="width:130px;"><div style="' + EST_LB + '">Año del trámite</div><input id="sa-anio" value="' + E(sa ? (sa.anio || '') : String(new Date().getFullYear() - 1)) + '" inputmode="numeric" maxlength="4" style="' + EST_IN + '"></div></div>'
+      + '<div style="' + EST_SEC + '">Conceptos y precios (lo que se pactó)</div>'
+      + '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 130px 26px;gap:6px;"><span style="' + EST_LB + '">Concepto</span><span style="' + EST_LB + '">Descripción</span><span style="' + EST_LB + 'text-align:right;">Precio</span><span></span></div>'
+      + '<div id="sa-conceptos">' + conceptosDe(sa).map(filaConcepto).join('') + '</div>'
+      + '<button type="button" id="sa-add-con" style="' + EST_ADD + '">＋ AGREGAR CONCEPTO</button>'
+      + '<div style="' + EST_SEC + '">Pagos que ya dio · recibos de papel (no entran a caja)</div>'
+      + '<div style="display:grid;grid-template-columns:140px minmax(0,1fr) 120px 130px 26px;gap:6px;"><span style="' + EST_LB + '">Fecha</span><span style="' + EST_LB + '">Concepto</span><span style="' + EST_LB + '">Folio de papel</span><span style="' + EST_LB + 'text-align:right;">Monto</span><span></span></div>'
+      + '<div id="sa-pagos">' + pagosDe(sa).map(filaPago).join('') + '</div>'
+      + '<button type="button" id="sa-add" style="' + EST_ADD + '">＋ AGREGAR PAGO ANTERIOR</button>'
+      + ((sa && (sa.pagosSistema || []).length) ? '<div style="' + EST_SEC + '">Pagos ya registrados en el sistema</div>' + sa.pagosSistema.map(function(p){ return '<div style="font-size:0.76rem;padding:3px 0;">' + E(fL(p.fecha)) + ' · ' + E(p.concepto || 'Abono') + ' · <b>' + $m(p.monto) + '</b> <span style="font-size:0.66rem;background:#e6f1fb;color:#185fa5;border-radius:8px;padding:0 6px;">' + E(p.comprobante || 'Caja') + '</span></div>'; }).join('') : '')
+      + '<div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;margin-top:14px;align-items:start;">'
+      +   '<div><div style="' + EST_LB + '">Nota</div><input id="sa-nota" value="' + E(sa ? (sa.nota || '') : '') + '" placeholder="Agrega una nota para uso interno, no se imprime" style="' + EST_IN + '"></div>'
+      +   '<div style="background:#faf3e2;border:1px solid #e1d6bb;border-radius:8px;padding:10px 12px;font-size:0.8rem;">'
+      +     lin('Costo pactado', '<span id="sa-t-costo" style="font-family:monospace;"></span>')
+      +     lin('Pagado en papel', '<span id="sa-t-papel" style="font-family:monospace;color:#a32d2d;"></span>')
+      +     (sis ? lin('Cobrado en el sistema', '<span style="font-family:monospace;color:#a32d2d;">− ' + $m(sis) + '</span>') : '')
+      +     '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #b8862b;margin-top:5px;padding-top:6px;"><span style="' + EST_LB + 'margin:0;color:#2a1c08;font-weight:700;">Total de adeudo 🔒</span>'
+      +     '<input id="sa-total" readonly tabindex="-1" title="Se calcula solo: costo pactado − pagos" style="width:130px;text-align:right;font-family:monospace;font-size:1rem;font-weight:800;color:#a32d2d;background:#efe8d6;border:1px solid #c8b88a;border-radius:6px;padding:5px 8px;cursor:not-allowed;"></div>'
+      +   '</div>'
+      + '</div>'
+      + '<div id="sa-err" style="color:#a32d2d;font-size:0.76rem;min-height:1em;margin-top:8px;"></div>'
       + '<div style="display:flex;justify-content:space-between;gap:8px;margin-top:6px;">'
       + (sa ? '<button type="button" id="sa-del" style="background:#fff;border:1px solid #c04040;color:#a32d2d;border-radius:6px;padding:7px 12px;font-size:0.72rem;cursor:pointer;">🗑 Eliminar</button>' : '<span></span>')
       + '<div style="display:flex;gap:8px;">'
@@ -115,69 +194,125 @@
       + '</div></div></div></div>';
     document.body.appendChild(ov);
     var q = function(s){ return ov.querySelector(s); };
+    var tipoSel = tipo;
+    function fmtDinero(inp){ var v = String(inp.value || '').trim(); if (!v) return; inp.value = $m(r2(v)); }
+    function leerClientes(){
+      var out = [];
+      ov.querySelectorAll('.sa-cli').forEach(function(r){
+        var c = { nombre: r.querySelector('.sa-c-nom').value.trim().toUpperCase(), movil: r.querySelector('.sa-c-mov').value.trim(), telCasa: r.querySelector('.sa-c-tel').value.trim(), domicilio: r.querySelector('.sa-c-dom').value.trim(), firma: !!(r.querySelector('.sa-c-firma') || {}).checked };
+        if (c.nombre || c.movil || c.telCasa || c.domicilio) out.push(c);
+      });
+      return out;
+    }
+    function leerConceptos(){
+      var out = [];
+      ov.querySelectorAll('.sa-con').forEach(function(r){
+        var c = r.querySelector('.sa-k-con').value.trim().toUpperCase(), d = r.querySelector('.sa-k-des').value.trim(), pTxt = r.querySelector('.sa-k-pre').value.trim(), p = r2(pTxt);
+        if (!c && !d && !pTxt) return;
+        out.push({ concepto: c, descripcion: d, precio: p, _sinTexto: !c && !d });
+      });
+      return out;
+    }
     function leerPagos(){
       var out = [];
       ov.querySelectorAll('.sa-pago').forEach(function(row){
-        var f = row.querySelector('.sa-p-fecha').value, c = row.querySelector('.sa-p-conc').value.trim(), m = r2(row.querySelector('.sa-p-monto').value);
-        if (!f && !c && !m) return;
-        out.push({ id: row.getAttribute('data-id') || ('PA-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6)), fecha: f, concepto: c || 'Abono', monto: m });
+        var f = row.querySelector('.sa-p-fecha').value, c = row.querySelector('.sa-p-conc').value.trim(), fo = row.querySelector('.sa-p-folio').value.trim(), m = r2(row.querySelector('.sa-p-monto').value);
+        if (!f && !c && !fo && !m) return;
+        out.push({ id: row.getAttribute('data-id') || ('PA-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6)), fecha: f, concepto: c || 'Abono', folioPapel: fo, monto: m });
       });
       return out;
     }
     function recalcular(){
-      var costo = q('#sa-costo').value.trim(), pag = suma(leerPagos()), sis = sa ? pagadoSistema(sa) : 0, inDebe = q('#sa-debe');
-      if (costo !== '') {
-        var d = Math.max(0, r2(r2(costo) - pag - sis));
-        inDebe.value = d; inDebe.readOnly = true; inDebe.style.background = '#f5f0e4';
-        q('#sa-debe-nota').textContent = 'Se calcula solo: costo pactado − pagos anteriores' + (sis ? ' − pagos en el sistema' : '') + '.';
-      } else { inDebe.readOnly = false; inDebe.style.background = '#fff'; q('#sa-debe-nota').textContent = 'Sin costo pactado: escribe cuánto debe hoy.'; }
-      q('#sa-resumen').innerHTML = (costo !== '' ? 'Costo ' + $m(costo) + ' · ' : '') + 'Pagado antes ' + $m(pag) + (sis ? ' · En el sistema ' + $m(sis) : '') + ' · <b style="color:#a32d2d;">Debe ' + $m(r2(inDebe.value)) + '</b>';
+      var costo = r2(leerConceptos().reduce(function(s, c){ return s + r2(c.precio); }, 0));
+      var pag = suma(leerPagos());
+      q('#sa-t-costo').textContent = $m(costo);
+      q('#sa-t-papel').textContent = '− ' + $m(pag);
+      q('#sa-total').value = $m(Math.max(0, r2(costo - pag - sis)));
     }
     function enlazar(){
-      ov.querySelectorAll('.sa-p-x').forEach(function(b){ b.onclick = function(){ b.parentNode.remove(); recalcular(); }; });
-      ov.querySelectorAll('.sa-pago input').forEach(function(i){ i.oninput = recalcular; });
+      ov.querySelectorAll('.sa-x').forEach(function(b){ b.onclick = function(){ var fila = b.parentNode, cont = fila.parentNode; fila.remove(); if (cont.id === 'sa-conceptos' && !cont.children.length) { var t = document.createElement('div'); t.innerHTML = filaConcepto({}); cont.appendChild(t.firstChild); enlazar(); } recalcular(); }; });
+      ov.querySelectorAll('.sa-cli-x').forEach(function(b){ b.onclick = function(){ b.parentNode.remove(); }; });
+      ov.querySelectorAll('.sa-k-pre, .sa-p-monto').forEach(function(i){ i.oninput = recalcular; i.onblur = function(){ fmtDinero(i); recalcular(); }; i.onfocus = function(){ try { i.select(); } catch(e){} }; });
+      ov.querySelectorAll('.sa-c-mov, .sa-c-tel').forEach(function(i){ i.oninput = function(){ try { if (typeof formatTelefono === 'function') formatTelefono(i); } catch(e){} }; });
+      ov.querySelectorAll('.sa-c-nom, .sa-k-con').forEach(function(i){ i.oninput = function(){ var p = i.selectionStart; i.value = i.value.toUpperCase(); try { i.setSelectionRange(p, p); } catch(e){} }; });
     }
-    q('#sa-add').onclick = function(){ var t = document.createElement('div'); t.innerHTML = filaPago({ fecha: '', concepto: '', monto: '' }); q('#sa-pagos').appendChild(t.firstChild); enlazar(); };
-    q('#sa-costo').oninput = recalcular; q('#sa-debe').oninput = recalcular;
+    function agregar(cont, html){ var t = document.createElement('div'); t.innerHTML = html; q(cont).appendChild(t.firstChild); enlazar(); var f = q(cont).lastElementChild.querySelector('input'); if (f) f.focus(); }
+    q('#sa-add').onclick = function(){ agregar('#sa-pagos', filaPago({})); };
+    q('#sa-add-con').onclick = function(){ agregar('#sa-conceptos', filaConcepto({})); };
+    q('#sa-add-cli').onclick = function(){ agregar('#sa-clientes', filaCliente({}, q('#sa-clientes').children.length || 1)); };
+    ov.querySelectorAll('.sa-tipo').forEach(function(b){ b.onclick = function(){
+      tipoSel = b.getAttribute('data-t');
+      ov.querySelectorAll('.sa-tipo').forEach(function(x){ var on = x === b; x.style.background = on ? '#fff4dd' : '#eee'; x.style.border = on ? '2px solid #b8862b' : '1px solid #c9c2b2'; x.style.color = on ? '#7a5410' : '#666'; });
+    }; });
     enlazar(); recalcular();
     function cerrarOv(){ ov.remove(); }
     q('#sa-x').onclick = cerrarOv; q('#sa-cancel').onclick = cerrarOv;
     function leerYValidar(){
       var err = q('#sa-err'); err.textContent = '';
-      var cliente = q('#sa-cliente').value.trim(), concepto = q('#sa-concepto').value.trim();
-      if (!cliente) { err.textContent = 'Escribe el nombre del cliente.'; return null; }
-      if (!concepto) { err.textContent = 'Escribe el trámite o concepto.'; return null; }
+      var clientes = leerClientes();
+      if (!clientes.length || !clientes[0].nombre) { err.textContent = 'Escribe el nombre del cliente.'; return null; }
+      if (clientes.some(function(c){ return !c.nombre; })) { err.textContent = 'A un cliente le falta el nombre (o quítalo con ✕).'; return null; }
+      if (!clientes.some(function(c){ return c.firma; })) { err.textContent = 'Marca quién va a firmar (casilla "¿Va a firmar?").'; return null; }
+      var conceptos = leerConceptos();
+      if (!conceptos.length) { err.textContent = 'Agrega al menos un concepto con su precio.'; return null; }
+      if (conceptos.some(function(c){ return c._sinTexto; })) { err.textContent = 'Hay un precio sin concepto. Escribe el concepto o quita el renglón.'; return null; }
+      if (conceptos.some(function(c){ return !(c.precio > 0); })) { err.textContent = 'Cada concepto debe tener un precio mayor a $0.'; return null; }
+      conceptos = conceptos.map(function(c){ return { concepto: c.concepto || 'HONORARIOS', descripcion: c.descripcion, precio: c.precio }; });
       var pagos = leerPagos();
       if (pagos.some(function(p){ return !(p.monto > 0); })) { err.textContent = 'Cada pago anterior debe tener monto mayor a $0.'; return null; }
-      var costo = q('#sa-costo').value.trim();
-      var d = r2(q('#sa-debe').value);
-      if (costo === '' && !(d > 0) && !(sa && sa.estado === 'convertido')) { err.textContent = 'Escribe cuánto debe hoy (o el costo pactado).'; return null; }
-      if (costo !== '' && r2(costo) - suma(pagos) < -0.005) { err.textContent = 'Los pagos anteriores suman más que el costo pactado.'; return null; }
-      return { cliente: cliente, tel: q('#sa-tel').value.trim(), concepto: concepto, categoria: q('#sa-cat').value, anio: q('#sa-anio').value.trim(),
-        folioPapel: q('#sa-papel').value.trim(), costo: costo === '' ? null : r2(costo), debeManual: costo === '' ? d + (sa ? pagadoSistema(sa) : 0) : null,
-        pagosAnteriores: pagos, nota: q('#sa-nota').value.trim() };
+      var costo = r2(conceptos.reduce(function(s, c){ return s + c.precio; }, 0));
+      if (r2(costo - suma(pagos) - sis) < -0.005) { err.textContent = 'Los pagos (' + $m(suma(pagos) + sis) + ') suman más que el costo pactado (' + $m(costo) + ').'; return null; }
+      var folios = foliosDe({ pagosAnteriores: pagos, formato: 2 });
+      var c0 = conceptos[0];
+      return {
+        formato: 2, clientes: clientes, cliente: clientes[0].nombre, tel: clientes[0].movil || clientes[0].telCasa || '',
+        tipoTramite: tipoSel, categoria: catDeTipo(tipoSel, sa && sa.categoria), anio: q('#sa-anio').value.trim(),
+        conceptos: conceptos, costo: costo, debeManual: null,
+        concepto: (c0.descripcion || c0.concepto) + (conceptos.length > 1 ? ' (+' + (conceptos.length - 1) + ')' : ''),
+        pagosAnteriores: pagos, folioPapel: folios.join(', '), nota: q('#sa-nota').value.trim()
+      };
     }
-    q('#sa-ok').onclick = function(){
+    // ¿Ya existe un recibo anterior del mismo cliente o con el mismo folio de papel?
+    function posibleDuplicado(v2){
+      var nombres = v2.clientes.map(function(c){ return N(c.nombre); }).filter(Boolean);
+      var folios = foliosDe({ pagosAnteriores: v2.pagosAnteriores, formato: 2 }).map(N);
+      return todos().filter(function(a){
+        if (sa && a.id === sa.id) return false;
+        var nomA = clientesDe(a).map(function(c){ return N(c.nombre); });
+        var folA = foliosDe(a).map(N);
+        return nomA.some(function(n){ return nombres.indexOf(n) >= 0; }) || folA.some(function(f){ return folios.indexOf(f) >= 0; });
+      })[0] || null;
+    }
+    async function guardarForm(despues){
       var v2 = leerYValidar(); if (!v2) return;
-      var ahora = new Date().toISOString();
-      var idGuardado;
-      if (sa) { Object.assign(sa, v2); sa.fechaMod = ahora; if (!sa.clave) sa.clave = nuevaClave(sa.folioPapel); idGuardado = sa.id; }
+      var dup = posibleDuplicado(v2);
+      if (dup) {
+        var fs = foliosDe(dup);
+        ov.style.display = 'none';
+        var otro = await preguntar('¿Es el mismo trámite?', String(dup.cliente).toUpperCase() + ' ya tiene un recibo anterior' + (fs.length ? ' (folios de papel ' + listaY(fs) + ')' : '') + ': ' + (dup.concepto || '') + '.\n\nSi es el mismo trámite, revisa el que ya existe y agrégale ahí los pagos, para no registrarlo dos veces.', 'Es otro trámite, guardar', 'Revisar el que ya existe');
+        if (!otro) { cerrarOv(); window.lexFichaSaldoAnterior(dup.id); return; }
+        ov.style.display = 'flex';
+      }
+      var ahora = new Date().toISOString(), idGuardado;
+      if (sa) { Object.assign(sa, v2); sa.fechaMod = ahora; if (!sa.clave) sa.clave = nuevaClave(foliosDe(sa)[0]); idGuardado = sa.id; }
       else {
         idGuardado = 'SA-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
         lista().unshift(Object.assign({ id: idGuardado, tipo: 'anterior', estado: 'pendiente',
-          clave: nuevaClave(v2.folioPapel), pagosSistema: [], creadoPor: usuario(), fechaCreacion: ahora, fechaMod: ahora }, v2));
+          clave: nuevaClave(foliosDe(v2)[0]), pagosSistema: [], creadoPor: usuario(), fechaCreacion: ahora, fechaMod: ahora }, v2));
       }
       cerrarOv(); guardar(); toastS('✅ Recibo anterior guardado');
-      // Oct-2026: al guardar se abre su Ficha del saldo
-      setTimeout(function(){ try { window.lexFichaSaldoAnterior(idGuardado); } catch(e){} }, 50);
-    };
-    if (q('#sa-cobrar')) q('#sa-cobrar').onclick = function(){ var v2 = leerYValidar(); if (!v2) return; Object.assign(sa, v2); sa.fechaMod = new Date().toISOString(); guardar(); cerrarOv(); window.lexCobrarSaldoAnterior(sa.id); };
+      if (despues) despues(idGuardado);
+      else setTimeout(function(){ try { window.lexFichaSaldoAnterior(idGuardado); } catch(e){} }, 50);
+    }
+    q('#sa-ok').onclick = function(){ guardarForm(); };
+    if (q('#sa-cobrar')) q('#sa-cobrar').onclick = function(){ guardarForm(function(id){ window.lexCobrarSaldoAnterior(id); }); };
     if (q('#sa-del')) q('#sa-del').onclick = async function(){
       var ok = await preguntar('Eliminar saldo', '¿Eliminar el saldo de años anteriores de ' + String(sa.cliente).toUpperCase() + '?' + ((sa.pagosSistema || []).length ? '\n\nLos cobros que ya entraron a Caja NO se borran de Caja.' : ''), 'Sí, eliminar', 'Cancelar');
       if (!ok) return;
       sa.eliminado = true; sa.eliminadoPor = usuario(); sa.fechaMod = new Date().toISOString();
       cerrarOv(); guardar(); toastS('🗑 Saldo eliminado');
     };
+    if (!sa) setTimeout(function(){ var n = q('.sa-c-nom'); if (n) n.focus(); }, 30);
   }
 
   // ════════════════════════════════════════════════════════════════════
@@ -232,56 +367,108 @@
       toastS('▲ Abono registrado en Caja — ' + $m(m) + (debe(sa) > 0.005 ? ' · debe ' + $m(debe(sa)) : ' · saldo liquidado'));
     };
   }
-  // Lleva al formulario de Generar Recibo, ya llenado (mismo método que "Convertir Pre-Recibo")
+  // Lleva al formulario de Generar Recibo, ya llenado con TODO lo capturado:
+  // clientes (nombre, móvil, tel. casa, domicilio), tipo de trámite, cada
+  // concepto con su precio y, al final, el renglón "PAGADO ANTERIORMENTE" en
+  // negativo (recibos de papel + cobros previos en caja). Así el total del
+  // recibo = lo que debe, el anticipo = lo que paga hoy, y a Caja solo entra
+  // el dinero de hoy (los pagos de papel no se vuelven a contar).
+  function maxFolioActual(){
+    var mx = 0; try { (appData.recibos || []).forEach(function(r){ var f = parseInt(r && r.folio, 10); if (f > mx) mx = f; }); } catch(e){}
+    return mx;
+  }
+  function textoPagadoAntes(sa){
+    var fs = foliosDe(sa), n = (sa.pagosAnteriores || []).length, sis = pagadoSistema(sa);
+    var partes = ['Saldo de trámite iniciado en ' + (sa.anio || 'años anteriores')];
+    if (fs.length) partes.push((fs.length > 1 ? 'Recibos de papel N° ' : 'Recibo de papel N° ') + listaY(fs));
+    if (n) partes.push(n + (n === 1 ? ' pago' : ' pagos') + ' por ' + $m(pagadoAntes(sa)));
+    if (sis > 0) partes.push('más ' + $m(sis) + ' cobrados en caja');
+    return partes.join(' · ');
+  }
   function prellenarRecibo(sa, totalDebe, montoHoy){
-    window._lexSAParaRecibo = { id: sa.id, total: totalDebe, monto: montoHoy, ts: Date.now() };
+    var p0 = { id: sa.id, total: totalDebe, monto: montoHoy, ts: Date.now(), folioMax: maxFolioActual() };
+    window._lexSAParaRecibo = p0;
     if (typeof ir === 'function') ir('nuevo-recibo');
     setTimeout(function(){
       try {
-        window._lexSAParaRecibo = { id: sa.id, total: totalDebe, monto: montoHoy, ts: Date.now() };
-        var elN = document.querySelector('#clientes-wrapper .cliente-row [id^="nombre_"]');
-        if (elN) { elN.value = String(sa.cliente).toUpperCase(); elN.dispatchEvent(new Event('input')); }
-        var elM = document.querySelector('#clientes-wrapper .cliente-row [id^="movil_"]');
-        if (elM && sa.tel) { elM.value = sa.tel; elM.dispatchEvent(new Event('input')); }
+        window._lexSAParaRecibo = p0;
+        var setV = function(el, v){ if (!el || v == null || v === '') return; el.value = v; try { el.dispatchEvent(new Event('input')); } catch(e){} };
+        // 1) Clientes
+        clientesDe(sa).forEach(function(c, i){
+          if (i > 0 && typeof agregarCliente === 'function') agregarCliente();
+          var filas = document.querySelectorAll('#clientes-wrapper .cliente-row'), fila = filas[i] || filas[filas.length - 1];
+          if (!fila) return;
+          setV(fila.querySelector('[id^="nombre_"]'), String(c.nombre || '').toUpperCase());
+          setV(fila.querySelector('[id^="movil_"]'), c.movil);
+          setV(fila.querySelector('[id^="tel_"]'), c.telCasa);
+          setV(fila.querySelector('[id^="domicilio_"]'), c.domicilio);
+          var chk = fila.querySelector('[id^="firmante_"]');
+          if (chk) chk.checked = (c.firma != null) ? !!c.firma : i === 0;
+        });
+        try { if (typeof sincronizarFirmantesClientes === 'function') sincronizarFirmantesClientes(); } catch(e){}
+        // 2) Tipo de trámite (mismos botones)
+        try { if (typeof setTipoTramite === 'function') setTipoTramite(tipoDe(sa)); } catch(e){}
+        // Hubo un costo pactado: en escrituras/juicio se marca "Con costo pactado"
+        try { var tt = tipoDe(sa); if ((tt === 'escritura' || tt === 'juicio') && typeof setModoCosto === 'function') setModoCosto('pactado'); } catch(e){}
+        // 3) Conceptos + renglón de lo ya pagado
         var tb = document.getElementById('conceptos-tbody');
         if (tb) {
           tb.innerHTML = '';
           try { if (typeof conceptoCount !== 'undefined') conceptoCount = 0; } catch(e){}
-          if (typeof agregarConcepto === 'function') agregarConcepto();
-          var tr = tb.lastElementChild;
-          if (tr) {
-            var taC = tr.querySelector('textarea.concepto'); if (taC) taC.value = String(sa.concepto).toUpperCase();
-            var taD = tr.querySelector('textarea.descripcion'); if (taD) taD.value = textoAntecedentes(sa, null);
-            var inP = tr.querySelector('input.precio'); if (inP) { inP.value = String(totalDebe); try { if (typeof formatPrecio === 'function') formatPrecio(inP); } catch(e){} }
-          }
+          var poner = function(f, bloqueado){
+            if (typeof agregarConcepto === 'function') agregarConcepto();
+            var tr = tb.lastElementChild; if (!tr) return;
+            var taC = tr.querySelector('textarea.concepto'), taD = tr.querySelector('textarea.descripcion'), inP = tr.querySelector('input.precio');
+            if (taC) taC.value = String(f.concepto || '').toUpperCase();
+            if (taD) taD.value = f.descripcion || '';
+            if (inP) inP.value = (f.precio < 0 ? '-' : '') + (typeof fmtMXN === 'function' ? fmtMXN(Math.abs(f.precio)) : String(Math.abs(f.precio)));
+            if (bloqueado) {
+              tr.setAttribute('data-lex-antecedente', '1');
+              [taC, taD, inP].forEach(function(x){ if (x) { x.readOnly = true; x.style.background = '#f3ece0'; x.style.color = '#a32d2d'; x.title = 'Lo que ya pagó antes (recibos de papel). No se modifica aquí.'; } });
+              var del = tr.querySelector('.del-concept'); if (del) del.style.visibility = 'hidden';
+            }
+            try { tr.querySelectorAll('.concepto-ta').forEach(function(ta){ if (typeof _autoGrowConceptoTA === 'function') _autoGrowConceptoTA(ta); }); } catch(e){}
+          };
+          conceptosDe(sa).forEach(function(c){ poner({ concepto: c.concepto, descripcion: c.descripcion, precio: r2(c.precio) }, false); });
+          var yaPagado = r2(pagadoAntes(sa) + pagadoSistema(sa));
+          var costoTotal = r2(conceptosDe(sa).reduce(function(s, c){ return s + r2(c.precio); }, 0));
+          // Si por algo el costo no cuadra con lo que debe, el renglón negativo lo ajusta
+          var ajuste = r2(costoTotal - totalDebe);
+          if (ajuste > 0.005) poner({ concepto: 'PAGADO ANTERIORMENTE', descripcion: textoPagadoAntes(sa), precio: -ajuste }, true);
+          else if (yaPagado <= 0.005) { var d1 = tb.querySelector('textarea.descripcion'); if (d1 && d1.value.indexOf('Saldo de trámite') < 0) d1.value = (d1.value ? d1.value + ' · ' : '') + textoPagadoAntes(sa); }
           try { if (typeof calcTotales === 'function') calcTotales(); } catch(e){}
         }
+        // 4) Anticipo = lo que paga hoy
         var elA = document.getElementById('anticipo');
-        if (elA) { elA.value = String(montoHoy); try { elA.dispatchEvent(new Event('input')); } catch(e){} try { if (typeof calcTotales === 'function') calcTotales(); } catch(e){} }
+        if (elA) { elA.value = typeof fmtMXN === 'function' ? fmtMXN(montoHoy) : String(montoHoy); try { elA.dispatchEvent(new Event('input')); } catch(e){} try { if (typeof calcTotales === 'function') calcTotales(); } catch(e){} }
         toastS('✓ Recibo pre-llenado con el recibo anterior — revisa y pulsa Imprimir', 'ok');
       } catch(e){ console.warn('[SaldosAnteriores] pre-llenado:', e); }
     }, 700);
   }
 
   // ── Ligar el saldo con el recibo que se acaba de generar ─────────────
-  // Se busca el folio (letra A) del mismo cliente cuyo concepto trae el texto
-  // "Saldo de trámite iniciado en …" y que no esté ligado a otro saldo.
+  // 1) Si se abrió desde "Cobrar": el primer folio A NUEVO del mismo cliente.
+  // 2) Si no: folio A del mismo cliente cuyo concepto trae "Saldo de trámite
+  //    iniciado en …" y alguno de sus folios de papel.
   window.lexVincularSaldosAnteriores = function(){
     var recs = []; try { recs = (typeof appData !== 'undefined' && appData && Array.isArray(appData.recibos)) ? appData.recibos : []; } catch(e){}
     var ligados = {}; todos().forEach(function(a){ if (a.folioConvertido != null) ligados[String(a.folioConvertido)] = 1; });
     var cambio = false;
     todos().filter(function(a){ return a.estado !== 'convertido'; }).forEach(function(sa){
+      var p = window._lexSAParaRecibo && window._lexSAParaRecibo.id === sa.id ? window._lexSAParaRecibo : null;
+      var nomsSA = clientesDe(sa).map(function(c){ return N(c.nombre); });
+      var fs = foliosDe(sa).map(N);
       var cand = recs.filter(function(r){
         if (!r || r.cancelado || r.esComplemento || String(r.letra || 'A').toUpperCase() !== 'A' || ligados[String(r.folio)]) return false;
-        var nombres = [r.nombre].concat((r.clientes || []).map(function(c){ return c && c.nombre; }));
-        if (!nombres.some(function(x){ return N(x) === N(sa.cliente); })) return false;
+        var nombres = [r.nombre].concat((r.clientes || []).map(function(c){ return c && c.nombre; })).map(N);
+        if (!nombres.some(function(x){ return nomsSA.indexOf(x) >= 0; })) return false;
+        if (p && p.folioMax != null && parseInt(r.folio, 10) > p.folioMax) return true;
         var txt = N((r.conceptos || []).map(function(c){ return (c && (c.concepto || '')) + ' ' + (c && (c.descripcion || '')); }).join(' '));
         if (txt.indexOf('SALDO DE TRAMITE INICIADO EN') < 0) return false;
-        if (sa.folioPapel && txt.indexOf(N(sa.folioPapel)) < 0) return false;
+        if (fs.length && !fs.some(function(f){ return txt.indexOf(f) >= 0; })) return false;
         return true;
       }).sort(function(a, b){ return (b.folio || 0) - (a.folio || 0); })[0];
       if (!cand) return;
-      var p = window._lexSAParaRecibo && window._lexSAParaRecibo.id === sa.id ? window._lexSAParaRecibo : null;
       var montoA = parseFloat(String(cand.anticipo || '0').replace(/[^0-9.]/g, '')) || (p ? p.monto : 0);
       sa.estado = 'convertido'; sa.folioConvertido = cand.folio; sa.fechaConversion = new Date().toISOString();
       if (!Array.isArray(sa.pagosSistema)) sa.pagosSistema = [];
@@ -317,7 +504,7 @@
       if (!sa.clave) sa.clave = nuevaClave(sa.folioPapel);
       return { folio: sa.clave, letra: '', esAnterior: true, saId: sa.id, anio: sa.anio || '', folioPapel: sa.folioPapel || '',
         nombre: String(sa.cliente || '').trim(), tel: String(sa.tel || '').trim(),
-        personas: [{ nombre: String(sa.cliente || '').trim(), tel: String(sa.tel || '').trim() }],
+        personas: clientesDe(sa).map(function(c){ return { nombre: String(c.nombre || '').trim(), tel: String(c.movil || c.telCasa || '').trim() }; }),
         concepto: String(sa.concepto || 'su trámite'), saldo: debe(sa), fecha: ultimaFecha(sa), categoria: sa.categoria || 'otros' };
     });
   };
@@ -337,9 +524,9 @@
     if (!sa) { box.innerHTML = ''; box.style.display = 'none'; return; }
     var pa = sa.pagosAnteriores || [];
     box.innerHTML = '<div style="background:#f1efe8;border:1px solid #d3d1c7;border-radius:8px;padding:8px 12px;font-size:0.76rem;color:#444441;">'
-      + '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;"><span><b>📄 ANTECEDENTES (antes del sistema)</b>' + (sa.folioPapel ? ' · Folio de papel <b>N° ' + E(sa.folioPapel) + '</b>' : '') + (sa.anio ? ' · ' + E(sa.anio) : '') + (sa.costo != null && sa.costo !== '' ? ' · Costo pactado ' + $m(sa.costo) : '') + '</span>'
+      + '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;"><span><b>📄 ANTECEDENTES (antes del sistema)</b>' + (foliosDe(sa).length ? ' · Papel <b>N° ' + E(listaY(foliosDe(sa))) + '</b>' : '') + (sa.anio ? ' · ' + E(sa.anio) : '') + (sa.costo != null && sa.costo !== '' ? ' · Costo pactado ' + $m(sa.costo) : '') + '</span>'
       + '<button type="button" onclick="lexAbrirSaldoAnterior(\'' + E(sa.id) + '\')" style="font-size:0.66rem;border:1px solid #b4b2a9;background:#fff;color:#444441;border-radius:5px;padding:2px 8px;cursor:pointer;">Ver / editar</button></div>'
-      + (pa.length ? '<div style="margin-top:4px;font-size:0.72rem;">' + pa.map(function(p){ return E(fL(p.fecha)) + ' ' + E(p.concepto || 'Abono') + ' ' + $m(p.monto); }).join(' · ') + ' → <b>Pagado antes: ' + $m(pagadoAntes(sa)) + '</b></div>' : '')
+      + (pa.length ? '<div style="margin-top:4px;font-size:0.72rem;">' + pagosDe(sa).map(function(p){ return E(fL(p.fecha)) + ' ' + E(p.concepto || 'Abono') + (p.folioPapel ? ' (papel ' + E(p.folioPapel) + ')' : '') + ' ' + $m(p.monto); }).join(' · ') + ' → <b>Pagado antes: ' + $m(pagadoAntes(sa)) + '</b></div>' : '')
       + (sa.nota ? '<div style="margin-top:3px;font-size:0.7rem;font-style:italic;">' + E(sa.nota) + '</div>' : '')
       + '<div style="font-size:0.66rem;color:#7a7a72;margin-top:3px;">Solo informativo: ese dinero se recibió en su momento y no entra a caja.</div></div>';
     box.style.display = 'block';
@@ -353,7 +540,7 @@
   var MESES_L = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
   function fLarga(iso){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || '')); return m ? (+m[3]) + ' de ' + MESES_L[+m[2] - 1] + ' de ' + m[1] : ''; }
   function todosLosPagos(sa){
-    var a = (sa.pagosAnteriores || []).map(function(p){ return { fecha: p.fecha, concepto: p.concepto || 'Abono', comprobante: sa.folioPapel ? 'papel ' + sa.folioPapel : 'papel', monto: r2(p.monto), papel: true }; });
+    var a = pagosDe(sa).map(function(p){ return { fecha: p.fecha, concepto: p.concepto || 'Abono', comprobante: p.folioPapel ? 'papel ' + p.folioPapel : 'papel', monto: r2(p.monto), papel: true }; });
     var b = (sa.pagosSistema || []).map(function(p){ return { fecha: p.fecha, concepto: p.concepto || 'Abono', comprobante: p.comprobante || 'Caja', monto: r2(p.monto), papel: false }; });
     return a.concat(b).sort(function(x, y){ return String(x.fecha || '').localeCompare(String(y.fecha || '')); });
   }
@@ -379,10 +566,14 @@
       + '<div style="display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px;padding:12px 16px;">'
       + '<div style="min-width:0;">'
       + '<div style="background:#fff;border:1px solid #eadfbf;border-radius:8px;padding:9px 12px;">'
-      + '<div style="font-size:0.6rem;color:#9a8a6a;letter-spacing:0.08em;font-family:monospace;">CLIENTE</div>'
-      + '<div style="font-size:0.95rem;font-weight:700;">' + E(String(sa.cliente || '').toUpperCase()) + '</div>'
-      + '<div style="font-size:0.78rem;color:#1a5fa8;font-weight:700;text-transform:uppercase;">' + E(sa.concepto) + '</div>'
-      + '<div style="font-size:0.74rem;color:#7a6840;">' + (sa.tel ? 'Tel. ' + E(sa.tel) : 'Sin teléfono') + (sa.anio ? ' · Trámite iniciado en ' + E(sa.anio) : '') + '</div>'
+      + '<div style="font-size:0.6rem;color:#9a8a6a;letter-spacing:0.08em;font-family:monospace;">' + (clientesDe(sa).length > 1 ? 'CLIENTES' : 'CLIENTE') + ' · ' + E((TIPOS_T.filter(function(t){ return t[0] === tipoDe(sa); })[0] || ['', ''])[1]) + '</div>'
+      + clientesDe(sa).map(function(c){ var tels = [c.movil, c.telCasa].filter(Boolean).join(' / ');
+          return '<div style="margin-top:3px;"><div style="font-size:0.95rem;font-weight:700;">' + E(String(c.nombre || '').toUpperCase()) + '</div>'
+            + '<div style="font-size:0.72rem;color:#7a6840;">' + (tels ? '📞 ' + E(tels) : 'Sin teléfono') + (c.domicilio ? ' · 🏠 ' + E(c.domicilio) : '') + '</div></div>'; }).join('')
+      + '<div style="font-size:0.74rem;color:#7a6840;margin-top:3px;">' + (sa.anio ? 'Trámite iniciado en ' + E(sa.anio) : '') + (foliosDe(sa).length ? ' · 📄 papel N° ' + E(listaY(foliosDe(sa))) : '') + '</div>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:8px;table-layout:fixed;"><colgroup><col style="width:34%"><col><col style="width:110px"></colgroup>'
+      +   conceptosDe(sa).map(function(c){ return '<tr style="border-top:1px solid #eadfbf;"><td style="padding:4px 6px;font-weight:700;color:#1a5fa8;">' + E(String(c.concepto || '').toUpperCase()) + '</td><td style="padding:4px 6px;color:#5a4a30;">' + E(c.descripcion || '') + '</td><td style="padding:4px 6px;text-align:right;font-family:monospace;">' + $m(c.precio) + '</td></tr>'; }).join('')
+      + '</table>'
       + (sa.nota ? '<div style="font-size:0.72rem;color:#8a7a5a;font-style:italic;margin-top:4px;">📝 ' + E(sa.nota) + ' <span style="font-size:0.62rem;">(uso interno)</span></div>' : '')
       + '</div>'
       + '<div style="font-size:0.6rem;color:#7a5410;letter-spacing:0.08em;margin:12px 0 4px;font-family:monospace;">PAGOS DEL TRÁMITE</div>'
@@ -450,13 +641,18 @@
   }
   function bloqueCliente(doc, sa, y){
     var W = doc.internal.pageSize.getWidth(), M = 14;
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(26, 16, 8);
-    doc.text(String(sa.cliente || '').toUpperCase(), M, y);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(26, 95, 168);
-    var lin = doc.splitTextToSize(String(sa.concepto || '').toUpperCase(), W - 2 * M); doc.text(lin, M, y + 5);
-    var y2 = y + 5 + lin.length * 4;
-    doc.setTextColor(90, 74, 48); doc.setFontSize(8.5);
-    doc.text((sa.folioPapel ? 'Folio de papel N° ' + sa.folioPapel : 'Sin folio de papel') + (sa.anio ? ' · Trámite iniciado en ' + sa.anio : '') + (sa.tel ? ' · Tel. ' + sa.tel : ''), M, y2 + 1);
+    var y2 = y;
+    clientesDe(sa).forEach(function(c, i){
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(26, 16, 8);
+      doc.text(String(c.nombre || '').toUpperCase(), M, y2);
+      var det = [[c.movil, c.telCasa].filter(Boolean).join(' / '), c.domicilio].filter(Boolean).join(' · ');
+      if (det) { doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(90, 74, 48); var ld = doc.splitTextToSize(det, W - 2 * M); doc.text(ld, M, y2 + 4.5); y2 += 4.5 + ld.length * 3.8; }
+      else y2 += 3;
+      y2 += 2;
+    });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor(90, 74, 48);
+    var fs = foliosDe(sa);
+    doc.text((fs.length ? (fs.length > 1 ? 'Recibos de papel N° ' : 'Recibo de papel N° ') + listaY(fs) : 'Sin folio de papel') + (sa.anio ? ' · Trámite iniciado en ' + sa.anio : ''), M, y2 + 1);
     return y2 + 7;
   }
   function filaTabla(doc, y, cols, vals, opts){
@@ -474,9 +670,15 @@
     y = bloqueCliente(doc, sa, y + 2);
     var cols = [{ x: 16 }, { x: W - 16, right: true }];
     y = filaTabla(doc, y + 2, cols, ['CONCEPTO', 'IMPORTE'], { bold: true, fondo: [245, 236, 214], color: [122, 84, 16], size: 8 });
-    y = filaTabla(doc, y, cols, ['Costo pactado del trámite', $m(costoDe(sa))]);
-    if ((sa.pagosAnteriores || []).length) y = filaTabla(doc, y, cols, ['Pagos anteriores (' + sa.pagosAnteriores.length + ')' + (sa.folioPapel ? ' — papel ' + sa.folioPapel : ''), '- ' + $m(pagadoAntes(sa))]);
-    if ((sa.pagosSistema || []).length) y = filaTabla(doc, y, cols, ['Abonos registrados en caja (' + sa.pagosSistema.length + ')', '- ' + $m(pagadoSistema(sa))]);
+    // Un renglón por concepto pactado (como en el recibo) y lo ya pagado en papel
+    var renglon = function(txt, imp, color){
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, color || [26, 16, 8]);
+      var ls = doc.splitTextToSize(txt, W - 70); doc.text(ls, 16, y); doc.text(imp, W - 16, y, { align: 'right' });
+      y += ls.length * 3.8 + 2.2;
+    };
+    conceptosDe(sa).forEach(function(c){ renglon(String(c.concepto || '').toUpperCase() + (c.descripcion ? ' — ' + c.descripcion : ''), $m(c.precio)); });
+    if ((sa.pagosAnteriores || []).length) { var fsP = foliosDe(sa); renglon('Pagado anteriormente (' + sa.pagosAnteriores.length + (sa.pagosAnteriores.length === 1 ? ' pago' : ' pagos') + ')' + (fsP.length ? ' — recibo(s) de papel N° ' + listaY(fsP) : ''), '- ' + $m(pagadoAntes(sa)), [163, 45, 45]); }
+    if ((sa.pagosSistema || []).length) y = filaTabla(doc, y, cols, ['Pagos ya registrados en el sistema (' + sa.pagosSistema.length + ')', '- ' + $m(pagadoSistema(sa))]);
     doc.setDrawColor(200, 149, 42); doc.line(14, y - 3, W - 14, y - 3);
     y = filaTabla(doc, y + 1, cols, ['SALDO PENDIENTE', $m(debe(sa))], { bold: true, color: [163, 45, 45], size: 10 });
     doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(122, 106, 74);
@@ -538,7 +740,7 @@
     var q = N((document.getElementById('raQ') || {}).value || '');
     var pend = pendientesRA();
     var base = _verPagadosRA ? todos().filter(function(a){ return pend.indexOf(a) < 0; }) : pend;
-    var lst = base.filter(function(a){ return !q || N([a.cliente, a.folioPapel, a.concepto, a.anio, a.tel, a.folioConvertido].join(' ')).indexOf(q) >= 0; })
+    var lst = base.filter(function(a){ return !q || N([a.cliente, a.folioPapel, foliosDe(a).join(' '), clientesDe(a).map(function(c){ return c.nombre + ' ' + (c.movil || '') + ' ' + (c.telCasa || ''); }).join(' '), a.concepto, a.anio, a.tel, a.folioConvertido].join(' ')).indexOf(q) >= 0; })
       .sort(function(a, b){ return String(ultimaFecha(a)).localeCompare(String(ultimaFecha(b))); });
     var bt = document.getElementById('raBtnPagados'); if (bt) bt.textContent = _verPagadosRA ? '← Pendientes' : '✓ Con folio / pagados';
     var cn = document.getElementById('raCountNum'); if (cn) cn.textContent = pend.length;
@@ -551,7 +753,7 @@
         + '<div style="width:5px;background:' + col + ';flex-shrink:0;"></div>'
         + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 14px;min-width:78px;border-right:1px dashed rgba(0,0,0,0.08);line-height:1.15;">'
         +   '<span style="font-size:0.56rem;font-weight:700;letter-spacing:0.06em;color:#a8987a;">AÑO</span><span style="font-family:monospace;font-weight:900;font-size:1.05rem;color:#5f5e5a;">' + E(a.anio || '—') + '</span>'
-        +   '<span style="margin-top:4px;font-size:0.7rem;font-weight:700;color:#8a4a10;background:#fdf0dc;border-radius:8px;padding:1px 7px;white-space:nowrap;">📄 ' + E(a.folioPapel || 'S/N') + '</span></div>'
+        +   '<span style="margin-top:4px;font-size:0.7rem;font-weight:700;color:#8a4a10;background:#fdf0dc;border-radius:8px;padding:1px 7px;white-space:nowrap;" title="' + E(foliosDe(a).join(', ')) + '">📄 ' + E(foliosDe(a).length > 1 ? foliosDe(a)[0] + ' +' + (foliosDe(a).length - 1) : (foliosDe(a)[0] || 'S/N')) + '</span></div>'
         + '<div style="flex:1;min-width:0;padding:10px 12px;cursor:pointer;" class="ra-abrir" title="Abrir ficha">'
         +   '<div style="font-size:13.5px;font-weight:600;color:' + (conv ? '#1a7a3a' : '#2e7d32') + ';text-transform:uppercase;letter-spacing:0.025em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">👤 ' + E(a.cliente || '') + '</div>'
         +   '<div style="font-size:12.5px;font-weight:600;color:var(--ink,#1a1008);margin-top:2px;">' + E(a.concepto || '') + '</div>'

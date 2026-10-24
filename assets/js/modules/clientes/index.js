@@ -261,6 +261,12 @@ function cargarReciboEnFormulario(recibo){
       +'<td></td>';
     tbody.appendChild(tr);
     tr.querySelectorAll('.concepto-ta').forEach(function(ta){ _autoGrowConceptoTA(ta); });
+    // Oct-2026: renglón en negativo "PAGADO ANTERIORMENTE" (recibos de papel de
+    // Recibos Anteriores): solo lectura, para que no se altere el total.
+    if ((parseFloat(c.precio)||0) < 0) {
+      tr.setAttribute('data-lex-antecedente','1');
+      tr.querySelectorAll('textarea, input').forEach(function(x){ x.readOnly = true; x.style.color = '#a32d2d'; });
+    }
   });
   // Si el recibo no trae conceptos (p.ej. modo restauración con folio vacío),
   // dejar una fila lista para capturar en lugar de la tabla vacía.

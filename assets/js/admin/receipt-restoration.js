@@ -4214,7 +4214,9 @@ const ESC_NOTAS_ACTIVO = [
 // y se clasifique exactamente igual (Pendiente/Urgente/Crítico/Abandonado).
 function _escDiasRetrasoIntermedio(p){
   if(!p || !p.fechaAutoInicio || p.intermedioSuperado) return 0;
-  const limite = new Date(p.fechaAutoInicio).getTime() + ESC_DIAS_INTERMEDIO*86400000;
+  // Oct-2026: cada fase puede tener su propio plazo (p.plazoDias): en Catastro
+  // el trámite puede tardar hasta 60 días y en Registro Público 30.
+  const limite = new Date(p.fechaAutoInicio).getTime() + (parseInt(p.plazoDias,10)||ESC_DIAS_INTERMEDIO)*86400000;
   const dias = (Date.now()-limite)/86400000;
   return dias>0 ? Math.floor(dias) : 0;
 }
@@ -5024,7 +5026,7 @@ function escRenderNotasEtapa(e){
         cont.innerHTML = _escAlertaPeligro({
           titulo: 'ATENCIÓN · ACCIÓN REQUERIDA',
           que: p.notas ? esc(p.notas) : 'Sin razón registrada — ábrelo y escribe una para poder guardar cualquier cambio.',
-          sub: `Paso ${i+1} · ${ESC_PASOS[i]} · ${_faseActiva?'En proceso':'Esperando iniciar'} · plazo de ${ESC_DIAS_INTERMEDIO} días <b style="color:#a32d2d;">vencido</b>`,
+          sub: `Paso ${i+1} · ${ESC_PASOS[i]} · ${_faseActiva?'En proceso':'Esperando iniciar'} · plazo de ${parseInt(p.plazoDias,10)||ESC_DIAS_INTERMEDIO} días <b style="color:#a32d2d;">vencido</b>`,
           dias: _diasIntermedio,
           boton: `<button type="button" onclick="escAccionRapidaPaso(${i}, '${_faseActiva?'completado':'activo'}')" style="background:#c81e1e;border:none;color:#fff;font-family:sans-serif;font-size:0.76rem;font-weight:800;letter-spacing:0.05em;padding:9px 16px;border-radius:7px;cursor:pointer;white-space:nowrap;" onmouseover="this.style.background='#a01616'" onmouseout="this.style.background='#c81e1e'">ATENDER AHORA ›</button>`
         });

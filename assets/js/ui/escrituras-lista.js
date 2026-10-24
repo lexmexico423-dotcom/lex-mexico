@@ -46,7 +46,13 @@
     var dias = e.pasoActivoFecha ? Math.floor((Date.now() - new Date(e.pasoActivoFecha).getTime()) / 86400000) : null;
     if (dias !== null && (isNaN(dias) || dias < 0)) dias = null;
     var umbral = e.pasoActivoRequerimientos ? g('ESC_DIAS_REQUIERE_ATENCION_REQUERIMIENTOS', 8) : (e.pasoActivoEnEspera ? g('ESC_DIAS_REQUIERE_ATENCION_ESPERA', 15) : g('ESC_DIAS_REQUIERE_ATENCION', 30));
-    var atencion = e.estado === 'proceso' && activo >= 0 && dias !== null && dias >= umbral;
+    var enCurso = e.estado === 'proceso' || !e.estado;   // sin estatus = recién creada, también cuenta
+    var atencion = enCurso && activo >= 0 && dias !== null && dias >= umbral;
+    // Oct-2026: también se marca vencida cuando el PLAZO INTERMEDIO del paso
+    // (10 días, p.ej. presentar a Catastro tras la firma) ya pasó.
+    var vencidoInter = 0;
+    try { if (enCurso && pAct && typeof _escDiasRetrasoIntermedio === 'function') vencidoInter = _escDiasRetrasoIntermedio(pAct) || 0; } catch(_){}
+    if (vencidoInter > 0) atencion = true;
     var acto = '';
     try { var t = (g('ESC_TIPOS_TRAMITE_CATASTRO', {})[e.tipoMovimiento] || []).find(function(x){ return x[0] === e.tipoTramiteCatastro; }); if (t) acto = String(t[1]); } catch(_){}
     if (!acto) { try { acto = g('ESC_TIPOS_MOVIMIENTO', {})[e.tipoMovimiento] || ''; } catch(_){} }
@@ -72,7 +78,7 @@
       else sigue = (pAct && pAct.estado === 'activo' ? 'Dar seguimiento a ' : 'Iniciar ') + (({'FIRMA NOTARIAL':'la firma notarial','CATASTRO':'Catastro','TRASLADO MPL':'Traslado MPL','ISR':'ISR','IFREO':'IFREO'})[PASOS[activo]] || PASOS[activo].toLowerCase());
     } else if (e.estado === 'listo') sigue = 'Avisar al cliente y entregar la escritura';
     var fechaFirma = e.fechaFirma ? (function(){ try { return new Date(e.fechaFirma + 'T12:00:00').toLocaleDateString('es-MX', { day:'numeric', month:'short', year:'numeric' }); } catch(_){ return e.fechaFirma; } })() : (e.fechaFirmaTexto || '');
-    return { pasos: pasos, PASOS: PASOS, activo: activo, dias: dias, umbral: umbral, atencion: atencion, acto: acto,
+    return { pasos: pasos, PASOS: PASOS, activo: activo, dias: dias, umbral: umbral, atencion: atencion, vencidoInter: vencidoInter, acto: acto,
       compradores: compradores, vendedores: vendedores, estaEn: estaEn, estaSub: estaSub, sigue: sigue, fechaFirma: fechaFirma };
   }
   // Oct-2026: cada paso con su propio color (etiqueta), para distinguir el
@@ -245,7 +251,7 @@
     var col = colorEstaEn(e, d), auto = esAutomatico(e, d);
     var oscuro = { '#5f5e5a':'#444441', '#b06a10':'#7a4206', '#534ab7':'#3c3489', '#185fa5':'#0c447c', '#0f6e56':'#085041', '#1a7a3a':'#27500a' }[col] || '#444441';
     var txt = '';
-    if (d.atencion) txt = '<span style="color:#a32d2d;font-weight:700;">⚠ ' + E(d.sigue || ('Lleva ' + d.dias + ' días en este paso')) + '</span>';
+    if (d.atencion) txt = '<span style="color:#a32d2d;font-weight:700;"><span class="lex-esc-parpadeo">⚠</span> ' + E(d.sigue || ('Lleva ' + d.dias + ' días en este paso')) + '</span>';
     else if (!auto && d.sigue) txt = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + col + ';margin-right:7px;vertical-align:1px;"></span><span style="color:' + oscuro + ';font-weight:600;">' + E(d.sigue) + '</span>';
     return '<div title="' + E(d.sigue || '') + '" style="width:300px;flex-shrink:0;align-self:center;padding:8px 14px;font-size:12.5px;line-height:1.4;border-left:1px dashed ' + (txt ? '#e3d3a8' : 'transparent') + ';">'
       + (txt ? '<div style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">' + txt + '</div>' : '') + '</div>';
@@ -256,7 +262,7 @@
     else txt = String(d.estaEn).replace(/^[^A-Za-zÁÉÍÓÚÑ0-9]+/, '').toUpperCase();
     var dias = (d.dias !== null && d.activo >= 0 && (e.estado === 'proceso' || !e.estado || e.estado === 'espera')) ? ' · ' + d.dias + 'd' : '';
     var borde = d.atencion ? '#c81e1e' : col;
-    return '<span title="' + E(d.estaEn + (d.estaSub ? ' (' + d.estaSub + ')' : '') + (dias ? ' — ' + d.dias + ' días en este paso' : '')) + '" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;font-family:monospace;letter-spacing:0.03em;padding:6px 10px;width:195px;justify-content:center;box-sizing:border-box;border-radius:' + (pegado ? '0 7px 7px 0' : '7px') + ';border:1.5px solid ' + borde + ';background:' + col + ';color:#fff;white-space:nowrap;">' + (d.atencion ? '⚠ ' : '') + E(txt) + E(dias) + '</span>';
+    return '<span title="' + E(d.estaEn + (d.estaSub ? ' (' + d.estaSub + ')' : '') + (dias ? ' — ' + d.dias + ' días en este paso' : '')) + '" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;font-family:monospace;letter-spacing:0.03em;padding:6px 10px;width:195px;justify-content:center;box-sizing:border-box;border-radius:' + (pegado ? '0 7px 7px 0' : '7px') + ';border:1.5px solid ' + borde + ';background:' + col + ';color:#fff;white-space:nowrap;"' + (d.atencion ? ' class="lex-esc-vencida"' : '') + '>' + (d.atencion ? '<span class="lex-esc-parpadeo">⚠</span> ' : '') + E(txt) + E(dias) + '</span>';
   }
   function pintarLista(){
     var cont = document.getElementById('esc-lista'); if (!cont) return;
@@ -295,7 +301,7 @@
         + '<div style="width:5px;background:' + franja + ';flex-shrink:0;border-radius:8px 0 0 8px;"></div>'
         + '<div style="flex:1;min-width:0;padding:10px 6px 10px 12px;">'
         +   '<div style="display:flex;align-items:center;gap:10px;margin-bottom:3px;">'
-        +     '<div title="N° de trámite en curso (de la más antigua a la más reciente)" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;min-width:30px;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Trámite</span><span style="color:' + (n ? '#1a1008' : '#c8bb98') + ';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">' + (n || '—') + '</span></div>'
+        +     '<div title="N° de trámite en curso (de la más antigua a la más reciente)" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;min-width:30px;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Trámite</span><span style="color:' + (n ? '#1a1008' : '#c8bb98') + ';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">' + (n || '—') + '</span>' + (d.atencion ? '<span class="lex-esc-parpadeo" title="Plazo vencido" style="margin-top:3px;background:#c81e1e;color:#fff;font-size:7.5px;font-weight:800;letter-spacing:0.05em;border-radius:3px;padding:1px 4px;">VENCIDO</span>' : '') + '</div>'
         // Oct-2026: en UN solo renglón → 👤 CLIENTE (negro) · ACTO (verde) · — compra a Vendedor (azul)
         +     '<div style="min-width:0;line-height:1.35;">'
         +       '<span style="font-size:13.5px;font-weight:700;color:' + (apagada ? '#6a6a62' : '#1a1008') + ';font-family:\'Outfit\',sans-serif;letter-spacing:0.02em;text-transform:uppercase;">👤 ' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:11px;color:#9a8a6a;">+' + (d.compradores.length - 1) + '</span>' : '') + '</span>'
@@ -319,7 +325,10 @@
         + '</div>'
         + '</div>';
     }).join('');
-    cont.innerHTML = resumen + cards + '<style>.lex-esc-card:hover{border-color:#c8951a !important;box-shadow:0 2px 10px rgba(200,149,42,0.18);}</style>';
+    cont.innerHTML = resumen + cards + '<style>.lex-esc-card:hover{border-color:#c8951a !important;box-shadow:0 2px 10px rgba(200,149,42,0.18);}'
+      + '@keyframes lexEscParp{0%,100%{opacity:1}50%{opacity:.25}}@keyframes lexEscPulso{0%,100%{box-shadow:0 0 0 0 rgba(200,30,30,0.55)}50%{box-shadow:0 0 0 6px rgba(200,30,30,0)}}'
+      + '.lex-esc-parpadeo{animation:lexEscParp 1.1s ease-in-out infinite;display:inline-block}.lex-esc-vencida{animation:lexEscPulso 1.6s ease-out infinite}'
+      + '@media (prefers-reduced-motion:reduce){.lex-esc-parpadeo,.lex-esc-vencida{animation:none}}</style>';
     cont.querySelectorAll('.lex-esc-card').forEach(function(f){
       f.onclick = function(){ var i = parseInt(f.getAttribute('data-idx'), 10); if (typeof escAbrirDetalle === 'function' && i >= 0) escAbrirDetalle(i); };
       var acc = f.querySelector('.lex-esc-acc'); if (acc) acc.addEventListener('click', function(ev){ if (ev.target.closest && (ev.target.closest('button') || ev.target.closest('span[onclick]'))) ev.stopPropagation(); });

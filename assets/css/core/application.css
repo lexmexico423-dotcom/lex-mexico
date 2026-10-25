@@ -1282,7 +1282,8 @@ textarea.cb-input.cb-textarea{
 #mEscritura .field textarea{min-height:80px;}
 /* ── HOJA TAMAÑO CARTA (mockup aprobado): mismos colores, fondo de respaldo gris ── */
 #mEscritura.modal-ov{background:#e9e4d8;}
-#mEscritura .modal{background:#fdfaf4;border:1px solid #d4b870;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,0.15);max-width:816px;}
+/* Oct-2026: ventana de Escritura más ancha (antes 816px) para que quepa la línea del proceso con su mensaje */
+#mEscritura .modal{background:#fdfaf4;border:1px solid #d4b870;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,0.15);max-width:1120px;width:94vw;}
 #mEscritura .modal-hdr{background:#fdfaf4;border-bottom:1px solid #d4b870;border-radius:4px 4px 0 0;}
 #mEscritura .modal-ftr{background:#fdfaf4;border-top:1px solid #d4b870;border-radius:0 0 4px 4px;}
 #mEscritura .modal-body{background:#fdfaf4;padding:32px 40px;box-sizing:border-box;}

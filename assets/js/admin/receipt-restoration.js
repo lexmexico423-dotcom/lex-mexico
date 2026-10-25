@@ -5225,7 +5225,7 @@ function escActualizarTimelineDetalle(pasos){
   if(hint){
     hint.textContent = pasoActivo===-1
       ? '✅ Escritura completada en todos los pasos'
-      : 'Paso activo: '+ESC_PASOS[pasoActivo]+' — toca el círculo resaltado para registrar el estatus';
+      : 'Paso activo: '+ESC_PASOS[pasoActivo]+' — toca cualquier círculo para corregirlo, o ▶ AVANZAR para seguir';
     hint.style.color = pasoActivo===-1?'#1a7a3a':'var(--muted)';
     // Más grande y visible cuando ya se completaron los 5 pasos — el hint
     // normal ("Paso activo: ...") se queda en su tamaño chico de siempre.
@@ -5271,13 +5271,19 @@ async function escConfirmarEntrega(){
   });
   if(quienRecibio===null) return;
   elegirResponsable(function(nombreResponsable){
-    e.entregaRecibioPor = quienRecibio.trim();
-    e.entregaConfirmadaPor = nombreResponsable;
-    e.entregaConfirmadaFecha = new Date().toISOString();
-    e.estado = 'archivado';
-    e.fechaMod = new Date().toISOString();
+    // Oct-2026 FIX ("hay que darle varias veces"): mientras se contestaban los
+    // diálogos, la sincronización en vivo pudo reemplazar el objeto de la
+    // escritura en D.escrituras — se vuelve a buscar por id para no modificar
+    // una copia vieja que ya no está en la lista (el cambio se perdía).
+    const eAct = (e && e.id && D.escrituras.find(function(x){ return x && x.id === e.id; })) || e;
+    const iAct = D.escrituras.indexOf(eAct); if (iAct >= 0) _escIdx = iAct;
+    eAct.entregaRecibioPor = quienRecibio.trim();
+    eAct.entregaConfirmadaPor = nombreResponsable;
+    eAct.entregaConfirmadaFecha = new Date().toISOString();
+    eAct.estado = 'archivado';
+    eAct.fechaMod = new Date().toISOString();
     escSyncYRefrescar();
-    escMostrarDetalle(e);
+    escMostrarDetalle(eAct);
     if(typeof escRender==='function') escRender();
     toast('📦 Entrega confirmada por '+nombreResponsable+' — escritura archivada');
   });
@@ -6338,9 +6344,13 @@ function escActualizarTimeline(pasos){
 // Con "Editar" activo se puede abrir cualquiera de los 5 pasos (completados
 // o futuros), no solo el paso activo — para corregir errores o adelantar
 // registros. Se apaga sola al cerrar la escritura (ver escCancelar/cerrar).
-let _escModoEditarPasos = false;
+// Oct-2026 (a petición expresa): la línea del proceso SIEMPRE está en modo
+// edición — cualquier círculo se puede abrir para corregirlo, sin tener que
+// presionar "Editar" primero (el botón se oculta). Para avanzar con preguntas
+// está el botón "▶ AVANZAR".
+let _escModoEditarPasos = true;
 function escToggleModoEditarPasos(){
-  _escModoEditarPasos = !_escModoEditarPasos;
+  _escModoEditarPasos = true;
   ['esc-btn-editar-pasos','esc-btn-editar-pasos-d'].forEach(id=>{
     const btn = document.getElementById(id);
     if(!btn) return;

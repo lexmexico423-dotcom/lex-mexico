@@ -198,7 +198,12 @@
 
   // ── Ventana del asistente ─────────────────────────────────────────────
   window.lexEscSiguienteEtapa = function(idx){
+    try {
+      var abierta = document.getElementById('mEscritura');
+      if (abierta && abierta.classList.contains('show') && window._lexEscIdAbierta) { resyncIdx(); if (typeof _escIdx !== 'undefined' && _escIdx >= 0) idx = _escIdx; }
+    } catch(_){}
     var e = D.escrituras && D.escrituras[idx]; if (!e) return;
+    var _idE = e.id;
     normalizar(e);
     var i = activoDe(e);
     if (i === -1) {
@@ -214,7 +219,7 @@
     var ov = document.createElement('div'); ov.id = 'lex-esc-asis';
     ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
     document.body.appendChild(ov);
-    var COL = ['#5f5e5a', '#b06a10', '#534ab7', '#185fa5', '#0f6e56'];
+    var COL = ['#5f5e5a', '#b06a10', '#534ab7', '#185fa5', '#0e7490'];
     function visibles(){ return cfg.preguntas.filter(function(q){ return !q.si || resp[q.si] === 'si'; }); }
     function faltan(){ return visibles().filter(function(q){ return !q.neutral && resp[q.k] === 'no'; }); }
     function completo(){
@@ -270,6 +275,8 @@
     }
     function guardar(avanzar){
       var nota = (ov.querySelector('#asis-nota') || {}).value || '';
+      // Por si la sincronización reemplazó el objeto mientras se contestaba
+      try { var eNow = (D.escrituras || []).filter(function(x){ return x && x.id === _idE; })[0]; if (eNow && eNow !== e) { e = eNow; cfg = config(i, fase, e); idx = D.escrituras.indexOf(e); } } catch(_){}
       (cfg.datos || []).forEach(function(d){ var v = String(datos[d.k] || '').trim(); if (v) e[d.campo] = v; });
       if (avanzar) {
         resolverTareas(e, i, fase);
@@ -333,8 +340,8 @@
         var cont = document.getElementById('esc-notas-etapa');
         var idx = (D.escrituras || []).indexOf(e);
         if (cont && idx >= 0 && (e.estado === 'proceso' || !e.estado)) cont.insertAdjacentHTML('afterbegin', botonHtml(e, idx));
-        botonLinea();
       } catch(err){ console.warn('[Asistente escrituras]', err); }
+      try { botonLinea(); } catch(_){}   // siempre: lo quita si ya no está en proceso
       return r;
     };
     env._lexAsis = true;
@@ -344,6 +351,8 @@
   // botones que antes abrían el modal del paso (círculo resaltado, "Atender
   // ahora", "Ya inicié / Ya completé") ahora abren el asistente.
   function botonLinea(){
+    // El botón "Editar / Cerrar edición" ya no hace falta: la línea siempre se puede editar
+    ['esc-btn-editar-pasos', 'esc-btn-editar-pasos-d'].forEach(function(id){ var x = document.getElementById(id); if (x) x.style.display = 'none'; });
     var ed = document.getElementById('esc-btn-editar-pasos-d'); if (!ed) return;
     var idx = (typeof _escIdx !== 'undefined') ? _escIdx : -1;
     var e = idx >= 0 && D.escrituras ? D.escrituras[idx] : null;
@@ -379,6 +388,42 @@
       };
       envCP._lexAsis = true; window.escClickPaso = envCP;
     }
+  })();
+
+  // ── Oct-2026 FIX: la ficha abierta se sigue por su ID, no por su posición ──
+  // La sincronización en vivo reordena/reemplaza D.escrituras; _escIdx (la
+  // posición) quedaba apuntando a otra escritura o a una copia vieja y los
+  // cambios se perdían ("hay que darle varias veces"). Antes de cada acción de
+  // la ficha se vuelve a ubicar la escritura abierta por su id.
+  function resyncIdx(){
+    try {
+      var id = window._lexEscIdAbierta; if (!id || typeof _escIdx === 'undefined') return;
+      var lista = D.escrituras || [];
+      for (var k = 0; k < lista.length; k++) if (lista[k] && String(lista[k].id) === id) { if (_escIdx !== k) _escIdx = k; return; }
+    } catch(_){}
+  }
+  window._lexEscResync = resyncIdx;
+  (function engancharFichaPorId(){
+    var oa = window.escAbrirDetalle;
+    if (typeof oa === 'function' && !oa._lexId) {
+      var ea = function(idx){ var e = D.escrituras && D.escrituras[idx]; window._lexEscIdAbierta = e && e.id ? String(e.id) : null; return oa.apply(this, arguments); };
+      ea._lexId = true; window.escAbrirDetalle = ea;
+    }
+    // La ficha que se pinta es la que manda: fija el id y la posición
+    var om = window.escMostrarDetalle;
+    if (typeof om === 'function' && !om._lexId) {
+      var em = function(e){ try { if (e && e.id) { window._lexEscIdAbierta = String(e.id); var k = (D.escrituras || []).indexOf(e); if (k >= 0 && typeof _escIdx !== 'undefined') _escIdx = k; else resyncIdx(); } } catch(_){} return om.apply(this, arguments); };
+      em._lexId = true; window.escMostrarDetalle = em;
+    }
+    ['escActualizarTimelineDetalle','escActualizarTimeline','escConfirmarEntrega','escGuardarPaso','escAbrirPaso','escClickPaso','escAccionAtencion','escSuperarTramo','escAgregarNotaFinal','escGuardar','escEliminar','escCancelar','escModoEditar','escToggleMenuAtencion'].forEach(function(n){
+      var o = window[n];
+      if (typeof o !== 'function' || o._lexId) return;
+      var w2 = function(){ resyncIdx(); return o.apply(this, arguments); };
+      for (var k in o) { try { w2[k] = o[k]; } catch(_){} }
+      w2._lexId = true; window[n] = w2;
+    });
+    var on = window.escAbrirNueva;
+    if (typeof on === 'function' && !on._lexId) { var en = function(){ window._lexEscIdAbierta = null; return on.apply(this, arguments); }; en._lexId = true; window.escAbrirNueva = en; }
   })();
 
   (function engancharLista(){

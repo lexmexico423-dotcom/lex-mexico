@@ -84,7 +84,8 @@
   // Oct-2026: cada paso con su propio color (etiqueta), para distinguir el
   // avance de un vistazo: Firma gris · Catastro ámbar · Traslado morado ·
   // ISR azul · IFREO verde agua · Listo verde.
-  var COLOR_PASO = ['#5f5e5a', '#b06a10', '#534ab7', '#185fa5', '#0f6e56'];
+  // IFREO en azul petróleo (antes verde agua: se confundía con el verde de los pasos ya hechos)
+  var COLOR_PASO = ['#5f5e5a', '#b06a10', '#534ab7', '#185fa5', '#0e7490'];
   function colorEstaEn(e, d){
     if (e.estado === 'listo' || d.activo === -1) return '#1a7a3a';
     if (e.estado === 'archivado') return '#7a6840';
@@ -300,7 +301,12 @@
     var listo = e.estado === 'listo' || e.estado === 'archivado' || d.activo === -1, colAct = colorEstaEn(e, d);
     return '<div title="Avance: paso ' + (listo ? 5 : d.activo + 1) + ' de 5" style="display:flex;gap:2px;width:195px;">' + d.PASOS.map(function(n, i){
       var p = d.pasos[i] || {}, hecho = listo || p.estado === 'completado', aqui = !listo && i === d.activo;
-      return '<span title="' + (i + 1) + ' · ' + E(NOMBRE_PASO[n] || n) + '" style="flex:1;height:5px;border-radius:3px;background:' + (hecho ? '#1a7a3a' : aqui ? colAct : '#e5dcc4') + ';"></span>';
+      // Paso actual: rayado en su color si ya está en trámite; solo el contorno
+      // si todavía está en el intermedio (esperando iniciar). Hechos: verde.
+      var est = hecho ? 'background:#1a7a3a;'
+        : aqui ? (p.estado === 'activo' ? 'background:repeating-linear-gradient(-45deg,' + colAct + ' 0 4px,' + colAct + '88 4px 8px);' : 'background:#fff;box-shadow:inset 0 0 0 1.5px ' + colAct + ';')
+        : 'background:#e5dcc4;';
+      return '<span title="' + (i + 1) + ' · ' + E(NOMBRE_PASO[n] || n) + (hecho ? ' ✓ hecho' : aqui ? (p.estado === 'activo' ? ' — en trámite' : ' — esperando iniciar') : ' — pendiente') + '" style="flex:1;height:7px;border-radius:3px;' + est + '"></span>';
     }).join('') + '</div>';
   }
   // "Qué sigue" en una COLUMNA FIJA (todas las tarjetas alinean igual), sin
@@ -309,7 +315,7 @@
   // el botón del paso dice lo mismo.
   function avisoColumna(e, d){
     var col = colorEstaEn(e, d), auto = esAutomatico(e, d);
-    var oscuro = { '#5f5e5a':'#444441', '#b06a10':'#7a4206', '#534ab7':'#3c3489', '#185fa5':'#0c447c', '#0f6e56':'#085041', '#1a7a3a':'#27500a' }[col] || '#444441';
+    var oscuro = { '#5f5e5a':'#444441', '#b06a10':'#7a4206', '#534ab7':'#3c3489', '#185fa5':'#0c447c', '#0e7490':'#155e75', '#1a7a3a':'#27500a' }[col] || '#444441';
     var txt = '';
     if (d.atencion) txt = '<span style="color:#a32d2d;font-weight:700;"><span class="lex-esc-parpadeo">⚠</span> ' + E(d.sigue || ('Lleva ' + d.dias + ' días en este paso')) + '</span>';
     else if (!auto && d.sigue) txt = '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + col + ';margin-right:7px;vertical-align:1px;"></span><span style="color:' + oscuro + ';font-weight:600;">' + E(d.sigue) + '</span>';
@@ -317,12 +323,14 @@
       + (txt ? '<div style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;">' + txt + '</div>' : '') + '</div>';
   }
   function botonEstado(e, d, pegado){
+    // Intermedio (esperando iniciar el paso): botón solo con contorno, igual que su barrita
+    var esperando = d.activo >= 0 && /^\d/.test(d.estaEn) && ((d.pasos[d.activo] || {}).estado !== 'activo') && !d.atencion;
     var col = colorEstaEn(e, d), txt;
     if (/^\d/.test(d.estaEn)) txt = (d.activo + 1) + ' · ' + String(d.PASOS[d.activo]).toUpperCase();
     else txt = String(d.estaEn).replace(/^[^A-Za-zÁÉÍÓÚÑ0-9]+/, '').toUpperCase();
     var dias = (d.dias !== null && d.activo >= 0 && (e.estado === 'proceso' || !e.estado || e.estado === 'espera')) ? ' · ' + d.dias + 'd' : '';
     var borde = d.atencion ? '#c81e1e' : col;
-    return '<span title="' + E(d.estaEn + (d.estaSub ? ' (' + d.estaSub + ')' : '') + (dias ? ' — ' + d.dias + ' días en este paso' : '')) + '" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;font-family:monospace;letter-spacing:0.03em;padding:6px 10px;width:195px;justify-content:center;box-sizing:border-box;border-radius:' + (pegado ? '0 7px 7px 0' : '7px') + ';border:1.5px solid ' + borde + ';background:' + col + ';color:#fff;white-space:nowrap;"' + (d.atencion ? ' class="lex-esc-vencida"' : '') + '>' + (d.atencion ? '<span class="lex-esc-parpadeo">⚠</span> ' : '') + E(txt) + E(dias) + '</span>';
+    return '<span title="' + E(d.estaEn + (d.estaSub ? ' (' + d.estaSub + ')' : '') + (dias ? ' — ' + d.dias + ' días en este paso' : '')) + '" style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;font-family:monospace;letter-spacing:0.03em;padding:6px 10px;width:195px;justify-content:center;box-sizing:border-box;border-radius:' + (pegado ? '0 7px 7px 0' : '7px') + ';border:1.5px solid ' + borde + ';' + (esperando ? 'background:#fff;color:' + col + ';' : 'background:' + col + ';color:#fff;') + 'white-space:nowrap;"' + (d.atencion ? ' class="lex-esc-vencida"' : '') + '>' + (d.atencion ? '<span class="lex-esc-parpadeo">⚠</span> ' : '') + E(txt) + E(dias) + '</span>';
   }
   function pintarLista(){
     var cont = document.getElementById('esc-lista'); if (!cont) return;

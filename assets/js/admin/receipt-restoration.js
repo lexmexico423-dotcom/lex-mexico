@@ -13547,7 +13547,7 @@ async function _tareasPurgarResueltosViejos(){
   _lexLapidaTareas(Array.from(idsBorrar));
   D.tareasHoy = lista.filter(function(t){ return !(t && idsBorrar.has(t.id)); });
   aBorrar.forEach(function(t){ _tareasSeleccion.delete(t.id); });
-  console.warn('[Tareas hoy] 🗑 Purgadas '+aBorrar.length+' resuelta(s) con más de '+LIMITE_DIAS+' días — adjuntos borrados de Drive');
+  console.info('[Tareas hoy] 🗑 Purgadas '+aBorrar.length+' resuelta(s) con más de '+LIMITE_DIAS+' días — adjuntos borrados de Drive');
   if(typeof save === 'function') save();
   return true;
 }

@@ -2214,6 +2214,16 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     console.warn('[SB] syncEstadoSupabase:', e);
     _syncEnCurso = false;
     syncEnd(false, e.message || 'Error al sincronizar');
+    // Oct-2026: si falló por red o tardanza (no por permisos), reintentar solo
+    // en 15 s para que lo capturado no se quede únicamente en esta computadora.
+    try {
+      const _msgE = String((e && e.message) || e || '');
+      if (/tiempo de espera|Failed to fetch|NetworkError|network|Load failed|fetch/i.test(_msgE)) {
+        window._lexUltimoSyncFallido = true;
+        clearTimeout(window._lexReintentoSyncT);
+        window._lexReintentoSyncT = setTimeout(function(){ if (typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); }, 15000);
+      }
+    } catch(_eR){}
   }
 }
 

@@ -521,14 +521,16 @@
       info = { seg: seg, pct: pct, enCirculo: enCirculo, col: col, bg: bg,
         txt: (resta != null && resta < 0 ? '⚠ ' : '') + '<b>Lleva ' + pl(dias) + '</b> ' + mensajeFase(e, a, fase) + '.' + cola };
     }
-    function globo(){
+    // Globo: se ubica sobre TODA la línea (no se sale de la ventana en los extremos)
+    function burbuja(){
       if (!info) return '';
-      var sh = info.enCirculo ? (info.seg === 0 ? 0 : info.seg === 4 ? 100 : 50) : Math.round(info.pct * 100);
-      return '<div style="position:absolute;left:' + (info.enCirculo ? 50 : sh) + '%;bottom:8px;transform:translateX(-' + sh + '%);display:flex;flex-direction:column;align-items:' + (sh < 30 ? 'flex-start' : sh > 70 ? 'flex-end' : 'center') + ';z-index:3;pointer-events:none;">'
-        + '<div style="background:' + info.bg + ';border:1.5px solid ' + info.col + ';border-radius:8px;padding:6px 11px;width:270px;max-width:62vw;font-size:12.5px;line-height:1.38;color:#3a2a12;box-shadow:0 2px 8px rgba(0,0,0,0.08);">' + info.txt + '</div>'
-        + '<div style="margin:0 6px;">' + svgPersona(info.col) + '</div></div>';
+      var o = info.enCirculo ? info.seg / 4 : (info.seg + info.pct) / 4;
+      return '<div style="position:absolute;top:4px;left:calc(40px + (100% - 80px) * ' + o.toFixed(3) + ');transform:translateX(-' + Math.round(o * 100) + '%);z-index:3;pointer-events:none;">'
+        + '<div style="background:' + info.bg + ';border:1.5px solid ' + info.col + ';border-radius:9px;padding:7px 13px;width:340px;max-width:70vw;font-size:13px;line-height:1.4;color:#3a2a12;box-shadow:0 2px 8px rgba(0,0,0,0.08);">' + info.txt + '</div></div>';
     }
-    var html = '<div style="position:relative;display:flex;align-items:flex-start;padding:' + (info ? '96px' : '6px') + ' 6px 0;">';
+    // Personita: en su punto exacto de la línea
+    function persona(leftPct){ return '<div style="position:absolute;left:' + leftPct + '%;bottom:4px;transform:translateX(-50%);pointer-events:none;z-index:2;">' + svgPersona(info.col) + '</div>'; }
+    var html = '<div style="position:relative;display:flex;align-items:flex-start;padding:' + (info ? '104px' : '6px') + ' 6px 0;">' + burbuja();
     for (var k = 0; k < 5; k++) {
       var st = ps[k].estado, hecho = st === 'completado' || e.estado === 'listo' || e.estado === 'archivado', aqui = k === a && enCurso;
       var futuro = !hecho && k > a && a >= 0;
@@ -537,14 +539,14 @@
         : aqui ? 'background:#fff;color:' + (info ? info.col : COLP[k]) + ';border:3px solid ' + (info ? info.col : COLP[k]) + ';box-shadow:0 0 0 4px ' + (info ? info.bg : '#fff8e8') + ';'
         : 'background:#f1ede4;color:#b4a88a;border:2px solid #ddd3bd;';
       html += '<div style="width:68px;flex-shrink:0;text-align:center;position:relative;">'
-        + (info && info.enCirculo && info.seg === k ? '<div style="position:absolute;left:0;right:0;top:-4px;height:0;">' + globo() + '</div>' : '')
+        + (info && info.enCirculo && info.seg === k ? '<div style="position:absolute;left:0;right:0;top:-4px;height:0;">' + persona(50) + '</div>' : '')
         + '<div role="button" tabindex="0" onclick="lexEscTocarCirculo(' + k + ')" title="' + (futuro ? 'Avanzar hasta ' + NOMBRE[k] : 'Corregir ' + NOMBRE[k]) + '" style="width:34px;height:34px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;cursor:pointer;' + circ + '">' + (hecho ? '✓' : (k + 1)) + '</div>'
         + '<div style="font-family:monospace;font-size:10px;margin-top:5px;line-height:1.3;color:' + (hecho ? '#1a7a3a' : aqui ? (info ? info.col : '#7a4206') : '#a89c80') + ';font-weight:' + (aqui ? '800' : '600') + ';">' + CORTO[k] + (fechaH ? '<br><span style="font-weight:400;">' + E(fechaH) + '</span>' : '') + '</div></div>';
       if (k < 4) {
         var tramoHecho = (ps[k].estado === 'completado' && (ps[k + 1].estado === 'completado' || (k + 1 === a && fase === 'oficina'))) || e.estado === 'listo' || e.estado === 'archivado';
         var esSeg = info && !info.enCirculo && info.seg === k;
         html += '<div style="flex:1;position:relative;height:4px;margin-top:15px;background:' + (tramoHecho ? '#1a7a3a' : '#e5dcc4') + ';border-radius:2px;">'
-          + (esSeg ? '<div style="position:absolute;left:0;top:0;height:4px;width:' + Math.round(info.pct * 100) + '%;background:' + info.col + ';border-radius:2px;"></div>' + '<div style="position:absolute;left:0;right:0;top:-2px;height:0;">' + globo() + '</div>' : '')
+          + (esSeg ? '<div style="position:absolute;left:0;top:0;height:4px;width:' + Math.round(info.pct * 100) + '%;background:' + info.col + ';border-radius:2px;"></div>' + '<div style="position:absolute;left:0;right:0;top:-2px;height:0;">' + persona(Math.round(info.pct * 100)) + '</div>' : '')
           + '</div>';
       }
     }

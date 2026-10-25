@@ -364,9 +364,10 @@
       try {
         var cont = document.getElementById('esc-notas-etapa');
         var idx = (D.escrituras || []).indexOf(e);
-        if (cont && idx >= 0 && (e.estado === 'proceso' || !e.estado)) cont.insertAdjacentHTML('afterbegin', botonHtml(e, idx));
+        // (Oct-2026: la barra dorada se quitó; el único botón "▶ Avanzar" va debajo de la línea del proceso)
       } catch(err){ console.warn('[Asistente escrituras]', err); }
-      try { botonLinea(); } catch(_){}   // siempre: lo quita si ya no está en proceso
+      try { var bl = document.getElementById('esc-btn-avanzar-d'); if (bl) bl.remove(); ['esc-btn-editar-pasos', 'esc-btn-editar-pasos-d'].forEach(function(id){ var x = document.getElementById(id); if (x) x.style.display = 'none'; }); } catch(_){}
+      try { pintarProgreso(); } catch(_){}
       return r;
     };
     env._lexAsis = true;
@@ -459,5 +460,165 @@
     env._lexAsisN = true;
     window.escRender = env;
   })();
+  // ══════════════════════════════════════════════════════════════════════
+  // LÍNEA DEL PROCESO (oct-2026, opción A): personita que camina según los
+  // días del plazo + globo con mensaje claro ("Lleva 6 días sin cumplir…") y
+  // UN solo botón "▶ Avanzar: …". Reemplaza la línea vieja de la ficha (se
+  // oculta) y la barra dorada. Tocar un círculo:
+  //   · ya hecho o el actual → corregirlo a mano (ventana de siempre)
+  //   · uno ADELANTE → "Avanzar hasta aquí", preguntando si ya se superaron
+  //     las etapas de en medio.
+  // ══════════════════════════════════════════════════════════════════════
+  var CORTO = ['FIRMA', 'CATASTRO', 'TRASLADO', 'ISR', 'REGISTRO'];
+  var COLP = ['#5f5e5a', '#b06a10', '#534ab7', '#185fa5', '#0e7490'];
+  function diasDesde(iso){ var t = new Date(iso || '').getTime(); return isNaN(t) ? 0 : Math.max(0, Math.floor((Date.now() - t) / 86400000)); }
+  function pl(n){ return n + (n === 1 ? ' día' : ' días'); }
+  function mensajeFase(e, i, fase){
+    var muni = String(e.ubicacion || '').trim();
+    if (i === 0) return 'esperando la firma ante notario';
+    if (fase === 'intermedio') return ({ 1: 'sin cumplir los requisitos para ingresar el trámite a <b>Catastro</b>',
+      2: 'sin que el cliente pague su <b>traslado de dominio</b>' + (muni ? ' en ' + E(muni) : ''),
+      3: 'sin entregar el expediente al <b>notario para el ISR</b>',
+      4: 'sin ingresar la escritura al <b>Registro Público</b>' })[i];
+    return ({ 1: 'en <b>Catastro</b> esperando la cédula y el avalúo', 2: 'esperando el pago del <b>traslado de dominio</b>',
+      3: 'esperando que el <b>notario genere el ISR</b>', 4: 'en el <b>Registro Público</b> esperando la inscripción' })[i];
+  }
+  function svgPersona(col){ return '<svg width="22" height="30" viewBox="0 0 22 30" aria-hidden="true" style="display:block;"><circle cx="12" cy="7" r="3.2" fill="' + col + '"/><path d="M11 11 L9 18 L5 21 M10 15 L15 17 M9 18 L12 23 L11 28 M9 18 L6 28" stroke="' + col + '" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>'; }
+
+  function pintarProgreso(){
+    var track = document.getElementById('esc-progreso-track-d'); if (!track) return;
+    var viejo = track.parentNode; if (!viejo) return;
+    var idx = (typeof _escIdx !== 'undefined') ? _escIdx : -1;
+    var e = idx >= 0 && D.escrituras ? D.escrituras[idx] : null;
+    var hint = document.getElementById('esc-detalle-hint');
+    var box = document.getElementById('lex-esc-prog');
+    if (!e) { if (box) box.remove(); viejo.style.display = ''; if (hint) hint.style.display = ''; return; }
+    normalizar(e);
+    viejo.style.display = 'none';
+    if (!box) { box = document.createElement('div'); box.id = 'lex-esc-prog'; viejo.parentNode.insertBefore(box, viejo.nextSibling); }
+    var ps = pasosDe(e), a = activoDe(e), enCurso = (e.estado === 'proceso' || !e.estado);
+    if (hint) hint.style.display = (a === -1) ? '' : 'none';   // "Escritura completada…" sí se deja
+    // Dónde está la personita
+    var fase = a < 0 ? null : (a === 0 ? 'firma' : (ps[a].estado === 'activo' ? 'oficina' : 'intermedio'));
+    var info = null;
+    if (a >= 0 && enCurso) {
+      var p = ps[a], dias, plazo = null, pct = 0.5, seg, enCirculo = false;
+      if (fase === 'firma') { dias = diasDesde(p.fechaAutoInicio || e.fechaCreacion || e.pasoActivoFecha); enCirculo = true; seg = 0; }
+      else {
+        dias = diasDesde(p.fechaAutoInicio || e.pasoActivoFecha);
+        plazo = parseInt(p.plazoDias, 10) || (fase === 'oficina' ? DIAS_OFICINA[a] : DIAS_INTER);
+        pct = Math.min(1, dias / plazo);
+        if (fase === 'intermedio') seg = a - 1;            // tramo que LLEGA al paso
+        else if (a < 4) seg = a;                           // tramo que SALE del paso (en la oficina)
+        else { seg = 4; enCirculo = true; }
+      }
+      var resta = plazo != null ? plazo - dias : null;
+      var col = resta == null ? '#5f5e5a' : resta < 0 ? '#c81e1e' : resta <= Math.ceil(plazo / 3) ? '#b06a10' : '#1a7a3a';
+      var bg = resta == null ? '#f6f3ec' : resta < 0 ? '#fcebeb' : resta <= Math.ceil(plazo / 3) ? '#fff8e8' : '#eaf3de';
+      var cola = resta == null ? '' : resta < 0 ? ' <b style="color:#c81e1e;">El plazo de ' + pl(plazo) + ' venció hace ' + pl(-resta) + '.</b>'
+        : resta === 0 ? ' <b style="color:#b06a10;">¡Hoy vence el plazo!</b>'
+        : ' <b style="color:' + col + ';">' + (resta <= Math.ceil(plazo / 3) ? '¡Faltan ' + pl(resta) + '!' : 'Faltan ' + pl(resta) + '.') + '</b>';
+      info = { seg: seg, pct: pct, enCirculo: enCirculo, col: col, bg: bg,
+        txt: (resta != null && resta < 0 ? '⚠ ' : '') + '<b>Lleva ' + pl(dias) + '</b> ' + mensajeFase(e, a, fase) + '.' + cola };
+    }
+    function globo(){
+      if (!info) return '';
+      var sh = info.enCirculo ? (info.seg === 0 ? 0 : info.seg === 4 ? 100 : 50) : Math.round(info.pct * 100);
+      return '<div style="position:absolute;left:' + (info.enCirculo ? 50 : sh) + '%;bottom:8px;transform:translateX(-' + sh + '%);display:flex;flex-direction:column;align-items:' + (sh < 30 ? 'flex-start' : sh > 70 ? 'flex-end' : 'center') + ';z-index:3;pointer-events:none;">'
+        + '<div style="background:' + info.bg + ';border:1.5px solid ' + info.col + ';border-radius:8px;padding:6px 11px;width:270px;max-width:62vw;font-size:12.5px;line-height:1.38;color:#3a2a12;box-shadow:0 2px 8px rgba(0,0,0,0.08);">' + info.txt + '</div>'
+        + '<div style="margin:0 6px;">' + svgPersona(info.col) + '</div></div>';
+    }
+    var html = '<div style="position:relative;display:flex;align-items:flex-start;padding:' + (info ? '96px' : '6px') + ' 6px 0;">';
+    for (var k = 0; k < 5; k++) {
+      var st = ps[k].estado, hecho = st === 'completado' || e.estado === 'listo' || e.estado === 'archivado', aqui = k === a && enCurso;
+      var futuro = !hecho && k > a && a >= 0;
+      var fechaH = hecho && ps[k].fecha ? String(ps[k].fecha).split(',')[0].split(' ')[0] : '';
+      var circ = hecho ? 'background:#1a7a3a;color:#fff;border:2px solid #1a7a3a;'
+        : aqui ? 'background:#fff;color:' + (info ? info.col : COLP[k]) + ';border:3px solid ' + (info ? info.col : COLP[k]) + ';box-shadow:0 0 0 4px ' + (info ? info.bg : '#fff8e8') + ';'
+        : 'background:#f1ede4;color:#b4a88a;border:2px solid #ddd3bd;';
+      html += '<div style="width:68px;flex-shrink:0;text-align:center;position:relative;">'
+        + (info && info.enCirculo && info.seg === k ? '<div style="position:absolute;left:0;right:0;top:-4px;height:0;">' + globo() + '</div>' : '')
+        + '<div role="button" tabindex="0" onclick="lexEscTocarCirculo(' + k + ')" title="' + (futuro ? 'Avanzar hasta ' + NOMBRE[k] : 'Corregir ' + NOMBRE[k]) + '" style="width:34px;height:34px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;cursor:pointer;' + circ + '">' + (hecho ? '✓' : (k + 1)) + '</div>'
+        + '<div style="font-family:monospace;font-size:10px;margin-top:5px;line-height:1.3;color:' + (hecho ? '#1a7a3a' : aqui ? (info ? info.col : '#7a4206') : '#a89c80') + ';font-weight:' + (aqui ? '800' : '600') + ';">' + CORTO[k] + (fechaH ? '<br><span style="font-weight:400;">' + E(fechaH) + '</span>' : '') + '</div></div>';
+      if (k < 4) {
+        var tramoHecho = (ps[k].estado === 'completado' && (ps[k + 1].estado === 'completado' || (k + 1 === a && fase === 'oficina'))) || e.estado === 'listo' || e.estado === 'archivado';
+        var esSeg = info && !info.enCirculo && info.seg === k;
+        html += '<div style="flex:1;position:relative;height:4px;margin-top:15px;background:' + (tramoHecho ? '#1a7a3a' : '#e5dcc4') + ';border-radius:2px;">'
+          + (esSeg ? '<div style="position:absolute;left:0;top:0;height:4px;width:' + Math.round(info.pct * 100) + '%;background:' + info.col + ';border-radius:2px;"></div>' + '<div style="position:absolute;left:0;right:0;top:-2px;height:0;">' + globo() + '</div>' : '')
+          + '</div>';
+      }
+    }
+    html += '</div>';
+    if (a >= 0 && enCurso) {
+      var ETQ = { 'firma-0':'Registrar la firma ante notario', 'intermedio-1':'Reunir requisitos e ingresar a Catastro', 'oficina-1':'¿Ya salió la cédula y el avalúo?',
+        'intermedio-2':'¿Ya pagó el cliente su traslado de dominio?', 'oficina-2':'¿Ya pagó el cliente su traslado de dominio?', 'intermedio-3':'Entregar el expediente al notario para el ISR',
+        'oficina-3':'¿Ya generó el notario el ISR?', 'intermedio-4':'Ingresar la escritura al Registro Público', 'oficina-4':'¿Ya salió la inscripción del Registro?' };
+      html += '<div style="text-align:center;margin-top:14px;"><button type="button" onclick="lexEscSiguienteEtapa(' + idx + ')" style="background:#1a7a3a;color:#fff;border:none;border-radius:9px;padding:11px 22px;font-weight:800;font-size:0.85rem;cursor:pointer;box-shadow:0 3px 10px rgba(26,122,58,0.3);">▶ Avanzar: ' + E(ETQ[fase + '-' + a] || 'siguiente etapa') + '</button></div>'
+        + '<div style="text-align:center;font-size:0.68rem;color:#8a7f6a;margin-top:6px;">Verde = hecho · La personita = dónde va · Gris = falta · Toca un círculo para corregirlo o para adelantar</div>';
+    }
+    box.innerHTML = html;
+  }
+  window.lexEscPintarProgreso = pintarProgreso;
+
+  // Tocar un círculo: corregir (hecho/actual) o adelantar (futuro)
+  window.lexEscTocarCirculo = function(k){
+    resyncIdx();
+    var idx = (typeof _escIdx !== 'undefined') ? _escIdx : -1, e = idx >= 0 ? D.escrituras[idx] : null; if (!e) return;
+    var a = activoDe(e);
+    if (a >= 0 && k > a && (e.estado === 'proceso' || !e.estado)) return saltarHasta(idx, k);
+    if (typeof escAbrirPaso === 'function') escAbrirPaso(k);
+  };
+  function tareasAlEntrar(e, j){
+    var muni = String(e.ubicacion || '').trim();
+    if (j === 2) { tareaLlamada(e, 'traslado', 'para que vaya a pagar su TRASLADO DE DOMINIO' + (muni ? ' en ' + muni : ' en su municipio') + ' y traiga el comprobante. Tiene ' + DIAS_INTER + ' días.'); recordatorio(e, 'traslado-mitad', 'Seguimiento: ¿ya pagó el traslado de dominio?', Math.floor(DIAS_INTER / 2)); }
+    if (j === 3) tareaInterna(e, 'isr-enviar', 'Llevar el expediente al notario para que genere el ISR', hoyISO(0));
+    if (j === 4) tareaInterna(e, 'registro', 'Ingresar la escritura al Registro Público (IFREO)', hoyISO(0));
+  }
+  function saltarHasta(idx, j){
+    var e = D.escrituras[idx], a = activoDe(e), ps = pasosDe(e);
+    var viejo = document.getElementById('lex-esc-salto'); if (viejo) viejo.remove();
+    var ov = document.createElement('div'); ov.id = 'lex-esc-salto';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
+    var etapas = []; for (var k = a; k < j; k++) etapas.push(k);
+    var html = '<div role="dialog" aria-modal="true" style="background:#fdfaf3;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:520px;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#1a1008;overflow:hidden;">'
+      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-family:monospace;font-size:12px;letter-spacing:0.1em;display:flex;justify-content:space-between;"><span>⏩ AVANZAR HASTA ' + E(NOMBRE[j]).toUpperCase() + '</span><span id="salto-x" style="cursor:pointer;">✕</span></div>'
+      + '<div style="padding:14px 16px;">'
+      + '<div style="font-size:13px;margin-bottom:10px;">Para avanzar hasta <b>' + E(NOMBRE[j]) + '</b>, confirme que ya se superaron estas etapas:</div>'
+      + etapas.map(function(k){ return '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #eadfbf;border-radius:8px;background:#fff;margin-bottom:6px;cursor:pointer;font-size:13px;"><input type="checkbox" class="salto-chk" data-k="' + k + '" style="width:18px;height:18px;"><span><b>' + (k + 1) + ' · ' + E(NOMBRE[k]) + '</b> ya se superó' + (k === 0 ? ' (firma ante notario)' : k === 1 ? ' (cédula y avalúo listos)' : k === 2 ? ' (el cliente ya pagó y entregó comprobante)' : k === 3 ? ' (ISR generado y pagado)' : '') + '</span></label>'; }).join('')
+      + '<div style="font-family:monospace;font-size:10px;color:#8a7f6a;letter-spacing:0.08em;margin:12px 0 6px;">¿CÓMO ESTÁ ' + E(NOMBRE[j]).toUpperCase() + '?</div>'
+      + [['esperando','Por iniciar (empieza su plazo de ' + DIAS_INTER + ' días)'],['activo','Ya está en trámite' + (j === 1 ? ' en Catastro (plazo 60 días)' : j === 4 ? ' en el Registro (plazo 30 días)' : '')],['hecho','Ya también está terminada']].map(function(o, n){ return '<label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 2px;cursor:pointer;"><input type="radio" name="salto-est" value="' + o[0] + '"' + (n === 0 ? ' checked' : '') + '> ' + o[1] + '</label>'; }).join('')
+      + '<div id="salto-err" style="color:#a32d2d;font-size:12px;min-height:16px;margin-top:6px;"></div>'
+      + '<div style="display:flex;gap:8px;margin-top:6px;"><button type="button" id="salto-no" style="flex:1;border:1px solid #c8951a;background:#fff;color:#9a6e18;border-radius:7px;padding:10px;font-weight:700;font-size:12px;cursor:pointer;">Cancelar</button>'
+      + '<button type="button" id="salto-si" style="flex:1.4;border:none;background:#1a7a3a;color:#fff;border-radius:7px;padding:10px;font-weight:800;font-size:12px;cursor:pointer;">⏩ Avanzar hasta ' + E(CORTO[j]) + '</button></div>'
+      + '<div style="font-size:11px;color:#8a7f6a;margin-top:8px;text-align:center;">Para corregir a mano esta etapa sin avanzar, use <a href="#" id="salto-manual" style="color:#9a6e18;">corregir a mano</a>.</div>'
+      + '</div></div>';
+    ov.innerHTML = html; document.body.appendChild(ov);
+    var q = function(s){ return ov.querySelector(s); };
+    q('#salto-x').onclick = q('#salto-no').onclick = function(){ ov.remove(); };
+    q('#salto-manual').onclick = function(ev){ ev.preventDefault(); ov.remove(); if (typeof escAbrirPaso === 'function') escAbrirPaso(j); };
+    q('#salto-si').onclick = function(){
+      var faltan = [].slice.call(ov.querySelectorAll('.salto-chk')).filter(function(c){ return !c.checked; });
+      if (faltan.length) { q('#salto-err').textContent = 'Marque todas las etapas: solo se puede avanzar si ya se superaron.'; return; }
+      var est = (ov.querySelector('input[name="salto-est"]:checked') || {}).value || 'esperando';
+      var eNow = (D.escrituras || []).filter(function(x){ return x && x.id === e.id; })[0] || e;
+      etapas.forEach(function(k){ resolverTareas(eNow, k, k === a ? (a === 0 ? 'firma' : (pasosDe(eNow)[k].estado === 'activo' ? 'oficina' : 'intermedio')) : 'intermedio'); completar(eNow, k); });
+      if (est === 'esperando') { abrirIntermedio(eNow, j); tareasAlEntrar(eNow, j); }
+      else if (est === 'activo') iniciarOficina(eNow, j);
+      else { completar(eNow, j); if (j < 4) { abrirIntermedio(eNow, j + 1); tareasAlEntrar(eNow, j + 1); } else { eNow.estado = 'listo'; tareaLlamada(eNow, 'entrega', 'para avisarle que su ESCRITURA YA ESTÁ LISTA y pase a recogerla.'); } }
+      historial(eNow, 'Avance directo hasta ' + NOMBRE[j] + ' (se confirmaron ' + etapas.map(function(k){ return NOMBRE[k]; }).join(', ') + ')');
+      eNow.fechaMod = new Date().toISOString(); eNow.pasoActivoFecha = new Date().toISOString();
+      eNow.pasoActivoRequerimientos = false; eNow.pasoActivoEnEspera = false;
+      ov.remove();
+      refrescar(eNow, D.escrituras.indexOf(eNow));
+      toastS('⏩ Avanzó hasta ' + NOMBRE[j]);
+    };
+  }
+  (function engancharProgreso(){
+    var o = window.escActualizarTimelineDetalle;
+    if (typeof o !== 'function' || o._lexProg) return;
+    var w3 = function(){ var r = o.apply(this, arguments); try { pintarProgreso(); } catch(err){ console.warn('[Progreso escrituras]', err); } return r; };
+    w3._lexProg = true; window.escActualizarTimelineDetalle = w3;
+  })();
+
   window._lexEscAsisConfig = config;
 })();

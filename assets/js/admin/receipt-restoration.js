@@ -4728,9 +4728,10 @@ function escMostrarDetalle(e){
     </div>
     <div style="border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-bottom:14px;">
       <div style="display:flex;align-items:center;gap:6px;font-size:0.85rem;font-weight:700;color:#8c6518;margin-bottom:14px;">🏛 Datos Notariales</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:14px;">
+      <div style="display:grid;grid-template-columns:1.2fr 0.8fr 0.8fr 1.2fr 1fr;gap:16px;margin-bottom:14px;">
         ${fila('Notaría No.', esc(e.notaria||'—'))}
-        ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
+        ${fila('Instrumento', esc(e.instrumento || _escSplitVolInstr(e.volInstr).instrumento || '—'))}
+        ${fila('Volumen', esc(e.volumen || _escSplitVolInstr(e.volInstr).volumen || '—'))}
         ${fila('Fecha de Firma', fechaFmt)}
         ${fila('Cuenta Catastral', esc(e.cuentaCatastral||'—'))}
       </div>
@@ -4842,7 +4843,8 @@ function escImprimirFicha(){
     <div class="ip-sec-tit-c">🏛 Datos Notariales</div>
     <div class="ip-grid4">
       ${fila('Notaría No.', esc(e.notaria||'—'))}
-      ${fila('Instrumento / Volumen', [e.instrumento,e.volumen].filter(Boolean).map(esc).join(' / ')||(e.volInstr?esc(e.volInstr):'—'))}
+      ${fila('Instrumento', esc(e.instrumento || _escSplitVolInstr(e.volInstr).instrumento || '—'))}
+        ${fila('Volumen', esc(e.volumen || _escSplitVolInstr(e.volInstr).volumen || '—'))}
       ${fila('Fecha de Firma', fechaFmt)}
       ${fila('Cuenta Catastral', esc(e.cuentaCatastral||'—'))}
     </div>

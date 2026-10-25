@@ -360,8 +360,11 @@
       var desc = String(e.descripcion || '').trim();
       var obs = String((Array.isArray(e.bitacora) && e.bitacora[0] && e.bitacora[0].texto) || '').trim();
       var chips = [];
-      if (e.instrumento) chips.push('<span style="' + CH + 'background:#faeeda;color:#633806;font-weight:700;">Instr. ' + E(e.instrumento) + '</span>');
-      if (e.volumen) chips.push('<span style="' + CH + 'background:#f1efe8;color:#444441;">Vol. ' + E(e.volumen) + '</span>');
+      // Instrumento y volumen por separado; si solo existe "Vol./Instr." junto (Excel), se separa
+      var _vi = (typeof _escSplitVolInstr === 'function') ? _escSplitVolInstr(e.volInstr) : { instrumento:'', volumen:'' };
+      var _ins = e.instrumento || _vi.instrumento, _vol = e.volumen || _vi.volumen;
+      if (_ins) chips.push('<span style="' + CH + 'background:#faeeda;color:#633806;font-weight:700;">Instr. ' + E(_ins) + '</span>');
+      if (_vol) chips.push('<span style="' + CH + 'background:#f1efe8;color:#444441;">Vol. ' + E(_vol) + '</span>');
       if (d.fechaFirma) chips.push('<span style="' + CH + 'background:rgba(26,122,58,0.08);color:#27500a;">✍ Firma ' + E(d.fechaFirma) + '</span>');
       if (String(e.num || '').trim()) { var cn = String(e.num).trim(); chips.push('<span style="' + CH + 'background:rgba(200,149,42,0.12);color:#8c6518;font-weight:700;">🗂 CARP.- ' + E(cn.replace(/^carp\.?-?\s*/i, '')) + '</span>'); }
       if (e.notaria) chips.push('<span style="' + CH + 'background:rgba(0,0,0,0.05);color:#6a5a3a;font-weight:400;">🔏 ' + E(String(e.notaria).length > 34 ? String(e.notaria).slice(0, 34) + '…' : e.notaria) + '</span>');

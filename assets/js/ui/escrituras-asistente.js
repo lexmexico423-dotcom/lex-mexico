@@ -40,6 +40,18 @@
   function fechaTxt(){ return new Date().toLocaleString('es-MX', { timeZone:'America/Mexico_City', day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
   function fLarga(ms){ try { return new Date(ms).toLocaleDateString('es-MX', { day:'numeric', month:'long' }); } catch(e){ return ''; } }
   function nom(p){ return typeof p === 'string' ? p : ((p && p.nombre) || ''); }
+  var MES_N = { ene:1, feb:2, mar:3, abr:4, may:5, jun:6, jul:7, ago:8, sep:9, set:9, oct:10, nov:11, dic:12 };
+  // Fecha de firma en formato AAAA-MM-DD (para el campo de fecha); '' si solo hay año o nada
+  function fechaISO(e){
+    var f = String(e.fechaFirma || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(f)) return f.slice(0, 10);
+    var t = String(e.fechaFirmaTexto || f || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    var m = /(\d{1,2})\s*(?:de\s*)?([a-z]{3})[a-z]*\.?\s*(?:de\s*|del\s*)?(\d{4})/.exec(t);
+    if (m && MES_N[m[2]]) return m[3] + '-' + String(MES_N[m[2]]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+    m = /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(t);
+    if (m) return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+    return '';
+  }
 
   // Plazo de cada fase para escrituras capturadas antes (sin plazoDias)
   function normalizar(e){
@@ -215,6 +227,19 @@
     var cfg = config(i, fase, e); if (!cfg) return;
     var resp = {}, datos = {};
     (cfg.datos || []).forEach(function(d){ datos[d.k] = e[d.campo] || ''; });
+    // Oct-2026: tomar lo que YA tiene la escritura aunque esté capturado de
+    // otra forma — "Vol./Instr." junto (ej. 245/16262, importado de Excel) o
+    // la fecha de firma escrita como texto.
+    if (cfg.datos && cfg.datos.length) {
+      try {
+        var vi = (typeof _escSplitVolInstr === 'function') ? _escSplitVolInstr(e.volInstr) : { volumen:'', instrumento:'' };
+        if (!datos.instrumento) datos.instrumento = vi.instrumento || '';
+        if (!datos.volumen) datos.volumen = vi.volumen || '';
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(String(datos.fechaFirma || ''))) datos.fechaFirma = fechaISO(e);
+      } catch(_){}
+      // Si ya están los tres datos, la firma ya ocurrió: se marca "Sí" de entrada
+      if (datos.instrumento && datos.volumen && datos.fechaFirma) resp.firmo = 'si';
+    }
     var viejo = document.getElementById('lex-esc-asis'); if (viejo) viejo.remove();
     var ov = document.createElement('div'); ov.id = 'lex-esc-asis';
     ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';

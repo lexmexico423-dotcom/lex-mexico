@@ -72,6 +72,39 @@
   function esperaNotaria(e){ var p = pasosDe(e)[4]; return activoDe(e) === 4 && p.estado !== 'activo' && p.estado !== 'completado' && !p.escrituraRecibida; }
   function activoDe(e){ var ps = pasosDe(e), c = 0; for (var i = 0; i < 5; i++) { if (ps[i].estado === 'completado') c++; else break; } return c < 5 ? c : -1; }
 
+  // ── LÍNEA DE 6 BOLITAS (oct-2026) ─────────────────────────────────────
+  // 1 Firma · 2 Catastro · 3 Traslado · 4 ISR · 5 ESCRITURA NOTARÍA · 6 Registro.
+  // Los datos siguen siendo los 5 pasos de siempre (e.pasos[0..4]); la bolita
+  // 5 se guarda en e.pasos[4].escrituraRecibida (la notaría ya la entregó).
+  var V_NOMBRE = ['Firma notarial', 'Catastro', 'Traslado de dominio municipal', 'ISR con el notario', 'Escritura de la notaría', 'Registro Público (IFREO)'];
+  var V_CORTO = ['FIRMA', 'CATASTRO', 'TRASLADO', 'ISR', 'NOTARÍA', 'REGISTRO'];
+  var V_COL = ['#5f5e5a', '#b06a10', '#534ab7', '#185fa5', '#993556', '#0e7490'];
+  function notariaHecha(e){ var p = pasosDe(e)[4]; return !!p.escrituraRecibida || p.estado === 'activo' || p.estado === 'completado' || e.estado === 'listo' || e.estado === 'archivado'; }
+  function vActivo(e){ var a = activoDe(e); if (a < 4) return a; return notariaHecha(e) ? 5 : 4; }
+  function vEstado(e, k){
+    var ps = pasosDe(e);
+    if (k < 4) return ps[k].estado;
+    if (k === 4) return notariaHecha(e) ? 'completado' : 'pendiente';
+    return ps[4].estado === 'completado' ? 'completado' : ps[4].estado === 'activo' ? 'activo' : 'pendiente';
+  }
+  function vFase(e){ var va = vActivo(e); if (va < 0) return null; if (va === 0) return 'firma'; if (va === 4) return 'intermedio'; return vEstado(e, va) === 'activo' ? 'oficina' : 'intermedio'; }
+  function vFecha(e, k){
+    var ps = pasosDe(e);
+    if (k < 4) return ps[k].fecha;
+    if (k === 4) { var f = ps[4].escrituraRecibidaFecha; if (f) { try { return new Date(f).toLocaleDateString('es-MX', { day:'2-digit', month:'2-digit', year:'numeric' }); } catch(_){} } return ''; }
+    return ps[4].estado === 'completado' ? ps[4].fecha : '';
+  }
+  function marcarNotaria(e){
+    var p4 = pasosDe(e)[4];
+    if (p4.estado !== 'pendiente' || !p4.fechaAutoInicio) { abrirIntermedio(e, 4); p4 = pasosDe(e)[4]; }
+    resolverTareas(e, 4, 'intermedio');
+    p4.escrituraRecibida = true; p4.escrituraRecibidaFecha = new Date().toISOString();
+    p4.fechaAutoInicio = new Date().toISOString(); p4.plazoDias = DIAS_INTER; p4.fecha = fechaTxt();
+    p4.notas = 'La notaría entregó la escritura: tienes ' + DIAS_INTER + ' días para ingresarla al Registro Público';
+    historial(e, '5. Escritura de la notaría: entregada → inicia el plazo de ' + DIAS_INTER + ' días para ingresarla al Registro Público');
+  }
+  window.lexEscVirtual = { activo: vActivo, estado: vEstado, NOMBRE: V_NOMBRE, CORTO: V_CORTO, COL: V_COL };
+
   // ── Qué se pregunta en cada punto ─────────────────────────────────────
   // q: k (clave), t (texto), falta (texto del Llamado a la Acción si es "No"),
   //    cliente (si el "No" depende del cliente → tarea 📞), neutral (sí y no valen),
@@ -129,16 +162,12 @@
       }
     };
     if (i === 4 && fase === 'intermedio' && !pasosDe(e)[4].escrituraRecibida) return {
-      titulo: 'Intermedio · Solicitar la escritura a la notaría', plazo: DIAS_INTER,
+      titulo: 'Paso 5 · Escritura de la notaría (solicitarla y recibirla)', plazo: DIAS_INTER,
       preguntas: [
         { k:'solicitada', t:'¿Ya se solicitó a la notaría la entrega de la escritura?', falta:'Falta solicitar a la notaría la entrega de la escritura' },
         { k:'entregada', t:'¿La notaría ya entregó la escritura?', falta:'La notaría no ha entregado la escritura' }],
       siguiente: 'Escritura recibida → ingresar al Registro Público', accion: function(){
-        var p4 = pasosDe(e)[4];
-        p4.escrituraRecibida = true; p4.escrituraRecibidaFecha = new Date().toISOString();
-        p4.fechaAutoInicio = new Date().toISOString(); p4.plazoDias = DIAS_INTER; p4.fecha = fechaTxt();
-        p4.notas = 'La notaría entregó la escritura: tienes ' + DIAS_INTER + ' días para ingresarla al Registro Público';
-        historial(e, 'La notaría entregó la escritura → inicia el plazo de ' + DIAS_INTER + ' días para ingresarla al Registro Público');
+        marcarNotaria(e);
         tareaInterna(e, 'registro', 'Ingresar la escritura al Registro Público (IFREO)', hoyISO(0));
       }
     };
@@ -148,7 +177,7 @@
       siguiente: 'Ya está en el Registro Público (hasta 1 mes)', accion: function(){ iniciarOficina(e, 4); }
     };
     if (i === 4) return {
-      titulo: 'Paso 5 · En el Registro Público (IFREO)', plazo: DIAS_OFICINA[4],
+      titulo: 'Paso 6 · En el Registro Público (IFREO)', plazo: DIAS_OFICINA[4],
       preguntas: [
         { k:'inscripcion', t:'¿Ya salió la inscripción del Registro Público?', falta:'Falta que salga la inscripción del Registro Público' },
         { k:'fisica', t:'¿La escritura física ya está en el despacho?', falta:'Falta recoger la escritura física' }],
@@ -275,9 +304,9 @@
     }
     function pintar(){
       var cli = cliente(e), pl = cfg.plazo ? infoPlazo(e, i) : null;
-      var barra = ''; for (var b = 0; b < 5; b++) {
-        var st = pasosDe(e)[b].estado, hecho = st === 'completado', aqui = b === i;
-        barra += '<span style="width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;' + (hecho ? 'background:#1a7a3a;color:#fff;' : aqui ? 'background:' + COL[b] + ';color:#fff;' : 'border:2px solid #d3c6a6;color:#a89c80;') + '">' + (hecho ? '✓' : (b + 1)) + '</span>' + (b < 4 ? '<span style="flex:1;height:3px;background:' + (hecho ? '#1a7a3a' : '#e5dcc4') + ';"></span>' : '');
+      var vi = vActivo(e), barra = ''; for (var b = 0; b < 6; b++) {
+        var hecho = vEstado(e, b) === 'completado', aqui = b === vi;
+        barra += '<span title="' + E(V_NOMBRE[b]) + '" style="width:24px;height:24px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;' + (hecho ? 'background:#1a7a3a;color:#fff;' : aqui ? 'background:' + V_COL[b] + ';color:#fff;' : 'border:2px solid #d3c6a6;color:#a89c80;') + '">' + (hecho ? '✓' : (b + 1)) + '</span>' + (b < 5 ? '<span style="flex:1;height:3px;background:' + (hecho ? '#1a7a3a' : '#e5dcc4') + ';"></span>' : '');
       }
       var plazoHtml = '';
       if (pl) {
@@ -308,7 +337,7 @@
         + '<div style="position:sticky;top:0;background:#1a1008;color:#e8c875;padding:10px 16px;font-family:monospace;font-size:12px;letter-spacing:0.1em;display:flex;justify-content:space-between;"><span>▶ SIGUIENTE ETAPA · ' + E(String(cli.nombre).toUpperCase()) + '</span><span id="asis-x" style="cursor:pointer;" title="Cerrar sin guardar">✕</span></div>'
         + '<div style="padding:14px 16px;">'
         + '<div style="display:flex;align-items:center;gap:5px;margin-bottom:10px;">' + barra + '</div>'
-        + '<div style="font-family:monospace;font-size:11px;color:' + COL[i] + ';letter-spacing:0.08em;font-weight:800;margin-bottom:8px;">' + E(cfg.titulo).toUpperCase() + '</div>'
+        + '<div style="font-family:monospace;font-size:11px;color:' + V_COL[vi] + ';letter-spacing:0.08em;font-weight:800;margin-bottom:8px;">' + E(cfg.titulo).toUpperCase() + '</div>'
         + plazoHtml
         + (ds ? '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">' + ds + '</div>' : '')
         + '<div style="font-family:monospace;font-size:10px;color:#8a7f6a;letter-spacing:0.08em;margin-bottom:6px;">RESPONDA PARA AVANZAR</div>' + qs + avisoFalta
@@ -506,9 +535,10 @@
     if (fase === 'intermedio') return ({ 1: 'sin cumplir los requisitos para ingresar el trámite a <b>Catastro</b>',
       2: 'sin que el cliente pague su <b>traslado de dominio</b>' + (muni ? ' en ' + E(muni) : ''),
       3: 'sin entregar el expediente al <b>notario para el ISR</b>',
-      4: esperaNotaria(e) ? 'esperando que la <b>notaría entregue la escritura</b>' : 'sin ingresar la escritura al <b>Registro Público</b>' })[i];
+      4: 'esperando que la <b>notaría entregue la escritura</b>',
+      5: 'sin ingresar la escritura al <b>Registro Público</b>' })[i];
     return ({ 1: 'en <b>Catastro</b> esperando la cédula y el avalúo', 2: 'esperando el pago del <b>traslado de dominio</b>',
-      3: 'esperando que el <b>notario genere el ISR</b>', 4: 'en el <b>Registro Público</b> esperando la inscripción' })[i];
+      3: 'esperando que el <b>notario genere el ISR</b>', 5: 'en el <b>Registro Público</b> esperando la inscripción' })[i];
   }
   function svgPersona(col){ return '<svg width="22" height="30" viewBox="0 0 22 30" aria-hidden="true" style="display:block;"><circle cx="12" cy="7" r="3.2" fill="' + col + '"/><path d="M11 11 L9 18 L5 21 M10 15 L15 17 M9 18 L12 23 L11 28 M9 18 L6 28" stroke="' + col + '" stroke-width="2.4" fill="none" stroke-linecap="round"/></svg>'; }
 
@@ -523,22 +553,21 @@
     normalizar(e);
     viejo.style.display = 'none';
     if (!box) { box = document.createElement('div'); box.id = 'lex-esc-prog'; viejo.parentNode.insertBefore(box, viejo.nextSibling); }
-    var ps = pasosDe(e), a = activoDe(e), enCurso = (e.estado === 'proceso' || !e.estado);
+    var ps = pasosDe(e), a = activoDe(e), va = vActivo(e), enCurso = (e.estado === 'proceso' || !e.estado);
     if (hint) hint.style.display = (a === -1) ? '' : 'none';   // "Escritura completada…" sí se deja
-    // Dónde está la personita
-    var fase = a < 0 ? null : (a === 0 ? 'firma' : (ps[a].estado === 'activo' ? 'oficina' : 'intermedio'));
-    var info = null;
-    if (a >= 0 && enCurso) {
-      var p = ps[a], dias, plazo = null, pct = 0.5, seg, enCirculo = false;
+    // Dónde está la personita (índices de la línea de 6 bolitas)
+    var fase = vFase(e);
+    var info = null, NV = 6, UL = NV - 1;
+    if (va >= 0 && enCurso) {
+      var p = ps[va < 4 ? va : 4], dias, plazo = null, pct = 0.5, seg, enCirculo = false;
       if (fase === 'firma') { dias = diasDesde(p.fechaAutoInicio || e.fechaCreacion || e.pasoActivoFecha); enCirculo = true; seg = 0; }
       else {
         dias = diasDesde(p.fechaAutoInicio || e.pasoActivoFecha);
-        plazo = parseInt(p.plazoDias, 10) || (fase === 'oficina' ? DIAS_OFICINA[a] : DIAS_INTER);
+        plazo = parseInt(p.plazoDias, 10) || (fase === 'oficina' ? DIAS_OFICINA[va < 4 ? va : 4] : DIAS_INTER);
         pct = Math.min(1, dias / plazo);
-        if (fase === 'intermedio') seg = a - 1;            // tramo que LLEGA al paso
-        if (fase === 'intermedio' && a === 4) pct = p.escrituraRecibida ? 0.5 + pct / 2 : pct / 2;   // 1ª mitad: notaría · 2ª: ingresar
-        else if (a < 4) seg = a;                           // tramo que SALE del paso (en la oficina)
-        else { seg = 4; enCirculo = true; }
+        if (fase === 'intermedio') seg = va - 1;           // tramo que LLEGA a la bolita
+        else if (va < UL) seg = va;                        // tramo que SALE de la bolita (en la oficina)
+        else { seg = UL; enCirculo = true; }
       }
       var resta = plazo != null ? plazo - dias : null;
       var col = resta == null ? '#5f5e5a' : resta < 0 ? '#c81e1e' : resta <= Math.ceil(plazo / 3) ? '#b06a10' : '#1a7a3a';
@@ -547,67 +576,84 @@
         : resta === 0 ? ' <b style="color:#b06a10;">¡Hoy vence el plazo!</b>'
         : ' <b style="color:' + col + ';">' + (resta <= Math.ceil(plazo / 3) ? '¡Faltan ' + pl(resta) + '!' : 'Faltan ' + pl(resta) + '.') + '</b>';
       info = { seg: seg, pct: pct, enCirculo: enCirculo, col: col, bg: bg,
-        txt: (resta != null && resta < 0 ? '⚠ ' : '') + '<b>Lleva ' + pl(dias) + '</b> ' + mensajeFase(e, a, fase) + '.' + cola };
+        txt: (resta != null && resta < 0 ? '⚠ ' : '') + '<b>Lleva ' + pl(dias) + '</b> ' + mensajeFase(e, va, fase) + '.' + cola };
     }
     // Globo: se ubica sobre TODA la línea (no se sale de la ventana en los extremos)
     function burbuja(){
       if (!info) return '';
-      var o = info.enCirculo ? info.seg / 4 : (info.seg + info.pct) / 4;
+      var o = info.enCirculo ? info.seg / UL : (info.seg + info.pct) / UL;
       return '<div style="position:absolute;top:4px;left:calc(40px + (100% - 80px) * ' + o.toFixed(3) + ');transform:translateX(-' + Math.round(o * 100) + '%);z-index:3;pointer-events:none;">'
         + '<div style="background:' + info.bg + ';border:1.5px solid ' + info.col + ';border-radius:9px;padding:7px 13px;width:340px;max-width:70vw;font-size:13px;line-height:1.4;color:#3a2a12;box-shadow:0 2px 8px rgba(0,0,0,0.08);">' + info.txt + '</div></div>';
     }
     // Personita: en su punto exacto de la línea
     function persona(leftPct){ return '<div style="position:absolute;left:' + leftPct + '%;bottom:4px;transform:translateX(-50%);pointer-events:none;z-index:2;">' + svgPersona(info.col) + '</div>'; }
     var html = '<div style="position:relative;display:flex;align-items:flex-start;padding:' + (info ? '104px' : '6px') + ' 6px 0;">' + burbuja();
-    for (var k = 0; k < 5; k++) {
-      var st = ps[k].estado, hecho = st === 'completado' || e.estado === 'listo' || e.estado === 'archivado', aqui = k === a && enCurso;
-      var futuro = !hecho && k > a && a >= 0;
-      var fechaH = hecho && ps[k].fecha ? String(ps[k].fecha).split(',')[0].split(' ')[0] : '';
+    var cerrada = e.estado === 'listo' || e.estado === 'archivado';
+    for (var k = 0; k < NV; k++) {
+      var st = vEstado(e, k), hecho = st === 'completado' || cerrada, aqui = k === va && enCurso;
+      var futuro = !hecho && k > va && va >= 0;
+      var fRaw = vFecha(e, k), fechaH = hecho && fRaw ? String(fRaw).split(',')[0].split(' ')[0] : '';
       var circ = hecho ? 'background:#1a7a3a;color:#fff;border:2px solid #1a7a3a;'
-        : aqui ? 'background:#fff;color:' + (info ? info.col : COLP[k]) + ';border:3px solid ' + (info ? info.col : COLP[k]) + ';box-shadow:0 0 0 4px ' + (info ? info.bg : '#fff8e8') + ';'
+        : aqui ? 'background:#fff;color:' + (info ? info.col : V_COL[k]) + ';border:3px solid ' + (info ? info.col : V_COL[k]) + ';box-shadow:0 0 0 4px ' + (info ? info.bg : '#fff8e8') + ';'
         : 'background:#f1ede4;color:#b4a88a;border:2px solid #ddd3bd;';
-      html += '<div style="width:68px;flex-shrink:0;text-align:center;position:relative;">'
+      html += '<div style="width:64px;flex-shrink:0;text-align:center;position:relative;">'
         + (info && info.enCirculo && info.seg === k ? '<div style="position:absolute;left:0;right:0;top:-4px;height:0;">' + persona(50) + '</div>' : '')
-        + '<div role="button" tabindex="0" onclick="lexEscTocarCirculo(' + k + ')" title="' + (futuro ? 'Avanzar hasta ' + NOMBRE[k] : 'Corregir ' + NOMBRE[k]) + '" style="width:34px;height:34px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;cursor:pointer;' + circ + '">' + (hecho ? '✓' : (k + 1)) + '</div>'
-        + '<div style="font-family:monospace;font-size:10px;margin-top:5px;line-height:1.3;color:' + (hecho ? '#1a7a3a' : aqui ? (info ? info.col : '#7a4206') : '#a89c80') + ';font-weight:' + (aqui ? '800' : '600') + ';">' + CORTO[k] + (fechaH ? '<br><span style="font-weight:400;">' + E(fechaH) + '</span>' : '') + '</div></div>';
-      if (k < 4) {
-        var tramoHecho = (ps[k].estado === 'completado' && (ps[k + 1].estado === 'completado' || (k + 1 === a && fase === 'oficina'))) || e.estado === 'listo' || e.estado === 'archivado';
+        + '<div role="button" tabindex="0" onclick="lexEscTocarCirculo(' + k + ')" title="' + (futuro ? 'Avanzar hasta ' + V_NOMBRE[k] : 'Corregir ' + V_NOMBRE[k]) + '" style="width:34px;height:34px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;cursor:pointer;' + circ + '">' + (hecho ? '✓' : (k + 1)) + '</div>'
+        + '<div style="font-family:monospace;font-size:10px;margin-top:5px;line-height:1.3;color:' + (hecho ? '#1a7a3a' : aqui ? (info ? info.col : '#7a4206') : '#a89c80') + ';font-weight:' + (aqui ? '800' : '600') + ';">' + V_CORTO[k] + (fechaH ? '<br><span style="font-weight:400;">' + E(fechaH) + '</span>' : '') + '</div></div>';
+      if (k < UL) {
+        var tramoHecho = (vEstado(e, k) === 'completado' && (vEstado(e, k + 1) === 'completado' || (k + 1 === va && fase === 'oficina'))) || cerrada;
         var esSeg = info && !info.enCirculo && info.seg === k;
-        var marcaNot = '';
-        if (k === 3) {
-          var recib = !!ps[4].escrituraRecibida || ps[4].estado === 'activo' || ps[4].estado === 'completado' || e.estado === 'listo' || e.estado === 'archivado';
-          var aquiN = a === 4 && fase === 'intermedio' && !recib && enCurso;
-          var cN = recib ? '#1a7a3a' : aquiN ? (info ? info.col : '#0e7490') : '#c9bfa6';
-          marcaNot = '<div title="Solicitar a la notaría la entrega de la escritura' + (recib ? ' — ✓ entregada' : '') + '" style="position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:16px;height:16px;border-radius:4px;transform-origin:center;background:' + (recib ? '#1a7a3a' : '#fff') + ';border:2px solid ' + cN + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800;z-index:1;">' + (recib ? '✓' : '') + '</div>'
-            + '<div style="position:absolute;left:50%;top:14px;transform:translateX(-50%);font-family:monospace;font-size:9px;font-weight:' + (aquiN ? '800' : '600') + ';color:' + (recib ? '#1a7a3a' : aquiN ? cN : '#a89c80') + ';white-space:nowrap;line-height:1.25;text-align:center;">ESCRITURA<br>NOTARÍA</div>';
-        }
-        // Tramo ISR→Registro: verde hasta la marca cuando la notaría ya entregó
-        if (k === 3 && !tramoHecho && ps[4].escrituraRecibida) marcaNot = '<div style="position:absolute;left:0;top:0;height:4px;width:50%;background:#1a7a3a;border-radius:2px;"></div>' + marcaNot;
-        html += '<div style="flex:1;position:relative;height:4px;margin-top:15px;background:' + (tramoHecho ? '#1a7a3a' : '#e5dcc4') + ';border-radius:2px;">' + marcaNot
+        html += '<div style="flex:1;position:relative;height:4px;margin-top:15px;background:' + (tramoHecho ? '#1a7a3a' : '#e5dcc4') + ';border-radius:2px;">'
           + (esSeg ? '<div style="position:absolute;left:0;top:0;height:4px;width:' + Math.round(info.pct * 100) + '%;background:' + info.col + ';border-radius:2px;"></div>' + '<div style="position:absolute;left:0;right:0;top:-2px;height:0;">' + persona(Math.round(info.pct * 100)) + '</div>' : '')
           + '</div>';
       }
     }
     html += '</div>';
-    if (a >= 0 && enCurso) {
+    if (va >= 0 && enCurso) {
       var ETQ = { 'firma-0':'Registrar la firma ante notario', 'intermedio-1':'Reunir requisitos e ingresar a Catastro', 'oficina-1':'¿Ya salió la cédula y el avalúo?',
         'intermedio-2':'¿Ya pagó el cliente su traslado de dominio?', 'oficina-2':'¿Ya pagó el cliente su traslado de dominio?', 'intermedio-3':'Entregar el expediente al notario para el ISR',
-        'oficina-3':'¿Ya generó el notario el ISR?', 'intermedio-4':'Ingresar la escritura al Registro Público', 'oficina-4':'¿Ya salió la inscripción del Registro?' };
-      if (fase === 'intermedio' && a === 4 && esperaNotaria(e)) ETQ['intermedio-4'] = '¿Ya entregó la notaría la escritura?';
-      html += '<div style="text-align:center;margin-top:14px;"><button type="button" onclick="lexEscSiguienteEtapa(' + idx + ')" style="background:#1a7a3a;color:#fff;border:none;border-radius:9px;padding:11px 22px;font-weight:800;font-size:0.85rem;cursor:pointer;box-shadow:0 3px 10px rgba(26,122,58,0.3);">▶ Avanzar: ' + E(ETQ[fase + '-' + a] || 'siguiente etapa') + '</button></div>'
+        'oficina-3':'¿Ya generó el notario el ISR?', 'intermedio-4':'¿Ya entregó la notaría la escritura?', 'intermedio-5':'Ingresar la escritura al Registro Público', 'oficina-5':'¿Ya salió la inscripción del Registro?' };
+      html += '<div style="text-align:center;margin-top:14px;"><button type="button" onclick="lexEscSiguienteEtapa(' + idx + ')" style="background:#1a7a3a;color:#fff;border:none;border-radius:9px;padding:11px 22px;font-weight:800;font-size:0.85rem;cursor:pointer;box-shadow:0 3px 10px rgba(26,122,58,0.3);">▶ Avanzar: ' + E(ETQ[fase + '-' + va] || 'siguiente etapa') + '</button></div>'
         + '<div style="text-align:center;font-size:0.68rem;color:#8a7f6a;margin-top:6px;">Verde = hecho · La personita = dónde va · Gris = falta · Toca un círculo para corregirlo o para adelantar</div>';
     }
     box.innerHTML = html;
   }
   window.lexEscPintarProgreso = pintarProgreso;
 
-  // Tocar un círculo: corregir (hecho/actual) o adelantar (futuro)
+  // Tocar un círculo (índice de la línea de 6): corregir (hecho/actual) o adelantar (futuro)
   window.lexEscTocarCirculo = function(k){
     resyncIdx();
     var idx = (typeof _escIdx !== 'undefined') ? _escIdx : -1, e = idx >= 0 ? D.escrituras[idx] : null; if (!e) return;
-    var a = activoDe(e);
-    if (a >= 0 && k > a && (e.estado === 'proceso' || !e.estado)) return saltarHasta(idx, k);
-    if (typeof escAbrirPaso === 'function') escAbrirPaso(k);
+    var va = vActivo(e), enCurso = (e.estado === 'proceso' || !e.estado);
+    if (va >= 0 && k > va && enCurso) return saltarHasta(idx, k);
+    if (k < 4) { if (typeof escAbrirPaso === 'function') escAbrirPaso(k); return; }
+    if (k === 5) { if (typeof escAbrirPaso === 'function') escAbrirPaso(4); return; }
+    // Bolita 5 · Escritura de la notaría
+    if (va === 4 && enCurso) return window.lexEscSiguienteEtapa(idx);
+    var p4 = pasosDe(e)[4];
+    if (p4.estado === 'pendiente' && p4.escrituraRecibida) {
+      var w0 = document.getElementById('lex-esc-salto'); if (w0) w0.remove();
+      var ov = document.createElement('div'); ov.id = 'lex-esc-salto';
+      ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
+      ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fdfaf3;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:460px;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#1a1008;overflow:hidden;">'
+        + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-family:monospace;font-size:12px;letter-spacing:0.1em;">✎ CORREGIR · ESCRITURA DE LA NOTARÍA</div>'
+        + '<div style="padding:14px 16px;font-size:13px;line-height:1.5;">Está marcado que la notaría <b>ya entregó la escritura</b>' + (p4.escrituraRecibidaFecha ? ' (' + E(new Date(p4.escrituraRecibidaFecha).toLocaleDateString('es-MX')) + ')' : '') + '.<br>¿Desea regresarla a <b>pendiente</b>?'
+        + '<div style="display:flex;gap:8px;margin-top:14px;"><button type="button" id="cn-no" style="flex:1;border:1px solid #c8951a;background:#fff;color:#9a6e18;border-radius:7px;padding:10px;font-weight:700;cursor:pointer;">Dejar como está</button>'
+        + '<button type="button" id="cn-si" style="flex:1;border:none;background:#a32d2d;color:#fff;border-radius:7px;padding:10px;font-weight:800;cursor:pointer;">Regresar a pendiente</button></div></div></div>';
+      document.body.appendChild(ov);
+      ov.querySelector('#cn-no').onclick = function(){ ov.remove(); };
+      ov.querySelector('#cn-si').onclick = function(){
+        p4.escrituraRecibida = false; p4.escrituraRecibidaFecha = ''; p4.fechaAutoInicio = new Date().toISOString(); p4.plazoDias = DIAS_INTER; p4.fecha = fechaTxt();
+        p4.notas = 'Pendiente: solicitar a la notaría la entrega de la escritura';
+        historial(e, 'Corrección: la notaría aún no entrega la escritura');
+        var ahoraC = new Date().toISOString();
+        tareas().forEach(function(t){ if (t && t.estado !== 'resuelta' && t.escId === String(e.id) && t.escMotivo === 'registro') { t.estado = 'resuelta'; t.fechaResolucion = ahoraC; t.fechaMod = ahoraC; t.resueltaPor = 'Automático (corrección)'; } });
+        tareaInterna(e, 'notaria-escritura', 'Solicitar a la notaría la entrega de la escritura', hoyISO(0));
+        e.fechaMod = new Date().toISOString(); ov.remove(); refrescar(e, idx); toastS('✎ Escritura de la notaría: regresó a pendiente');
+      };
+      return;
+    }
+    toastS('Para corregir esta etapa, corrija primero el Registro Público (bolita 6).');
   };
   function tareasAlEntrar(e, j){
     var muni = String(e.ubicacion || '').trim();
@@ -615,43 +661,63 @@
     if (j === 3) tareaInterna(e, 'isr-enviar', 'Llevar el expediente al notario para que genere el ISR', hoyISO(0));
     if (j === 4) tareaInterna(e, 'notaria-escritura', 'Solicitar a la notaría la entrega de la escritura', hoyISO(0));
   }
+  // Avanzar hasta la bolita j (0-5) confirmando las etapas de en medio
   function saltarHasta(idx, j){
-    var e = D.escrituras[idx], a = activoDe(e), ps = pasosDe(e);
+    var e = D.escrituras[idx], va = vActivo(e);
     var viejo = document.getElementById('lex-esc-salto'); if (viejo) viejo.remove();
     var ov = document.createElement('div'); ov.id = 'lex-esc-salto';
     ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
-    var etapas = []; for (var k = a; k < j; k++) etapas.push(k);
+    var etapas = []; for (var k = va; k < j; k++) etapas.push(k);
+    var DESC = [' (firma ante notario)', ' (cédula y avalúo listos)', ' (el cliente ya pagó y entregó comprobante)', ' (ISR generado y pagado)', ' (la notaría ya entregó la escritura)', ''];
+    var opciones = j === 4
+      ? [['esperando','Por solicitar a la notaría (empieza su plazo de ' + DIAS_INTER + ' días)'], ['hecho','La notaría ya la entregó']]
+      : [['esperando','Por iniciar (empieza su plazo de ' + DIAS_INTER + ' días)'], ['activo','Ya está en trámite' + (j === 1 ? ' en Catastro (plazo 60 días)' : j === 5 ? ' en el Registro (plazo 30 días)' : '')], ['hecho','Ya también está terminada']];
     var html = '<div role="dialog" aria-modal="true" style="background:#fdfaf3;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:520px;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#1a1008;overflow:hidden;">'
-      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-family:monospace;font-size:12px;letter-spacing:0.1em;display:flex;justify-content:space-between;"><span>⏩ AVANZAR HASTA ' + E(NOMBRE[j]).toUpperCase() + '</span><span id="salto-x" style="cursor:pointer;">✕</span></div>'
+      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-family:monospace;font-size:12px;letter-spacing:0.1em;display:flex;justify-content:space-between;"><span>⏩ AVANZAR HASTA ' + E(V_NOMBRE[j]).toUpperCase() + '</span><span id="salto-x" style="cursor:pointer;">✕</span></div>'
       + '<div style="padding:14px 16px;">'
-      + '<div style="font-size:13px;margin-bottom:10px;">Para avanzar hasta <b>' + E(NOMBRE[j]) + '</b>, confirme que ya se superaron estas etapas:</div>'
-      + etapas.map(function(k){ return '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #eadfbf;border-radius:8px;background:#fff;margin-bottom:6px;cursor:pointer;font-size:13px;"><input type="checkbox" class="salto-chk" data-k="' + k + '" style="width:18px;height:18px;"><span><b>' + (k + 1) + ' · ' + E(NOMBRE[k]) + '</b> ya se superó' + (k === 0 ? ' (firma ante notario)' : k === 1 ? ' (cédula y avalúo listos)' : k === 2 ? ' (el cliente ya pagó y entregó comprobante)' : k === 3 ? ' (ISR generado y pagado)' : '') + '</span></label>'; }).join('')
-      + '<div style="font-family:monospace;font-size:10px;color:#8a7f6a;letter-spacing:0.08em;margin:12px 0 6px;">¿CÓMO ESTÁ ' + E(NOMBRE[j]).toUpperCase() + '?</div>'
-      + [['esperando','Por iniciar (empieza su plazo de ' + DIAS_INTER + ' días)'],['activo','Ya está en trámite' + (j === 1 ? ' en Catastro (plazo 60 días)' : j === 4 ? ' en el Registro (plazo 30 días)' : '')],['hecho','Ya también está terminada']].map(function(o, n){ return '<label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 2px;cursor:pointer;"><input type="radio" name="salto-est" value="' + o[0] + '"' + (n === 0 ? ' checked' : '') + '> ' + o[1] + '</label>'; }).join('')
+      + '<div style="font-size:13px;margin-bottom:10px;">Para avanzar hasta <b>' + E(V_NOMBRE[j]) + '</b>, confirme que ya se superaron estas etapas:</div>'
+      + etapas.map(function(k){ return '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #eadfbf;border-radius:8px;background:#fff;margin-bottom:6px;cursor:pointer;font-size:13px;"><input type="checkbox" class="salto-chk" data-k="' + k + '" style="width:18px;height:18px;"><span><b>' + (k + 1) + ' · ' + E(V_NOMBRE[k]) + '</b> ya se superó' + DESC[k] + '</span></label>'; }).join('')
+      + '<div style="font-family:monospace;font-size:10px;color:#8a7f6a;letter-spacing:0.08em;margin:12px 0 6px;">¿CÓMO ESTÁ ' + E(V_NOMBRE[j]).toUpperCase() + '?</div>'
+      + opciones.map(function(o, n){ return '<label style="display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 2px;cursor:pointer;"><input type="radio" name="salto-est" value="' + o[0] + '"' + (n === 0 ? ' checked' : '') + '> ' + o[1] + '</label>'; }).join('')
       + '<div id="salto-err" style="color:#a32d2d;font-size:12px;min-height:16px;margin-top:6px;"></div>'
       + '<div style="display:flex;gap:8px;margin-top:6px;"><button type="button" id="salto-no" style="flex:1;border:1px solid #c8951a;background:#fff;color:#9a6e18;border-radius:7px;padding:10px;font-weight:700;font-size:12px;cursor:pointer;">Cancelar</button>'
-      + '<button type="button" id="salto-si" style="flex:1.4;border:none;background:#1a7a3a;color:#fff;border-radius:7px;padding:10px;font-weight:800;font-size:12px;cursor:pointer;">⏩ Avanzar hasta ' + E(CORTO[j]) + '</button></div>'
-      + '<div style="font-size:11px;color:#8a7f6a;margin-top:8px;text-align:center;">Para corregir a mano esta etapa sin avanzar, use <a href="#" id="salto-manual" style="color:#9a6e18;">corregir a mano</a>.</div>'
+      + '<button type="button" id="salto-si" style="flex:1.4;border:none;background:#1a7a3a;color:#fff;border-radius:7px;padding:10px;font-weight:800;font-size:12px;cursor:pointer;">⏩ Avanzar hasta ' + E(V_CORTO[j]) + '</button></div>'
+      + (j !== 4 ? '<div style="font-size:11px;color:#8a7f6a;margin-top:8px;text-align:center;">Para corregir a mano esta etapa sin avanzar, use <a href="#" id="salto-manual" style="color:#9a6e18;">corregir a mano</a>.</div>' : '')
       + '</div></div>';
     ov.innerHTML = html; document.body.appendChild(ov);
     var q = function(s){ return ov.querySelector(s); };
     q('#salto-x').onclick = q('#salto-no').onclick = function(){ ov.remove(); };
-    q('#salto-manual').onclick = function(ev){ ev.preventDefault(); ov.remove(); if (typeof escAbrirPaso === 'function') escAbrirPaso(j); };
+    if (q('#salto-manual')) q('#salto-manual').onclick = function(ev){ ev.preventDefault(); ov.remove(); if (typeof escAbrirPaso === 'function') escAbrirPaso(j === 5 ? 4 : j); };
     q('#salto-si').onclick = function(){
       var faltan = [].slice.call(ov.querySelectorAll('.salto-chk')).filter(function(c){ return !c.checked; });
       if (faltan.length) { q('#salto-err').textContent = 'Marque todas las etapas: solo se puede avanzar si ya se superaron.'; return; }
       var est = (ov.querySelector('input[name="salto-est"]:checked') || {}).value || 'esperando';
       var eNow = (D.escrituras || []).filter(function(x){ return x && x.id === e.id; })[0] || e;
-      etapas.forEach(function(k){ resolverTareas(eNow, k, k === a ? (a === 0 ? 'firma' : (pasosDe(eNow)[k].estado === 'activo' ? 'oficina' : 'intermedio')) : 'intermedio'); completar(eNow, k); });
-      if (est === 'esperando') { abrirIntermedio(eNow, j); tareasAlEntrar(eNow, j); }
-      else if (est === 'activo') iniciarOficina(eNow, j);
-      else { completar(eNow, j); if (j < 4) { abrirIntermedio(eNow, j + 1); tareasAlEntrar(eNow, j + 1); } else { eNow.estado = 'listo'; tareaLlamada(eNow, 'entrega', 'para avisarle que su ESCRITURA YA ESTÁ LISTA y pase a recogerla.'); } }
-      historial(eNow, 'Avance directo hasta ' + NOMBRE[j] + ' (se confirmaron ' + etapas.map(function(k){ return NOMBRE[k]; }).join(', ') + ')');
+      etapas.forEach(function(k){
+        if (k === 4) { marcarNotaria(eNow); return; }
+        var a0 = activoDe(eNow);
+        resolverTareas(eNow, k, k === a0 ? (a0 === 0 ? 'firma' : (pasosDe(eNow)[k].estado === 'activo' ? 'oficina' : 'intermedio')) : 'intermedio');
+        completar(eNow, k);
+      });
+      if (j < 4) {
+        if (est === 'esperando') { abrirIntermedio(eNow, j); tareasAlEntrar(eNow, j); }
+        else if (est === 'activo') iniciarOficina(eNow, j);
+        else { completar(eNow, j); abrirIntermedio(eNow, j + 1); tareasAlEntrar(eNow, j + 1); }
+      } else if (j === 4) {
+        abrirIntermedio(eNow, 4);
+        if (est === 'hecho') { marcarNotaria(eNow); tareaInterna(eNow, 'registro', 'Ingresar la escritura al Registro Público (IFREO)', hoyISO(0)); }
+        else tareasAlEntrar(eNow, 4);
+      } else {
+        if (est === 'esperando') { if (!pasosDe(eNow)[4].escrituraRecibida) marcarNotaria(eNow); tareaInterna(eNow, 'registro', 'Ingresar la escritura al Registro Público (IFREO)', hoyISO(0)); }
+        else if (est === 'activo') { resolverTareas(eNow, 4, 'intermedio'); iniciarOficina(eNow, 4); }
+        else { resolverTareas(eNow, 4, 'intermedio'); completar(eNow, 4); eNow.estado = 'listo'; tareaLlamada(eNow, 'entrega', 'para avisarle que su ESCRITURA YA ESTÁ LISTA y pase a recogerla.'); }
+      }
+      historial(eNow, 'Avance directo hasta ' + V_NOMBRE[j] + (etapas.length ? ' (se confirmaron ' + etapas.map(function(k){ return V_NOMBRE[k]; }).join(', ') + ')' : ''));
       eNow.fechaMod = new Date().toISOString(); eNow.pasoActivoFecha = new Date().toISOString();
       eNow.pasoActivoRequerimientos = false; eNow.pasoActivoEnEspera = false;
       ov.remove();
       refrescar(eNow, D.escrituras.indexOf(eNow));
-      toastS('⏩ Avanzó hasta ' + NOMBRE[j]);
+      toastS('⏩ Avanzó hasta ' + V_NOMBRE[j]);
     };
   }
   (function engancharProgreso(){

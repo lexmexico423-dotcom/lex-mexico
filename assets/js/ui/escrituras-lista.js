@@ -43,6 +43,16 @@
     var completados = pasos.filter(function(p){ return p && p.estado === 'completado'; }).length;
     var activo = completados < 5 ? completados : -1;
     var pAct = activo >= 0 ? (pasos[activo] || {}) : null;
+    // Oct-2026: línea de 6 bolitas — entre ISR y Registro va la ESCRITURA DE
+    // LA NOTARÍA (dato: pasos[4].escrituraRecibida). Se arma una lista virtual.
+    var V = window.lexEscVirtual;
+    if (V && pasos.length >= 5) {
+      PASOS = ['FIRMA NOTARIAL','CATASTRO','TRASLADO MPL','ISR','ESCRITURA NOTARÍA','IFREO'];
+      var p4 = pasos[4] || {};
+      pasos = [0, 1, 2, 3, 4, 5].map(function(k){ var st = V.estado(e, k); return k < 4 ? pasos[k] : Object.assign({}, p4, { estado: st }); });
+      activo = activo === -1 ? -1 : V.activo(e);
+      pAct = activo >= 0 ? pasos[activo] : null;
+    }
     var dias = e.pasoActivoFecha ? Math.floor((Date.now() - new Date(e.pasoActivoFecha).getTime()) / 86400000) : null;
     if (dias !== null && (isNaN(dias) || dias < 0)) dias = null;
     var umbral = e.pasoActivoRequerimientos ? g('ESC_DIAS_REQUIERE_ATENCION_REQUERIMIENTOS', 8) : (e.pasoActivoEnEspera ? g('ESC_DIAS_REQUIERE_ATENCION_ESPERA', 15) : g('ESC_DIAS_REQUIERE_ATENCION', 30));
@@ -75,7 +85,7 @@
     if (e.estado === 'proceso' || !e.estado || e.estado === 'espera') {
       if (activo === -1) sigue = e.notaFinal ? String(e.notaFinal) : 'Pasar a "Listo para entregar"';
       else if (pAct && pAct.notas) sigue = String(pAct.notas);
-      else sigue = (pAct && pAct.estado === 'activo' ? 'Dar seguimiento a ' : 'Iniciar ') + (({'FIRMA NOTARIAL':'la firma notarial','CATASTRO':'Catastro','TRASLADO MPL':'Traslado MPL','ISR':'ISR','IFREO':'IFREO'})[PASOS[activo]] || PASOS[activo].toLowerCase());
+      else sigue = (pAct && pAct.estado === 'activo' ? 'Dar seguimiento a ' : 'Iniciar ') + (({'FIRMA NOTARIAL':'la firma notarial','CATASTRO':'Catastro','TRASLADO MPL':'Traslado MPL','ISR':'ISR','ESCRITURA NOTARÍA':'la entrega de la escritura por la notaría','IFREO':'IFREO'})[PASOS[activo]] || PASOS[activo].toLowerCase());
     } else if (e.estado === 'listo') sigue = 'Avisar al cliente y entregar la escritura';
     var fechaFirma = e.fechaFirma ? (function(){ try { return new Date(e.fechaFirma + 'T12:00:00').toLocaleDateString('es-MX', { day:'numeric', month:'short', year:'numeric' }); } catch(_){ return e.fechaFirma; } })() : (e.fechaFirmaTexto || '');
     return { pasos: pasos, PASOS: PASOS, activo: activo, dias: dias, umbral: umbral, atencion: atencion, vencidoInter: vencidoInter, acto: acto,
@@ -86,12 +96,13 @@
   // ISR azul · IFREO verde agua · Listo verde.
   // IFREO en azul petróleo (antes verde agua: se confundía con el verde de los pasos ya hechos)
   var COLOR_PASO = ['#5f5e5a', '#b06a10', '#534ab7', '#185fa5', '#0e7490'];
+  var COLOR_PASO6 = ['#5f5e5a', '#b06a10', '#534ab7', '#185fa5', '#993556', '#0e7490'];   // con la bolita de la notaría
   function colorEstaEn(e, d){
     if (e.estado === 'listo' || d.activo === -1) return '#1a7a3a';
     if (e.estado === 'archivado') return '#7a6840';
     if (e.estado === 'cancelado') return '#6b6b6b';
     if (e.estado === 'noprocedio') return '#7a2020';
-    return COLOR_PASO[d.activo] || '#5f5e5a';
+    return (d.PASOS.length === 6 ? COLOR_PASO6 : COLOR_PASO)[d.activo] || '#5f5e5a';
   }
   function chipEstaEn(e, d, grande){
     return '<span style="display:inline-block;background:' + colorEstaEn(e, d) + ';color:#fff;font-size:' + (grande ? '0.8rem' : '0.7rem') + ';font-weight:700;letter-spacing:0.02em;border-radius:12px;padding:' + (grande ? '2px 11px' : '3px 10px') + ';white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;">' + E(d.estaEn) + '</span>';
@@ -196,14 +207,14 @@
       var col = hecho ? '#1a7a3a' : aqui ? '#2a1c08' : '#b4a88a';
       return '<div style="flex:1;min-width:0;text-align:center;">'
         + '<div style="height:6px;border-radius:3px;background:' + (hecho ? '#1a7a3a' : aqui ? '#c8951a' : '#eadfbf') + ';"></div>'
-        + '<div style="font-size:0.62rem;margin-top:3px;color:' + col + ';font-weight:' + (aqui ? '700' : '400') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (hecho ? '✓ ' : aqui ? '● ' : '') + E(({'FIRMA NOTARIAL':'Firma notarial','CATASTRO':'Catastro','TRASLADO MPL':'Traslado MPL','ISR':'ISR','IFREO':'IFREO'})[n] || n) + '</div></div>';
+        + '<div style="font-size:0.62rem;margin-top:3px;color:' + col + ';font-weight:' + (aqui ? '700' : '400') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (hecho ? '✓ ' : aqui ? '● ' : '') + E(({'FIRMA NOTARIAL':'Firma notarial','CATASTRO':'Catastro','TRASLADO MPL':'Traslado MPL','ISR':'ISR','ESCRITURA NOTARÍA':'Notaría','IFREO':'IFREO'})[n] || n) + '</div></div>';
     }).join('<div style="width:4px;"></div>');
     var folios = '';
     try { if (typeof _escFoliosHtml === 'function') { var fh = _escFoliosHtml(e, 'escAbrirRecibo', ' · '); if (fh) folios = '<span style="font-size:0.72rem;color:#1a4a8a;">🧾 Recibo: ' + fh + '</span>'; } } catch(_){}
     return '<div style="background:#fffdf6;border-top:1px dashed #d8c08a;padding:12px 16px 14px 16px;">'
       + '<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;">'
       + '<span style="font-size:0.82rem;">Está en: ' + chipEstaEn(e, d, true)
-      + (d.activo >= 0 && /^\d/.test(d.estaEn) ? ' <span style="font-size:0.7rem;color:#7a6a4a;">(paso ' + (d.activo + 1) + ' de 5' + (d.estaSub ? ', ' + E(d.estaSub) : '') + ')</span>' : '') + '</span>'
+      + (d.activo >= 0 && /^\d/.test(d.estaEn) ? ' <span style="font-size:0.7rem;color:#7a6a4a;">(paso ' + (d.activo + 1) + ' de ' + d.PASOS.length + (d.estaSub ? ', ' + E(d.estaSub) : '') + ')</span>' : '') + '</span>'
       + (d.dias !== null && d.activo >= 0 ? '<span style="font-size:0.74rem;color:#5a4a2a;">Lleva ' + semaforo(d, e) + ' en este paso</span>' : '')
       + '</div>'
       + (d.sigue ? '<div style="margin-top:8px;font-size:0.84rem;color:' + (d.atencion ? '#a32d2d' : '#8a3a10') + ';">👉 Qué sigue: <b style="font-weight:600;">' + E(d.sigue) + '</b></div>' : '')
@@ -407,7 +418,7 @@
   // chips con los datos, y a la derecha FOLIO + estado del paso + 📞.
   // Sin desplegables ni documentos adjuntos. Ordenadas por N° (en orden).
   // Clic en la tarjeta → expediente completo.
-  var NOMBRE_PASO = {'FIRMA NOTARIAL':'Firma notarial','CATASTRO':'Catastro','TRASLADO MPL':'Traslado MPL','ISR':'ISR','IFREO':'IFREO'};
+  var NOMBRE_PASO = {'FIRMA NOTARIAL':'Firma notarial','CATASTRO':'Catastro','TRASLADO MPL':'Traslado MPL','ISR':'ISR','ESCRITURA NOTARÍA':'Escritura de la notaría','IFREO':'IFREO'};
   var CH = 'font-size:11.5px;border-radius:4px;padding:2px 8px;font-family:monospace;white-space:nowrap;font-weight:700;';
   function esAutomatico(e, d){
     if (!d.sigue) return true;
@@ -416,7 +427,7 @@
   }
   function miniBarra(e, d){
     var listo = e.estado === 'listo' || e.estado === 'archivado' || d.activo === -1, colAct = colorEstaEn(e, d);
-    return '<div title="Avance: paso ' + (listo ? 5 : d.activo + 1) + ' de 5" style="display:flex;gap:2px;width:195px;">' + d.PASOS.map(function(n, i){
+    return '<div title="Avance: paso ' + (listo ? d.PASOS.length : d.activo + 1) + ' de ' + d.PASOS.length + '" style="display:flex;gap:2px;width:195px;">' + d.PASOS.map(function(n, i){
       var p = d.pasos[i] || {}, hecho = listo || p.estado === 'completado', aqui = !listo && i === d.activo;
       // Paso actual: rayado en su color si ya está en trámite; solo el contorno
       // si todavía está en el intermedio (esperando iniciar). Hechos: verde.

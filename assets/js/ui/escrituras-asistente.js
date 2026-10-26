@@ -276,7 +276,12 @@
         return '<div><div style="font-family:monospace;font-size:10px;color:#8a7f6a;letter-spacing:0.06em;margin-bottom:3px;">' + E(d.t).toUpperCase() + ' *</div><input data-d="' + d.k + '" type="' + (d.tipo || 'text') + '" value="' + E(datos[d.k]) + '" style="width:100%;box-sizing:border-box;padding:7px 9px;border:1px solid #d8c08a;border-radius:6px;font-size:13px;"></div>';
       }).join('');
       var fl = faltan();
-      var avisoFalta = fl.length ? '<div style="background:#fcebeb;border:1px solid #efb3b3;color:#a32d2d;border-radius:8px;padding:8px 10px;margin:4px 0 8px;font-size:12px;">⚠ ' + fl.map(function(q){ return E(q.falta); }).join(' · ') + '.<br>Se guardará como <b>Llamado a la Acción</b>' + (fl.some(function(q){ return q.cliente; }) ? ' y se creará una tarea en <b>Tareas de hoy</b> para llamar al cliente (📞)' : '') + '.</div>' : '';
+      // Oct-2026: con algún "No" aparece aquí mismo el botón para ACEPTAR y
+      // guardar el Llamado a la Acción (la escritura se queda en esta etapa).
+      var avisoFalta = fl.length ? '<div style="background:#fcebeb;border:1px solid #efb3b3;color:#a32d2d;border-radius:8px;padding:10px 12px;margin:4px 0 8px;font-size:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;">'
+        + '<div>⚠ ' + fl.map(function(q){ return E(q.falta); }).join(' · ') + '.<br>Se guardará como <b>Llamado a la Acción</b>' + (fl.some(function(q){ return q.cliente; }) ? ' y se creará una tarea en <b>Tareas de hoy</b> para llamar al cliente (📞)' : '') + '.</div>'
+        + '<button type="button" id="asis-aceptar-lla" style="flex-shrink:0;background:#a32d2d;color:#fff;border:none;border-radius:7px;padding:9px 14px;font-weight:800;font-size:12px;cursor:pointer;white-space:nowrap;">📌 Aceptar Llamado a la Acción</button>'
+        + '</div>' : '';
       var ok = completo();
       ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fdfaf3;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:640px;max-height:94vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#1a1008;">'
         + '<div style="position:sticky;top:0;background:#1a1008;color:#e8c875;padding:10px 16px;font-family:monospace;font-size:12px;letter-spacing:0.1em;display:flex;justify-content:space-between;"><span>▶ SIGUIENTE ETAPA · ' + E(String(cli.nombre).toUpperCase()) + '</span><span id="asis-x" style="cursor:pointer;" title="Cerrar sin guardar">✕</span></div>'
@@ -288,7 +293,7 @@
         + '<div style="font-family:monospace;font-size:10px;color:#8a7f6a;letter-spacing:0.08em;margin-bottom:6px;">RESPONDA PARA AVANZAR</div>' + qs + avisoFalta
         + '<textarea id="asis-nota" rows="2" placeholder="Nota adicional (opcional)" style="width:100%;box-sizing:border-box;border:1px solid #d8c08a;border-radius:6px;padding:7px 9px;font-size:12.5px;font-family:inherit;resize:vertical;margin-top:4px;">' + E(ov._nota || '') + '</textarea>'
         + '<div style="display:flex;gap:8px;margin-top:10px;">'
-        + '<button type="button" id="asis-guardar" style="flex:1;border:1px solid #c8951a;background:#fff;color:#9a6e18;border-radius:7px;padding:10px;font-weight:700;font-size:12px;cursor:pointer;">💾 Guardar avance (sigue aquí)</button>'
+        + '<button type="button" id="asis-guardar" style="' + (fl.length ? 'display:none;' : '') + 'flex:1;border:1px solid #c8951a;background:#fff;color:#9a6e18;border-radius:7px;padding:10px;font-weight:700;font-size:12px;cursor:pointer;">💾 Guardar avance (sigue aquí)</button>'
         + '<button type="button" id="asis-avanzar" ' + (ok ? '' : 'disabled') + ' style="flex:1.3;border:none;border-radius:7px;padding:10px;font-weight:800;font-size:12px;' + (ok ? 'background:#1a7a3a;color:#fff;cursor:pointer;' : 'background:#e5dcc4;color:#8a7f6a;cursor:not-allowed;') + '">▶ ' + E(cfg.siguiente) + '</button>'
         + '</div><div style="font-size:11px;color:#8a7f6a;margin-top:6px;text-align:center;">' + (ok ? 'Todo listo para avanzar.' : 'El botón para avanzar se habilita cuando todo está en "Sí"' + ((cfg.datos || []).length ? ' y los datos están capturados' : '') + '.') + '</div>'
         + '</div></div>';
@@ -296,6 +301,7 @@
       ov.querySelectorAll('[data-q]').forEach(function(b){ b.onclick = function(){ ov._nota = ov.querySelector('#asis-nota').value; resp[b.getAttribute('data-q')] = b.getAttribute('data-v'); pintar(); }; });
       ov.querySelectorAll('[data-d]').forEach(function(inp){ inp.oninput = function(){ datos[inp.getAttribute('data-d')] = inp.value; var okAhora = completo(), bA = ov.querySelector('#asis-avanzar'); bA.disabled = !okAhora; bA.style.background = okAhora ? '#1a7a3a' : '#e5dcc4'; bA.style.color = okAhora ? '#fff' : '#8a7f6a'; bA.style.cursor = okAhora ? 'pointer' : 'not-allowed'; }; });
       ov.querySelector('#asis-guardar').onclick = function(){ guardar(false); };
+      var bLla = ov.querySelector('#asis-aceptar-lla'); if (bLla) bLla.onclick = function(){ guardar(false); };
       ov.querySelector('#asis-avanzar').onclick = function(){ if (completo()) guardar(true); };
     }
     function guardar(avanzar){
@@ -321,7 +327,7 @@
       e.pasoActivoRequerimientos = false; e.pasoActivoEnEspera = false;
       ov.remove();
       refrescar(e, idx);
-      toastS(avanzar ? '✅ Listo: ' + cfg.siguiente.replace(/^🎉\s*/, '') : '💾 Avance guardado');
+      toastS(avanzar ? '✅ Listo: ' + cfg.siguiente.replace(/^🎉\s*/, '') : (faltan().length ? '📌 Llamado a la Acción guardado' : '💾 Avance guardado'));
     }
     pintar();
   };

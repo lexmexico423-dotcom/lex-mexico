@@ -389,8 +389,8 @@
       return d;
     };
     var fr = document.createDocumentFragment();
-    fr.appendChild(mk('escQInstr', 'INSTRUMENTO', '12,848', 118));
-    fr.appendChild(mk('escQVol', 'VOLUMEN', '186', 86));
+    fr.appendChild(mk('escQInstr', 'INSTRUMENTO', '', 118));
+    fr.appendChild(mk('escQVol', 'VOLUMEN', '', 86));
     fr.appendChild(mk('escQFecha', 'FECHA DE FIRMA', 'dd/mm/aaaa', 138));
     q.parentNode.insertBefore(fr, q);
     q.placeholder = '🔍 Cliente, acto, notaría, predio…';

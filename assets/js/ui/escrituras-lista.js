@@ -290,6 +290,8 @@
   // Instrumento y volumen: número exacto, con o sin coma (12848 = 12,848).
   // Fecha: día (13/09/2024), mes (09/2024) o año (2024).
   function dig(s){ return String(s || '').replace(/\D/g, ''); }
+  // Sin acentos ni mayúsculas: "jose" encuentra "José", "nino" encuentra "Niño"
+  function sinAc(s){ return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim(); }
   function insVol(e){
     var vi = (typeof _escSplitVolInstr === 'function') ? _escSplitVolInstr(e.volInstr) : { instrumento:'', volumen:'' };
     return { ins: String(e.instrumento || vi.instrumento || '').trim(), vol: String(e.volumen || vi.volumen || '').trim() };
@@ -316,7 +318,7 @@
   }
   function filtrosBusqueda(){
     var v = function(id){ return String((document.getElementById(id) || {}).value || '').trim(); };
-    return { q: v('escQ').toLowerCase(), ins: dig(v('escQInstr')), vol: dig(v('escQVol')), fecha: leerFechaBuscada(v('escQFecha')) };
+    return { q: sinAc(v('escQ')), ins: dig(v('escQInstr')), vol: dig(v('escQVol')), fecha: leerFechaBuscada(v('escQFecha')) };
   }
   function pasaBusqueda(e, F, TM){
     if (F.ins || F.vol) {
@@ -333,7 +335,8 @@
     }
     if (F.q) {
       var iv2 = insVol(e);
-      var txt = [e.num || '', (e.compradores || []).map(nom).join(' '), (e.vendedores || []).map(nom).join(' '), e.tipo || '', TM[e.tipoMovimiento] || '', e.notaria || '', e.descripcion || '', iv2.ins, iv2.vol, e.volInstr || '', e.predio || '', e.ubicacion || '', e.tramite || ''].join(' ').toLowerCase();
+      var txt = [e.num || '', (e.compradores || []).map(nom).join(' '), (e.vendedores || []).map(nom).join(' '), e.tipo || '', TM[e.tipoMovimiento] || '', e.notaria || '', e.descripcion || '', iv2.ins, iv2.vol, e.volInstr || '', e.predio || '', e.ubicacion || '', e.tramite || ''].join(' ');
+      txt = sinAc(txt);
       if (txt.indexOf(F.q) < 0) {
         // Números escritos con o sin coma (12848 ↔ 12,848)
         var qd = dig(F.q);

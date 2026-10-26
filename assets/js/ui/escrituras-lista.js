@@ -260,7 +260,10 @@
     if (!barra) return;
     barra.id = 'lex-esc-clasif';
     var cuenta = {}; CLASIF.forEach(function(c){ cuenta[c.k] = 0; });
-    (D.escrituras || []).forEach(function(e){ if (!e) return; CLASIF.forEach(function(c){ if (cabe(e, c.k)) cuenta[c.k]++; }); });
+    // Con búsqueda activa, cada tarjeta cuenta solo lo que coincide
+    var F = filtrosBusqueda(), TM = g('ESC_TIPOS_MOVIMIENTO', {}), busc = hayBusqueda(F);
+    (D.escrituras || []).forEach(function(e){ if (!e) return; if (busc && !pasaBusqueda(e, F, TM)) return; CLASIF.forEach(function(c){ if (cabe(e, c.k)) cuenta[c.k]++; }); });
+    window._lexEscCuentaClasif = cuenta;
     barra.style.cssText = 'display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;padding:10px 16px 14px;';
     barra.innerHTML = CLASIF.map(function(c){
       var on = c.k === _cat;
@@ -271,19 +274,133 @@
     }).join('');
   }
 
+  // ── Oct-2026 · Búsqueda por INSTRUMENTO / VOLUMEN / FECHA DE FIRMA ────
+  // Tres campos delante del buscador. Se combinan entre sí y con el texto.
+  // Instrumento y volumen: número exacto, con o sin coma (12848 = 12,848).
+  // Fecha: día (13/09/2024), mes (09/2024) o año (2024).
+  function dig(s){ return String(s || '').replace(/\D/g, ''); }
+  function insVol(e){
+    var vi = (typeof _escSplitVolInstr === 'function') ? _escSplitVolInstr(e.volInstr) : { instrumento:'', volumen:'' };
+    return { ins: String(e.instrumento || vi.instrumento || '').trim(), vol: String(e.volumen || vi.volumen || '').trim() };
+  }
+  function notKey(n){ var m = /(\d+)/.exec(String(n || '')); return m ? m[1] : ''; }
+  function fechaPartes(x){
+    var f = String(x.fechaFirma || '').trim(), m;
+    if ((m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f))) return { y: m[1], m: +m[2], d: +m[3] };
+    var t = String(x.fechaFirmaTexto || f || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if ((m = /(\d{1,2})\s*(?:de\s*)?([a-z]{3})[a-z]*\.?\s*(?:de\s*|del\s*)?(\d{4})/.exec(t)) && MES_N[m[2]]) return { y: m[3], m: MES_N[m[2]], d: +m[1] };
+    if ((m = /(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/.exec(t))) return { y: m[3], m: +m[2], d: +m[1] };
+    if ((m = /([a-z]{3})[a-z]*\.?\s*(?:de\s*|del\s*)?(\d{4})/.exec(t)) && MES_N[m[1]]) return { y: m[2], m: MES_N[m[1]], d: 0 };
+    if ((m = /(\d{4})/.exec(t))) return { y: m[1], m: 0, d: 0 };
+    return null;
+  }
+  function leerFechaBuscada(q){
+    q = String(q || '').trim(); if (!q) return null;
+    var p = q.split(/[\/\-.\s]+/).filter(Boolean);
+    var y4 = function(s){ return s.length === 2 ? '20' + s : s; };
+    if (p.length === 1) return /^\d{4}$/.test(p[0]) ? { y: p[0], m: 0, d: 0 } : { malo: true };
+    if (p.length === 2) return { y: y4(p[1]), m: +p[0], d: 0 };
+    if (p[0].length === 4) return { y: p[0], m: +p[1], d: +p[2] };
+    return { y: y4(p[2]), m: +p[1], d: +p[0] };
+  }
+  function filtrosBusqueda(){
+    var v = function(id){ return String((document.getElementById(id) || {}).value || '').trim(); };
+    return { q: v('escQ').toLowerCase(), ins: dig(v('escQInstr')), vol: dig(v('escQVol')), fecha: leerFechaBuscada(v('escQFecha')) };
+  }
+  function pasaBusqueda(e, F, TM){
+    if (F.ins || F.vol) {
+      var iv = insVol(e);
+      if (F.ins && dig(iv.ins) !== F.ins) return false;
+      if (F.vol && dig(iv.vol) !== F.vol) return false;
+    }
+    if (F.fecha) {
+      if (F.fecha.malo) return false;
+      var p = fechaPartes(e);
+      if (!p || p.y !== F.fecha.y) return false;
+      if (F.fecha.m && p.m !== F.fecha.m) return false;
+      if (F.fecha.d && p.d !== F.fecha.d) return false;
+    }
+    if (F.q) {
+      var iv2 = insVol(e);
+      var txt = [e.num || '', (e.compradores || []).map(nom).join(' '), (e.vendedores || []).map(nom).join(' '), e.tipo || '', TM[e.tipoMovimiento] || '', e.notaria || '', e.descripcion || '', iv2.ins, iv2.vol, e.volInstr || '', e.predio || '', e.ubicacion || '', e.tramite || ''].join(' ').toLowerCase();
+      if (txt.indexOf(F.q) < 0) {
+        // Números escritos con o sin coma (12848 ↔ 12,848)
+        var qd = dig(F.q);
+        if (!(qd && qd.length >= 3 && /^[\d,.\s\/]+$/.test(F.q) && (dig(iv2.ins) === qd || dig(iv2.vol) === qd))) return false;
+      }
+    }
+    return true;
+  }
   function filtrar(){
-    var q = String((document.getElementById('escQ') || {}).value || '').toLowerCase();
+    var F = filtrosBusqueda();
     var TM = g('ESC_TIPOS_MOVIMIENTO', {});
     return (D.escrituras || []).filter(function(e){
       if (!e) return false;
       if (!cabe(e, _cat)) return false;
-      if (q) {
-        var txt = [e.num || '', (e.compradores || []).map(nom).join(' '), (e.vendedores || []).map(nom).join(' '), e.tipo || '', TM[e.tipoMovimiento] || '', e.notaria || '', e.descripcion || '', e.instrumento || ''].join(' ').toLowerCase();
-        return txt.indexOf(q) >= 0;
-      }
-      return true;
+      return pasaBusqueda(e, F, TM);
     });
   }
+  function hayBusqueda(F){ return !!(F.q || F.ins || F.vol || F.fecha); }
+
+  // ── Instrumentos REPETIDOS (misma notaría) ───────────────────────────
+  // VIGENTE = la que no está cancelada; CANCELADA = número reutilizado.
+  // Dos vigentes con el mismo instrumento y notaría → posible duplicado.
+  function esCancelada(e){ return e && (e.estado === 'cancelado' || e.estado === 'noprocedio'); }
+  function mismaNotaria(a, b){ var x = notKey(a.notaria), y = notKey(b.notaria); return !x || !y || x === y; }
+  function hermanasInstr(e, lista){
+    var k = dig(insVol(e).ins); if (!k) return [];
+    return (lista || D.escrituras || []).filter(function(o){ return o && o !== e && o.id !== e.id && dig(insVol(o).ins) === k && mismaNotaria(o, e); });
+  }
+  window._lexEscHermanasInstr = hermanasInstr;
+  window._lexEscInsVol = insVol;
+  function marcaRepetido(e){
+    var h = hermanasInstr(e); if (!h.length) return null;
+    var n = h.length + 1;
+    var tip = 'Este instrumento aparece ' + n + ' veces: ' + h.map(function(o){ return ((o.compradores || [])[0] ? nom(o.compradores[0]) : 'sin comprador') + (esCancelada(o) ? ' (cancelada)' : ''); }).join(', ');
+    var chipRep = '<span title="' + E(tip) + '" style="' + CH + 'background:#3a2a10;color:#f3d48a;">⇄ Instr. repetido (' + n + ')</span>';
+    var badge;
+    if (esCancelada(e)) badge = '<span title="' + E(tip) + '" style="' + CH + 'background:#fcebeb;color:#791f1f;border:1px solid #a32d2d;">✕ CANCELADA · número reutilizado</span>';
+    else if (h.some(function(o){ return !esCancelada(o); })) badge = '<span title="' + E(tip) + '" style="' + CH + 'background:#fcebeb;color:#a32d2d;border:1px solid #a32d2d;">⚠ POSIBLE DUPLICADO</span>';
+    else badge = '<span title="' + E(tip) + '" style="' + CH + 'background:#e3f1dc;color:#27500a;border:1px solid #3b6d11;">✔ VIGENTE</span>';
+    return { chips: badge + chipRep, tachar: esCancelada(e) };
+  }
+
+  // ── Campos de búsqueda delante del buscador ──────────────────────────
+  function asegurarCampos(){
+    var q = document.getElementById('escQ');
+    if (!q || document.getElementById('escQInstr')) return;
+    var mk = function(id, lbl, ph, w){
+      var d = document.createElement('div');
+      d.style.cssText = 'position:relative;flex:0 0 ' + w + 'px;min-width:0;';
+      d.innerHTML = '<span style="position:absolute;top:-15px;left:3px;font-size:9.5px;font-weight:700;letter-spacing:0.1em;color:#c9a96a;font-family:monospace;white-space:nowrap;">' + lbl + '</span>'
+        + '<input class="search-inp lex-esc-campo" type="search" id="' + id + '" placeholder="' + ph + '" autocomplete="off" style="width:100%;box-sizing:border-box;padding:9px 10px;font-family:monospace;">';
+      d.querySelector('input').addEventListener('input', function(){ window.escRender(); });
+      return d;
+    };
+    var fr = document.createDocumentFragment();
+    fr.appendChild(mk('escQInstr', 'INSTRUMENTO', '12,848', 118));
+    fr.appendChild(mk('escQVol', 'VOLUMEN', '186', 86));
+    fr.appendChild(mk('escQFecha', 'FECHA DE FIRMA', 'dd/mm/aaaa', 138));
+    q.parentNode.insertBefore(fr, q);
+    q.placeholder = '🔍 Cliente, acto, notaría, predio…';
+    q.style.minWidth = '200px';
+    var row = q.parentNode; if (row && !row._lexPad) { row._lexPad = true; row.style.marginTop = '18px'; }
+    var st = document.createElement('style');
+    st.textContent = '.lex-esc-campo.lex-on{border:2px solid #2e7d32 !important;background:#eef7e9 !important;}';
+    document.head.appendChild(st);
+  }
+  function marcarCampos(){
+    ['escQInstr', 'escQVol', 'escQFecha', 'escQ'].forEach(function(id){
+      var i = document.getElementById(id); if (!i) return;
+      var on = !!String(i.value || '').trim();
+      if (id === 'escQ') { i.style.borderColor = on ? '#2e7d32' : ''; return; }
+      i.classList.toggle('lex-on', on);
+    });
+  }
+  window.lexEscLimpiarBusqueda = function(){
+    ['escQInstr', 'escQVol', 'escQFecha', 'escQ'].forEach(function(id){ var i = document.getElementById(id); if (i) i.value = ''; });
+    window.escRender();
+  };
   // ── Tarjetas estilo Pendientes de Placas (oct-2026) ───────────────────
   // Misma forma y tamaño que las fichas de Placas: franja de color a la
   // izquierda, N° de trámite, 👤 cliente en grande, el trámite en negritas,
@@ -344,9 +461,25 @@
       return c !== 0 ? c : (b.n - a.n);
     });
     var cnt = document.getElementById('escCountNum'); if (cnt) cnt.textContent = lst.length;
-    if (!lst.length) { cont.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.8rem;">Sin escrituras en este filtro.</div>'; return; }
+    var F = filtrosBusqueda(), busc = hayBusqueda(F);
+    // Con búsqueda: avisar si también hay coincidencias en otras clasificaciones
+    var tambien = '';
+    if (busc) {
+      var cu0 = window._lexEscCuentaClasif || {};
+      var enTodos = _cat === 'todos';
+      var otros0 = CLASIF.filter(function(c){ return c.k !== 'todos' && c.k !== _cat && cu0[c.k] && !(enTodos && (c.k === 'proceso' || c.k === 'listo')); });
+      if (otros0.length) tambien = '<span style="margin-left:10px;color:#c8b68a;">' + (lst.length ? 'También en:' : 'Sí hay en:') + '</span>' + otros0.map(function(c){ return '<button type="button" onclick="lexEscClasif(\'' + c.k + '\')" style="background:#fdfaf4;border:none;border-top:3px solid ' + c.c + ';border-radius:6px;padding:3px 10px;margin-left:6px;cursor:pointer;color:' + c.t + ';font-weight:700;font-size:0.7rem;">' + c.lbl + ' (' + cu0[c.k] + ') ›</button>'; }).join('');
+    }
+    var barraBusq = busc ? '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:0 2px 8px;font-size:0.78rem;color:#f3d48a;">'
+      + '<span>🔎 Búsqueda: <b style="font-family:monospace;color:#7ddc8a;">' + lst.length + (lst.length === 1 ? ' escritura' : ' escrituras') + '</b>'
+      + [F.ins ? 'Instr. ' + F.ins : '', F.vol ? 'Vol. ' + F.vol : '', F.fecha ? 'Firma ' + E((document.getElementById('escQFecha') || {}).value || '') : '', F.q ? '“' + E(F.q) + '”' : ''].filter(Boolean).map(function(t){ return ' <span style="border:1px solid #c8952a;border-radius:10px;padding:1px 8px;margin-left:4px;font-size:0.7rem;">' + t + '</span>'; }).join('')
+      + tambien + '</span><button type="button" onclick="lexEscLimpiarBusqueda()" style="background:transparent;border:1px solid #c8952a;color:#e8c46a;border-radius:6px;padding:4px 12px;font-size:0.72rem;cursor:pointer;">✕ Limpiar búsqueda</button></div>' : '';
+    if (!lst.length) {
+      cont.innerHTML = barraBusq + '<div style="padding:24px;text-align:center;color:var(--muted);font-size:0.8rem;">' + (busc ? (tambien ? 'En este filtro no hay; vea arriba dónde sí está.' : 'No hay ninguna escritura con esos datos.') : 'Sin escrituras en este filtro.') + '</div>';
+      return;
+    }
     var nAt = lst.filter(function(x){ return x.d.atencion; }).length;
-    var resumen = '<div style="display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;font-size:0.72rem;color:#c8b68a;">'
+    var resumen = barraBusq + '<div style="display:flex;justify-content:space-between;align-items:center;padding:0 2px 8px;font-size:0.72rem;color:#c8b68a;">'
       + '<span>' + (nAt ? '<b style="color:#f08a8a;">⚠ ' + nAt + (nAt === 1 ? ' requiere' : ' requieren') + ' atención</b> (franja roja)' : '') + '</span>'
       + '<span>Trámites en curso: <b style="color:#e8c875;font-family:monospace;font-size:0.85rem;">' + NUM.total + '</b></span></div>';
     var cards = lst.map(function(x){
@@ -363,8 +496,10 @@
       // Instrumento y volumen por separado; si solo existe "Vol./Instr." junto (Excel), se separa
       var _vi = (typeof _escSplitVolInstr === 'function') ? _escSplitVolInstr(e.volInstr) : { instrumento:'', volumen:'' };
       var _ins = e.instrumento || _vi.instrumento, _vol = e.volumen || _vi.volumen;
-      if (_ins) chips.push('<span style="' + CH + 'background:#faeeda;color:#633806;font-weight:700;">Instr. ' + E(_ins) + '</span>');
-      if (_vol) chips.push('<span style="' + CH + 'background:#f1efe8;color:#444441;">Vol. ' + E(_vol) + '</span>');
+      var rep = null; try { rep = marcaRepetido(e); } catch(_r){}
+      if (rep) chips.push(rep.chips);
+      if (_ins) chips.push('<span style="' + CH + 'background:#faeeda;color:#633806;font-weight:700;' + (F.ins && dig(_ins) === F.ins ? 'box-shadow:0 0 0 2px #2e7d32;' : '') + '">Instr. ' + E(_ins) + '</span>');
+      if (_vol) chips.push('<span style="' + CH + 'background:#f1efe8;color:#444441;' + (F.vol && dig(_vol) === F.vol ? 'box-shadow:0 0 0 2px #2e7d32;' : '') + '">Vol. ' + E(_vol) + '</span>');
       if (d.fechaFirma) chips.push('<span style="' + CH + 'background:rgba(26,122,58,0.08);color:#27500a;">✍ Firma ' + E(d.fechaFirma) + '</span>');
       if (String(e.num || '').trim()) { var cn = String(e.num).trim(); chips.push('<span style="' + CH + 'background:rgba(200,149,42,0.12);color:#8c6518;font-weight:700;">🗂 CARP.- ' + E(cn.replace(/^carp\.?-?\s*/i, '')) + '</span>'); }
       if (e.notaria) chips.push('<span style="' + CH + 'background:rgba(0,0,0,0.05);color:#6a5a3a;font-weight:400;">🔏 ' + E(String(e.notaria).length > 34 ? String(e.notaria).slice(0, 34) + '…' : e.notaria) + '</span>');
@@ -376,7 +511,7 @@
         +     '<div title="N° de trámite en curso (de la más antigua a la más reciente)" style="display:flex;flex-direction:column;align-items:center;line-height:1.05;flex-shrink:0;min-width:30px;"><span style="color:#a8987a;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Trámite</span><span style="color:' + (n ? '#1a1008' : '#c8bb98') + ';font-family:\'JetBrains Mono\',monospace;font-size:15px;font-weight:900;">' + (n || '—') + '</span>' + (d.atencion ? '<span class="lex-esc-parpadeo" title="Plazo vencido" style="margin-top:3px;background:#c81e1e;color:#fff;font-size:7.5px;font-weight:800;letter-spacing:0.05em;border-radius:3px;padding:1px 4px;">VENCIDO</span>' : '') + '</div>'
         // Oct-2026: en UN solo renglón → 👤 CLIENTE (negro) · ACTO (verde) · — compra a Vendedor (azul)
         +     '<div style="min-width:0;line-height:1.35;">'
-        +       '<span style="font-size:13.5px;font-weight:700;color:' + (apagada ? '#6a6a62' : '#1a1008') + ';font-family:\'Outfit\',sans-serif;letter-spacing:0.02em;text-transform:uppercase;">👤 ' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:11px;color:#9a8a6a;">+' + (d.compradores.length - 1) + '</span>' : '') + '</span>'
+        +       '<span style="font-size:13.5px;font-weight:700;color:' + (apagada ? '#6a6a62' : '#1a1008') + ';font-family:\'Outfit\',sans-serif;letter-spacing:0.02em;text-transform:uppercase;' + (rep && rep.tachar ? 'text-decoration:line-through;text-decoration-color:#a32d2d;' : '') + '">👤 ' + E(nomC) + (d.compradores.length > 1 ? ' <span style="font-size:11px;color:#9a8a6a;">+' + (d.compradores.length - 1) + '</span>' : '') + '</span>'
         +       ' <span style="font-size:12.5px;font-weight:700;color:' + colNom + ';margin-left:6px;">' + E(acto) + '</span>'
         +       (rel ? ' <span style="font-size:12px;color:#9a8a6a;">— ' + E(verboRel(d)) + '</span> <span style="font-size:13px;font-weight:500;color:#185fa5;">' + E(d.vendedores.map(nombrePropio).join(', ')) + '</span>' : '')
         +     '</div>'
@@ -428,10 +563,84 @@
     // Oct-2026: se quitó la "Vista anterior (tarjetas)" a petición del Lic.
     // Nahúm — siempre se usa la Lista de trabajo.
     try { var _sv = document.getElementById('lex-esc-vista-sel'); if (_sv) _sv.remove(); } catch(e){}
+    try { asegurarCampos(); marcarCampos(); } catch(errB) { console.warn('[Escrituras búsqueda]', errB); }
     if (typeof D === 'undefined' || !Array.isArray(D.escrituras)) return original.apply(this, arguments);
     try { pintarClasificacion(); } catch(errC) { console.warn('[Escrituras clasificación]', errC); }
     try { pintarLista(); }
     catch(err) { console.warn('[Escrituras lista] se usa la vista anterior:', err); return original.apply(this, arguments); }
   };
   window._lexEscDatos = datos;
+
+  // ── Aviso de instrumento repetido al GUARDAR (nueva o editada) ────────
+  //  · Solo existe en una CANCELADA → aviso amarillo, se guarda normal.
+  //  · Ya está VIGENTE (misma notaría) → aviso rojo: Abrir la existente /
+  //    Guardar de todos modos / Volver al formulario.
+  // Solo revisa cuando el instrumento es nuevo o cambió (no molesta al editar
+  // otros datos de una escritura que ya lo tenía).
+  function avisoRepetido(vig, ins, alGuardar){
+    var prev = document.getElementById('lex-esc-dup'); if (prev) prev.remove();
+    var o = vig[0], nomO = (o.compradores || [])[0] ? nom(o.compradores[0]) : 'sin comprador';
+    var iv = insVol(o);
+    var w = document.createElement('div'); w.id = 'lex-esc-dup';
+    w.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:100000;display:flex;align-items:center;justify-content:center;';
+    w.innerHTML = '<div style="background:#fdf8ee;border-radius:12px;border-top:6px solid #a32d2d;max-width:520px;width:92%;padding:20px 22px;font-family:Outfit,sans-serif;color:#2a1a08;box-shadow:0 12px 40px rgba(0,0,0,0.45);">'
+      + '<div style="font-size:1.05rem;font-weight:800;color:#a32d2d;margin-bottom:8px;">⛔ Instrumento ya registrado</div>'
+      + '<div style="font-size:0.9rem;line-height:1.5;">El instrumento <b style="font-family:monospace;">' + E(ins) + '</b>' + (o.notaria ? ' de <b>' + E(o.notaria) + '</b>' : '') + ' ya está <b style="color:#27500a;">VIGENTE</b> en:</div>'
+      + '<div style="margin:10px 0 14px;padding:10px 12px;background:#fff;border:1px solid #e3d3a8;border-left:5px solid #2e7d32;border-radius:6px;font-size:0.88rem;"><b style="text-transform:uppercase;">👤 ' + E(nomO) + '</b><div style="font-family:monospace;font-size:0.78rem;color:#1a7a3a;margin-top:3px;">' + (iv.vol ? 'Vol. ' + E(iv.vol) + ' · ' : '') + 'Instr. ' + E(iv.ins) + (o.fechaFirma ? ' · Firma ' + E(o.fechaFirma) : '') + '</div>' + (vig.length > 1 ? '<div style="font-size:0.75rem;color:#7a6a4a;margin-top:3px;">y ' + (vig.length - 1) + ' más</div>' : '') + '</div>'
+      + '<div style="font-size:0.85rem;margin-bottom:14px;">¿Es la misma escritura?</div>'
+      + '<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">'
+      + '<button type="button" data-a="volver" style="background:transparent;border:1px solid #9a8a6a;color:#5a4a2a;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:600;">Volver al formulario</button>'
+      + '<button type="button" data-a="abrir" style="background:#2e7d32;border:none;color:#fff;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:700;">Abrir la existente</button>'
+      + '<button type="button" data-a="guardar" style="background:#a32d2d;border:none;color:#fff;border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:700;">Guardar de todos modos</button>'
+      + '</div></div>';
+    document.body.appendChild(w);
+    w.querySelectorAll('button').forEach(function(b){
+      b.onclick = function(){
+        var a = b.getAttribute('data-a'); w.remove();
+        if (a === 'guardar') alGuardar();
+        else if (a === 'abrir') {
+          try { if (typeof cerrar === 'function') cerrar('mEscritura'); } catch(_){}
+          var i = D.escrituras.indexOf(o);
+          if (i >= 0 && typeof escAbrirDetalle === 'function') setTimeout(function(){ escAbrirDetalle(i); }, 50);
+        }
+      };
+    });
+  }
+  function envolverGuardar(){
+    var og = window.escGuardar;
+    if (typeof og !== 'function' || og._lexDup) return;
+    var env = function(){
+      var self = this, args = arguments;
+      try {
+        var ins = String((document.getElementById('eInstrumento') || {}).value || '').trim();
+        var k = dig(ins);
+        var idx = (typeof _escIdx === 'number') ? _escIdx : -1;
+        var actual = idx >= 0 ? D.escrituras[idx] : null;
+        var cambio = !actual || dig(insVol(actual).ins) !== k;
+        if (k && cambio && !window._lexEscDupOk) {
+          var fake = { id: actual ? actual.id : '__nueva__', instrumento: ins, notaria: String((document.getElementById('eNotaria') || {}).value || '').trim() };
+          var h = hermanasInstr(fake).filter(function(o){ return o !== actual; });
+          var vig = h.filter(function(o){ return !esCancelada(o); });
+          if (vig.length) {
+            avisoRepetido(vig, ins, function(){ window._lexEscDupOk = true; try { og.apply(self, args); } finally { window._lexEscDupOk = false; } });
+            return;
+          }
+          if (h.length) {
+            var c0 = h[0], n0 = (c0.compradores || [])[0] ? nom(c0.compradores[0]) : 'sin comprador';
+            setTimeout(function(){
+              var a = document.createElement('div');
+              a.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:100000;max-width:560px;width:90%;background:#fdf3dc;color:#633806;border:1.5px solid #ba7517;border-left:6px solid #ba7517;border-radius:8px;padding:12px 16px;font-size:0.86rem;line-height:1.45;box-shadow:0 8px 24px rgba(0,0,0,0.35);';
+              a.innerHTML = '⚠ El instrumento <b style="font-family:monospace;">' + E(ins) + '</b> ya se usó en una escritura <b>CANCELADA</b> (' + E(n0) + '). Se guardó y quedará marcada como “instrumento reutilizado”.';
+              document.body.appendChild(a);
+              setTimeout(function(){ a.remove(); }, 7000);
+            }, 600);
+          }
+        }
+      } catch(errD) { console.warn('[Escrituras instr. repetido]', errD); }
+      return og.apply(self, args);
+    };
+    env._lexDup = true;
+    window.escGuardar = env;
+  }
+  envolverGuardar();
 })();

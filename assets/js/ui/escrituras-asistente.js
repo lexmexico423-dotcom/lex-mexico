@@ -9,6 +9,8 @@
 //   3 Traslado de dominio municipal: pagado + comprobante entregado
 //     ↓ intermedio (10 días): enviar al notario para el ISR           → tarea
 //   4 ISR con el notario (10 días): generado (+ pago del cliente si aplica)
+//     ↓ intermedio (10 días): SOLICITAR a la notaría la escritura y que
+//       la ENTREGUE (oct-2026)                                         → tarea
 //     ↓ intermedio (10 días): ingresar al Registro Público            → tarea
 //   5 Registro Público / IFREO (en la oficina, hasta 30 días): inscripción +
 //     escritura física en el despacho → LISTO PARA ENTREGAR           → 📞 tarea
@@ -31,6 +33,7 @@
       ESC_NOTAS_ACTIVO[1] = 'Ya se ingresó a Catastro: puede tardar hasta 2 meses en salir la cédula y el avalúo';
       ESC_NOTAS_ACTIVO[4] = 'Ya se ingresó al Registro Público: puede tardar hasta 1 mes en salir la inscripción';
     }
+    if (typeof ESC_NOTAS_AUTO_INTERMEDIO !== 'undefined') ESC_NOTAS_AUTO_INTERMEDIO[4] = 'Concluyó el ISR: solicita a la notaría la entrega de la escritura (10 días)';
   } catch(e){}
 
   function E(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
@@ -63,6 +66,10 @@
     for (var i = 0; i < 5; i++) if (!e.pasos[i]) e.pasos[i] = { estado:'pendiente', notas:'', fecha:'' };
     return e.pasos;
   }
+  // Oct-2026: entre el ISR y el Registro Público hay un paso más: solicitar a
+  // la notaría la escritura y que la entregue. Vive dentro del intermedio del
+  // paso 5 (pasos[4].escrituraRecibida = true cuando la notaría ya la entregó).
+  function esperaNotaria(e){ var p = pasosDe(e)[4]; return activoDe(e) === 4 && p.estado !== 'activo' && p.estado !== 'completado' && !p.escrituraRecibida; }
   function activoDe(e){ var ps = pasosDe(e), c = 0; for (var i = 0; i < 5; i++) { if (ps[i].estado === 'completado') c++; else break; } return c < 5 ? c : -1; }
 
   // ── Qué se pregunta en cada punto ─────────────────────────────────────
@@ -116,8 +123,22 @@
         { k:'generado', t:'¿El notario ya generó el ISR?', falta:'Falta que el notario genere el ISR' },
         { k:'cargo', t:'¿Hay pago de ISR a cargo del cliente?', neutral:true },
         { k:'pagado', t:'¿El cliente ya pagó su ISR?', si:'cargo', falta:'El cliente no ha pagado su ISR', cliente:true, llamar:'para que pague su ISR' }],
-      siguiente: 'ISR listo → ingresar al Registro Público', accion: function(){
+      siguiente: 'ISR listo → solicitar la escritura a la notaría', accion: function(){
         completar(e, 3); abrirIntermedio(e, 4);
+        tareaInterna(e, 'notaria-escritura', 'Solicitar a la notaría la entrega de la escritura', hoyISO(0));
+      }
+    };
+    if (i === 4 && fase === 'intermedio' && !pasosDe(e)[4].escrituraRecibida) return {
+      titulo: 'Intermedio · Solicitar la escritura a la notaría', plazo: DIAS_INTER,
+      preguntas: [
+        { k:'solicitada', t:'¿Ya se solicitó a la notaría la entrega de la escritura?', falta:'Falta solicitar a la notaría la entrega de la escritura' },
+        { k:'entregada', t:'¿La notaría ya entregó la escritura?', falta:'La notaría no ha entregado la escritura' }],
+      siguiente: 'Escritura recibida → ingresar al Registro Público', accion: function(){
+        var p4 = pasosDe(e)[4];
+        p4.escrituraRecibida = true; p4.escrituraRecibidaFecha = new Date().toISOString();
+        p4.fechaAutoInicio = new Date().toISOString(); p4.plazoDias = DIAS_INTER; p4.fecha = fechaTxt();
+        p4.notas = 'La notaría entregó la escritura: tienes ' + DIAS_INTER + ' días para ingresarla al Registro Público';
+        historial(e, 'La notaría entregó la escritura → inicia el plazo de ' + DIAS_INTER + ' días para ingresarla al Registro Público');
         tareaInterna(e, 'registro', 'Ingresar la escritura al Registro Público (IFREO)', hoyISO(0));
       }
     };
@@ -187,7 +208,7 @@
   }
   function recordatorio(e, motivo, titulo, enDias){ tareaInterna(e, motivo, titulo, hoyISO(enDias)); }
   // Al cumplirse una etapa, sus tareas automáticas pendientes se dan por resueltas
-  var RESUELVE = { '2':['traslado','traslado-mitad'], '3-intermedio':['isr-enviar'], '4-intermedio':['registro'] };
+  var RESUELVE = { '2':['traslado','traslado-mitad'], '3-intermedio':['isr-enviar'], '4-intermedio':['notaria-escritura','registro'] };
   function resolverTareas(e, i, fase){
     var lista = (RESUELVE[i + '-' + fase] || RESUELVE[String(i)] || []), ahora = new Date().toISOString(), n = 0;
     tareas().forEach(function(t){
@@ -485,7 +506,7 @@
     if (fase === 'intermedio') return ({ 1: 'sin cumplir los requisitos para ingresar el trámite a <b>Catastro</b>',
       2: 'sin que el cliente pague su <b>traslado de dominio</b>' + (muni ? ' en ' + E(muni) : ''),
       3: 'sin entregar el expediente al <b>notario para el ISR</b>',
-      4: 'sin ingresar la escritura al <b>Registro Público</b>' })[i];
+      4: esperaNotaria(e) ? 'esperando que la <b>notaría entregue la escritura</b>' : 'sin ingresar la escritura al <b>Registro Público</b>' })[i];
     return ({ 1: 'en <b>Catastro</b> esperando la cédula y el avalúo', 2: 'esperando el pago del <b>traslado de dominio</b>',
       3: 'esperando que el <b>notario genere el ISR</b>', 4: 'en el <b>Registro Público</b> esperando la inscripción' })[i];
   }
@@ -515,6 +536,7 @@
         plazo = parseInt(p.plazoDias, 10) || (fase === 'oficina' ? DIAS_OFICINA[a] : DIAS_INTER);
         pct = Math.min(1, dias / plazo);
         if (fase === 'intermedio') seg = a - 1;            // tramo que LLEGA al paso
+        if (fase === 'intermedio' && a === 4) pct = p.escrituraRecibida ? 0.5 + pct / 2 : pct / 2;   // 1ª mitad: notaría · 2ª: ingresar
         else if (a < 4) seg = a;                           // tramo que SALE del paso (en la oficina)
         else { seg = 4; enCirculo = true; }
       }
@@ -551,7 +573,17 @@
       if (k < 4) {
         var tramoHecho = (ps[k].estado === 'completado' && (ps[k + 1].estado === 'completado' || (k + 1 === a && fase === 'oficina'))) || e.estado === 'listo' || e.estado === 'archivado';
         var esSeg = info && !info.enCirculo && info.seg === k;
-        html += '<div style="flex:1;position:relative;height:4px;margin-top:15px;background:' + (tramoHecho ? '#1a7a3a' : '#e5dcc4') + ';border-radius:2px;">'
+        var marcaNot = '';
+        if (k === 3) {
+          var recib = !!ps[4].escrituraRecibida || ps[4].estado === 'activo' || ps[4].estado === 'completado' || e.estado === 'listo' || e.estado === 'archivado';
+          var aquiN = a === 4 && fase === 'intermedio' && !recib && enCurso;
+          var cN = recib ? '#1a7a3a' : aquiN ? (info ? info.col : '#0e7490') : '#c9bfa6';
+          marcaNot = '<div title="Solicitar a la notaría la entrega de la escritura' + (recib ? ' — ✓ entregada' : '') + '" style="position:absolute;left:50%;top:-6px;transform:translateX(-50%);width:16px;height:16px;border-radius:4px;transform-origin:center;background:' + (recib ? '#1a7a3a' : '#fff') + ';border:2px solid ' + cN + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:800;z-index:1;">' + (recib ? '✓' : '') + '</div>'
+            + '<div style="position:absolute;left:50%;top:14px;transform:translateX(-50%);font-family:monospace;font-size:9px;font-weight:' + (aquiN ? '800' : '600') + ';color:' + (recib ? '#1a7a3a' : aquiN ? cN : '#a89c80') + ';white-space:nowrap;line-height:1.25;text-align:center;">ESCRITURA<br>NOTARÍA</div>';
+        }
+        // Tramo ISR→Registro: verde hasta la marca cuando la notaría ya entregó
+        if (k === 3 && !tramoHecho && ps[4].escrituraRecibida) marcaNot = '<div style="position:absolute;left:0;top:0;height:4px;width:50%;background:#1a7a3a;border-radius:2px;"></div>' + marcaNot;
+        html += '<div style="flex:1;position:relative;height:4px;margin-top:15px;background:' + (tramoHecho ? '#1a7a3a' : '#e5dcc4') + ';border-radius:2px;">' + marcaNot
           + (esSeg ? '<div style="position:absolute;left:0;top:0;height:4px;width:' + Math.round(info.pct * 100) + '%;background:' + info.col + ';border-radius:2px;"></div>' + '<div style="position:absolute;left:0;right:0;top:-2px;height:0;">' + persona(Math.round(info.pct * 100)) + '</div>' : '')
           + '</div>';
       }
@@ -561,6 +593,7 @@
       var ETQ = { 'firma-0':'Registrar la firma ante notario', 'intermedio-1':'Reunir requisitos e ingresar a Catastro', 'oficina-1':'¿Ya salió la cédula y el avalúo?',
         'intermedio-2':'¿Ya pagó el cliente su traslado de dominio?', 'oficina-2':'¿Ya pagó el cliente su traslado de dominio?', 'intermedio-3':'Entregar el expediente al notario para el ISR',
         'oficina-3':'¿Ya generó el notario el ISR?', 'intermedio-4':'Ingresar la escritura al Registro Público', 'oficina-4':'¿Ya salió la inscripción del Registro?' };
+      if (fase === 'intermedio' && a === 4 && esperaNotaria(e)) ETQ['intermedio-4'] = '¿Ya entregó la notaría la escritura?';
       html += '<div style="text-align:center;margin-top:14px;"><button type="button" onclick="lexEscSiguienteEtapa(' + idx + ')" style="background:#1a7a3a;color:#fff;border:none;border-radius:9px;padding:11px 22px;font-weight:800;font-size:0.85rem;cursor:pointer;box-shadow:0 3px 10px rgba(26,122,58,0.3);">▶ Avanzar: ' + E(ETQ[fase + '-' + a] || 'siguiente etapa') + '</button></div>'
         + '<div style="text-align:center;font-size:0.68rem;color:#8a7f6a;margin-top:6px;">Verde = hecho · La personita = dónde va · Gris = falta · Toca un círculo para corregirlo o para adelantar</div>';
     }
@@ -580,7 +613,7 @@
     var muni = String(e.ubicacion || '').trim();
     if (j === 2) { tareaLlamada(e, 'traslado', 'para que vaya a pagar su TRASLADO DE DOMINIO' + (muni ? ' en ' + muni : ' en su municipio') + ' y traiga el comprobante. Tiene ' + DIAS_INTER + ' días.'); recordatorio(e, 'traslado-mitad', 'Seguimiento: ¿ya pagó el traslado de dominio?', Math.floor(DIAS_INTER / 2)); }
     if (j === 3) tareaInterna(e, 'isr-enviar', 'Llevar el expediente al notario para que genere el ISR', hoyISO(0));
-    if (j === 4) tareaInterna(e, 'registro', 'Ingresar la escritura al Registro Público (IFREO)', hoyISO(0));
+    if (j === 4) tareaInterna(e, 'notaria-escritura', 'Solicitar a la notaría la entrega de la escritura', hoyISO(0));
   }
   function saltarHasta(idx, j){
     var e = D.escrituras[idx], a = activoDe(e), ps = pasosDe(e);

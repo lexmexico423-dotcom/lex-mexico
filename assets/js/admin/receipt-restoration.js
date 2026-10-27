@@ -5958,13 +5958,18 @@ function escToggleCaracteristica(clave){
 }
 function escSetEstado(estado, btn){
   document.getElementById('eEstado').value=estado;
-  const colores={proceso:'#c8952a',listo:'#1a7a3a',espera:'#7a6840',archivado:'#8c6518',noprocedio:'#7a2020'};
+  // Oct-2026: píldoras con los nombres y colores de las tarjetas de clasificación.
+  // "No procedió" (dato antiguo) se marca en la píldora de Cancelado.
+  const marcado = estado==='noprocedio' ? 'cancelado' : (estado||'proceso');
   document.querySelectorAll('.esc-estado-btn').forEach(b=>{
-    const activo=b.dataset.estado===estado;
-    const c=colores[b.dataset.estado]||'#7a6840';
+    const activo=b.dataset.estado===marcado;
+    const c=b.dataset.col||'#7a6840', t=b.dataset.txt||c;
+    const lbl=(b.dataset.lbl || (b.dataset.lbl=b.textContent.replace(/^[✔●]\s*/,'').trim()));
+    b.innerHTML='<span style="width:9px;height:9px;border-radius:50%;background:'+(activo?'#fff':c)+';display:inline-block;"></span>'+lbl;
     b.style.background=activo?c:'#fff';
-    b.style.color=activo?'#fff':'#7a6840';
-    b.style.borderColor=activo?c:'#d4b870';
+    b.style.color=activo?'#fff':t;
+    b.style.border='1.5px solid '+c;
+    b.style.boxShadow=activo?('0 3px 10px '+c+'55'):'none';
   });
 }
 function escAgregarPersona(tipo, datos={}){

@@ -191,7 +191,8 @@
   }
 
   // ── Movimientos del trámite ───────────────────────────────────────────
-  function historial(e, txt){ if (!Array.isArray(e.historialPasos)) e.historialPasos = []; e.historialPasos.push({ fecha: new Date().toISOString(), por: usuario(), texto: txt }); }
+  var _sinHistorial = false;   // al revertir no se deja rastro en el historial (a petición)
+  function historial(e, txt){ if (_sinHistorial) return; if (!Array.isArray(e.historialPasos)) e.historialPasos = []; e.historialPasos.push({ fecha: new Date().toISOString(), por: usuario(), texto: txt }); }
   function completar(e, i){
     var ps = pasosDe(e);
     ps[i] = { estado:'completado', notas:'', fecha: fechaTxt() };
@@ -531,39 +532,112 @@
     inp.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') { ev.preventDefault(); clearTimeout(t); ubicGuardar(inp, true); inp.blur(); } });
   }
   // ── Oct-2026 · OBSERVACIONES INICIALES = NOTA PERMANENTE (bloqueada) ───
-  // Se muestra fija (🔒) y solo se cambia con el botón "✎ Editar". Al salir
-  // de la casilla se guarda (función de siempre escEditarObservacion) y se
-  // vuelve a bloquear.
+  // Bloqueada (🔒). "✎ Editar" → se abre la casilla y aparecen "💾 Guardar" y
+  // "Cancelar". Si se intenta salir (cerrar la ventana, abrir otra escritura,
+  // GUARDAR general) con cambios sin guardar, se pregunta qué hacer.
+  // El estado de edición sobrevive a los repintados de la sincronización.
   (function bloquearObservaciones(){
     var orig = window.escRenderBitacora;
     if (typeof orig !== 'function' || orig._lexBloq) return;
-    var w = function(lista, editable){
-      if (!editable) return orig.apply(this, arguments);
-      var texto = (lista && lista[0] && lista[0].texto) || '';
+    var ED = null;   // { id, original, valor } mientras se edita
+    function escActual(){ resyncIdx(); var i = (typeof _escIdx !== 'undefined') ? _escIdx : -1; return i >= 0 ? D.escrituras[i] : null; }
+    function textoDe(e){ return (e && Array.isArray(e.bitacora) && e.bitacora[0] && e.bitacora[0].texto) || ''; }
+    var BTN = 'flex-shrink:0;border-radius:8px;padding:7px 14px;font-size:0.74rem;font-weight:800;cursor:pointer;white-space:nowrap;';
+    function htmlBloq(texto){
       return '<div id="lex-obs-ini" style="display:flex;gap:12px;align-items:flex-start;">'
         + '<div style="flex:1;min-width:0;background:#f7f9fc;border:1px dashed #8a9bb5;border-radius:8px;padding:9px 12px;font-size:0.86rem;line-height:1.5;color:#1e2a3e;white-space:pre-wrap;">'
         + (texto ? '🔒 ' + E(texto) : '<span style="color:#8a94a8;font-style:italic;">🔒 Sin observación inicial.</span>') + '</div>'
-        + '<button type="button" onclick="lexEscEditarObsIni()" title="Editar la nota permanente" style="flex-shrink:0;background:#fff;border:1.5px solid #44546e;color:#2c3a52;border-radius:8px;padding:7px 12px;font-size:0.72rem;font-weight:700;cursor:pointer;">✎ Editar</button>'
-        + '</div>';
+        + '<button type="button" onclick="lexEscEditarObsIni()" title="Editar la nota permanente" style="' + BTN + 'background:#fff;border:1.5px solid #44546e;color:#2c3a52;">✎ Editar</button></div>';
+    }
+    function htmlEdit(valor){
+      return '<div id="lex-obs-ini" data-editando="1" style="display:flex;gap:12px;align-items:flex-start;">'
+        + '<textarea id="lex-obs-ini-ta" rows="3" style="flex:1;min-width:0;box-sizing:border-box;background:#fff;border:2px solid #44546e;border-radius:8px;padding:9px 12px;font-size:0.86rem;line-height:1.5;color:#1e2a3e;font-family:inherit;resize:vertical;outline:none;">' + E(valor) + '</textarea>'
+        + '<div style="display:flex;flex-direction:column;gap:6px;">'
+        + '<button type="button" onclick="lexEscObsGuardar()" style="' + BTN + 'background:#1a7a3a;border:1.5px solid #1a7a3a;color:#fff;">💾 Guardar</button>'
+        + '<button type="button" onclick="lexEscObsCancelar()" style="' + BTN + 'background:#fff;border:1.5px solid #8a9bb5;color:#44546e;">Cancelar</button></div></div>'
+        + '<div id="lex-obs-ini-aviso" style="font-size:0.7rem;color:#5a6680;margin-top:6px;">✎ Editando la nota permanente. Presione <b>💾 Guardar</b> para conservar los cambios.</div>';
+    }
+    function pintar(){
+      var cont = document.getElementById('esc-bitacora-lista-edit'); if (!cont) return;
+      var e = escActual();
+      if (ED && e && String(e.id) === ED.id) {
+        cont.innerHTML = htmlEdit(ED.valor);
+        var ta = document.getElementById('lex-obs-ini-ta');
+        if (ta) ta.addEventListener('input', function(){ if (ED) ED.valor = ta.value; var av = document.getElementById('lex-obs-ini-aviso'); if (av) { av.innerHTML = '⚠ <b>Cambios sin guardar.</b> Presione 💾 Guardar o Cancelar.'; av.style.color = '#a32d2d'; } });
+        return ta;
+      }
+      cont.innerHTML = htmlBloq(textoDe(e));
+      return null;
+    }
+    var w = function(lista, editable){
+      if (!editable) return orig.apply(this, arguments);
+      var e = null; try { e = escActual(); } catch(_){}
+      if (ED && e && String(e.id) === ED.id) return htmlEdit(ED.valor);
+      return htmlBloq((lista && lista[0] && lista[0].texto) || '');
     };
     for (var k in orig) { try { w[k] = orig[k]; } catch(_){} }
     w._lexBloq = true; w._orig = orig;
     window.escRenderBitacora = w;
+    // Después de que el sistema pinte la casilla, enganchar el textarea si se está editando
+    var oDet = window.escAbrirDetalle;
+    if (typeof oDet === 'function' && !oDet._lexObs) {
+      var wd = function(idx){ try { var eN = D.escrituras && D.escrituras[idx]; if (ED && (!eN || String(eN.id) !== ED.id)) resolverPendiente('Va a abrir otra escritura.'); } catch(_){} var r = oDet.apply(this, arguments); try { if (ED) { var t = pintar(); if (t) t.focus(); } } catch(_){} return r; };
+      for (var k2 in oDet) { try { wd[k2] = oDet[k2]; } catch(_){} }
+      wd._lexObs = true; window.escAbrirDetalle = wd;
+    }
+
+    function hayCambios(){ return !!(ED && String(ED.valor).trim() !== String(ED.original).trim()); }
+    function guardarYa(){
+      if (!ED) return;
+      var e = (D.escrituras || []).filter(function(x){ return x && String(x.id) === ED.id; })[0];
+      var valor = String(ED.valor || ''), id = ED.id;
+      ED = null;
+      if (!e) return;
+      var i = D.escrituras.indexOf(e);
+      if (typeof _escIdx !== 'undefined' && i >= 0) _escIdx = i;
+      if (typeof escEditarObservacion === 'function') escEditarObservacion(0, valor);   // guarda y repinta (bloqueada)
+      else pintar();
+    }
+    function descartar(){ ED = null; pintar(); }
+    // Pregunta al salir con cambios. Devuelve true si se puede continuar.
+    function resolverPendiente(motivo){
+      if (!ED) return true;
+      if (!hayCambios()) { ED = null; return true; }
+      if (confirm('Tiene cambios SIN GUARDAR en "Observaciones iniciales".\n\n' + (motivo || '') + '\n\nAceptar = GUARDAR los cambios\nCancelar = DESCARTARLOS (se perderán)')) guardarYa();
+      else ED = null;
+      return true;
+    }
+    window.lexEscObsPendiente = resolverPendiente;
+
     window.lexEscEditarObsIni = function(){
-      var cont = document.getElementById('esc-bitacora-lista-edit'); if (!cont) return;
-      if (!confirm('Esta es la NOTA PERMANENTE de cómo ingresó el trámite.\n\nPara avisos del paso actual use "Llamado a la Acción".\n\n¿Seguro que quiere editarla?')) return;
-      resyncIdx();
-      var idx = (typeof _escIdx !== 'undefined') ? _escIdx : -1, e = idx >= 0 ? D.escrituras[idx] : null;
-      cont.innerHTML = orig(e ? (e.bitacora || []) : [], true)
-        + '<div style="font-size:0.68rem;color:#5a6680;margin-top:6px;">Escriba y haga clic fuera de la casilla para guardar; se volverá a bloquear.</div>';
-      var ed = cont.querySelector('[contenteditable]');
-      if (ed) {
-        ed.style.background = '#fff'; ed.style.borderColor = '#44546e';
-        ed.focus();
-        // Si sale sin cambiar nada, se vuelve a bloquear igual
-        ed.addEventListener('blur', function(){ setTimeout(function(){ if (!ed.dataset.dirty) { var e2 = (typeof _escIdx !== 'undefined' && _escIdx >= 0) ? D.escrituras[_escIdx] : null; cont.innerHTML = w(e2 ? (e2.bitacora || []) : [], true); } }, 0); });
-      }
+      var e = escActual(); if (!e) return;
+      ED = { id: String(e.id), original: textoDe(e), valor: textoDe(e) };
+      var ta = pintar();
+      if (ta) { ta.focus(); try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch(_){} }
     };
+    window.lexEscObsGuardar = function(){
+      if (!ED) return;
+      var ta = document.getElementById('lex-obs-ini-ta'); if (ta) ED.valor = ta.value;
+      if (!hayCambios()) { descartar(); toastS('Sin cambios'); return; }
+      guardarYa();
+    };
+    window.lexEscObsCancelar = function(){
+      if (!ED) return;
+      var ta = document.getElementById('lex-obs-ini-ta'); if (ta) ED.valor = ta.value;
+      if (hayCambios() && !confirm('¿Descartar los cambios de "Observaciones iniciales"?\n\nLo que escribió se perderá.')) return;
+      descartar();
+    };
+    // Salidas: cerrar la ventana, abrir otra escritura o nueva, GUARDAR general
+    function envolver(nombre, motivo, pre){
+      var o = window[nombre]; if (typeof o !== 'function' || o['_lexObsP']) return;
+      var f = function(){ var a = arguments; try { if (!pre || pre.apply(this, a)) resolverPendiente(motivo); } catch(_){} return o.apply(this, a); };
+      for (var k3 in o) { try { f[k3] = o[k3]; } catch(_){} }
+      f['_lexObsP'] = true; window[nombre] = f;
+    }
+    envolver('cerrar', 'Va a cerrar la ventana de la escritura.', function(id){ return id === 'mEscritura'; });
+    envolver('escAbrirNueva', 'Va a abrir una escritura nueva.');
+    envolver('escGuardar', 'Va a guardar la escritura.');
+    window.addEventListener('beforeunload', function(ev){ if (hayCambios()) { ev.preventDefault(); ev.returnValue = ''; } });
   })();
 
   // ── Nota de REVISIÓN (no es la observación inicial) ───────────────────
@@ -749,6 +823,11 @@
     resyncIdx();
     var idx = (typeof _escIdx !== 'undefined') ? _escIdx : -1, e = idx >= 0 ? D.escrituras[idx] : null; if (!e) return;
     var va = vActivo(e), enCurso = (e.estado === 'proceso' || !e.estado);
+    // Oct-2026: REVERTIR — bolita ya hecha (o escritura concluida/lista por
+    // error) → preguntar y regresar hasta esa etapa, con estatus En proceso.
+    var cerrada = e.estado === 'listo' || e.estado === 'archivado';
+    var anulada = e.estado === 'cancelado' || e.estado === 'noprocedio';
+    if (!anulada && (cerrada || (vEstado(e, k) === 'completado' && !(enCurso && k === va)))) return revertirHasta(idx, k);
     if (va >= 0 && k > va && enCurso) return saltarHasta(idx, k);
     if (k < 4) { if (typeof escAbrirPaso === 'function') escAbrirPaso(k); return; }
     if (k === 5) { if (typeof escAbrirPaso === 'function') escAbrirPaso(4); return; }
@@ -785,6 +864,77 @@
     if (j === 3) tareaInterna(e, 'isr-enviar', 'Llevar el expediente al notario para que genere el ISR', hoyISO(0));
     if (j === 4) tareaInterna(e, 'notaria-escritura', 'Solicitar a la notaría la entrega de la escritura', hoyISO(0));
   }
+  // ── REVERTIR hasta la bolita j (0-5) ─────────────────────────────────
+  // Deshace j y todas las de después; la escritura vuelve a "En proceso".
+  var MOTIVOS_DESDE = { 1: ['traslado','traslado-mitad','isr-enviar','notaria-escritura','registro','entrega'], 2: ['traslado','traslado-mitad','isr-enviar','notaria-escritura','registro','entrega'],
+    3: ['isr-enviar','notaria-escritura','registro','entrega'], 4: ['notaria-escritura','registro','entrega'], 5: ['registro','entrega'], 0: ['traslado','traslado-mitad','isr-enviar','notaria-escritura','registro','entrega'] };
+  function revertirHasta(idx, j){
+    var e = D.escrituras[idx]; if (!e) return;
+    var va = vActivo(e), cerrada = e.estado === 'listo' || e.estado === 'archivado';
+    var hasta = cerrada || va < 0 ? 5 : va;
+    var deshacer = []; for (var k = j; k <= hasta; k++) if (vEstado(e, k) === 'completado' || cerrada || k === va) deshacer.push(k);
+    var EST = { proceso:'En proceso', listo:'Listo para entregar', archivado:'Concluida y entregada', espera:'En pausa' };
+    var opciones = j === 0 ? [['esperando','Por firmar (pendiente)']]
+      : j === 4 ? [['esperando','La notaría aún NO entrega la escritura (empieza su plazo de ' + DIAS_INTER + ' días)']]
+      : [['esperando','Por iniciar (empieza su plazo de ' + DIAS_INTER + ' días)'], ['activo','Ya está en trámite' + (j === 1 ? ' en Catastro' : j === 5 ? ' en el Registro' : '')]];
+    var viejo = document.getElementById('lex-esc-salto'); if (viejo) viejo.remove();
+    var ov = document.createElement('div'); ov.id = 'lex-esc-salto';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
+    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fdfaf3;border:1.5px solid #a32d2d;border-radius:12px;width:100%;max-width:520px;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#1a1008;overflow:hidden;">'
+      + '<div style="background:#a32d2d;color:#fff;padding:10px 16px;font-family:monospace;font-size:12px;letter-spacing:0.1em;display:flex;justify-content:space-between;"><span>⏪ REVERTIR HASTA ' + E(V_NOMBRE[j]).toUpperCase() + '</span><span id="rv-x" style="cursor:pointer;">✕</span></div>'
+      + '<div style="padding:14px 16px;font-size:13px;line-height:1.5;">'
+      + (cerrada ? '<div style="background:#fcebeb;border:1px solid #efb3b3;color:#791f1f;border-radius:8px;padding:8px 10px;margin-bottom:10px;">Esta escritura está como <b>' + E(EST[e.estado] || e.estado) + '</b>. Al revertir, su estatus cambiará en automático a <b>En proceso</b>.</div>' : '')
+      + '<div style="margin-bottom:6px;">Se van a <b>deshacer</b> estas etapas:</div>'
+      + '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;">' + deshacer.map(function(k){ return '<span style="background:#fff;border:1px solid #efb3b3;color:#a32d2d;border-radius:12px;padding:2px 10px;font-size:12px;font-weight:700;">' + (k + 1) + ' · ' + E(V_NOMBRE[k]) + '</span>'; }).join('') + '</div>'
+      + '<div style="font-family:monospace;font-size:10px;color:#8a7f6a;letter-spacing:0.08em;margin-bottom:4px;">¿CÓMO ESTÁ ' + E(V_NOMBRE[j]).toUpperCase() + '?</div>'
+      + opciones.map(function(o, n){ return '<label style="display:flex;align-items:center;gap:8px;padding:4px 2px;cursor:pointer;"><input type="radio" name="rv-est" value="' + o[0] + '"' + (n === 0 ? ' checked' : '') + '> ' + o[1] + '</label>'; }).join('')
+      + '<label style="display:flex;align-items:center;gap:10px;margin-top:12px;padding:8px 10px;border:1.5px solid #a32d2d;border-radius:8px;background:#fff;cursor:pointer;font-weight:700;color:#a32d2d;"><input type="checkbox" id="rv-seguro" style="width:18px;height:18px;"> Sí, estoy seguro de revertir</label>'
+      + '<div id="rv-err" style="color:#a32d2d;font-size:12px;min-height:16px;margin-top:6px;"></div>'
+      + '<div style="display:flex;gap:8px;margin-top:4px;"><button type="button" id="rv-no" style="flex:1;border:1px solid #c8951a;background:#fff;color:#9a6e18;border-radius:7px;padding:10px;font-weight:700;font-size:12px;cursor:pointer;">Cancelar</button>'
+      + '<button type="button" id="rv-si" style="flex:1.4;border:none;background:#a32d2d;color:#fff;border-radius:7px;padding:10px;font-weight:800;font-size:12px;cursor:pointer;">⏪ Revertir hasta ' + E(V_CORTO[j]) + '</button></div>'
+      + (j !== 4 ? '<div style="font-size:11px;color:#8a7f6a;margin-top:8px;text-align:center;">¿Solo quiere corregir la nota o la fecha de esta etapa? Use <a href="#" id="rv-manual" style="color:#9a6e18;">corregir a mano</a>.</div>' : '')
+      + '</div></div>';
+    document.body.appendChild(ov);
+    var q = function(s){ return ov.querySelector(s); };
+    q('#rv-x').onclick = q('#rv-no').onclick = function(){ ov.remove(); };
+    if (q('#rv-manual')) q('#rv-manual').onclick = function(ev){ ev.preventDefault(); ov.remove(); if (typeof escAbrirPaso === 'function') escAbrirPaso(j === 5 ? 4 : j); };
+    q('#rv-si').onclick = function(){
+      if (!q('#rv-seguro').checked) { q('#rv-err').textContent = 'Marque "Sí, estoy seguro de revertir" para continuar.'; return; }
+      if (!confirm('¿Está seguro de revertir hasta ' + V_NOMBRE[j] + '?\n\nSe deshacen ' + deshacer.length + ' etapa(s) y el estatus quedará EN PROCESO.')) return;
+      var est = (ov.querySelector('input[name="rv-est"]:checked') || {}).value || 'esperando';
+      var eNow = (D.escrituras || []).filter(function(x){ return x && x.id === e.id; })[0] || e;
+      var ps = pasosDe(eNow), estadoAntes = eNow.estado, desdeTxt = cerrada ? (EST[estadoAntes] || estadoAntes) : V_NOMBRE[va];
+      var real = j < 4 ? j : 4;
+      _sinHistorial = true;
+      try {
+      for (var r = real; r < 5; r++) ps[r] = { estado:'pendiente', notas:'', fecha:'' };
+      if (j === 0) { ps[0] = { estado:'pendiente', notas:'', fecha:'', fechaAutoInicio: new Date().toISOString() }; }
+      else if (j < 4) { if (est === 'activo') iniciarOficina(eNow, j); else abrirIntermedio(eNow, j); }
+      else if (j === 4) { abrirIntermedio(eNow, 4); }
+      else { if (est === 'activo') iniciarOficina(eNow, 4); else { abrirIntermedio(eNow, 4); marcarNotaria(eNow); } }
+      eNow.estado = 'proceso';
+      // Las tareas automáticas de las etapas deshechas ya no aplican
+      var ahora = new Date().toISOString(), lista = MOTIVOS_DESDE[j] || [];
+      tareas().forEach(function(t){
+        if (!t || t.estado === 'resuelta' || t.escId !== String(eNow.id)) return;
+        var m = String(t.escMotivo || ''), num = parseInt((/^falta-(\d)-/.exec(m) || [])[1], 10);
+        if (lista.indexOf(m) >= 0 || (!isNaN(num) && num >= real)) { t.estado = 'resuelta'; t.fechaResolucion = ahora; t.fechaMod = ahora; t.resueltaPor = 'Automático: se revirtió la escritura (' + usuario() + ')'; }
+      });
+      // Tareas de la etapa a la que se regresa (si está por iniciar)
+      if (est === 'esperando' && j >= 2 && j <= 4) tareasAlEntrar(eNow, j);
+      if (est === 'esperando' && j === 5) tareaInterna(eNow, 'registro', 'Ingresar la escritura al Registro Público (IFREO)', hoyISO(0));
+      } finally { _sinHistorial = false; }
+      eNow.fechaMod = ahora; eNow.pasoActivoFecha = ahora;
+      eNow.pasoActivoRequerimientos = false; eNow.pasoActivoEnEspera = false;
+      ov.remove();
+      var i2 = D.escrituras.indexOf(eNow);
+      refrescar(eNow, i2);
+      try { if (typeof escSetEstado === 'function') escSetEstado('proceso'); } catch(_){}
+      try { if (typeof escAbrirDetalle === 'function' && i2 >= 0) escAbrirDetalle(i2); } catch(_){}
+      toastS('⏪ Revertido hasta ' + V_NOMBRE[j] + ' · Estatus: En proceso');
+    };
+  }
+  window.lexEscRevertirHasta = revertirHasta;
   // Avanzar hasta la bolita j (0-5) confirmando las etapas de en medio
   function saltarHasta(idx, j){
     var e = D.escrituras[idx], va = vActivo(e);

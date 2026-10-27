@@ -255,7 +255,17 @@
       ov.querySelectorAll('.sa-tipo').forEach(function(x){ var on = x === b; x.style.background = on ? '#fff4dd' : '#eee'; x.style.border = on ? '2px solid #b8862b' : '1px solid #c9c2b2'; x.style.color = on ? '#7a5410' : '#666'; });
     }; });
     enlazar(); recalcular(); visFirmas();
-    function cerrarOv(){ ov.remove(); }
+    // Oct-2026: si se escribió algo, avisar antes de cerrar sin guardar
+    var _saSucio = false;
+    var _saMarca = function(ev){ if (ev.isTrusted) _saSucio = true; };
+    ov.addEventListener('input', _saMarca, true); ov.addEventListener('change', _saMarca, true);
+    function cerrarOv(){
+      if (_saSucio && typeof window.lexDialogoCambios === 'function') {
+        window.lexDialogoCambios({ cambios: [sa ? 'Recibo anterior' : 'Nuevo recibo anterior'], accion: 'cerrar', sinGuardar: true, onSalir: function(){ ov.remove(); } });
+        return;
+      }
+      ov.remove();
+    }
     q('#sa-x').onclick = cerrarOv; q('#sa-cancel').onclick = cerrarOv;
     function leerYValidar(){
       var err = q('#sa-err'); err.textContent = '';

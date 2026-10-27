@@ -403,6 +403,40 @@
     st.textContent = '.lex-esc-campo.lex-on{border:2px solid #2e7d32 !important;background:#eef7e9 !important;}';
     document.head.appendChild(st);
   }
+  // ── Oct-2026 · FRANJA FIJA AL BAJAR ──────────────────────────────────
+  // Buscadores + tarjetas de clasificación juntos en una franja que se queda
+  // pegada debajo de la barra superior mientras se recorre la lista.
+  function fondoPagina(){
+    var n = document.getElementById('panel-escrituras');
+    while (n && n !== document.documentElement) {
+      try { var b = getComputedStyle(n).backgroundColor; if (b && b !== 'transparent' && !/rgba\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(b)) return b; } catch(_){}
+      n = n.parentElement;
+    }
+    return '#120c06';
+  }
+  function topeFranja(){
+    var f = document.getElementById('lex-esc-franja'); if (!f) return;
+    var tb = document.querySelector('.topbar'), h = 0;
+    try { if (tb && getComputedStyle(tb).position === 'sticky' || (tb && getComputedStyle(tb).position === 'fixed')) h = tb.getBoundingClientRect().height; } catch(_){}
+    f.style.top = Math.round(h) + 'px';
+  }
+  function asegurarFranja(){
+    var q = document.getElementById('escQ'); if (!q) return;
+    var fila = q.closest ? q.closest('.search-row') : q.parentNode;
+    var barra = document.getElementById('lex-esc-clasif');
+    if (!fila) return;
+    var f = document.getElementById('lex-esc-franja');
+    if (!f) {
+      f = document.createElement('div'); f.id = 'lex-esc-franja';
+      fila.parentNode.insertBefore(f, fila);
+      f.appendChild(fila);
+      window.addEventListener('resize', topeFranja);
+      window.addEventListener('scroll', function(){ var ff = document.getElementById('lex-esc-franja'); if (!ff) return; var pegada = ff.getBoundingClientRect().top <= (parseFloat(ff.style.top) || 0) + 1 && window.scrollY > 0; ff.style.boxShadow = pegada ? '0 8px 14px -6px rgba(0,0,0,0.65)' : 'none'; ff.style.borderBottom = pegada ? '1px solid rgba(200,149,42,0.35)' : '1px solid transparent'; }, { passive: true });
+    }
+    if (barra && barra.parentNode !== f) f.appendChild(barra);
+    f.style.cssText = 'position:sticky;z-index:40;background:' + fondoPagina() + ';margin:0 -28px;padding:2px 28px 2px;border-bottom:1px solid transparent;transition:box-shadow 0.15s;' + 'top:' + (f.style.top || '0px') + ';';
+    topeFranja();
+  }
   function marcarCampos(){
     ['escQInstr', 'escQVol', 'escQFecha', 'escQ'].forEach(function(id){
       var i = document.getElementById(id); if (!i) return;
@@ -580,6 +614,7 @@
     try { asegurarCampos(); marcarCampos(); } catch(errB) { console.warn('[Escrituras búsqueda]', errB); }
     if (typeof D === 'undefined' || !Array.isArray(D.escrituras)) return original.apply(this, arguments);
     try { pintarClasificacion(); } catch(errC) { console.warn('[Escrituras clasificación]', errC); }
+    try { asegurarFranja(); } catch(errF) { console.warn('[Escrituras franja]', errF); }
     try { pintarLista(); }
     catch(err) { console.warn('[Escrituras lista] se usa la vista anterior:', err); return original.apply(this, arguments); }
   };

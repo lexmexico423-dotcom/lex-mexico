@@ -15259,13 +15259,13 @@ Recibo original im…</td>
             <input type="hidden" id="eCaracterIfreo" value="">
           </div>
           <input type="hidden" id="eVolInstr" value="">
-          <!-- Semáforo -->
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">
-            <button type="button" onclick="escSetEstado(&#39;proceso&#39;,this)" data-estado="proceso" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">🟡 En Proceso</button>
-            <button type="button" onclick="escSetEstado(&#39;listo&#39;,this)" data-estado="listo" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">🟢 Listo p/Entregar</button>
-            <button type="button" onclick="escSetEstado(&#39;espera&#39;,this)" data-estado="espera" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">⬜ En Espera</button>
-            <button type="button" onclick="escSetEstado(&#39;archivado&#39;,this)" data-estado="archivado" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">🗄 Archivado</button>
-            <button type="button" onclick="escSetEstado(&#39;noprocedio&#39;,this)" data-estado="noprocedio" class="esc-estado-btn" style="border:1px solid #d4b870;border-radius:8px;padding:5px 10px;font-size:0.62rem;color:#7a6840;min-width:110px;text-align:center;background:#fff;cursor:pointer;font-family:sans-serif;font-weight:700;">⛔ No Procedió</button>
+          <!-- Semáforo (oct-2026: píldoras con los mismos nombres y colores que las tarjetas de la lista) -->
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
+            <button type="button" onclick="escSetEstado(&#39;proceso&#39;,this)" data-estado="proceso" data-col="#2e7d32" data-txt="#2e7d32" class="esc-estado-btn" style="display:inline-flex;align-items:center;gap:7px;background:#fff;border:1.5px solid #2e7d32;border-radius:20px;padding:7px 15px;font-family:sans-serif;font-size:0.74rem;font-weight:700;color:#2e7d32;cursor:pointer;transition:all 0.15s;">En proceso</button>
+            <button type="button" onclick="escSetEstado(&#39;listo&#39;,this)" data-estado="listo" data-col="#22c55e" data-txt="#15803d" class="esc-estado-btn" style="display:inline-flex;align-items:center;gap:7px;background:#fff;border:1.5px solid #22c55e;border-radius:20px;padding:7px 15px;font-family:sans-serif;font-size:0.74rem;font-weight:700;color:#15803d;cursor:pointer;transition:all 0.15s;">Listo para entregar</button>
+            <button type="button" onclick="escSetEstado(&#39;archivado&#39;,this)" data-estado="archivado" data-col="#185fa5" data-txt="#185fa5" class="esc-estado-btn" style="display:inline-flex;align-items:center;gap:7px;background:#fff;border:1.5px solid #185fa5;border-radius:20px;padding:7px 15px;font-family:sans-serif;font-size:0.74rem;font-weight:700;color:#185fa5;cursor:pointer;transition:all 0.15s;">Concluido y entregado</button>
+            <button type="button" onclick="escSetEstado(&#39;cancelado&#39;,this)" data-estado="cancelado" data-col="#c81e1e" data-txt="#c81e1e" class="esc-estado-btn" style="display:inline-flex;align-items:center;gap:7px;background:#fff;border:1.5px solid #c81e1e;border-radius:20px;padding:7px 15px;font-family:sans-serif;font-size:0.74rem;font-weight:700;color:#c81e1e;cursor:pointer;transition:all 0.15s;">Cancelado</button>
+            <button type="button" onclick="escSetEstado(&#39;espera&#39;,this)" data-estado="espera" data-col="#6b6b6b" data-txt="#5f5e5a" class="esc-estado-btn" style="display:inline-flex;align-items:center;gap:7px;background:#fff;border:1.5px solid #6b6b6b;border-radius:20px;padding:7px 15px;font-family:sans-serif;font-size:0.74rem;font-weight:700;color:#5f5e5a;cursor:pointer;transition:all 0.15s;">En pausa</button>
             <input type="hidden" id="eEstado" value="proceso">
           </div>
           <!-- Propietario que trasmite (vendedores/donadores) -->
@@ -19451,7 +19451,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20261027a"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=20261027d"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->
@@ -19484,7 +19484,7 @@ Recibo original im…</td>
 <script src="assets/js/ui/sync-vivo.js?v=20261023i"></script>
 <script src="assets/js/ui/gastos-cliente.js?v=20261023a"></script>
 <script src="assets/js/ui/escrituras-lista.js?v=20261027c"></script>
-<script src="assets/js/ui/escrituras-asistente.js?v=20261027c"></script>
+<script src="assets/js/ui/escrituras-asistente.js?v=20261027f"></script>
 <script src="assets/js/ui/saldos-anteriores.js?v=20261023w"></script>
 <script src="assets/js/ui/cotizaciones.js?v=20261023l"></script>
 <script src="assets/js/ui/cerrar-seccion.js?v=20261024f"></script>

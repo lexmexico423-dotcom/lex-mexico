@@ -526,11 +526,157 @@
     var inp = document.getElementById('lex-esc-ubic-inp'); if (!inp) return;
     // Si se estaba escribiendo y la ficha se repintó (sincronización), no se pierde lo escrito
     if (previo && previo.id === String(e.id)) { inp.value = previo.valor; if (previo.foco) { inp.focus(); try { inp.setSelectionRange(previo.valor.length, previo.valor.length); } catch(_){} } }
-    var t = null;
-    inp.addEventListener('input', function(){ var fu = document.getElementById('eUbicacion'); if (fu) fu.value = inp.value; var st = document.getElementById('lex-esc-ubic-st'); if (st) { st.textContent = 'Escribiendo…'; st.style.color = '#7a8a6a'; } clearTimeout(t); t = setTimeout(function(){ ubicGuardar(inp); }, 1000); });
-    inp.addEventListener('blur', function(){ clearTimeout(t); ubicGuardar(inp, true); });
-    inp.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') { ev.preventDefault(); clearTimeout(t); ubicGuardar(inp, true); inp.blur(); } });
+    // Oct-2026: ya NO se guarda solo. Al cambiar algo aparece "💾 Guardar"
+    // junto a Imprimir; si se intenta cerrar sin guardar, se avisa.
+    inp.addEventListener('input', function(){ var fu = document.getElementById('eUbicacion'); if (fu) fu.value = inp.value; marcarUbic(); });
+    inp.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') { ev.preventDefault(); window.lexEscGuardarFicha(); } });
+    marcarUbic();
   }
+  function escDeUbic(){
+    var box = document.getElementById('lex-esc-ubic'); if (!box) return null;
+    return (D.escrituras || []).filter(function(x){ return x && String(x.id) === box.getAttribute('data-id'); })[0] || null;
+  }
+  function ubicPendiente(){
+    var inp = document.getElementById('lex-esc-ubic-inp'), e = escDeUbic();
+    var modal = document.getElementById('mEscritura');
+    if (!inp || !e || (modal && !modal.classList.contains('show'))) return false;
+    return String(inp.value || '').trim() !== String(e.ubicacion || '').trim();
+  }
+  window.lexEscUbicPendiente = ubicPendiente;
+  function marcarUbic(){
+    var pend = ubicPendiente(), st = document.getElementById('lex-esc-ubic-st');
+    if (st) { st.textContent = pend ? '⚠ Cambios sin guardar' : ''; st.style.color = '#a32d2d'; st.style.fontWeight = pend ? '700' : '400'; }
+    var ftr = document.getElementById('esc-ftr-detalle'), b = document.getElementById('lex-esc-btn-guardar');
+    if (ftr && !b) {
+      b = document.createElement('button'); b.id = 'lex-esc-btn-guardar'; b.type = 'button'; b.className = 'btn';
+      b.textContent = '💾 Guardar';
+      b.style.cssText = 'display:none;background:#1a7a3a;color:#fff;border:1px solid #1a7a3a;font-weight:800;';
+      b.onclick = function(){ window.lexEscGuardarFicha(); };
+      var imp = Array.prototype.filter.call(ftr.querySelectorAll('button'), function(x){ return /Imprimir/i.test(x.textContent); })[0];
+      if (imp && imp.nextSibling) ftr.insertBefore(b, imp.nextSibling); else ftr.appendChild(b);
+    }
+    if (b) b.style.display = pend ? '' : 'none';
+  }
+  // 💾 Guardar de la ficha: guarda y regresa a la lista de escrituras
+  window.lexEscGuardarFicha = function(){
+    var inp = document.getElementById('lex-esc-ubic-inp');
+    if (inp && ubicPendiente()) ubicGuardar(inp, true);
+    marcarUbic();
+    if (typeof cerrarOriginal === 'function') cerrarOriginal('mEscritura');
+    toastS('✓ Cambios guardados');
+  };
+  // ── Aviso al salir con cambios sin guardar (reutilizable) ─────────────
+  // lexDialogoCambios({ cambios:['Ubicación del predio'], accion:'cerrar', onGuardar, onSalir })
+  window.lexDialogoCambios = function(o){
+    var v = document.getElementById('lex-dlg-cambios'); if (v) v.remove();
+    var ov = document.createElement('div'); ov.id = 'lex-dlg-cambios';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100100;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
+    var acc = o.accion || 'salir';
+    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fdfaf3;border:2px solid #ba7517;border-radius:12px;width:100%;max-width:440px;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#1a1008;overflow:hidden;">'
+      + '<div style="background:#fdf3dc;border-bottom:1px solid #ecd9ae;padding:12px 16px;font-weight:800;color:#854f0b;font-size:15px;">⚠ Hay cambios sin guardar</div>'
+      + '<div style="padding:14px 16px;font-size:13.5px;line-height:1.5;">Se va a <b>' + E(acc) + ' sin guardar</b> los cambios en:'
+      + '<ul style="margin:8px 0 4px 18px;padding:0;">' + (o.cambios || []).map(function(c){ return '<li><b>' + E(c) + '</b></li>'; }).join('') + '</ul>'
+      + '<div style="color:#7a6a4a;font-size:12.5px;">Si no los guarda, se perderán.</div>'
+      + '<div style="display:flex;flex-direction:column;gap:7px;margin-top:14px;">'
+      + (o.sinGuardar ? '' : '<button type="button" data-a="g" style="border:none;background:#1a7a3a;color:#fff;border-radius:8px;padding:10px;font-weight:800;cursor:pointer;">💾 Guardar y ' + E(acc) + '</button>')
+      + '<button type="button" data-a="s" style="border:1.5px solid #a32d2d;background:#fff;color:#a32d2d;border-radius:8px;padding:9px;font-weight:700;cursor:pointer;">' + E(acc.charAt(0).toUpperCase() + acc.slice(1)) + ' sin guardar</button>'
+      + '<button type="button" data-a="r" style="border:1px solid #c8b68a;background:#fff;color:#5a4a2a;border-radius:8px;padding:9px;font-weight:600;cursor:pointer;">← Regresar' + (o.sinGuardar ? ' (para guardar)' : '') + '</button>'
+      + '</div></div></div>';
+    document.body.appendChild(ov);
+    ov.querySelectorAll('button').forEach(function(b){ b.onclick = function(){ var a = b.getAttribute('data-a'); ov.remove(); if (a === 'g' && o.onGuardar) o.onGuardar(); else if (a === 's' && o.onSalir) o.onSalir(); }; });
+  };
+  var cerrarOriginal = null;
+  // Formulario Editar / Nueva escritura: se toma una "foto" de los campos al
+  // abrirlo y se compara al salir.
+  function fotoForm(){
+    var body = document.getElementById('modal-body-form'); if (!body) return '';
+    return Array.prototype.map.call(body.querySelectorAll('input, select, textarea'), function(x){
+      if (x.type === 'file' || x.id === 'lex-obs-ini-ta') return '';
+      return (x.id || x.className || x.name || '') + '=' + ((x.type === 'checkbox' || x.type === 'radio') ? (x.checked ? '1' : '0') : String(x.value || ''));
+    }).join('|');
+  }
+  var _fotoForm = null;
+  function formVisible(){
+    var m = document.getElementById('mEscritura'), f = document.getElementById('esc-ftr-form');
+    return !!(m && m.classList.contains('show') && f && f.style.display !== 'none' && getComputedStyle(f).display !== 'none');
+  }
+  function formPendiente(){ return _fotoForm !== null && formVisible() && fotoForm() !== _fotoForm; }
+  window.lexEscFormPendiente = formPendiente;
+  window.lexEscFotoForm = function(){ _fotoForm = fotoForm(); };
+  ['escMostrarFormulario', 'escAbrirNueva'].forEach(function(n){
+    var o = window[n]; if (typeof o !== 'function' || o._lexFoto) return;
+    var w = function(){ var r = o.apply(this, arguments); _fotoForm = null; setTimeout(function(){ _fotoForm = fotoForm(); }, 60); return r; };
+    for (var k in o) { try { w[k] = o[k]; } catch(_){} }
+    w._lexFoto = true; window[n] = w;
+  });
+  function cambiosFicha(){
+    var c = [];
+    try { if (formPendiente()) c.push('Datos de la escritura (formulario de edición)'); } catch(_){}
+    try { if (ubicPendiente()) c.push('Ubicación del predio'); } catch(_){}
+    try { if (typeof window.lexEscObsHayCambios === 'function' && window.lexEscObsHayCambios()) c.push('Observaciones iniciales'); } catch(_){}
+    return c;
+  }
+  function guardarFichaSinCerrar(){
+    var inp = document.getElementById('lex-esc-ubic-inp');
+    if (inp && ubicPendiente()) ubicGuardar(inp, true);
+    try { if (typeof window.lexEscObsGuardarYa === 'function') window.lexEscObsGuardarYa(); } catch(_){}
+  }
+  function descartarFicha(){
+    var inp = document.getElementById('lex-esc-ubic-inp'), e = escDeUbic();
+    if (inp && e) { inp.value = e.ubicacion || ''; var fu = document.getElementById('eUbicacion'); if (fu) fu.value = inp.value; }
+    try { if (typeof window.lexEscObsDescartar === 'function') window.lexEscObsDescartar(); } catch(_){}
+    marcarUbic();
+  }
+  (function engancharSalidas(){
+    var oc = window.cerrar;
+    if (typeof oc === 'function' && !oc._lexFicha) {
+      cerrarOriginal = function(){ return oc.apply(window, arguments); };
+      var wc = function(id){
+        if (id === 'mEscritura' && !window._lexGuardandoEsc) {
+          var c = cambiosFicha();
+          if (c.length) { window.lexDialogoCambios({ cambios: c, accion: 'cerrar',
+            onGuardar: function(){
+              if (formPendiente()) { try { if (typeof window.lexEscObsGuardarYa === 'function') window.lexEscObsGuardarYa(); } catch(_){} window.escGuardar(); return; }   // valida y cierra solo
+              guardarFichaSinCerrar(); oc('mEscritura'); toastS('✓ Cambios guardados');
+            },
+            onSalir: function(){ descartarFicha(); _fotoForm = null; oc('mEscritura'); } }); return; }
+        }
+        return oc.apply(this, arguments);
+      };
+      for (var k in oc) { try { wc[k] = oc[k]; } catch(_){} }
+      wc._lexFicha = true; window.cerrar = wc;
+    } else cerrarOriginal = oc;
+    var oa = window.escAbrirDetalle;
+    if (typeof oa === 'function' && !oa._lexFicha) {
+      var wa = function(idx){
+        var self = this, args = arguments, eN = D.escrituras && D.escrituras[idx], eA = escDeUbic();
+        var c = cambiosFicha();
+        if (c.length && eA && (!eN || String(eN.id) !== String(eA.id))) {
+          window.lexDialogoCambios({ cambios: c, accion: 'abrir otra escritura', onGuardar: function(){ guardarFichaSinCerrar(); oa.apply(self, args); }, onSalir: function(){ descartarFicha(); oa.apply(self, args); } });
+          return;
+        }
+        return oa.apply(this, arguments);
+      };
+      for (var k2 in oa) { try { wa[k2] = oa[k2]; } catch(_){} }
+      wa._lexFicha = true; window.escAbrirDetalle = wa;
+    }
+    // La tecla Esc cierra todas las ventanas de golpe: si la escritura tiene
+    // cambios sin guardar, se pasa por el mismo aviso.
+    var om = window.cerrarModalesAbiertos;
+    if (typeof om === 'function' && !om._lexFicha) {
+      var wm = function(){
+        var m = document.getElementById('mEscritura');
+        if (m && m.classList.contains('show') && cambiosFicha().length) {
+          if (document.getElementById('lex-dlg-cambios')) return;
+          window.cerrar('mEscritura'); return;
+        }
+        return om.apply(this, arguments);
+      };
+      wm._lexFicha = true; window.cerrarModalesAbiertos = wm;
+    }
+    // El GUARDAR general del formulario ya guarda la ubicación (misma casilla)
+    window.addEventListener('beforeunload', function(ev){ if (cambiosFicha().length) { ev.preventDefault(); ev.returnValue = ''; } });
+  })();
   // ── Oct-2026 · OBSERVACIONES INICIALES = NOTA PERMANENTE (bloqueada) ───
   // Bloqueada (🔒). "✎ Editar" → se abre la casilla y aparecen "💾 Guardar" y
   // "Cancelar". Si se intenta salir (cerrar la ventana, abrir otra escritura,
@@ -581,7 +727,7 @@
     // Después de que el sistema pinte la casilla, enganchar el textarea si se está editando
     var oDet = window.escAbrirDetalle;
     if (typeof oDet === 'function' && !oDet._lexObs) {
-      var wd = function(idx){ try { var eN = D.escrituras && D.escrituras[idx]; if (ED && (!eN || String(eN.id) !== ED.id)) resolverPendiente('Va a abrir otra escritura.'); } catch(_){} var r = oDet.apply(this, arguments); try { if (ED) { var t = pintar(); if (t) t.focus(); } } catch(_){} return r; };
+      var wd = function(idx){ try { var eN = D.escrituras && D.escrituras[idx]; if (ED && eN && String(eN.id) !== ED.id && !document.getElementById('lex-esc-ubic')) resolverPendiente('Va a abrir otra escritura.'); } catch(_){} var r = oDet.apply(this, arguments); try { if (ED) { var t = pintar(); if (t) t.focus(); } } catch(_){} return r; };
       for (var k2 in oDet) { try { wd[k2] = oDet[k2]; } catch(_){} }
       wd._lexObs = true; window.escAbrirDetalle = wd;
     }
@@ -634,7 +780,7 @@
       for (var k3 in o) { try { f[k3] = o[k3]; } catch(_){} }
       f['_lexObsP'] = true; window[nombre] = f;
     }
-    envolver('cerrar', 'Va a cerrar la ventana de la escritura.', function(id){ return id === 'mEscritura'; });
+    window.lexEscObsHayCambios = hayCambios; window.lexEscObsGuardarYa = guardarYa; window.lexEscObsDescartar = descartar;
     envolver('escAbrirNueva', 'Va a abrir una escritura nueva.');
     envolver('escGuardar', 'Va a guardar la escritura.');
     window.addEventListener('beforeunload', function(ev){ if (hayCambios()) { ev.preventDefault(); ev.returnValue = ''; } });
@@ -999,6 +1145,34 @@
     if (typeof o !== 'function' || o._lexProg) return;
     var w3 = function(){ var r = o.apply(this, arguments); try { pintarProgreso(); } catch(err){ console.warn('[Progreso escrituras]', err); } return r; };
     w3._lexProg = true; window.escActualizarTimelineDetalle = w3;
+  })();
+
+  // ── Oct-2026 · Confirmar al GUARDAR con estatus Concluido o Cancelado ──
+  (function confirmarEstatusFinal(){
+    var o = window.escGuardar; if (typeof o !== 'function' || o._lexEstFin) return;
+    var NOM = { archivado:'CONCLUIDO Y ENTREGADO', cancelado:'CANCELADO', noprocedio:'CANCELADO (no procedió)' };
+    var w = function(){
+      try {
+        var nuevo = String((document.getElementById('eEstado') || {}).value || '');
+        var idx = (typeof _escIdx !== 'undefined') ? _escIdx : -1, e = idx >= 0 ? D.escrituras[idx] : null;
+        var antes = e ? String(e.estado || 'proceso') : '';
+        if (NOM[nuevo] && nuevo !== antes) {
+          var quien = e ? ((e.compradores || [])[0] ? (typeof e.compradores[0] === 'string' ? e.compradores[0] : e.compradores[0].nombre) : '') : '';
+          if (!confirm('¿Seguro que quiere guardar esta escritura como ' + NOM[nuevo] + '?\n\n' + (quien ? 'Cliente: ' + quien + '\n' : '')
+            + 'Saldrá de "En proceso" y ya no aparecerá en la lista de trabajo.\n\nAceptar = guardar · Cancelar = regresar')) return;
+        }
+      } catch(err){ console.warn('[Confirmar estatus]', err); }
+      // Mientras GUARDAR trabaja, su propio cierre de la ventana no debe preguntar
+      window._lexGuardandoEsc = true;
+      try { return o.apply(this, arguments); }
+      finally {
+        window._lexGuardandoEsc = false;
+        var m = document.getElementById('mEscritura');
+        if (m && !m.classList.contains('show') && typeof window.lexEscFotoForm === 'function') window.lexEscFotoForm();
+      }
+    };
+    for (var k in o) { try { w[k] = o[k]; } catch(_){} }
+    w._lexEstFin = true; window.escGuardar = w;
   })();
 
   window._lexEscAsisConfig = config;

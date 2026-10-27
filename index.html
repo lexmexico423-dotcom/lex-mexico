@@ -15178,7 +15178,7 @@ Recibo original im…</td>
           </div>
           <div style="margin-bottom:10px;display:flex;gap:14px;align-items:flex-end;">
             <div style="flex:1;">
-              <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">UBICACIÓN DE LA PROPIEDAD</div>
+              <div style="font-size:0.55rem;color:#7a6840;font-weight:700;">📍 UBICACIÓN DEL PREDIO</div>
               <input id="eUbicacion" type="text" placeholder="Ubicación del predio" style="width:100%;box-sizing:border-box;border:1px solid #d4b870;border-radius:6px;padding:5px 7px;font-size:0.72rem;">
             </div>
             <div style="display:flex;gap:14px;align-items:center;flex-shrink:0;padding-bottom:2px;">
@@ -15281,9 +15281,9 @@ Recibo original im…</td>
             <button type="button" onclick="escAgregarPersona(&#39;comprador&#39;)" style="width:100%;background:linear-gradient(135deg,#3b82f6,#1a4a8a);border:none;color:#fff;border-radius:8px;padding:8px;cursor:pointer;font-size:0.78rem;font-family:sans-serif;font-weight:700;box-shadow:0 2px 6px rgba(26,74,138,0.3);">＋ Agregar otro comprador/donatario</button>
           </div>
           <!-- Observaciones (bitácora) también visible en modo edición -->
-          <div style="background:#fff8e8;border:1.5px solid rgba(200,149,42,0.3);border-radius:12px;padding:14px 16px;margin-bottom:16px;">
-            <div style="font-family:monospace;font-size:0.65rem;letter-spacing:0.08em;color:#8c6518;font-weight:700;margin-bottom:4px;">🗒️ OBSERVACIONES INICIALES DEL TRÁMITE</div>
-            <div style="font-size:0.68rem;color:var(--muted);margin-bottom:10px;">Nota general del trámite — no cambia por paso. Distinta de "Llamado a la Acción" (más abajo).</div>
+          <div id="esc-obs-ini-box" style="background:#eef1f6;border:1.5px solid #8a9bb5;border-left:6px solid #44546e;border-radius:12px;padding:14px 16px;margin-bottom:16px;">
+            <div style="font-family:monospace;font-size:0.65rem;letter-spacing:0.08em;color:#2c3a52;font-weight:800;margin-bottom:4px;">📌 OBSERVACIONES INICIALES · NOTA PERMANENTE</div>
+            <div style="font-size:0.68rem;color:#5a6680;margin-bottom:10px;">Cómo ingresó el trámite desde el inicio. Es para recordar: <b>no cambia</b> con los pasos. Para avisos del paso actual use <b>"Llamado a la Acción"</b> (más abajo).</div>
             <div id="esc-bitacora-lista-edit"></div>
           </div>
           <!-- ══ LÍNEA DEL TIEMPO ══ -->
@@ -15327,8 +15327,8 @@ Recibo original im…</td>
           </div>
           <!-- Notas por etapa también visibles en modo edición -->
           <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-l);">
-            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:4px;">🎯 Llamado a la Acción</div>
-            <div style="font-size:0.68rem;color:var(--muted);margin-bottom:12px;">Nota del paso activo — distinta de Observaciones. De aquí depende el aviso de "Requiere atención" tras 30 días sin novedades.</div>
+            <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:4px;">🎯 Llamado a la Acción · cambia en cada etapa</div>
+            <div style="font-size:0.68rem;color:var(--muted);margin-bottom:12px;">Lo que <b>realmente cambia por etapa</b>: qué falta y qué sigue en el paso actual. <b>Actualícela</b> cada vez que haya novedades — al avanzar de etapa empieza de nuevo. De aquí depende el aviso de "Requiere atención" tras 30 días sin novedades.</div>
             <div id="esc-notas-etapa-edit"></div>
           </div>
         </div><!-- /modal-body-form -->
@@ -19451,7 +19451,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20261025a"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=20261027a"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->
@@ -19483,8 +19483,8 @@ Recibo original im…</td>
 <script src="assets/js/ui/mandar-llamada.js?v=20261023g"></script>
 <script src="assets/js/ui/sync-vivo.js?v=20261023i"></script>
 <script src="assets/js/ui/gastos-cliente.js?v=20261023a"></script>
-<script src="assets/js/ui/escrituras-lista.js?v=20261027a"></script>
-<script src="assets/js/ui/escrituras-asistente.js?v=20261027a"></script>
+<script src="assets/js/ui/escrituras-lista.js?v=20261027c"></script>
+<script src="assets/js/ui/escrituras-asistente.js?v=20261027c"></script>
 <script src="assets/js/ui/saldos-anteriores.js?v=20261023w"></script>
 <script src="assets/js/ui/cotizaciones.js?v=20261023l"></script>
 <script src="assets/js/ui/cerrar-seccion.js?v=20261024f"></script>

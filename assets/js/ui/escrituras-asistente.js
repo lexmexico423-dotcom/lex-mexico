@@ -487,11 +487,12 @@
   window._lexEscResync = resyncIdx;
 
   // ── Oct-2026 · UBICACIÓN DEL PREDIO, editable directo en la ficha ─────
-  // Debajo de Comprador / Vendedor. Se guarda en e.descripcion (es el texto
-  // que se ve en la tarjeta de la lista debajo del nombre: "Riego", "Teco"…).
+  // Debajo de Comprador / Vendedor. Es EL MISMO dato que "Ubicación del predio"
+  // del formulario de edición (e.ubicacion): lo que se escribe en uno aparece
+  // en el otro al instante.
   // Guarda solo al salir de la casilla, con Enter, o 1 s después de dejar de escribir.
   function ubicHtml(e){
-    var v = String(e.descripcion || '');
+    var v = String(e.ubicacion || '');
     return '<div id="lex-esc-ubic" data-id="' + E(e.id || '') + '" style="margin:-4px 0 16px;border:1.5px solid rgba(26,122,58,0.35);border-radius:14px;background:#f3f9ee;padding:10px 14px;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
       + '<span style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#27500a;font-weight:700;">📍 UBICACIÓN DEL PREDIO</span>'
@@ -506,9 +507,10 @@
     var st = document.getElementById('lex-esc-ubic-st');
     if (!e) { if (st) st.textContent = 'No se encontró la escritura'; return; }
     var nuevo = String(inp.value || '').trim();
-    if (nuevo === String(e.descripcion || '').trim()) { if (forzar && st) st.textContent = ''; return; }
-    var antes = String(e.descripcion || '').trim();
-    e.descripcion = nuevo;
+    if (nuevo === String(e.ubicacion || '').trim()) { if (forzar && st) st.textContent = ''; return; }
+    var antes = String(e.ubicacion || '').trim();
+    e.ubicacion = nuevo;
+    var fu = document.getElementById('eUbicacion'); if (fu && fu.value !== nuevo) fu.value = nuevo;
     e.fechaMod = new Date().toISOString();
     historial(e, 'Ubicación del predio: ' + (antes ? '"' + antes + '" → ' : '') + (nuevo ? '"' + nuevo + '"' : '(borrada)'));
     try { if (typeof escSyncYRefrescar === 'function') escSyncYRefrescar(); else if (typeof save === 'function') save(); } catch(_){}
@@ -518,22 +520,80 @@
     var top = document.getElementById('esc-detalle-header-top'); if (!top || !e) return;
     var previo = window._lexUbicPendiente; window._lexUbicPendiente = null;
     var viejo = document.getElementById('lex-esc-ubic'); if (viejo) viejo.remove();
-    top.insertAdjacentHTML('beforeend', ubicHtml(e));
+    var vr = document.getElementById('lex-esc-revision'); if (vr) vr.remove();
+    top.insertAdjacentHTML('beforeend', ubicHtml(e) + revisionHtml(e));
     var inp = document.getElementById('lex-esc-ubic-inp'); if (!inp) return;
     // Si se estaba escribiendo y la ficha se repintó (sincronización), no se pierde lo escrito
     if (previo && previo.id === String(e.id)) { inp.value = previo.valor; if (previo.foco) { inp.focus(); try { inp.setSelectionRange(previo.valor.length, previo.valor.length); } catch(_){} } }
     var t = null;
-    inp.addEventListener('input', function(){ var st = document.getElementById('lex-esc-ubic-st'); if (st) { st.textContent = 'Escribiendo…'; st.style.color = '#7a8a6a'; } clearTimeout(t); t = setTimeout(function(){ ubicGuardar(inp); }, 1000); });
+    inp.addEventListener('input', function(){ var fu = document.getElementById('eUbicacion'); if (fu) fu.value = inp.value; var st = document.getElementById('lex-esc-ubic-st'); if (st) { st.textContent = 'Escribiendo…'; st.style.color = '#7a8a6a'; } clearTimeout(t); t = setTimeout(function(){ ubicGuardar(inp); }, 1000); });
     inp.addEventListener('blur', function(){ clearTimeout(t); ubicGuardar(inp, true); });
     inp.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') { ev.preventDefault(); clearTimeout(t); ubicGuardar(inp, true); inp.blur(); } });
   }
+  // ── Oct-2026 · OBSERVACIONES INICIALES = NOTA PERMANENTE (bloqueada) ───
+  // Se muestra fija (🔒) y solo se cambia con el botón "✎ Editar". Al salir
+  // de la casilla se guarda (función de siempre escEditarObservacion) y se
+  // vuelve a bloquear.
+  (function bloquearObservaciones(){
+    var orig = window.escRenderBitacora;
+    if (typeof orig !== 'function' || orig._lexBloq) return;
+    var w = function(lista, editable){
+      if (!editable) return orig.apply(this, arguments);
+      var texto = (lista && lista[0] && lista[0].texto) || '';
+      return '<div id="lex-obs-ini" style="display:flex;gap:12px;align-items:flex-start;">'
+        + '<div style="flex:1;min-width:0;background:#f7f9fc;border:1px dashed #8a9bb5;border-radius:8px;padding:9px 12px;font-size:0.86rem;line-height:1.5;color:#1e2a3e;white-space:pre-wrap;">'
+        + (texto ? '🔒 ' + E(texto) : '<span style="color:#8a94a8;font-style:italic;">🔒 Sin observación inicial.</span>') + '</div>'
+        + '<button type="button" onclick="lexEscEditarObsIni()" title="Editar la nota permanente" style="flex-shrink:0;background:#fff;border:1.5px solid #44546e;color:#2c3a52;border-radius:8px;padding:7px 12px;font-size:0.72rem;font-weight:700;cursor:pointer;">✎ Editar</button>'
+        + '</div>';
+    };
+    for (var k in orig) { try { w[k] = orig[k]; } catch(_){} }
+    w._lexBloq = true; w._orig = orig;
+    window.escRenderBitacora = w;
+    window.lexEscEditarObsIni = function(){
+      var cont = document.getElementById('esc-bitacora-lista-edit'); if (!cont) return;
+      if (!confirm('Esta es la NOTA PERMANENTE de cómo ingresó el trámite.\n\nPara avisos del paso actual use "Llamado a la Acción".\n\n¿Seguro que quiere editarla?')) return;
+      resyncIdx();
+      var idx = (typeof _escIdx !== 'undefined') ? _escIdx : -1, e = idx >= 0 ? D.escrituras[idx] : null;
+      cont.innerHTML = orig(e ? (e.bitacora || []) : [], true)
+        + '<div style="font-size:0.68rem;color:#5a6680;margin-top:6px;">Escriba y haga clic fuera de la casilla para guardar; se volverá a bloquear.</div>';
+      var ed = cont.querySelector('[contenteditable]');
+      if (ed) {
+        ed.style.background = '#fff'; ed.style.borderColor = '#44546e';
+        ed.focus();
+        // Si sale sin cambiar nada, se vuelve a bloquear igual
+        ed.addEventListener('blur', function(){ setTimeout(function(){ if (!ed.dataset.dirty) { var e2 = (typeof _escIdx !== 'undefined' && _escIdx >= 0) ? D.escrituras[_escIdx] : null; cont.innerHTML = w(e2 ? (e2.bitacora || []) : [], true); } }, 0); });
+      }
+    };
+  })();
+
+  // ── Nota de REVISIÓN (no es la observación inicial) ───────────────────
+  // e.notaRevision = { texto, fecha, origen } — avisos de cotejo (PDF, libreta…).
+  // Se ve aparte, en ámbar, con botón "✓ Ya lo revisé" que la quita.
+  function revisionHtml(e){
+    var n = e && e.notaRevision; if (!n || !n.texto) return '';
+    return '<div id="lex-esc-revision" style="margin:-6px 0 16px;border:1.5px solid #ba7517;border-left:6px solid #ba7517;border-radius:12px;background:#fdf3dc;padding:9px 14px;display:flex;gap:12px;align-items:center;">'
+      + '<div style="flex:1;min-width:0;"><div style="font-family:monospace;font-size:0.58rem;letter-spacing:0.08em;color:#854f0b;font-weight:800;margin-bottom:2px;">🔎 NOTA DE REVISIÓN' + (n.origen ? ' · ' + E(String(n.origen).toUpperCase()) : '') + '</div>'
+      + '<div style="font-size:0.84rem;color:#633806;line-height:1.45;">' + E(n.texto) + '</div></div>'
+      + '<button type="button" onclick="lexEscRevisionHecha()" style="flex-shrink:0;background:#1a7a3a;color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:0.72rem;font-weight:800;cursor:pointer;">✓ Ya lo revisé</button></div>';
+  }
+  window.lexEscRevisionHecha = function(){
+    resyncIdx();
+    var idx = (typeof _escIdx !== 'undefined') ? _escIdx : -1, e = idx >= 0 ? D.escrituras[idx] : null; if (!e || !e.notaRevision) return;
+    if (!confirm('¿Quitar la nota de revisión?\n\n"' + e.notaRevision.texto + '"')) return;
+    historial(e, 'Nota de revisión atendida: ' + e.notaRevision.texto);
+    delete e.notaRevision; e.fechaMod = new Date().toISOString();
+    try { if (typeof escSyncYRefrescar === 'function') escSyncYRefrescar(); } catch(_){}
+    var b = document.getElementById('lex-esc-revision'); if (b) b.remove();
+    toastS('✓ Nota de revisión quitada');
+  };
+
   (function engancharUbicacion(){
     var o = window.escMostrarDetalle;
     if (typeof o !== 'function' || o._lexUbic) return;
     var w = function(e){
       try {
         var inp = document.getElementById('lex-esc-ubic-inp'), box = document.getElementById('lex-esc-ubic');
-        if (inp && box && String(inp.value) !== String((((D.escrituras || []).filter(function(x){ return x && String(x.id) === box.getAttribute('data-id'); })[0]) || {}).descripcion || ''))
+        if (inp && box && String(inp.value) !== String((((D.escrituras || []).filter(function(x){ return x && String(x.id) === box.getAttribute('data-id'); })[0]) || {}).ubicacion || ''))
           window._lexUbicPendiente = { id: box.getAttribute('data-id'), valor: String(inp.value), foco: document.activeElement === inp };
       } catch(_){}
       var r = o.apply(this, arguments);
@@ -542,6 +602,11 @@
     };
     for (var k in o) { try { w[k] = o[k]; } catch(_){} }
     w._lexUbic = true; window.escMostrarDetalle = w;
+    // Lo que se escribe en la casilla del formulario se refleja en la de la ficha
+    document.addEventListener('input', function(ev){
+      var t = ev.target; if (!t || t.id !== 'eUbicacion') return;
+      var inp = document.getElementById('lex-esc-ubic-inp'); if (inp && inp.value !== t.value) inp.value = t.value;
+    }, true);
   })();
 
   (function engancharFichaPorId(){

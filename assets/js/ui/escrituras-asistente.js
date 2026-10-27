@@ -485,6 +485,65 @@
     } catch(_){}
   }
   window._lexEscResync = resyncIdx;
+
+  // ── Oct-2026 · UBICACIÓN DEL PREDIO, editable directo en la ficha ─────
+  // Debajo de Comprador / Vendedor. Se guarda en e.descripcion (es el texto
+  // que se ve en la tarjeta de la lista debajo del nombre: "Riego", "Teco"…).
+  // Guarda solo al salir de la casilla, con Enter, o 1 s después de dejar de escribir.
+  function ubicHtml(e){
+    var v = String(e.descripcion || '');
+    return '<div id="lex-esc-ubic" data-id="' + E(e.id || '') + '" style="margin:-4px 0 16px;border:1.5px solid rgba(26,122,58,0.35);border-radius:14px;background:#f3f9ee;padding:10px 14px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+      + '<span style="font-family:monospace;font-size:0.6rem;letter-spacing:0.08em;color:#27500a;font-weight:700;">📍 UBICACIÓN DEL PREDIO</span>'
+      + '<span id="lex-esc-ubic-st" style="font-size:0.68rem;color:#7a8a6a;"></span></div>'
+      + '<input id="lex-esc-ubic-inp" type="text" autocomplete="off" value="' + E(v) + '" placeholder="Escriba dónde está el predio (paraje, barrio, colindancia…)" '
+      + 'style="width:100%;box-sizing:border-box;border:1px solid #b9d4a5;border-radius:8px;background:#fff;padding:9px 12px;font-size:0.92rem;color:#1a1008;outline:none;">'
+      + '</div>';
+  }
+  function ubicGuardar(inp, forzar){
+    var box = document.getElementById('lex-esc-ubic'); if (!box || !inp) return;
+    var id = box.getAttribute('data-id'), e = (D.escrituras || []).filter(function(x){ return x && String(x.id) === id; })[0];
+    var st = document.getElementById('lex-esc-ubic-st');
+    if (!e) { if (st) st.textContent = 'No se encontró la escritura'; return; }
+    var nuevo = String(inp.value || '').trim();
+    if (nuevo === String(e.descripcion || '').trim()) { if (forzar && st) st.textContent = ''; return; }
+    var antes = String(e.descripcion || '').trim();
+    e.descripcion = nuevo;
+    e.fechaMod = new Date().toISOString();
+    historial(e, 'Ubicación del predio: ' + (antes ? '"' + antes + '" → ' : '') + (nuevo ? '"' + nuevo + '"' : '(borrada)'));
+    try { if (typeof escSyncYRefrescar === 'function') escSyncYRefrescar(); else if (typeof save === 'function') save(); } catch(_){}
+    if (st) { st.textContent = '✓ Guardado'; st.style.color = '#1a7a3a'; setTimeout(function(){ if (st.textContent === '✓ Guardado') st.textContent = ''; }, 2500); }
+  }
+  function ubicPintar(e){
+    var top = document.getElementById('esc-detalle-header-top'); if (!top || !e) return;
+    var previo = window._lexUbicPendiente; window._lexUbicPendiente = null;
+    var viejo = document.getElementById('lex-esc-ubic'); if (viejo) viejo.remove();
+    top.insertAdjacentHTML('beforeend', ubicHtml(e));
+    var inp = document.getElementById('lex-esc-ubic-inp'); if (!inp) return;
+    // Si se estaba escribiendo y la ficha se repintó (sincronización), no se pierde lo escrito
+    if (previo && previo.id === String(e.id)) { inp.value = previo.valor; if (previo.foco) { inp.focus(); try { inp.setSelectionRange(previo.valor.length, previo.valor.length); } catch(_){} } }
+    var t = null;
+    inp.addEventListener('input', function(){ var st = document.getElementById('lex-esc-ubic-st'); if (st) { st.textContent = 'Escribiendo…'; st.style.color = '#7a8a6a'; } clearTimeout(t); t = setTimeout(function(){ ubicGuardar(inp); }, 1000); });
+    inp.addEventListener('blur', function(){ clearTimeout(t); ubicGuardar(inp, true); });
+    inp.addEventListener('keydown', function(ev){ if (ev.key === 'Enter') { ev.preventDefault(); clearTimeout(t); ubicGuardar(inp, true); inp.blur(); } });
+  }
+  (function engancharUbicacion(){
+    var o = window.escMostrarDetalle;
+    if (typeof o !== 'function' || o._lexUbic) return;
+    var w = function(e){
+      try {
+        var inp = document.getElementById('lex-esc-ubic-inp'), box = document.getElementById('lex-esc-ubic');
+        if (inp && box && String(inp.value) !== String((((D.escrituras || []).filter(function(x){ return x && String(x.id) === box.getAttribute('data-id'); })[0]) || {}).descripcion || ''))
+          window._lexUbicPendiente = { id: box.getAttribute('data-id'), valor: String(inp.value), foco: document.activeElement === inp };
+      } catch(_){}
+      var r = o.apply(this, arguments);
+      try { ubicPintar(e); } catch(err){ console.warn('[Ubicación del predio]', err); }
+      return r;
+    };
+    for (var k in o) { try { w[k] = o[k]; } catch(_){} }
+    w._lexUbic = true; window.escMostrarDetalle = w;
+  })();
+
   (function engancharFichaPorId(){
     var oa = window.escAbrirDetalle;
     if (typeof oa === 'function' && !oa._lexId) {

@@ -5071,8 +5071,8 @@ function escRenderNotasEtapa(e){
         ? `<button type="button" onclick="escAccionRapidaPaso(${i},'completado')" style="margin-top:10px;display:block;width:100%;box-sizing:border-box;background:linear-gradient(135deg,#1a7a3a,#155c2c);border:none;color:#fff;border-radius:8px;padding:11px 14px;font-size:0.85rem;font-weight:800;cursor:pointer;">✓ Ya completé este paso</button>`
         : `<button type="button" onclick="escAccionRapidaPaso(${i},'activo')" style="margin-top:10px;display:block;width:100%;box-sizing:border-box;background:linear-gradient(135deg,#2563eb,#1a4a9a);border:none;color:#fff;border-radius:8px;padding:11px 14px;font-size:0.85rem;font-weight:800;cursor:pointer;">▶ Ya inicié este paso</button>`;
       cont.innerHTML = `<div style="margin-bottom:16px;">
-        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:4px;">🎯 Llamado a la Acción</div>
-        <div style="font-size:0.68rem;color:var(--muted);margin-bottom:10px;">Nota del paso activo — distinta de Observaciones.</div>
+        <div style="font-family:monospace;font-size:0.6rem;letter-spacing:0.1em;text-transform:uppercase;color:#8c6518;font-weight:700;margin-bottom:4px;">🎯 Llamado a la Acción · cambia en cada etapa</div>
+        <div style="font-size:0.68rem;color:var(--muted);margin-bottom:10px;">Lo que <b>realmente cambia por etapa</b>: qué falta y qué sigue en el paso actual. Se actualiza en cada etapa.</div>
         <div style="background:${_bgFase};border-left:4px solid ${_colorFase};border-radius:0 10px 10px 0;box-shadow:0 2px 8px rgba(0,0,0,0.08);padding:12px 14px;">
           <div style="font-family:monospace;font-size:0.68rem;font-weight:700;color:${_colorFase};">${i+1}. ${ESC_PASOS[i]} · ${_faseTxt}</div>
           ${_diasFaseTxt?`<div style="font-size:0.72rem;color:var(--ink);font-weight:600;margin-top:4px;">${_diasFaseTxt}</div>`:''}

@@ -335,7 +335,7 @@
     }
     if (F.q) {
       var iv2 = insVol(e);
-      var txt = [e.num || '', (e.compradores || []).map(nom).join(' '), (e.vendedores || []).map(nom).join(' '), e.tipo || '', TM[e.tipoMovimiento] || '', e.notaria || '', e.descripcion || '', iv2.ins, iv2.vol, e.volInstr || '', e.predio || '', e.ubicacion || '', e.tramite || ''].join(' ');
+      var txt = [e.num || '', (e.compradores || []).map(nom).join(' '), (e.vendedores || []).map(nom).join(' '), e.tipo || '', TM[e.tipoMovimiento] || '', e.notaria || '', e.descripcion || '', iv2.ins, iv2.vol, e.volInstr || '', e.predio || '', e.ubicacion || '', e.tramite || '', (e.notaRevision && e.notaRevision.texto) || '', (Array.isArray(e.bitacora) && e.bitacora[0] && e.bitacora[0].texto) || ''].join(' ');
       txt = sinAc(txt);
       if (txt.indexOf(F.q) < 0) {
         // Números escritos con o sin coma (12848 ↔ 12,848)
@@ -564,9 +564,11 @@
         +       (rel ? ' <span style="font-size:12px;color:#9a8a6a;">— ' + E(verboRel(d)) + '</span> <span style="font-size:13px;font-weight:500;color:#185fa5;">' + E(d.vendedores.map(nombrePropio).join(', ')) + '</span>' : '')
         +     '</div>'
         +   '</div>'
+        +   (String(e.ubicacion || '').trim() ? '<div title="Ubicación del predio" style="font-size:12.5px;color:#27500a;line-height:1.4;margin:2px 0 0 40px;">📍 ' + E(String(e.ubicacion).trim()) + '</div>' : '')
         +   (desc ? '<div style="font-size:12.5px;color:#5a4a30;line-height:1.4;margin:2px 0 0 40px;">' + E(desc) + '</div>' : '')
         +   '<div style="height:6px;"></div>'
         +   (chips.length ? '<div style="display:flex;flex-wrap:wrap;gap:4px;">' + chips.join('') + '</div>' : '')
+        +   (e.notaRevision && e.notaRevision.texto ? '<div title="Nota de revisión (no es la observación inicial)" style="font-size:12px;color:#633806;margin-top:7px;padding:5px 9px;background:#fdf3dc;border-left:3px solid #ba7517;border-radius:0 4px 4px 0;line-height:1.45;">🔎 ' + E(e.notaRevision.texto) + '</div>' : '')
         +   (obs ? '<div style="font-size:12px;color:#1a1008;margin-top:7px;padding:5px 9px;background:rgba(200,149,42,0.08);border-radius:4px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;" title="' + E(obs) + '">' + E(obs) + '</div>' : '')
         + '</div>'
         + avisoColumna(e, d)

@@ -24,10 +24,35 @@
     w._lexConf = true; window[nombre] = w;
   }
 
+  // ¿El cierre lo pidió el usuario con un botón de CERRAR / CANCELAR / ✕ (o Esc)?
+  // Si el cierre viene de un botón de guardar, registrar, cobrar, etc. (la
+  // ventana se cierra sola al terminar), NO se pregunta nada.
+  var RX_CIERRE = /^\s*(✕|×|x|✖)\s*$|cerrar|cancelar|volver|regresar|salir/i;
+  var RX_ACCION = /guardar|registrar|cobrar|imprimir|confirmar|aceptar|agregar|generar|enviar|crear|eliminar|borrar|pagar|aplicar|vincular|cancelar (la )?(escritura|recibo|cita|tr[aá]mite|folio)|cancelaci[oó]n/i;
+  window.lexEsCierreUsuario = function(){
+    var ev = window.event;
+    if (!ev || !ev.isTrusted) return false;                       // cierre automático (después de guardar, etc.)
+    if (ev.type === 'keydown') return ev.key === 'Escape';
+    if (!/click|mouseup|pointerup|touchend/.test(ev.type)) return false;
+    var t = ev.target; if (!t || !t.closest) return false;
+    var el = t.closest('button, [onclick], [role="button"], a, span, i') || t;
+    var oc = String(el.getAttribute && el.getAttribute('onclick') || '');
+    var txt = String(el.textContent || '').replace(/\s+/g, ' ').trim();
+    var tip = String((el.getAttribute && (el.getAttribute('title') || el.getAttribute('aria-label'))) || '');
+    if (RX_ACCION.test(txt) || RX_ACCION.test(oc.replace(/^\s*cerrar\([^)]*\)\s*;?\s*$/, ''))) return false;
+    if (/^\s*cerrar\s*\(/.test(oc)) return true;
+    return RX_CIERRE.test(txt) || RX_CIERRE.test(tip);
+  };
+
   // ════════════════ 1) Tecla Esc con cambios sin guardar ════════════════
   // Se marca "con cambios" la ventana en la que el usuario escribe o elige
   // algo; al abrirse de nuevo vuelve a quedar limpia.
-  var IGNORAR = { 'mEscritura':1, 'mLogin':1, 'modal-horario-gate':1, 'modal-aviso-programado':1, 'mDocPreview':1, 'modal-confirmar-recibo':1, 'modal-validacion':1, 'modal-anticipo-warn':1, 'modal-drive-desconectado':1 };
+  // Ventanas donde NO se pregunta al cerrar: buscadores/selectores, avisos y
+  // confirmaciones, y los cobros rápidos de Caja (esos ya piden confirmar el cobro).
+  var IGNORAR = { 'mEscritura':1, 'mLogin':1, 'modal-horario-gate':1, 'modal-aviso-programado':1, 'mDocPreview':1, 'modal-confirmar-recibo':1, 'modal-validacion':1, 'modal-anticipo-warn':1, 'modal-drive-desconectado':1,
+    'mSelJuicio':1, 'mSelRecVeh':1, 'mVincularFolio':1, 'mVincularDrive':1, 'mVincularArchivo':1, 'mEscVincularFolio':1, 'mPerfilContacto':1,
+    'modal-cancelacion':1, 'modal-autorizacion':1, 'modal-eliminar-recibo':1, 'modal-vehicular':1, 'modal-versiones':1, 'modal-exp-digital-placas':1, 'modal-crear-expediente':1, 'modal-placas':1, 'modal':1,
+    'mTenencia':1, 'mCSF':1, 'mCopias':1, 'mEscaneo':1, 'mLibre':1, 'mRegistroCivil':1, 'mCarrito':1 };
   function marcar(ev){
     if (!ev.isTrusted) return;
     var t = ev.target; if (!t || !t.closest) return;
@@ -78,7 +103,7 @@
   // Se usa la confirmación nativa (instantánea) para no romper la apertura de
   // la página de Tenencia / WhatsApp, que debe ocurrir en el mismo clic.
   function cobro(concepto, total){
-    return confirm('¿Registrar este cobro en CAJA?\n\n' + concepto + '\nTotal: ' + mx(total) + '\n\nAceptar = registrar · Cancelar = regresar');
+    return confirm('¿Está seguro de este COBRO?\n\nSe registrará como INGRESO en caja:\n' + concepto + '\nTotal: ' + mx(total) + '\n\nAceptar = registrar el ingreso · Cancelar = regresar');
   }
   function engancharCaja(){
     envolver('registrarTenencia', function(){
@@ -161,7 +186,7 @@
     if (typeof o !== 'function' || o._lexConfCerrar) return;
     var w = function(id){
       var m = id && typeof id === 'string' ? $(id) : null;
-      if (m && !_guardando && !IGNORAR[id] && m.classList.contains('show') && m.dataset.lexSucio === '1' && typeof window.lexDialogoCambios === 'function' && !$('lex-dlg-cambios')) {
+      if (m && !_guardando && !IGNORAR[id] && m.classList.contains('show') && m.dataset.lexSucio === '1' && window.lexEsCierreUsuario() && typeof window.lexDialogoCambios === 'function' && !$('lex-dlg-cambios')) {
         var self = this, args = arguments, fn = GUARDAR_DE[id];
         window.lexDialogoCambios({
           cambios: [tituloDe(m)], accion: 'cerrar', sinGuardar: !(fn && typeof window[fn] === 'function'),
@@ -200,7 +225,8 @@
     var oi = window.ir;
     if (typeof oi === 'function' && !oi._lexConfIr) {
       var wi = function(dest){
-        var ev = window.event, porUsuario = !!(ev && ev.isTrusted && /click|keydown|touchend/.test(ev.type));
+        var ev = window.event, tg = ev && ev.target && ev.target.closest ? ev.target : null;
+        var porUsuario = !!(ev && ev.isTrusted && /click|touchend/.test(ev.type) && tg && tg.closest('.sidebar, .nav-item, .nav-sub-item, #lex-cerrar-seccion, .topbar, #global-search-results'));
         var actual = (document.querySelector('.content .panel.active') || {}).id || '';
         var self = this, args = arguments, cambios = [];
         if (porUsuario && actual === 'panel-nuevo-recibo' && dest !== 'nuevo-recibo' && reciboPendiente()) cambios.push('Recibo en captura (Generar recibo)');
@@ -220,7 +246,7 @@
       var o = window[n]; if (typeof o !== 'function' || o._lexConfCot) return;
       var w = function(){
         var self = this, args = arguments;
-        if (cotPendiente() && typeof window.lexDialogoCambios === 'function' && !$('lex-dlg-cambios')) {
+        if (cotPendiente() && window.lexEsCierreUsuario() && typeof window.lexDialogoCambios === 'function' && !$('lex-dlg-cambios')) {
           window.lexDialogoCambios({ cambios: ['Cotización en captura'], accion: 'cerrar', sinGuardar: true, onSalir: function(){ _cotEl = null; o.apply(self, args); } });
           return;
         }
@@ -237,13 +263,8 @@
 
   // ════════════════ 6) Confirmaciones puntuales ════════════════
   function engancharPuntuales(){
-    // 14 · "▶ Ya inicié este paso" / "✓ Terminé este paso" (escrituras)
-    envolver('escAccionRapidaPaso', function(i, destino){
-      var nom = (typeof ESC_PASOS !== 'undefined' && ESC_PASOS[i]) ? ESC_PASOS[i] : ('paso ' + (i + 1));
-      return confirm(destino === 'completado'
-        ? '¿Marcar como TERMINADO el paso "' + nom + '"?\n\nSe abrirá la ventana para registrarlo.'
-        : '¿Confirma que YA INICIÓ el paso "' + nom + '"?\n\nEmpieza a contar su plazo. Se abrirá la ventana para registrarlo.');
-    });
+    // (14 · "Ya inicié este paso": se quitó la pregunta — ese botón ya abre la
+    //  ventana del paso, donde se confirma con su propio Guardar.)
     // 15 · Citas
     envolver('agendarCitaGuardar', function(){
       var t = String(($('citaTitulo') || {}).value || '').trim(), f = String(($('citaFecha') || {}).value || ''), h = String(($('citaHora') || {}).value || '');

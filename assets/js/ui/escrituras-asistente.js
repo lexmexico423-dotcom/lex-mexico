@@ -595,17 +595,20 @@
       return (x.id || x.className || x.name || '') + '=' + ((x.type === 'checkbox' || x.type === 'radio') ? (x.checked ? '1' : '0') : String(x.value || ''));
     }).join('|');
   }
-  var _fotoForm = null;
+  var _fotoForm = null, _formTocado = false;
+  // Solo cuenta si la persona escribió/eligió algo (no los llenados automáticos del sistema)
+  var _marcaForm = function(ev){ if (ev.isTrusted && ev.target && ev.target.closest && ev.target.closest('#modal-body-form')) _formTocado = true; };
+  document.addEventListener('input', _marcaForm, true); document.addEventListener('change', _marcaForm, true);
   function formVisible(){
     var m = document.getElementById('mEscritura'), f = document.getElementById('esc-ftr-form');
     return !!(m && m.classList.contains('show') && f && f.style.display !== 'none' && getComputedStyle(f).display !== 'none');
   }
-  function formPendiente(){ return _fotoForm !== null && formVisible() && fotoForm() !== _fotoForm; }
+  function formPendiente(){ return _formTocado && _fotoForm !== null && formVisible() && fotoForm() !== _fotoForm; }
   window.lexEscFormPendiente = formPendiente;
-  window.lexEscFotoForm = function(){ _fotoForm = fotoForm(); };
+  window.lexEscFotoForm = function(){ _fotoForm = fotoForm(); _formTocado = false; };
   ['escMostrarFormulario', 'escAbrirNueva'].forEach(function(n){
     var o = window[n]; if (typeof o !== 'function' || o._lexFoto) return;
-    var w = function(){ var r = o.apply(this, arguments); _fotoForm = null; setTimeout(function(){ _fotoForm = fotoForm(); }, 60); return r; };
+    var w = function(){ var r = o.apply(this, arguments); _fotoForm = null; _formTocado = false; setTimeout(function(){ _fotoForm = fotoForm(); _formTocado = false; }, 60); return r; };
     for (var k in o) { try { w[k] = o[k]; } catch(_){} }
     w._lexFoto = true; window[n] = w;
   });
@@ -632,7 +635,7 @@
     if (typeof oc === 'function' && !oc._lexFicha) {
       cerrarOriginal = function(){ return oc.apply(window, arguments); };
       var wc = function(id){
-        if (id === 'mEscritura' && !window._lexGuardandoEsc) {
+        if (id === 'mEscritura' && !window._lexGuardandoEsc && (typeof window.lexEsCierreUsuario !== 'function' || window.lexEsCierreUsuario())) {
           var c = cambiosFicha();
           if (c.length) { window.lexDialogoCambios({ cambios: c, accion: 'cerrar',
             onGuardar: function(){

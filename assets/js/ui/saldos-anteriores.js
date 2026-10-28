@@ -259,14 +259,17 @@
     var _saSucio = false;
     var _saMarca = function(ev){ if (ev.isTrusted) _saSucio = true; };
     ov.addEventListener('input', _saMarca, true); ov.addEventListener('change', _saMarca, true);
-    function cerrarOv(){
+    // Cierre normal (después de GUARDAR, Eliminar, etc.): sin preguntar.
+    function cerrarOv(){ ov.remove(); }
+    // Solo la ✕ y "Cancelar" preguntan, y solo si se escribió algo.
+    function cerrarConAviso(){
       if (_saSucio && typeof window.lexDialogoCambios === 'function') {
         window.lexDialogoCambios({ cambios: [sa ? 'Recibo anterior' : 'Nuevo recibo anterior'], accion: 'cerrar', sinGuardar: true, onSalir: function(){ ov.remove(); } });
         return;
       }
       ov.remove();
     }
-    q('#sa-x').onclick = cerrarOv; q('#sa-cancel').onclick = cerrarOv;
+    q('#sa-x').onclick = cerrarConAviso; q('#sa-cancel').onclick = cerrarConAviso;
     function leerYValidar(){
       var err = q('#sa-err'); err.textContent = '';
       var clientes = leerClientes();

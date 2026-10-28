@@ -654,7 +654,8 @@
       var wa = function(idx){
         var self = this, args = arguments, eN = D.escrituras && D.escrituras[idx], eA = escDeUbic();
         var c = cambiosFicha();
-        if (c.length && eA && (!eN || String(eN.id) !== String(eA.id))) {
+        var evA = window.event, porUsuario = !!(evA && evA.isTrusted);
+        if (c.length && porUsuario && eA && (!eN || String(eN.id) !== String(eA.id))) {
           window.lexDialogoCambios({ cambios: c, accion: 'abrir otra escritura', onGuardar: function(){ guardarFichaSinCerrar(); oa.apply(self, args); }, onSalir: function(){ descartarFicha(); oa.apply(self, args); } });
           return;
         }
@@ -785,7 +786,8 @@
     }
     window.lexEscObsHayCambios = hayCambios; window.lexEscObsGuardarYa = guardarYa; window.lexEscObsDescartar = descartar;
     envolver('escAbrirNueva', 'Va a abrir una escritura nueva.');
-    envolver('escGuardar', 'Va a guardar la escritura.');
+    // GUARDAR general: lo escrito en la nota permanente se guarda junto, sin preguntar
+    (function(){ var o = window.escGuardar; if (typeof o !== 'function' || o['_lexObsP']) return; var f = function(){ try { if (ED && hayCambios()) guardarYa(); else ED = null; } catch(_){} return o.apply(this, arguments); }; for (var k3 in o) { try { f[k3] = o[k3]; } catch(_){} } f['_lexObsP'] = true; window.escGuardar = f; })();
     window.addEventListener('beforeunload', function(ev){ if (hayCambios()) { ev.preventDefault(); ev.returnValue = ''; } });
   })();
 

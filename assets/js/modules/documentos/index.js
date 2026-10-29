@@ -1335,13 +1335,24 @@ function driveChipClick() {
     }
     return;
   }
+  // Oct-2026: antes, un clic en el chip "Supabase ✓" ofrecía CERRAR SESIÓN y,
+  // si se aceptaba (fácil por accidente), el sistema dejaba de guardar en la
+  // nube hasta volver a entrar ("Reconectar Supabase"). Ahora el clic solo
+  // guarda en ese momento; para salir se usa "Cerrar sesión" del menú.
   if (sbSession && Date.now() < sbExpiry) {
-    if (confirm('¿Cerrar sesión?\n\nLos datos locales se conservan. Solo se desconecta la sincronización en la nube.')) {
-      sbSession = null; sbExpiry = 0;
-      localStorage.removeItem('drive_token'); localStorage.removeItem('drive_expiry');
-      actualizarAmbossBadges(false); toast('Sesión cerrada');
-    }
-  } else { iniciarAuth(); }
+    if (typeof toast === 'function') toast('☁️ Conectado — guardando en la nube…');
+    if (typeof syncEstadoSupabase === 'function') syncEstadoSupabase().catch(function(e){ if(typeof registrarError==='function') registrarError('driveChipClick.sync', e); });
+    return;
+  }
+  // Desconectado: primero intentar recuperar la sesión guardada sin pedir contraseña
+  if (typeof window._lexRevisarSesion === 'function') {
+    window._lexRevisarSesion('clic en el chip').then(function(ok){
+      if (ok) { if (typeof toast === 'function') toast('✅ Reconectado a Supabase'); }
+      else iniciarAuth();
+    });
+    return;
+  }
+  iniciarAuth();
 }
 
 async function obtenerTimestampDrive(){

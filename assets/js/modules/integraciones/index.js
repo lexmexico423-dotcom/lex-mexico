@@ -75,6 +75,14 @@ async function initSupabase(){
         }, 1000);
       }
     }
+    // Oct-2026 · FIX "se desconecta solo": Supabase renueva el token cada hora
+    // por su cuenta (TOKEN_REFRESHED), pero el sistema no se enteraba y, una
+    // hora después de recargar la página, creía que la sesión había vencido:
+    // dejaba de sincronizar y pedía iniciar sesión. Ahora cada renovación
+    // extiende la sesión del sistema.
+    if((event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') && session){
+      try { _lexSesionVigente(session, event); } catch(e){ console.warn('[SB] renovar sesión', e); }
+    }
     if(event === 'SIGNED_OUT'){
       sbSession = null; sbExpiry = 0;
       window.SB_DESPACHO_ID = null;
@@ -649,3 +657,43 @@ async function _llamarGeminiIADirecto(prompt){
     return (await _iaLlamar(prompt, 2048, 0.3, 'consulta')).trim() || 'Sin respuesta.';
   } catch(e){ return 'Error: ' + e.message; }
 }
+
+
+// ── Oct-2026 · Mantener viva la sesión del sistema ──────────────────────
+// Actualiza sbSession/sbExpiry con la sesión real de Supabase. Si el sistema
+// se había quedado como "desconectado", lo reconecta solo y guarda lo pendiente.
+function _lexSesionVigente(session, motivo){
+  if(!session || !session.user) return false;
+  var estabaDesconectado = !sbSession || Date.now() >= sbExpiry;
+  var hasta = session.expires_at ? session.expires_at * 1000 : 0;
+  sbSession = 'supabase-active-' + session.user.id;
+  // El token se renueva solo antes de vencer; se le da margen para no marcar
+  // "desconectado" mientras ocurre la renovación.
+  sbExpiry = Math.max(sbExpiry || 0, hasta + 10 * 60 * 1000, Date.now() + 15 * 60 * 1000);
+  window._miUserId = session.user.id;
+  if(estabaDesconectado){
+    console.log('[SB] Sesión recuperada (' + (motivo || '') + ')');
+    if(typeof actualizarAmbossBadges === 'function') actualizarAmbossBadges(true);
+    try { if(typeof syncEstadoSupabaseDebounced === 'function') syncEstadoSupabaseDebounced(); } catch(e){}
+  }
+  return true;
+}
+window._lexSesionVigente = _lexSesionVigente;
+async function _lexRevisarSesion(motivo){
+  try {
+    if(!window.SB || !window.SB.auth) return false;
+    var r = await window.SB.auth.getSession();
+    var ses = r && r.data && r.data.session;
+    if(ses) return _lexSesionVigente(ses, motivo || 'revisión');
+  } catch(e){ console.warn('[SB] revisar sesión', e); }
+  return false;
+}
+window._lexRevisarSesion = _lexRevisarSesion;
+// Cada 2 minutos (y al volver a la pestaña): si el sistema cree que la sesión
+// venció pero Supabase sigue con sesión válida, se reconecta solo.
+setInterval(function(){
+  if(!sbSession || Date.now() >= sbExpiry - 5 * 60 * 1000) _lexRevisarSesion('cada 2 min');
+}, 2 * 60 * 1000);
+document.addEventListener('visibilitychange', function(){
+  if(document.visibilityState === 'visible' && (!sbSession || Date.now() >= sbExpiry - 5 * 60 * 1000)) _lexRevisarSesion('al volver a la pestaña');
+});

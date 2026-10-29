@@ -7262,7 +7262,7 @@ function registrarCorteRetro() {
   const resp  = (document.getElementById('corte-retro-resp')?.value || (typeof empNombre==='function'?empNombre():'')).trim();
   if (!fecha) { if(typeof toast==='function') toast('Selecciona una fecha','err'); return; }
   // Calcular monto automáticamente — no editable
-  const monto = Math.round(Math.max(0, getSaldoHasta(fecha, horaV)) * 100) / 100;   // a centavos
+  const monto = Math.max(0, getSaldoHasta(fecha, horaV));
   if (monto <= 0) { if(typeof toast==='function') toast('No hay saldo disponible hasta esa fecha','err'); return; }
   // Registrar movimiento de egreso tipo corte
   const movCorte = {

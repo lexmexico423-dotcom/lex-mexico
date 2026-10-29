@@ -491,7 +491,10 @@ function generarFolioMovCaja(fechaMov) {
   const delMesAnio = (D.movimientos || [])
     .filter(m => m.fuente !== 'recibo' && m.fuente !== 'corte' && !m.borrado
                  && m.folioCaja && m.folioCaja.startsWith(prefijo));
-  const siguiente = delMesAnio.length + 1;
+  // Oct-2026 (revisión de dinero): "el número más alto + 1" en vez de
+  // "cuántos hay + 1", para que un folio nuevo nunca repita uno existente.
+  const maxNum = delMesAnio.reduce((mx, m) => { const n = parseInt(String(m.folioCaja).slice(prefijo.length), 10); return isNaN(n) ? mx : Math.max(mx, n); }, 0);
+  const siguiente = Math.max(maxNum, delMesAnio.length) + 1;
   D._folioMovCajaCounter = siguiente;
   D._folioMovCajaMax     = siguiente;
   return prefijo + siguiente;   // sin ceros al frente, crece sin límite
@@ -1018,6 +1021,9 @@ async function eliminarPend(){
 function _registrarMovimiento(mov) {
   if (!mov || !mov.id) return false;
   if (!Array.isArray(D.movimientos)) D.movimientos = [];
+  // Oct-2026 (revisión de dinero): todo monto NUEVO se guarda redondeado a
+  // centavos (antes podían quedar montos como 789.999). No toca lo ya registrado.
+  try { var _mN = parseFloat(mov.monto); if (!isNaN(_mN)) mov.monto = Math.round(_mN * 100) / 100; } catch(_eR){}
   // ── CANDADO ANTI-FECHA-RETROACTIVA-INVOLUNTARIA ──────────────────────────
   // Última red de seguridad del bug del 08-ago-2026 (ver _capturaRetroVigente):
   // si un movimiento va a quedar guardado con una fecha distinta a la de HOY,
@@ -1978,7 +1984,13 @@ async function syncEstadoSupabase(_intentoConcurrencia){
             return String(m.folio)+'|'+(m.letra||'A')+'|'+(m.fecha||'')+'|'+((m.hora||'').slice(0,5))+'|'+(parseFloat(m.monto)||0)+'|'+(m.estatus||'');
           };
           const _movsRecLocal = movsLimpios.filter(function(m){ return m && m.fuente === 'recibo'; });
-          const _movsNoRec     = movsLimpios.filter(function(m){ return !m || m.fuente !== 'recibo'; });
+          // Oct-2026 (revisión de dinero): también se respetan las lápidas que
+          // acaban de llegar del servidor — un movimiento borrado en otra
+          // computadora ya no se vuelve a subir desde esta memoria local.
+          const _movsNoRec     = movsLimpios.filter(function(m){ return (!m || m.fuente !== 'recibo') && !(m && m.id && _movTombSet.has(m.id)); });
+          if (movsLimpios.some(function(m){ return m && m.fuente !== 'recibo' && m.id && _movTombSet.has(m.id); })) {
+            D.movimientos = (D.movimientos || []).filter(function(m){ return !(m && m.fuente !== 'recibo' && m.id && _movTombSet.has(m.id)); });
+          }
           // ── Recuperar MOVIMIENTOS NO-recibo (caja/retiro/manual) que solo existen en SB ──
           // FIX (caso real: folio 1006, empleada registró 3 movimientos, el Monitor
           // confirmó "creado" en la bitácora de auditoría, pero solo 2 aparecían en
@@ -2440,9 +2452,10 @@ async function cerrarCajaAutomatico(fechaObjetivo) {
     D.cierres.unshift(cierreSM);
     if (!D.saldoAcumulado) D.saldoAcumulado = 0;
   } else {
-    const ing  = m.filter(x => x.tipo === 'ingreso').reduce((s,x) => s + x.monto, 0);
-    const egr  = m.filter(x => x.tipo === 'egreso').reduce((s,x)  => s + x.monto, 0);
-    const saldo = ing - egr;
+    const _r2 = v => Math.round((parseFloat(v) || 0) * 100) / 100;   // a centavos
+    const ing  = _r2(m.filter(x => x.tipo === 'ingreso').reduce((s,x) => s + (parseFloat(x.monto) || 0), 0));
+    const egr  = _r2(m.filter(x => x.tipo === 'egreso').reduce((s,x)  => s + (parseFloat(x.monto) || 0), 0));
+    const saldo = _r2(ing - egr);
     const cierre = { fecha: fechaCierre, hora: hora(), ingresos: ing, egresos: egr, saldo, movimientos: m.length, automatico: true };
     D.cierres.unshift(cierre);
     if (!D.saldoAcumulado) D.saldoAcumulado = 0;

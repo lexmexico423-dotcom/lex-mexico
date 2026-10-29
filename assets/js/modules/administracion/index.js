@@ -6118,10 +6118,8 @@ function adminBorrarMovEspec(id) {
         D.movimientos_eliminados.push({ id: id, ts: Date.now() });
       _auditoriaRegistrar('eliminado', mov);
       D.movimientos = D.movimientos.filter(m => m.id !== id);
-      // Oct-2026 (revisión de dinero): si el movimiento era el cobro (o el pago)
-      // de un "Adeudo sin recibo", el adeudo vuelve a quedar PENDIENTE. Antes se
-      // quedaba "cobrado" aunque el dinero ya no estuviera en caja (caso real:
-      // $1,300 de Xóchitl Esperanza López Maldonado).
+      // Oct-2026 (revisión de dinero): si el movimiento borrado era el cobro (o
+      // el pago) de un "Adeudo sin recibo", el adeudo vuelve a quedar PENDIENTE.
       try {
         (D.adeudosSinRecibo || []).forEach(function(a){
           var tocado = false;

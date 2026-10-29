@@ -491,11 +491,36 @@ function generarFolioMovCaja(fechaMov) {
   const delMesAnio = (D.movimientos || [])
     .filter(m => m.fuente !== 'recibo' && m.fuente !== 'corte' && !m.borrado
                  && m.folioCaja && m.folioCaja.startsWith(prefijo));
-  const siguiente = delMesAnio.length + 1;
+  // Oct-2026 (revisión de dinero): antes era "cuántos hay + 1"; si se borraba
+  // un movimiento, el siguiente REPETÍA un folio que ya existía (caso real:
+  // F-OC2026-39 dos veces). Ahora es "el número más alto + 1".
+  const maxNum = delMesAnio.reduce((mx, m) => { const n = parseInt(String(m.folioCaja).slice(prefijo.length), 10); return isNaN(n) ? mx : Math.max(mx, n); }, 0);
+  const siguiente = Math.max(maxNum, delMesAnio.length) + 1;
   D._folioMovCajaCounter = siguiente;
   D._folioMovCajaMax     = siguiente;
   return prefijo + siguiente;   // sin ceros al frente, crece sin límite
 }
+
+// Oct-2026 (revisión de dinero): si dos computadoras crearon movimientos al
+// mismo tiempo, podían salir con el MISMO folio de caja (caso real F-OC2026-39).
+// Si hay folios repetidos, se renumera SOLO ese mes, en orden de fecha y hora
+// (mismo criterio en todas las computadoras, así todas llegan al mismo número).
+function _lexRepararFoliosCajaDuplicados() {
+  const movs = (D.movimientos || []).filter(m => m && m.fuente !== 'recibo' && m.fuente !== 'corte' && !m.borrado && m.folioCaja);
+  const vistos = {}, mesesDup = new Set();
+  movs.forEach(m => { if (vistos[m.folioCaja]) mesesDup.add(String(m.folioCaja).replace(/-\d+$/, '')); vistos[m.folioCaja] = true; });
+  if (!mesesDup.size) return 0;
+  let cambiados = 0;
+  mesesDup.forEach(pref => {
+    const delMes = movs.filter(m => String(m.folioCaja).replace(/-\d+$/, '') === pref)
+      .map((m, i) => ({ m: m, i: i }))
+      .sort((a, b) => (((a.m.fecha || '') + 'T' + (a.m.hora || '00:00')).localeCompare((b.m.fecha || '') + 'T' + (b.m.hora || '00:00'))) || String(a.m.id).localeCompare(String(b.m.id)));
+    delMes.forEach((x, k) => { const nuevo = pref + '-' + (k + 1); if (x.m.folioCaja !== nuevo) { x.m.folioCaja = nuevo; cambiados++; } });
+  });
+  if (cambiados) console.warn('[folios caja] Se renumeraron ' + cambiados + ' folio(s) de caja repetidos en: ' + Array.from(mesesDup).join(', '));
+  return cambiados;
+}
+window._lexRepararFoliosCajaDuplicados = _lexRepararFoliosCajaDuplicados;
 
 function _reordenarFoliosCaja() {
   try {
@@ -1018,6 +1043,10 @@ async function eliminarPend(){
 function _registrarMovimiento(mov) {
   if (!mov || !mov.id) return false;
   if (!Array.isArray(D.movimientos)) D.movimientos = [];
+  // Oct-2026 (revisión de dinero): todo monto se guarda redondeado a centavos.
+  // Antes podían quedar montos como 789.999 o 27591.998999999996 por sumas y
+  // precios con más de 2 decimales, y el corte/caja arrastraban esa basura.
+  try { var _mN = parseFloat(mov.monto); if (!isNaN(_mN)) mov.monto = Math.round(_mN * 100) / 100; } catch(_eR){}
   // ── CANDADO ANTI-FECHA-RETROACTIVA-INVOLUNTARIA ──────────────────────────
   // Última red de seguridad del bug del 08-ago-2026 (ver _capturaRetroVigente):
   // si un movimiento va a quedar guardado con una fecha distinta a la de HOY,
@@ -1731,6 +1760,7 @@ async function syncEstadoSupabase(_intentoConcurrencia){
   syncStart();
   // ── Protección: restaurar movimientos de recibo perdidos antes de persistir ──
   _protegerMovimientosRecibo();
+  try { _lexRepararFoliosCajaDuplicados(); } catch(_eFD){ console.warn('[folios caja]', _eFD); }
   try {
     // Limpiar movimientos sintéticos antes de persistir
     // + excluir movimientos con tombstone (eliminados de forma duradera por reconciliación)
@@ -1978,7 +2008,13 @@ async function syncEstadoSupabase(_intentoConcurrencia){
             return String(m.folio)+'|'+(m.letra||'A')+'|'+(m.fecha||'')+'|'+((m.hora||'').slice(0,5))+'|'+(parseFloat(m.monto)||0)+'|'+(m.estatus||'');
           };
           const _movsRecLocal = movsLimpios.filter(function(m){ return m && m.fuente === 'recibo'; });
-          const _movsNoRec     = movsLimpios.filter(function(m){ return !m || m.fuente !== 'recibo'; });
+          // Oct-2026 (revisión de dinero): también se respetan las lápidas que
+          // acaban de llegar del servidor — antes un movimiento borrado en otra
+          // computadora podía volver a subirse desde esta memoria local.
+          const _movsNoRec     = movsLimpios.filter(function(m){ return (!m || m.fuente !== 'recibo') && !(m && m.id && _movTombSet.has(m.id)); });
+          if (movsLimpios.some(function(m){ return m && m.fuente !== 'recibo' && m.id && _movTombSet.has(m.id); })) {
+            D.movimientos = (D.movimientos || []).filter(function(m){ return !(m && m.fuente !== 'recibo' && m.id && _movTombSet.has(m.id)); });
+          }
           // ── Recuperar MOVIMIENTOS NO-recibo (caja/retiro/manual) que solo existen en SB ──
           // FIX (caso real: folio 1006, empleada registró 3 movimientos, el Monitor
           // confirmó "creado" en la bitácora de auditoría, pero solo 2 aparecían en
@@ -2285,6 +2321,28 @@ function verCierres() {
     return;
   }
   tb.innerHTML=D.cierres.filter(function(c){ return c && !c.corteEliminado; }).map(function(c) {
+    // Oct-2026 (revisión de dinero): el cierre guarda una "foto" de ese día, pero
+    // si después se registraron movimientos de esa fecha (retroactivos, otra
+    // computadora que se sincronizó tarde…) la foto quedaba vieja. Ahora se
+    // muestran SIEMPRE los importes reales de ese día; si cambiaron, se marca.
+    var _r2 = function(v){ return Math.round((parseFloat(v) || 0) * 100) / 100; };
+    if (!c.esCorte && c.fecha && typeof getMovHoy === 'function') {
+      try {
+        var _mv = getMovHoy(c.fecha) || [];
+        if (_mv.length) {
+          var _ing = _r2(_mv.filter(function(x){ return x.tipo === 'ingreso'; }).reduce(function(s, x){ return s + (parseFloat(x.monto) || 0); }, 0));
+          var _egr = _r2(_mv.filter(function(x){ return x.tipo === 'egreso'; }).reduce(function(s, x){ return s + (parseFloat(x.monto) || 0); }, 0));
+          var _cambio = c.sinMovimientos === true || Math.abs(_ing - _r2(c.ingresos)) > 0.005 || Math.abs(_egr - _r2(c.egresos)) > 0.005;
+          var _nota = _cambio ? ' <span title="Se registraron movimientos de este día después del cierre. Antes decía: +$' + fmt(c.ingresos || 0) + ' / -$' + fmt(c.egresos || 0) + '" style="font-size:0.55rem;color:#b06a10;font-weight:700;cursor:help;">⟳ actualizado</span>' : '';
+          return '<tr><td class="mono" style="font-size:0.7rem;">' + c.fecha + _nota + '</td>' +
+            '<td class="mono" style="font-size:0.68rem;color:var(--muted);">' + (c.hora || '—') + '</td>' +
+            '<td class="monto ing">+$' + fmt(_ing) + '</td>' +
+            '<td class="monto egr">-$' + fmt(_egr) + '</td>' +
+            '<td class="monto" style="font-weight:700;">$' + fmt(_r2(_ing - _egr)) + '</td>' +
+            '<td class="mono" style="font-size:0.65rem;color:var(--muted);">' + _mv.length + '</td></tr>';
+        }
+      } catch(_eC){}
+    }
     // Cierres sin movimientos contables (manuales o auto-registrados)
     if (c.sinMovimientos === true) {
       var etiqAuto = c.auto ? ' <span style="font-size:0.55rem;color:#888;font-style:italic;">(auto)</span>' : '';
@@ -2440,9 +2498,10 @@ async function cerrarCajaAutomatico(fechaObjetivo) {
     D.cierres.unshift(cierreSM);
     if (!D.saldoAcumulado) D.saldoAcumulado = 0;
   } else {
-    const ing  = m.filter(x => x.tipo === 'ingreso').reduce((s,x) => s + x.monto, 0);
-    const egr  = m.filter(x => x.tipo === 'egreso').reduce((s,x)  => s + x.monto, 0);
-    const saldo = ing - egr;
+    const _r2 = v => Math.round((parseFloat(v) || 0) * 100) / 100;
+    const ing  = _r2(m.filter(x => x.tipo === 'ingreso').reduce((s,x) => s + (parseFloat(x.monto) || 0), 0));
+    const egr  = _r2(m.filter(x => x.tipo === 'egreso').reduce((s,x)  => s + (parseFloat(x.monto) || 0), 0));
+    const saldo = _r2(ing - egr);
     const cierre = { fecha: fechaCierre, hora: hora(), ingresos: ing, egresos: egr, saldo, movimientos: m.length, automatico: true };
     D.cierres.unshift(cierre);
     if (!D.saldoAcumulado) D.saldoAcumulado = 0;

@@ -281,7 +281,7 @@ function getSaldo() {
   const todos = [...movsCaja, ...sinteticos];
   const ing = todos.filter(m => m.tipo === 'ingreso').reduce((s, m) => s + (parseFloat(m.monto) || 0), 0);
   const egr = todos.filter(m => m.tipo === 'egreso').reduce((s, m) => s + (parseFloat(m.monto) || 0), 0);
-  return ing - egr;
+  return Math.round((ing - egr) * 100) / 100;   // a centavos (evita 27591.998999…)
 }
 
 function _poblarSelectorAnios() {

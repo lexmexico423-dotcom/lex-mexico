@@ -6118,6 +6118,24 @@ function adminBorrarMovEspec(id) {
         D.movimientos_eliminados.push({ id: id, ts: Date.now() });
       _auditoriaRegistrar('eliminado', mov);
       D.movimientos = D.movimientos.filter(m => m.id !== id);
+      // Oct-2026 (revisión de dinero): si el movimiento era el cobro (o el pago)
+      // de un "Adeudo sin recibo", el adeudo vuelve a quedar PENDIENTE. Antes se
+      // quedaba "cobrado" aunque el dinero ya no estuviera en caja (caso real:
+      // $1,300 de Xóchitl Esperanza López Maldonado).
+      try {
+        (D.adeudosSinRecibo || []).forEach(function(a){
+          var tocado = false;
+          (a.conceptos || []).forEach(function(c){
+            if (c && c.movIngresoId === id) { c.cobrado = false; delete c.movIngresoId; delete c.cobradoFecha; delete c.cobradoPor; tocado = true; }
+            if (c && c.movEgresoId === id) { delete c.movEgresoId; tocado = true; }
+          });
+          if (tocado) {
+            if ((a.conceptos || []).some(function(c){ return c && !c.cobrado; })) { a.estado = 'pendiente'; delete a.fechaResolucion; delete a.cobradoPor; }
+            a.fechaMod = new Date().toISOString();
+            toast('↩ El adeudo de ' + (a.cliente || 'cliente') + ' volvió a quedar pendiente', 'ok');
+          }
+        });
+      } catch(_eAd){ console.warn('[borrar mov → adeudo]', _eAd); }
       // ── PARCHE ANTI-DUPLICADO (movimientos normales) ──────────────────────
       if (false && mov.folio != null) {
         if (!Array.isArray(D.recibosExcluidosCaja)) D.recibosExcluidosCaja = [];

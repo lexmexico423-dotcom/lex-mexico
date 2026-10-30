@@ -1389,7 +1389,7 @@ async function eliminarCarpeta(){
     num: c.num, vacio: true, cliente: 'VACÍO', estatus: 'VACÍO',
     tipoTramite: '', descripcion: '', obs: '', obsLista: [], docDesc: '', juicioDesc: '', escTipo: '',
     escNotario: '', escVolumen: '', escInstrumento: '', celebEscritura: '', regCivilTipo: '',
-    reciboOficial: '', totalPactado: 0, prioridad: '', estadoArchivo: '', ubicacion: null, ingreso: '',
+    reciboOficial: '', totalPactado: 0, prioridad: '', estadoArchivo: '', ubicacion: c.ubicacion || null, ingreso: '',
     fechaCreacion: c.fechaCreacion || _ahoraC, fechaModificacion: _ahoraC,
     eliminadoFecha: _ahoraC, eliminadoPor: _quienC
   };

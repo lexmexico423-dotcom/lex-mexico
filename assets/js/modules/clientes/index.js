@@ -1376,6 +1376,8 @@ async function guardarCarpeta(){
     regCivilTipo: tipoTramite==='registro_civil'?$('kRegCivilTipo').value:'',
     docDesc: tipoTramite==='documentos'?$('kDocDesc').value.trim():''
   };
+  // Oct-2026: si se guarda una carpeta VACÍO sin ponerle cliente nuevo, sigue siendo VACÍO
+  if(/^VAC[IÍ]O$/i.test(cliente)){ c.vacio = true; c.cliente = 'VACÍO'; c.estatus = 'VACÍO'; }
   try {
     if(eiK>=0) D.carpetas[eiK]=c; else D.carpetas.unshift(c);
   } catch(e) {

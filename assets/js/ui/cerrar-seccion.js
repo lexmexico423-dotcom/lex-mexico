@@ -89,3 +89,79 @@
   window.addEventListener('resize', actualizar);
   window.lexCerrarSeccionActualizar = actualizar;
 })();
+
+// ── Oct-2026 · ✕ PARA BORRAR LA BÚSQUEDA (opción A) EN TODOS LOS BUSCADORES ──
+// Una equis pequeña dentro de la casilla, a la derecha. Solo se ve cuando hay
+// algo escrito; al tocarla se borra lo buscado y la lista vuelve completa.
+(function(){
+  'use strict';
+  if (window._lexBuscadorX) return;
+  window._lexBuscadorX = true;
+  var st = document.createElement('style');
+  st.textContent = '.lex-bx-wrap{position:relative;box-sizing:border-box;}'
+    + '.search-row>.lex-bx-wrap{flex:1;min-width:0;margin:0 !important;}'
+    + '.lex-bx-wrap>input{width:100% !important;margin:0 !important;padding-right:34px !important;box-sizing:border-box;}'
+    + '.lex-bx-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:22px;height:22px;border-radius:50%;border:none;background:#e3d6b4;color:#5a4a2a;font-size:12px;line-height:22px;text-align:center;cursor:pointer;padding:0;display:none;z-index:2;}'
+    + '.lex-bx-btn:hover{background:#c8952a;color:#fff;}'
+    + '.lex-bx-wrap input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display:none;}';
+  (document.head || document.documentElement).appendChild(st);
+
+  function esBuscador(i){
+    if (!i || i.tagName !== 'INPUT' || i.dataset.lexBx) return false;
+    var t = String(i.type || 'text').toLowerCase();
+    if (t !== 'text' && t !== 'search') return false;
+    if (i.readOnly || i.disabled) return false;
+    var ph = String(i.getAttribute('placeholder') || ''), id = String(i.id || ''), cls = String(i.className || '');
+    if (id === 'global-search-inp') return false;            // el buscador general tiene su propio manejo
+    return /search-inp/.test(cls) || t === 'search' || /buscar|🔍/i.test(ph) || /Q$/.test(id) || /buscar/i.test(id);
+  }
+  function actualizarX(i){ var b = i && i._lexBx; if (b) b.style.display = String(i.value || '') ? 'block' : 'none'; }
+  function poner(i){
+    if (!esBuscador(i) || !i.parentNode) return;
+    i.dataset.lexBx = '1';
+    var cs = window.getComputedStyle ? getComputedStyle(i) : null;
+    var w = document.createElement('span');
+    w.className = 'lex-bx-wrap';
+    // El envoltorio ocupa el mismo lugar que tenía la casilla
+    w.style.display = (cs && cs.display === 'block') ? 'block' : 'inline-block';
+    if (cs) {
+      if (cs.flexGrow && cs.flexGrow !== '0') w.style.flex = cs.flexGrow + ' ' + cs.flexShrink + ' ' + cs.flexBasis;
+      w.style.marginTop = cs.marginTop; w.style.marginBottom = cs.marginBottom; w.style.marginLeft = cs.marginLeft; w.style.marginRight = cs.marginRight;
+      if (cs.minWidth && cs.minWidth !== 'auto' && cs.minWidth !== '0px') w.style.minWidth = cs.minWidth;
+    }
+    if (i.style.width) w.style.width = i.style.width; else if (cs && cs.display === 'block') w.style.width = '100%';
+    if (i.style.flex) w.style.flex = i.style.flex;
+    if (i.style.maxWidth) w.style.maxWidth = i.style.maxWidth;
+    i.parentNode.insertBefore(w, i);
+    w.appendChild(i);
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'lex-bx-btn'; b.textContent = '✕';
+    b.title = 'Borrar búsqueda'; b.setAttribute('aria-label', 'Borrar búsqueda');
+    b.addEventListener('mousedown', function(ev){ ev.preventDefault(); });   // no quitar el foco
+    b.addEventListener('click', function(ev){
+      ev.preventDefault(); ev.stopPropagation();
+      i.value = '';
+      ['input', 'keyup', 'change'].forEach(function(tipo){ try { i.dispatchEvent(new Event(tipo, { bubbles: true })); } catch(_){} });
+      actualizarX(i); i.focus();
+    });
+    w.appendChild(b);
+    i._lexBx = b;
+    i.addEventListener('input', function(){ actualizarX(i); });
+    actualizarX(i);
+  }
+  function revisar(raiz){
+    try { (raiz && raiz.querySelectorAll ? raiz : document).querySelectorAll('input').forEach(poner); } catch(_){}
+  }
+  // Cuando el sistema borra una búsqueda por su cuenta (al cambiar de sección), ocultar la ✕
+  setInterval(function(){ document.querySelectorAll('input[data-lex-bx]').forEach(actualizarX); }, 1500);
+  function iniciar(){
+    revisar(document);
+    try {
+      new MutationObserver(function(muts){
+        muts.forEach(function(m){ m.addedNodes && m.addedNodes.forEach(function(n){ if (n.nodeType === 1) { if (n.tagName === 'INPUT') poner(n); else revisar(n); } }); });
+      }).observe(document.body, { childList: true, subtree: true });
+    } catch(_){}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
+  window.lexBuscadorXRevisar = revisar;
+})();

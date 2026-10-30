@@ -786,7 +786,23 @@ function renderCarp(){
     if(filtroCT==='archivada')return esArchivada;
     if(filtroCT==='cancelada')return esCancelada;
     return true;
-  }).filter(c=>!q||_carpTextoBusqueda(c).includes(q));
+  }).filter(c=>{
+    // Oct-2026: sin acentos y sin importar mayúsculas. Si se escribe SOLO un
+    // número (ej. 56) busca esa carpeta exacta — antes salía también la 67
+    // porque su volumen 1056 contiene "56". También acepta volumen o
+    // instrumento exactos.
+    const _sa = s => String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    const qq = _sa(q).trim();
+    if(!qq) return true;
+    if(/^\d+$/.test(qq)){
+      const n = parseInt(qq,10);
+      const numC = String(c.num||'').match(/(\d+)\s*$/);
+      if(numC && parseInt(numC[1],10)===n) return true;
+      const soloDig = v => String(v||'').replace(/\D/g,'');
+      return (soloDig(c.escVolumen) && parseInt(soloDig(c.escVolumen),10)===n) || (soloDig(c.escInstrumento) && parseInt(soloDig(c.escInstrumento),10)===n);
+    }
+    return _sa(_carpTextoBusqueda(c)).includes(qq);
+  });
   // FIX (caso real: CARP.- 41, 2026-09-30): la tabla se mostraba en el orden
   // interno del arreglo, y una carpeta guardada fuera de lugar (p. ej. por una
   // sincronización que la dejó al final) aparecía "desfasada" debajo de la

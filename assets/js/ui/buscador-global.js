@@ -37,6 +37,76 @@
     for (var i = 0; i < palabras.length; i++) if (txt.indexOf(palabras[i]) < 0) return false;
     return true;
   }
+  // ── Oct-2026 (opción A): ¿en qué parte de la ficha apareció lo buscado? ──
+  var ETIQ = { obs:'observaciones', obsLista:'observaciones', bitacora:'observaciones', notaRevision:'nota de revisión', notaFinal:'nota final',
+    descripcion:'descripción', notas:'notas', nota:'nota', texto:'texto', titulo:'título', vendedores:'vendedor', compradores:'comprador',
+    nombreConyuge:'cónyuge', conducto:'por conducto de', conceptos:'conceptos', concepto:'concepto', clientes:'otros clientes', personas_veh:'personas',
+    tel:'teléfono', tel2:'teléfono', pob:'población', desc:'descripción', persona:'persona', juiCliente:'cliente del juicio', predio:'predio',
+    ubicacion:'ubicación', tramite:'trámite', tramites:'trámites', docDesc:'documentos', juicioDesc:'juicio', escTipo:'tipo de escritura',
+    escNotario:'notaría', notaria:'notaría', instrumento:'instrumento', volumen:'volumen', escInstrumento:'instrumento', escVolumen:'volumen',
+    expediente:'expediente', juzgado:'juzgado', acuerdos:'acuerdos', terminos:'términos', costosExtra:'gastos extra', pagosParciales:'abonos',
+    folioPapel:'folio de papel', entregaRecibioPor:'entregada a', volInstr:'volumen/instrumento', nombre_cliente_firma:'firma', placa:'placa', serie:'serie', marca:'marca', cliente:'cliente', nombre:'nombre' };
+  function dondeAparece(obj, palabras, titulo){
+    var tn = sinAc(titulo);
+    var faltan = palabras.filter(function(p){ return tn.indexOf(p) < 0; });
+    if (!faltan.length) return null;
+    var hallado = null;
+    (function rec(o, clave, prof){
+      if (hallado || o == null || prof > 5) return;
+      var t = typeof o;
+      if (t === 'string' || t === 'number') {
+        var s = String(o), sn = sinAc(s);
+        for (var i = 0; i < faltan.length; i++) {
+          var pos = sn.indexOf(faltan[i]);
+          if (pos >= 0) {
+            var ini = Math.max(0, pos - 30), fin = Math.min(s.length, pos + faltan[i].length + 40);
+            hallado = { campo: ETIQ[clave] || clave || 'datos', texto: (ini > 0 ? '…' : '') + s.slice(ini, fin) + (fin < s.length ? '…' : '') };
+            return;
+          }
+        }
+        return;
+      }
+      if (t !== 'object') return;
+      if (Array.isArray(o)) { for (var j = 0; j < o.length; j++) rec(o[j], clave, prof + 1); }
+      else for (var k in o) { if (!Object.prototype.hasOwnProperty.call(o, k) || EXCLUIR.test(k)) continue; rec(o[k], (k === 'texto' || k === 'nombre') && clave && ETIQ[clave] ? clave : k, prof + 1); }
+    })(obj, '', 0);
+    return hallado;
+  }
+  // Resaltar lo buscado (sin importar acentos) dentro del texto original
+  function resaltar(s, palabras){
+    s = String(s == null ? '' : s);
+    if (!s) return '';
+    var norm = '', mapa = [];
+    for (var i = 0; i < s.length; i++) { var n = sinAc(s.charAt(i)); for (var j = 0; j < n.length; j++) { norm += n.charAt(j); mapa.push(i); } }
+    var marca = new Array(s.length);
+    palabras.forEach(function(p){
+      if (!p) return;
+      var desde = 0, pos;
+      while ((pos = norm.indexOf(p, desde)) >= 0) { for (var k = pos; k < pos + p.length; k++) marca[mapa[k]] = true; desde = pos + p.length; }
+    });
+    var out = '', dentro = false;
+    for (var x = 0; x < s.length; x++) {
+      if (marca[x] && !dentro) { out += '<mark class="lex-gs-mk">'; dentro = true; }
+      if (!marca[x] && dentro) { out += '</mark>'; dentro = false; }
+      out += e(s.charAt(x));
+    }
+    if (dentro) out += '</mark>';
+    return out;
+  }
+  // Colores de cada sección (etiqueta de la izquierda)
+  var COLOR = {
+    recibo:['#E1F5EE','#085041'], directorio:['#EEEDFE','#3C3489'], carpeta:['#FAECE7','#712B13'], escritura:['#E6F1FB','#0C447C'],
+    juicio:['#FBEAF0','#72243E'], pendiente:['#FAEEDA','#633806'], anterior:['#F1EFE8','#444441'], adeudo:['#FAEEDA','#633806'],
+    cotizacion:['#EEEDFE','#3C3489'], cita:['#E1F5EE','#085041'], gestion:['#F1EFE8','#444441'], movimiento:['#EAF3DE','#27500A'], tarea:['#E6F1FB','#0C447C'] };
+  function tono(txt){
+    var t = sinAc(txt);
+    if (/liquidad|resuelt|ya es recibo|conclu|lista|entregad|cobrad|pagad|▲|^completad/.test(t)) return ['#EAF3DE','#27500A'];
+    if (/cancel|no procedi|▼|vencid/.test(t)) return ['#FCEBEB','#791F1F'];
+    if (/pendiente|debe|espera|activo/.test(t)) return ['#FAEEDA','#633806'];
+    if (/proceso|tramite/.test(t)) return ['#E6F1FB','#0C447C'];
+    return ['#F1EFE8','#444441'];
+  }
+  var EST_ESC = { proceso:'En proceso', listo:'Lista', archivado:'Archivado', cancelado:'Cancelado', noprocedio:'No procedió', espera:'En espera' };
   function e(s){ return (typeof esc === 'function') ? esc(s == null ? '' : String(s)) : String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
   function $m(n){ try { return (typeof fmt === 'function') ? fmt(n) : Number(n || 0).toFixed(2); } catch(_){ return String(n); } }
   function fFecha(f){ try { return (typeof fmtFecha === 'function' && f) ? fmtFecha(f) : (f || ''); } catch(_){ return f || ''; } }
@@ -95,7 +165,7 @@
         var comp = nombresPersonas(x.compradores), vend = nombresPersonas(x.vendedores);
         var datos = [x.instrumento ? 'Instr. ' + x.instrumento : '', x.volumen ? 'Vol. ' + x.volumen : '', x.notaria ? 'Notaría ' + x.notaria : ''].filter(Boolean).join(' · ');
         return { titulo: comp || vend || x.tramite || '—', sub: (vend && comp ? 'Vende: ' + vend + (datos ? ' · ' : '') : '') + datos,
-          badge: x.estado ? { txt:x.estado, color:'#a0c0ff', bg:'rgba(100,150,255,0.12)' } : null,
+          badge: x.estado ? { txt:EST_ESC[x.estado] || x.estado } : null,
           accion: function(){ irSeccion('escrituras', null, '', function(){ if (typeof escAbrirDetalle === 'function') escAbrirDetalle(idx); }); } }; } });
     // Juicios
     F.push({ clave:'juicio', titulo:'⚖️ Juicios', icono:'⚖️', panel:'juicios', input:'juicioQ',
@@ -122,9 +192,9 @@
     F.push({ clave:'adeudo', titulo:'💳 Adeudos sin recibo', icono:'💳', panel:'adeudos-sin-recibo', input:'adeudosBuscar',
       lista: function(){ return arr(d.adeudosSinRecibo).filter(function(a){ return a && a.tipo !== 'anterior' && !a.eliminado; }); },
       item: function(a){
-        var total = 0; arr(a.conceptos).forEach(function(c){ total += Number(c && c.monto || 0); });
-        return { titulo: a.cliente || '—', sub: arr(a.conceptos).map(function(c){ return c && c.descripcion; }).filter(Boolean).slice(0, 2).join(' · ') + (total ? ' · $' + $m(total) : ''),
-          badge: a.estado ? { txt:a.estado, color:'#e8c875', bg:'rgba(200,149,42,0.12)' } : null,
+        var total = 0, debe = 0; arr(a.conceptos).forEach(function(c){ var m = Number(c && c.monto || 0); total += m; if (!(c && c.cobrado)) debe += m; });
+        return { titulo: a.cliente || '—', sub: arr(a.conceptos).map(function(c){ return c && c.descripcion; }).filter(Boolean).slice(0, 2).join(' · ') + (total ? ' · total $' + $m(total) : ''),
+          badge: (a.estado !== 'cobrado' && debe > 0) ? { txt:'Debe $' + $m(debe) } : (a.estado ? { txt:a.estado === 'cobrado' ? 'Cobrado' : a.estado } : null),
           accion: function(){ irSeccion('adeudos-sin-recibo', 'adeudosBuscar', a.cliente || ''); } }; } });
     // Cotizaciones
     F.push({ clave:'cotizacion', titulo:'📝 Cotizaciones', icono:'📝', panel:'pre-recibo', input:null,
@@ -180,37 +250,71 @@
       grupos.push({ f: f, hallados: hallados });
     });
     var total = grupos.reduce(function(s, g){ return s + g.hallados.length; }, 0);
+    res.classList.add('lex-gs-a');
+    ajustarAncho(res);
     if (!total) {
-      res.innerHTML = '<div class="gs-empty">Sin resultados para "' + e(q) + '"</div>';
+      res.innerHTML = '<div class="lex-gs-vacio">Sin resultados para «' + e(q) + '»</div>';
       res.classList.add('show');
       return;
     }
-    var html = '<div style="padding:8px 14px 4px;font-family:monospace;font-size:0.58rem;color:rgba(232,200,117,0.75);letter-spacing:0.06em;">'
-      + total + ' resultado' + (total === 1 ? '' : 's') + ' en ' + grupos.length + ' secci' + (grupos.length === 1 ? 'ón' : 'ones') + '</div>';
-    grupos.forEach(function(g, gi){
-      var f = g.f;
-      if (gi > 0) html += '<hr class="gs-divider">';
-      html += '<div class="gs-section"><div class="gs-section-title" style="display:flex;justify-content:space-between;">'
-        + '<span>' + e(f.titulo) + '</span><span style="background:rgba(200,149,42,0.18);color:#e8c875;border-radius:9px;padding:0 7px;letter-spacing:0;">' + g.hallados.length + '</span></div>';
+    // Encabezado: total y cuántos hay en cada sección
+    var html = '<div class="lex-gs-head"><b>' + total + ' resultado' + (total === 1 ? '' : 's') + '</b> en ' + grupos.length + ' secci' + (grupos.length === 1 ? 'ón' : 'ones') + ': '
+      + grupos.map(function(g){ return '<span>' + e(g.f.titulo.replace(/^\S+\s/, '')) + ' ' + g.hallados.length + '</span>'; }).join(' · ') + '</div>';
+    grupos.forEach(function(g){
+      var f = g.f, col = COLOR[f.clave] || ['#F1EFE8', '#444441'];
+      var nombreSec = f.titulo.replace(/^\S+\s/, '');
       g.hallados.slice(0, MAX_POR_GRUPO).forEach(function(x){
         var it; try { it = f.item(x); } catch(err){ return; }
         if (!it.accion) { it.accion = (function(f2){ return function(){ irSeccion(f2.panel, f2.input, q); }; })(f); }
         var i = acc.length; acc.push(it.accion);
-        var badge = it.badge ? '<span class="gs-item-badge" style="color:' + it.badge.color + ';background:' + it.badge.bg + ';">' + e(it.badge.txt) + '</span>' : '';
-        html += '<div class="gs-item" onclick="lexGsIr(' + i + ')"><div class="gs-item-icon">' + f.icono + '</div>'
-          + '<div class="gs-item-main"><div class="gs-item-title">' + e(it.titulo) + '</div><div class="gs-item-sub">' + e(it.sub || '') + '</div></div>' + badge + '</div>';
+        var badge = '';
+        if (it.badge && it.badge.txt) { var tb = tono(it.badge.txt); badge = ' <span class="lex-gs-badge" style="background:' + tb[0] + ';color:' + tb[1] + ';">' + e(it.badge.txt) + '</span>'; }
+        var donde = null; try { donde = dondeAparece(x, palabras, it.titulo + ' ' + (it.sub || '')); } catch(_){}
+        html += '<div class="lex-gs-row" onclick="lexGsIr(' + i + ')">'
+          + '<span class="lex-gs-sec" style="background:' + col[0] + ';color:' + col[1] + ';">' + e(nombreSec) + '</span>'
+          + '<div class="lex-gs-main"><div class="lex-gs-tit">' + resaltar(it.titulo, palabras) + badge + '</div>'
+          + (it.sub ? '<div class="lex-gs-sub">' + resaltar(it.sub, palabras) + '</div>' : '')
+          + (donde ? '<div class="lex-gs-donde">Aparece en ' + e(donde.campo) + ': «' + resaltar(donde.texto, palabras) + '»</div>' : '')
+          + '</div><span class="lex-gs-abrir">Abrir ›</span></div>';
       });
       if (g.hallados.length > MAX_POR_GRUPO) {
         var i2 = acc.length;
         acc.push((function(f2){ return function(){ irSeccion(f2.panel, f2.input, q); }; })(f));
-        html += '<div class="gs-item" onclick="lexGsIr(' + i2 + ')" style="justify-content:flex-end;"><span style="font-family:monospace;font-size:0.62rem;color:#e8c875;">Ver los ' + g.hallados.length + ' en ' + e(f.titulo.replace(/^\S+\s/, '')) + ' →</span></div>';
+        html += '<div class="lex-gs-mas" onclick="lexGsIr(' + i2 + ')">Ver los ' + g.hallados.length + ' de ' + e(nombreSec) + ' →</div>';
       }
-      html += '</div>';
     });
     window._lexGsAcc = acc;
     res.innerHTML = html;
     res.classList.add('show');
   }
+  // Más ancho: casi todo lo que queda a la derecha del buscador
+  function ajustarAncho(res){
+    try {
+      var r = (res.parentElement || res).getBoundingClientRect();
+      var w = Math.min(1000, Math.max(r.width, window.innerWidth - r.left - 24));
+      res.style.width = w + 'px'; res.style.right = 'auto';
+    } catch(_){}
+  }
+  var st = document.createElement('style');
+  st.textContent = ''
+    + '#global-search-results.lex-gs-a{background:#fdfaf4;border:1.5px solid #d4b870;box-shadow:0 14px 40px rgba(60,40,10,0.28);max-height:72vh;border-radius:12px;color:#2a1a06;}'
+    + '.lex-gs-head{padding:10px 16px;font-size:0.74rem;color:#7a6440;border-bottom:1px solid #eee2c4;background:#f8f1de;position:sticky;top:0;z-index:1;}'
+    + '.lex-gs-head b{color:#4a2f08;font-weight:700;}'
+    + '.lex-gs-row{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #eee2c4;cursor:pointer;transition:background .12s;}'
+    + '.lex-gs-row:hover{background:#fbf2d8;}'
+    + '.lex-gs-sec{flex-shrink:0;min-width:118px;text-align:center;font-size:0.7rem;font-weight:700;padding:4px 10px;border-radius:12px;white-space:nowrap;}'
+    + '.lex-gs-main{flex:1;min-width:0;}'
+    + '.lex-gs-tit{font-size:0.9rem;font-weight:600;color:#1a0f02;line-height:1.35;}'
+    + '.lex-gs-sub{font-size:0.76rem;color:#6a5434;margin-top:2px;line-height:1.35;}'
+    + '.lex-gs-donde{font-size:0.74rem;color:#8c6518;margin-top:3px;font-style:italic;}'
+    + '.lex-gs-badge{display:inline-block;font-size:0.68rem;font-weight:700;padding:2px 9px;border-radius:10px;margin-left:6px;vertical-align:1px;white-space:nowrap;}'
+    + '.lex-gs-abrir{flex-shrink:0;font-size:0.76rem;font-weight:700;color:#8c6518;}'
+    + '.lex-gs-row:hover .lex-gs-abrir{color:#c8952a;}'
+    + '.lex-gs-mas{padding:8px 16px;text-align:right;font-size:0.76rem;font-weight:700;color:#8c6518;cursor:pointer;border-bottom:1px solid #eee2c4;background:#faf5e8;}'
+    + '.lex-gs-mas:hover{background:#fbf2d8;}'
+    + 'mark.lex-gs-mk{background:#fae4a8;color:#1a0f02;padding:0 1px;border-radius:3px;}'
+    + '.lex-gs-vacio{padding:22px 16px;text-align:center;font-size:0.82rem;color:#7a6440;}';
+  (document.head || document.documentElement).appendChild(st);
   window.lexGsIr = function(i){
     var a = window._lexGsAcc[i];
     try { if (typeof globalSearchCerrar === 'function') globalSearchCerrar(); } catch(_){}
@@ -222,7 +326,10 @@
     var previo = window.globalSearch;   // incluye el modo IA ("?")
     var nuevo = function(q){
       q = String(q || '').trim();
-      if (q.charAt(0) === '?') { if (typeof previo === 'function') return previo(q); return; }
+      if (q.charAt(0) === '?') {
+        try { var r0 = document.getElementById('global-search-results'); if (r0) { r0.classList.remove('lex-gs-a'); r0.style.width = ''; r0.style.right = ''; } } catch(_){}
+        if (typeof previo === 'function') return previo(q); return;
+      }
       try { var ic = document.getElementById('global-search-icon'); if (ic) ic.textContent = '🔍'; } catch(_){}
       var res = document.getElementById('global-search-results');
       clearTimeout(_timer);

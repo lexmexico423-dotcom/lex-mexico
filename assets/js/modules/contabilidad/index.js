@@ -750,7 +750,9 @@ function renderCarp(){
   const EST_ARCHIVADO=['ARCHIVADO'];
   const EST_CANCELADO=['CANCELADO'];
   // Mejora 5: actualizar contadores arriba (siempre con TODAS las carpetas, sin filtro)
-  const todas = D.carpetas || [];
+  // Oct-2026: las carpetas eliminadas quedan como "VACÍO" (conservan su número)
+  // y no cuentan en los contadores.
+  const todas = (D.carpetas || []).filter(c => c && !c.vacio);
   let cntActiva = 0, cntConcluida = 0, cntArchivada = 0, cntCancelada = 0;
   todas.forEach(c => {
     const est = (c.estatus||'').toUpperCase().trim();
@@ -774,6 +776,7 @@ function renderCarp(){
   setStat('carpStArch', cntArchivada);
   setStat('carpStCanc', cntCancelada);
   let l=D.carpetas.filter(c=>{
+    if(c && c.vacio) return filtroCT==='todas' || filtroCT==='todos' || !filtroCT || !['activa','entregada','archivada','cancelada'].includes(filtroCT);
     const est=(c.estatus||'').toUpperCase().trim();
     const esConcluida=EST_CONCLUIDO.some(x=>est.startsWith(x));
     const esArchivada=!esConcluida&&EST_ARCHIVADO.some(x=>est.startsWith(x));
@@ -832,6 +835,15 @@ function renderCarp(){
       <tbody>
         ${l.map((c,rowI)=>{
           const idx=D.carpetas.indexOf(c);
+          if(c.vacio){
+            // Carpeta eliminada: fila normal, solo con el texto VACÍO
+            const _bgV=rowI%2===0?'#fdfaf4':'#faf5e8';
+            const _tdV='padding:10px 13px;font-size:0.76rem;color:#2a1a06;border-bottom:1px solid rgba(212,184,112,0.25);vertical-align:middle;';
+            return '<tr class="carp-tr" style="background:'+_bgV+';" title="Carpeta eliminada'+(c.eliminadoFecha?' el '+esc(new Date(c.eliminadoFecha).toLocaleDateString('es-MX')):'')+(c.eliminadoPor?' por '+esc(c.eliminadoPor):'')+'">'
+              +'<td style="'+_tdV+'text-align:center;"><span class="carp-num-badge" style="border:1.5px solid #d4b870;padding:3px 0;min-width:52px;font-family:monospace;font-size:0.9rem;font-weight:800;color:#1a0f02;white-space:nowrap;border-radius:6px;background:#fdfaf4;display:inline-block;text-align:center;">'+_carpSoloNum(c.num)+'</span></td>'
+              +'<td style="'+_tdV+'font-weight:600;font-size:0.8rem;color:#1a0f02;line-height:1.3;">VACÍO</td>'
+              +'<td style="'+_tdV+'"></td><td style="'+_tdV+'"></td><td style="'+_tdV+'"></td><td style="'+_tdV+'"></td></tr>';
+          }
           const tipoLabel={juicio:'JUICIO',escritura:'ESCRITURA',registro_civil:'REG. CIVIL',documentos:'DOCUMENTOS'}[c.tipoTramite]||(c.tipoTramite?c.tipoTramite.toUpperCase():'—');
           let subTipo='';
           if(c.tipoTramite==='juicio'&&c.juicioDesc) subTipo=c.juicioDesc;

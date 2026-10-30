@@ -1373,15 +1373,27 @@ async function eliminarCarpeta(){
   }
   const c=D.carpetas[idxLive];
   const ok = await confirmarBonito({
-    titulo: 'Eliminar carpeta',
-    mensaje: '¿Eliminar carpeta '+c.num+' — '+c.cliente+'?\n\nEsta acción no se puede deshacer.',
+    titulo: '⚠ ¿Está seguro?',
+    mensaje: 'Los datos de la carpeta '+c.num+' — '+(c.cliente||'')+' se borrarán PERMANENTEMENTE y NO podrán recuperarse.\n\nEl número '+c.num+' se quedará en la lista como "VACÍO".',
     btnSi: 'Sí, eliminar',
     btnNo: 'Cancelar',
     peligro: true
   });
   if(!ok) return;
-  D.carpetas.splice(idxLive,1);
-  save();saveCarpetas();renderCarp();cerrar('mCarpeta');toast('Carpeta eliminada — sincronizando...');
+  // Oct-2026: ya no se quita de la lista (la sincronización la regresaba).
+  // Se queda el número con la leyenda VACÍO y la fecha del borrado, que es la
+  // versión más reciente y así ninguna computadora la vuelve a traer.
+  const _ahoraC = new Date().toISOString();
+  const _quienC = (typeof empNombre === 'function' ? empNombre() : '') || '';
+  D.carpetas[idxLive] = {
+    num: c.num, vacio: true, cliente: 'VACÍO', estatus: 'VACÍO',
+    tipoTramite: '', descripcion: '', obs: '', obsLista: [], docDesc: '', juicioDesc: '', escTipo: '',
+    escNotario: '', escVolumen: '', escInstrumento: '', celebEscritura: '', regCivilTipo: '',
+    reciboOficial: '', totalPactado: 0, prioridad: '', estadoArchivo: '', ubicacion: null, ingreso: '',
+    fechaCreacion: c.fechaCreacion || _ahoraC, fechaModificacion: _ahoraC,
+    eliminadoFecha: _ahoraC, eliminadoPor: _quienC
+  };
+  save();saveCarpetas();renderCarp();cerrar('mCarpeta');toast('🗑 Carpeta '+c.num+' eliminada — queda como VACÍO');
 }
 
 function setJF(f,el){filtroJ=f;document.querySelectorAll('#panel-juicios .fbtn').forEach(b=>b.classList.remove('active'));el.classList.add('active');renderJuicios();}

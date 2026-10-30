@@ -4508,7 +4508,7 @@ function escBuscarCarpeta(q){
   const cont = document.getElementById('eNumSug');
   if(!cont) return;
   window._escNumSugKeepOpen = false;
-  const carpetas = (typeof D!=='undefined' && D.carpetas) ? D.carpetas : [];
+  const carpetas = ((typeof D!=='undefined' && D.carpetas) ? D.carpetas : []).filter(c => c && !c.vacio);   // las VACÍO no se ofrecen
   const ql = (q||'').toLowerCase().trim();
   const filtradas = ql
     ? carpetas.filter(c=>(c.num||'').toLowerCase().includes(ql)||(c.cliente||'').toLowerCase().includes(ql))

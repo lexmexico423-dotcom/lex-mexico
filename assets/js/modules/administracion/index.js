@@ -5870,11 +5870,13 @@ function adminRenderMovsEditar(q, tipo) {
     if(_soloHoy && m.fecha !== _hoyStr) return false;
     if(tipo && tipo !== 'todos' && m.tipo !== tipo) return false;
     if(q){
-      var ql = q.toLowerCase();
-      return (m.descripcion||'').toLowerCase().includes(ql) ||
-             (m.fecha||'').includes(ql) ||
+      // Oct-2026: sin importar mayúsculas, minúsculas ni acentos ("nahum" = "NAHÚM")
+      var _sa = function(t){ return String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(); };
+      var ql = _sa(q);
+      return _sa(m.descripcion).includes(ql) ||
+             (m.fecha||'').includes(q.toLowerCase()) ||
              (_fechaQ && (m.fecha||'').includes(_fechaQ)) ||
-             (m.cat||'').toLowerCase().includes(ql);
+             _sa(m.cat).includes(ql);
     }
     return true;
   });
@@ -5886,7 +5888,8 @@ function adminRenderMovsEditar(q, tipo) {
   // correcto para Caja. Pero en "Editar Cobros/Egresos" se pidió el mismo orden
   // que Contabilidad: más viejo arriba, más reciente abajo. Se toman los 60 más
   // recientes (igual que antes) y se invierte solo el orden de despliegue.
-  listEl.innerHTML = filtrados.slice(0,60).reverse().map(function(m){
+  // Oct-2026: a petición, los MÁS RECIENTES ARRIBA (ya no se invierte el orden).
+  listEl.innerHTML = filtrados.slice(0,60).map(function(m){
     var esIngreso = m.tipo === 'ingreso';
     var color = esIngreso ? '#4dca6a' : '#e85555';
     var signo = esIngreso ? '+' : '-';

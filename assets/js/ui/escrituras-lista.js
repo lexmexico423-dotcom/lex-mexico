@@ -395,10 +395,11 @@
     fr.appendChild(mk('escQInstr', 'INSTRUMENTO', '', 118));
     fr.appendChild(mk('escQVol', 'VOLUMEN', '', 86));
     fr.appendChild(mk('escQFecha', 'FECHA DE FIRMA', 'dd/mm/aaaa', 138));
-    q.parentNode.insertBefore(fr, q);
+    var _qBox = (q.closest && q.closest('.lex-bx-wrap')) || q;   // la casilla puede estar dentro del envoltorio de la ✕
+    _qBox.parentNode.insertBefore(fr, _qBox);
     q.placeholder = '🔍 Cliente, acto, notaría, predio…';
     q.style.minWidth = '200px';
-    var row = q.parentNode; if (row && !row._lexPad) { row._lexPad = true; row.style.marginTop = '18px'; }
+    var row = (q.closest && q.closest('.search-row')) || q.parentNode; if (row && !row._lexPad) { row._lexPad = true; row.style.marginTop = '18px'; }
     var st = document.createElement('style');
     st.textContent = '.lex-esc-campo.lex-on{border:2px solid #2e7d32 !important;background:#eef7e9 !important;}';
     document.head.appendChild(st);

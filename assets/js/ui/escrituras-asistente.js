@@ -965,8 +965,54 @@
       html += '<div style="text-align:center;margin-top:14px;"><button type="button" onclick="lexEscSiguienteEtapa(' + idx + ')" style="background:#1a7a3a;color:#fff;border:none;border-radius:9px;padding:11px 22px;font-weight:800;font-size:0.85rem;cursor:pointer;box-shadow:0 3px 10px rgba(26,122,58,0.3);">▶ Avanzar: ' + E(ETQ[fase + '-' + va] || 'siguiente etapa') + '</button></div>'
         + '<div style="text-align:center;font-size:0.68rem;color:#8a7f6a;margin-top:6px;">Verde = hecho · La personita = dónde va · Gris = falta · Toca un círculo para corregirlo o para adelantar</div>';
     }
+    // Oct-2026 · ESTATUS GUIADO al terminar: el sistema pregunta lo que sigue
+    //  · todas las etapas listas y sigue "En proceso" → ¿Ya está lista para entregar?
+    //  · "Listo para entregar"                          → ¿Ya se entregó?
+    //  · "Concluida y entregada"                        → a quién y cuándo
+    var guia = '';
+    var todoHecho = a === -1, estado = e.estado || 'proceso';
+    var btnEnt = document.getElementById('esc-btn-confirmar-entrega');
+    if (todoHecho && (estado === 'proceso' || estado === 'espera')) {
+      guia = '<div style="margin-top:16px;border:2px solid #22c55e;border-radius:12px;background:#f0fbf3;padding:14px 16px;text-align:center;">'
+        + '<div style="font-size:1rem;font-weight:800;color:#15803d;">🎉 Se completaron todas las etapas</div>'
+        + '<div style="font-size:0.88rem;color:#27500a;margin:4px 0 12px;">¿La escritura ya está <b>lista para entregar</b> al cliente?</div>'
+        + '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">'
+        + '<button type="button" onclick="lexEscMarcarLista(' + idx + ')" style="background:#15803d;color:#fff;border:none;border-radius:9px;padding:10px 20px;font-weight:800;font-size:0.85rem;cursor:pointer;">✔ Sí, está lista para entregar</button>'
+        + '<button type="button" onclick="this.closest(\'div[style*=f0fbf3]\').querySelector(\'.lex-todavia\').style.display=\'block\'" style="background:#fff;color:#5a4a2a;border:1px solid #c8b68a;border-radius:9px;padding:10px 18px;font-weight:700;font-size:0.82rem;cursor:pointer;">Todavía no</button>'
+        + '</div><div class="lex-todavia" style="display:none;font-size:0.78rem;color:#7a6a4a;margin-top:10px;">Se queda <b>En proceso</b>. Si falta algo, toque la bolita de esa etapa para regresarla.</div></div>';
+      if (btnEnt) btnEnt.style.display = 'none';
+      if (hint) hint.style.display = 'none';
+    } else if (estado === 'listo') {
+      guia = '<div style="margin-top:16px;border:2px solid #185fa5;border-radius:12px;background:#eef5fd;padding:14px 16px;text-align:center;">'
+        + '<div style="font-size:1rem;font-weight:800;color:#0c447c;">📦 Lista para entregar</div>'
+        + '<div style="font-size:0.88rem;color:#0c447c;margin:4px 0 12px;">¿El cliente <b>ya recogió</b> su escritura?</div>'
+        + '<button type="button" onclick="escConfirmarEntrega()" style="background:#185fa5;color:#fff;border:none;border-radius:9px;padding:10px 20px;font-weight:800;font-size:0.85rem;cursor:pointer;">✔ Sí, se entregó — confirmar entrega</button></div>';
+      if (btnEnt) btnEnt.style.display = 'none';
+      if (hint) hint.style.display = 'none';
+    } else if (estado === 'archivado') {
+      var fEnt = e.entregaConfirmadaFecha ? new Date(e.entregaConfirmadaFecha).toLocaleDateString('es-MX', { day:'2-digit', month:'long', year:'numeric' }) : '';
+      guia = '<div style="margin-top:16px;border:1.5px solid #9fb6cf;border-radius:12px;background:#f6f8fb;padding:12px 16px;text-align:center;font-size:0.88rem;color:#2c3a52;">'
+        + '✅ <b>Concluida y entregada</b>' + (e.entregaRecibioPor ? ' · la recibió <b>' + E(e.entregaRecibioPor) + '</b>' : '') + (fEnt ? ' · ' + E(fEnt) : '') + '</div>';
+      if (btnEnt) btnEnt.style.display = 'none';
+      if (hint) hint.style.display = 'none';
+    }
+    html += guia;
     box.innerHTML = html;
   }
+  // "Sí, está lista para entregar": estatus → Listo para entregar + tarea de llamar al cliente
+  window.lexEscMarcarLista = function(idx){
+    resyncIdx();
+    var i = (typeof _escIdx !== 'undefined' && _escIdx >= 0) ? _escIdx : idx;
+    var e = D.escrituras && D.escrituras[i]; if (!e) return;
+    e.estado = 'listo';
+    e.fechaMod = new Date().toISOString();
+    historial(e, 'Estatus: Listo para entregar (todas las etapas completas)');
+    tareaLlamada(e, 'entrega', 'para avisarle que su ESCRITURA YA ESTÁ LISTA y pase a recogerla.');
+    try { if (typeof escSetEstado === 'function') escSetEstado('listo'); } catch(_){}
+    refrescar(e, i);
+    try { if (typeof escMostrarDetalle === 'function') escMostrarDetalle(e); } catch(_){}
+    toastS('📦 Lista para entregar — se creó la tarea para avisar al cliente');
+  };
   window.lexEscPintarProgreso = pintarProgreso;
 
   // Tocar un círculo (índice de la línea de 6): corregir (hecho/actual) o adelantar (futuro)

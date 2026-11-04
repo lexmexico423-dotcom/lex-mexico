@@ -244,6 +244,8 @@
     var acc = [];
     var grupos = [];
     fuentes().forEach(function(f){
+      // Nov-2026: cada rol solo ve resultados de las secciones que tiene permitidas
+      try { if (typeof window.lexRolPuedeVer === 'function' && !window.lexRolPuedeVer(f.panel)) return; } catch(_){}
       var lista = []; try { lista = f.lista() || []; } catch(err){ console.warn('[buscador] ' + f.clave, err); }
       var hallados = lista.filter(function(x){ try { return coincide(x, palabras); } catch(_){ return false; } });
       if (!hallados.length) return;

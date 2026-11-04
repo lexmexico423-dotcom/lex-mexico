@@ -320,6 +320,8 @@ const _despachoOk = await obtenerDespachoActivo();
         if(/invalid login credentials/i.test(msg)) msg = 'Correo o contraseña incorrectos';
         else if(/user already registered/i.test(msg)) msg = 'Ya existe una cuenta con ese correo';
         else if(/email not confirmed/i.test(msg)) msg = 'Confirma tu correo o desactiva la confirmación en Supabase';
+        // Nov-2026: cuenta deshabilitada desde Gestión de Accesos (Supabase responde "User is banned")
+        else if(/bann?ed/i.test(msg)) msg = 'Cuenta bloqueada por el número de intentos.';
         eErr().textContent = msg;
         eErr().style.display = 'block';
         btn.disabled = false;

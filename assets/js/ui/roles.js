@@ -22,7 +22,7 @@
                      escrituras:'r', juicios:'-', carpetas:'r', pendientes:'w', 'registro-civil':'w', gestiones:'w', citas:'w', directorio:'w', 'tareas-hoy':'w', configuracion:'-' },
     abogado:       { caja:'w', contabilidad:'-', recibos:'-', 'nuevo-recibo':'-', 'busqueda-cliente':'-', 'pre-recibo':'-', 'recibos-anteriores':'-', 'adeudos-sin-recibo':'-',
                      escrituras:'w', juicios:'w', carpetas:'w', pendientes:'w', 'registro-civil':'w', gestiones:'w', citas:'w', directorio:'w', 'tareas-hoy':'w', configuracion:'-' },
-    consultor:     { caja:'r', contabilidad:'-', recibos:'-', 'nuevo-recibo':'-', 'busqueda-cliente':'-', 'pre-recibo':'-', 'recibos-anteriores':'-', 'adeudos-sin-recibo':'-',
+    consultor:     { caja:'w', contabilidad:'-', recibos:'-', 'nuevo-recibo':'-', 'busqueda-cliente':'-', 'pre-recibo':'-', 'recibos-anteriores':'-', 'adeudos-sin-recibo':'-',
                      escrituras:'r', juicios:'r', carpetas:'r', pendientes:'r', 'registro-civil':'r', gestiones:'r', citas:'r', directorio:'r', 'tareas-hoy':'w', configuracion:'-' }
   };
   var SIN_MONTOS = { abogado:true, consultor:true };
@@ -57,6 +57,26 @@
     + 'body.lex-rol-sinmontos #panel-caja .cierre-bar{display:none !important;}'
     + 'body.lex-rol-recepcionista #panel-caja .cierre-bar .btn-success{display:none !important;}'
     + '.lex-rol-banner{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:8px 14px;border-radius:8px;background:#F1EFE8;color:#444441;border:1px solid #D3D1C7;font-size:0.78rem;}'
+    + '.lex-rol-inicio-oculto{display:none !important;}'
+    + '#lex-inicio-rol{padding:4px 2px 10px;}'
+    + '.lxi-saludo{font-family:Georgia,"Times New Roman",serif;font-size:1.7rem;color:#f3e3bd;line-height:1.2;}'
+    + '.lxi-sub{color:#b59a63;font-size:0.86rem;margin:4px 0 18px;}'
+    + '.lxi-cifras{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px;}'
+    + '.lxi-cifra{background:#fdfaf4;border-radius:12px;border-top:3px solid #c8952a;padding:14px 16px;cursor:pointer;transition:transform .15s,box-shadow .15s;}'
+    + '.lxi-cifra:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(200,149,42,0.25);}'
+    + '.lxi-k{font-family:monospace;font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:#8c6518;}'
+    + '.lxi-n{font-size:2rem;font-weight:700;color:#4a2f08;line-height:1.15;margin-top:4px;}'
+    + '.lxi-dos{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;}'
+    + '.lxi-caja{background:#fdfaf4;border-radius:12px;padding:14px 16px;}'
+    + '.lxi-tit{margin-bottom:6px;}'
+    + '.lxi-li{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid #eee2c4;font-size:0.86rem;color:#2a1a06;cursor:pointer;}'
+    + '.lxi-li:last-child{border-bottom:none;}'
+    + '.lxi-li:hover{background:#fbf2d8;}'
+    + '.lxi-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}'
+    + '.lxi-dia{min-width:52px;font-size:0.8rem;}'
+    + '.lxi-mas{text-align:right;font-size:0.78rem;font-weight:700;color:#8c6518;cursor:pointer;padding-top:8px;}'
+    + '.lxi-vacio{color:#7a6440;font-size:0.84rem;padding:12px 2px;}'
+    + '@media(max-width:900px){.lxi-cifras{grid-template-columns:repeat(2,minmax(0,1fr));}.lxi-dos{grid-template-columns:1fr;}}'
     + '#lex-rol-chip{display:inline-block;margin-left:8px;padding:1px 9px;border-radius:10px;font-size:0.62rem;font-weight:700;font-family:monospace;letter-spacing:0.04em;vertical-align:1px;}';
   (document.head || document.documentElement).appendChild(st);
 
@@ -92,13 +112,106 @@
   }
 
   // ── Etiqueta del rol junto al usuario (barra de arriba) ──────────────────
-  function aplicarChip(){
-    var u = document.getElementById('topbar-usuario-txt'); if (!u) return;
-    var c = document.getElementById('lex-rol-chip');
-    if (!email()) { if (c) c.remove(); return; }
-    if (!c) { c = document.createElement('span'); c.id = 'lex-rol-chip'; u.parentNode.insertBefore(c, u.nextSibling); }
-    var r = rol(), col = COLOR[r] || COLOR.operador;
-    c.textContent = NOMBRE[r] || r; c.style.background = col[0]; c.style.color = col[1];
+  // (Nov-2026: el Lic. pidió que NO aparezca el rol junto al correo)
+  function aplicarChip(){ var c = document.getElementById('lex-rol-chip'); if (c) c.remove(); }
+
+  // ── Principal para Abogado / Consultor (opción A: bienvenida + mi día) ──
+  function hoyISO(){ var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function aISO(f){
+    f = String(f || '').trim(); if (!f) return '';
+    var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(f); if (m) return m[1] + '-' + m[2] + '-' + m[3];
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(f); if (m) return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+    return '';
+  }
+  function difDias(iso){ if (!iso) return null; var a = new Date(hoyISO() + 'T00:00:00'), b = new Date(iso + 'T00:00:00'); return Math.round((b - a) / 86400000); }
+  function etiquetaDia(iso){
+    var d = difDias(iso); if (d === 0) return 'Hoy'; if (d === 1) return 'Mañana';
+    var dt = new Date(iso + 'T00:00:00');
+    return ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'][dt.getDay()] + ' ' + dt.getDate();
+  }
+  function h(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
+  function nombreCorto(){
+    var n = String((typeof empleadoActual !== 'undefined' && empleadoActual && empleadoActual.nombre) || '').trim();
+    if (!n) return '';
+    var p = n.split(/\s+/), cap = function(x){ x = String(x || '').toLowerCase(); return x.charAt(0).toUpperCase() + x.slice(1); };
+    if (/^lic\.?$/i.test(p[0]) && p[1]) return 'Lic. ' + cap(p[1]);
+    return cap(p[0]);
+  }
+  function datosInicio(){
+    var d = (typeof D !== 'undefined' && D) ? D : {}, hoy = hoyISO();
+    var elimT = Array.isArray(d.tareasHoyEliminadas) ? d.tareasHoyEliminadas : [];
+    var tareas = (d.tareasHoy || []).filter(function(t){
+      if (!t || elimT.indexOf(t.id) >= 0) return false;
+      if (/resuel|complet|hecha/i.test(String(t.estado || ''))) return false;
+      var f = aISO(t.fechaProgramada); return !f || f <= hoy;
+    });
+    var citasHoy = (d.citas || []).filter(function(c){ return c && aISO(c.fecha) === hoy && !c.cancelada; });
+    var elimE = Array.isArray(d.escriturasEliminadas) ? d.escriturasEliminadas : [];
+    var escProc = (d.escrituras || []).filter(function(e){ return e && elimE.indexOf(e.id) < 0 && /^(proceso|espera)$/.test(String(e.estado || 'proceso')); }).length;
+    var juiAct = (d.juicios || []).filter(function(j){ return j && !/conclu|archiv|cancel|termin/i.test(String(j.estatus || '')); }).length;
+    // Próximos vencimientos: términos y audiencias de juicios + citas (15 días)
+    var venc = [];
+    (d.juicios || []).forEach(function(j){
+      (j && j.terminos || []).forEach(function(t){
+        var f = aISO(t && t.fecha); var dd = difDias(f);
+        if (t && !t.cumplido && dd !== null && dd >= 0 && dd <= 15) venc.push({ f:f, txt:(t.tipo || 'Término') + ' — ' + (j.cliente || j.tipo || ''), urg: dd <= 1 });
+      });
+      var fa = aISO(j && j.audiencia); var da = difDias(fa);
+      if (da !== null && da >= 0 && da <= 15) venc.push({ f:fa, txt:'Audiencia — ' + (j.cliente || '') + (j.expediente ? ' · Exp. ' + j.expediente : ''), urg: da <= 1 });
+    });
+    (d.citas || []).forEach(function(c){
+      var f = aISO(c && c.fecha); var dc = difDias(f);
+      if (c && !c.cancelada && dc !== null && dc >= 0 && dc <= 15) venc.push({ f:f, txt:'Cita' + (c.hora ? ' ' + c.hora : '') + ' — ' + (c.titulo || c.cliente || ''), urg: false, cita: true });
+    });
+    venc.sort(function(a, b){ return a.f < b.f ? -1 : a.f > b.f ? 1 : 0; });
+    var vencHoy = venc.filter(function(v){ return !v.cita && difDias(v.f) <= 1; }).length;
+    return { tareas: tareas, citasHoy: citasHoy, escProc: escProc, juiAct: juiAct, venc: venc, vencHoy: vencHoy };
+  }
+  var _htmlInicio = '';
+  function pintarInicio(){
+    var panel = document.getElementById('panel-caja'); if (!panel) return;
+    var usar = !!SIN_MONTOS[rol()];
+    var box = document.getElementById('lex-inicio-rol');
+    if (!usar) {
+      if (box) box.remove(); _htmlInicio = '';
+      panel.querySelectorAll('.lex-rol-inicio-oculto').forEach(function(el){ el.classList.remove('lex-rol-inicio-oculto'); });
+      return;
+    }
+    Array.prototype.forEach.call(panel.children, function(el){ if (el.id !== 'lex-inicio-rol') el.classList.add('lex-rol-inicio-oculto'); });
+    if (!box) { box = document.createElement('div'); box.id = 'lex-inicio-rol'; panel.insertBefore(box, panel.firstChild); }
+    var x = datosInicio(), hr = new Date().getHours();
+    var saludo = hr < 12 ? 'Buenos días' : (hr < 19 ? 'Buenas tardes' : 'Buenas noches');
+    var nom = nombreCorto();
+    var fecha = new Date().toLocaleDateString('es-MX', { weekday:'long', day:'numeric', month:'long' });
+    fecha = fecha.replace(',', ''); fecha = fecha.charAt(0).toUpperCase() + fecha.slice(1);
+    var partes = [];
+    partes.push(x.tareas.length + ' tarea' + (x.tareas.length === 1 ? '' : 's'));
+    partes.push(x.citasHoy.length + ' cita' + (x.citasHoy.length === 1 ? '' : 's'));
+    partes.push(x.vencHoy + ' término' + (x.vencHoy === 1 ? '' : 's') + ' por vencer');
+    var cifra = function(k, n, accion){ return '<div class="lxi-cifra" onclick="' + accion + '"><div class="lxi-k">' + k + '</div><div class="lxi-n">' + n + '</div></div>'; };
+    var html = '<div class="lxi-saludo">' + saludo + (nom ? ', ' + h(nom) : '') + '</div>'
+      + '<div class="lxi-sub">' + h(fecha) + ' · tienes ' + partes.join(', ').replace(/, ([^,]*)$/, ' y $1') + '</div>'
+      + '<div class="lxi-cifras">'
+      + cifra('Tareas hoy', x.tareas.length, "if(typeof abrirTareasHoy==='function')abrirTareasHoy();else ir('tareas-hoy')")
+      + cifra('Citas hoy', x.citasHoy.length, "ir('citas')")
+      + cifra('Escrituras en proceso', x.escProc, "ir('escrituras')")
+      + cifra('Juicios activos', x.juiAct, "ir('juicios')")
+      + '</div><div class="lxi-dos">'
+      + '<div class="lxi-caja"><div class="lxi-k lxi-tit">Mis tareas de hoy</div>'
+      + (x.tareas.length ? x.tareas.slice(0, 6).map(function(t){
+          var vencida = aISO(t.fechaProgramada) && aISO(t.fechaProgramada) < hoyISO();
+          return '<div class="lxi-li" onclick="if(typeof abrirTareasHoy===\'function\')abrirTareasHoy();else ir(\'tareas-hoy\')"><span class="lxi-dot" style="background:' + (vencida ? '#E24B4A' : '#EF9F27') + '"></span>' + h(t.titulo || t.texto || 'Tarea') + '</div>';
+        }).join('') + (x.tareas.length > 6 ? '<div class="lxi-mas" onclick="if(typeof abrirTareasHoy===\'function\')abrirTareasHoy();else ir(\'tareas-hoy\')">Ver las ' + x.tareas.length + ' tareas →</div>' : '')
+        : '<div class="lxi-vacio">Sin tareas pendientes para hoy ✓</div>')
+      + '</div>'
+      + '<div class="lxi-caja"><div class="lxi-k lxi-tit">Próximos vencimientos</div>'
+      + (x.venc.length ? x.venc.slice(0, 6).map(function(v){
+          var dd = difDias(v.f);
+          return '<div class="lxi-li" onclick="ir(\'' + (v.cita ? 'citas' : 'juicios') + '\')"><b class="lxi-dia" style="color:' + (dd <= 1 ? '#791F1F' : '#633806') + '">' + etiquetaDia(v.f) + '</b>' + h(v.txt) + '</div>';
+        }).join('')
+        : '<div class="lxi-vacio">Nada por vencer en los próximos 15 días ✓</div>')
+      + '</div></div>';
+    if (html !== _htmlInicio) { box.innerHTML = html; _htmlInicio = html; }
   }
 
   // ── Navegación: no entrar a secciones sin permiso ────────────────────────
@@ -194,6 +307,7 @@
     document.body.classList.toggle('lex-rol-sinmontos', !!SIN_MONTOS[r]);
     ['recepcionista', 'abogado', 'consultor'].forEach(function(x){ document.body.classList.toggle('lex-rol-' + x, r === x); });
     aplicarMenu(); aplicarChip(); envolverIr(); envolverFunciones();
+    try { pintarInicio(); } catch(e){ console.warn('[Roles] inicio', e); }
     if (!PERM[r]) { restaurarTodo(); quitarBanners(); return; }
     var pa = panelActivo();
     if (pa && permiso(pa) === '-') { try { window.ir('caja'); } catch(_){} return; }

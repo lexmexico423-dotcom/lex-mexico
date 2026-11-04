@@ -4341,8 +4341,8 @@ function _forzarCierreSesionPorDeshabilitado(){
   localStorage.removeItem('empleado_email');
   localStorage.removeItem('empleado_nombre');
   try{ if(typeof lexRealtimeDesconectar === 'function') lexRealtimeDesconectar(); } catch(e){ if(typeof _lexSil==="function")_lexSil(e); }
-  // Aviso nativo a propósito: detiene todo hasta que se lea, porque luego se recarga
-  (window._alertNativo || alert)('Tu acceso fue deshabilitado por el administrador. Tu sesión se cerrará ahora.');
+  // Nov-2026 (a petición del Lic.): se sale sin ningún mensaje — solo regresa
+  // a la pantalla de inicio de sesión.
   location.reload();
 }
 

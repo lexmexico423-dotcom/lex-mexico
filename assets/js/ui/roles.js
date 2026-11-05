@@ -370,8 +370,9 @@
       if (!window.SB || !window.SB_DESPACHO_ID || !email()) return;
       var u = await window.SB.auth.getUser();
       var uid = u && u.data && u.data.user && u.data.user.id; if (!uid) return;
-      var q = await window.SB.from('miembros').select('rol').eq('user_id', uid).eq('despacho_id', window.SB_DESPACHO_ID).limit(1);
+      var q = await window.SB.from('miembros').select('rol,nombre').eq('user_id', uid).eq('despacho_id', window.SB_DESPACHO_ID).limit(1);
       var nuevo = q && q.data && q.data[0] && q.data[0].rol;
+      aplicarMiNombre(q && q.data && q.data[0] && q.data[0].nombre);
       if (nuevo && nuevo !== window.SB_ROL_ACTUAL) {
         window.SB_ROL_ACTUAL = nuevo;
         pasada();
@@ -379,8 +380,21 @@
       }
     } catch(e){ console.warn('[Roles] releer', e); }
   }
+  // Nombre del empleado: el que el administrador le puso en Gestión de Accesos
+  // (columna nombre de miembros). "Administrador" es el genérico de la cuenta
+  // principal y no reemplaza a "LIC NAHUM PELAEZ".
+  function aplicarMiNombre(nom){
+    nom = String(nom || '').trim();
+    if (!nom || /^administrador$/i.test(nom) || typeof empleadoActual === 'undefined' || !empleadoActual) return;
+    if (empleadoActual.nombre === nom) return;
+    var antes = empleadoActual.nombre;
+    empleadoActual.nombre = nom;
+    try { if (typeof EMPLEADOS !== 'undefined' && EMPLEADOS) EMPLEADOS[email()] = nom; } catch(_){}
+    try { localStorage.setItem('empleado_nombre', nom); } catch(_){}
+    if (antes) { try { if (typeof toast === 'function') toast('👤 Tu nombre ahora es: ' + nom, 'ok'); } catch(_){} }
+  }
   setInterval(function(){ engancharCanal(); releerMiRol(true); }, 60000);
-  setTimeout(function(){ engancharCanal(); }, 3000);
+  setTimeout(function(){ engancharCanal(); releerMiRol(false); }, 3000);
 
   // ── Gestión de Accesos: lista desplegable de rol ─────────────────────────
   function envolverGestion(){
@@ -395,46 +409,144 @@
     window._renderGestionAccesos = env;
     try { _renderGestionAccesos = env; } catch(_){}
   }
+  // Nov-2026: cada renglón se ve fijo; con "Editar" se abren nombre y rol, y
+  // "Guardar" guarda los dos juntos (ya no se guarda nada solo con elegir).
+  var _gaEditando = null;
+  var BTN = 'padding:5px 10px;border-radius:6px;font-size:0.72rem;cursor:pointer;margin-right:6px;';
   function pintarSelects(){
     var tbody = document.getElementById('ga-tbody'); if (!tbody) return;
     Array.prototype.forEach.call(tbody.children, function(tr){
       if (tr.id) return;   // renglones ocultos de contraseña / tiempo extra
       var b = tr.querySelector('[onclick*="_gaTogglePassRow("]'); if (!b) return;
       var i = parseInt((/_gaTogglePassRow\((\d+)\)/.exec(b.getAttribute('onclick')) || [])[1], 10);
-      var u = (window._gaUsuarios || [])[i]; var td = tr.children[2]; if (!u || !td) return;
-      var rr = String(u.rol || '').toLowerCase();
-      if (rr === 'admin') {
-        td.innerHTML = '<span style="display:inline-block;padding:3px 10px;border-radius:10px;background:#FAEEDA;color:#633806;font-size:0.74rem;font-weight:700;">🛡 Administrador</span>';
+      var u = (window._gaUsuarios || [])[i]; if (!u) return;
+      var tdN = tr.children[1], tdR = tr.children[2], tdA = tr.children[4];
+      var rr = String(u.rol || '').toLowerCase(); if (rr === 'empleado' || !rr) rr = 'operador';
+      var esAdm = rr === 'admin';
+      if (tdR) tdR.style.textTransform = 'none';
+      if (_gaEditando === i && !esAdm) {
+        tdN.innerHTML = '<input id="lex-ga-nom-' + i + '" value="' + h(u.nombre || '') + '" maxlength="80" style="width:100%;max-width:280px;padding:6px 8px;border:1.5px solid #c8952a;border-radius:7px;font-size:0.82rem;box-sizing:border-box;" '
+          + 'onkeydown="if(event.key===\'Enter\'){event.preventDefault();lexGaGuardarFila(' + i + ');}if(event.key===\'Escape\'){event.preventDefault();lexGaCancelarFila();}">';
+        tdR.innerHTML = '<select id="lex-ga-rol-' + i + '" style="padding:6px 8px;border:1.5px solid #c8952a;border-radius:7px;background:#fff;color:#2a1a06;font-size:0.8rem;cursor:pointer;min-width:140px;">'
+          + ASIGNABLES.map(function(x){ return '<option value="' + x + '"' + (x === rr ? ' selected' : '') + '>' + NOMBRE[x] + '</option>'; }).join('') + '</select>';
+        tr.style.background = '#fff8ec';
+        if (tdA && !tdA.querySelector('.lex-ga-acc')) {
+          var sp = document.createElement('span'); sp.className = 'lex-ga-acc';
+          sp.innerHTML = '<button type="button" onclick="lexGaGuardarFila(' + i + ')" style="' + BTN + 'border:none;background:#8c6518;color:#fff;">💾 Guardar</button>'
+            + '<button type="button" onclick="lexGaCancelarFila()" style="' + BTN + 'border:1px solid #d4b870;background:none;color:#8c6518;">Cancelar</button>';
+          tdA.insertBefore(sp, tdA.firstChild);
+        }
+        var inp = document.getElementById('lex-ga-nom-' + i); if (inp && !inp._foco) { inp._foco = true; setTimeout(function(){ inp.focus(); }, 30); }
         return;
       }
-      if (rr === 'empleado' || !rr) rr = 'operador';
-      td.style.textTransform = 'none';
-      td.innerHTML = '<select onchange="lexGaCambiarRol(' + i + ',this)" style="padding:6px 8px;border:1.5px solid #c8952a;border-radius:7px;background:#fff;color:#2a1a06;font-size:0.8rem;cursor:pointer;min-width:140px;">'
-        + ASIGNABLES.map(function(x){ return '<option value="' + x + '"' + (x === rr ? ' selected' : '') + '>' + NOMBRE[x] + '</option>'; }).join('')
-        + '</select>';
+      tdN.textContent = u.nombre || '—';
+      tdR.innerHTML = esAdm
+        ? '<span style="display:inline-block;padding:3px 10px;border-radius:10px;background:#FAEEDA;color:#633806;font-size:0.74rem;font-weight:700;">🛡 Administrador</span>'
+        : '<span style="display:inline-block;padding:3px 10px;border-radius:10px;background:' + (COLOR[rr] || COLOR.operador)[0] + ';color:' + (COLOR[rr] || COLOR.operador)[1] + ';font-size:0.74rem;font-weight:700;">' + (NOMBRE[rr] || rr) + '</span>';
+      if (tdA && !esAdm && !tdA.querySelector('.lex-ga-acc')) {
+        var sp2 = document.createElement('span'); sp2.className = 'lex-ga-acc';
+        sp2.innerHTML = '<button type="button" onclick="lexGaEditarFila(' + i + ')" style="' + BTN + 'border:1px solid #c8952a;background:none;color:#8c6518;">✏️ Editar</button>';
+        tdA.insertBefore(sp2, tdA.firstChild);
+      }
     });
+    pintarAlta();
   }
-  window.lexGaCambiarRol = async function(i, sel){
-    var u = (window._gaUsuarios || [])[i]; if (!u || !sel) return;
+  window.lexGaEditarFila = function(i){ _gaEditando = i; window._renderGestionAccesos(); };
+  window.lexGaCancelarFila = function(){ _gaEditando = null; window._renderGestionAccesos(); };
+  function avisarEnVivoRol(u, rolNuevo){
+    var ch = window._lexRealtimeChannel;
+    if (ch && ch.state === 'joined') { try { ch.send({ type:'broadcast', event:'rol_actualizado', payload:{ email:String(u.email).toLowerCase(), rol:rolNuevo || null, ts:Date.now() } }).catch(function(){}); } catch(_){} }
+  }
+  window.lexGaGuardarFila = async function(i){
+    var u = (window._gaUsuarios || [])[i]; if (!u) return;
+    var inp = document.getElementById('lex-ga-nom-' + i), sel = document.getElementById('lex-ga-rol-' + i);
+    if (!inp || !sel) return;
+    var nom = String(inp.value || '').trim().replace(/\s+/g, ' ');
     var actual = String(u.rol || 'operador').toLowerCase(); if (actual === 'empleado') actual = 'operador';
-    var nuevo = sel.value;
-    if (nuevo === actual) return;
-    var ok = true;
-    var msg = '¿Cambiar a ' + (u.nombre || u.email) + ' de ' + (NOMBRE[actual] || actual) + ' a ' + NOMBRE[nuevo] + '?';
-    try { ok = (typeof confirmarBonito === 'function') ? await confirmarBonito({ titulo: 'Cambiar rol', mensaje: msg, btnSi: 'Sí, cambiar', btnNo: 'Cancelar' }) : window.confirm(msg); } catch(_){ ok = false; }
-    if (!ok) { sel.value = actual; return; }
-    sel.disabled = true;
+    var nuevoRol = sel.value;
+    if (nom.length < 2) { aviso('⚠ Escribe el nombre'); inp.focus(); return; }
+    var cambiaNom = nom !== String(u.nombre || ''), cambiaRol = nuevoRol !== actual;
+    if (!cambiaNom && !cambiaRol) { window.lexGaCancelarFila(); return; }
+    if (cambiaRol) {
+      var msg = '¿Cambiar a ' + (nom || u.email) + ' de ' + (NOMBRE[actual] || actual) + ' a ' + NOMBRE[nuevoRol] + '?';
+      var ok = false;
+      try { ok = (typeof confirmarBonito === 'function') ? await confirmarBonito({ titulo: 'Cambiar rol', mensaje: msg, btnSi: 'Sí, cambiar', btnNo: 'Cancelar' }) : window.confirm(msg); } catch(_){ ok = false; }
+      if (!ok) return;
+    }
+    inp.disabled = true; sel.disabled = true;
     try {
-      var r = await window.SB.rpc('lex_asignar_rol', { p_despacho: window.SB_DESPACHO_ID, p_user_id: u.userId, p_rol: nuevo });
-      if (r && r.error) throw r.error;
-      u.rol = nuevo;
-      var ch = window._lexRealtimeChannel;
-      if (ch && ch.state === 'joined') { try { ch.send({ type:'broadcast', event:'rol_actualizado', payload:{ email:String(u.email).toLowerCase(), rol:nuevo, ts:Date.now() } }).catch(function(){}); } catch(_){} }
-      try { if (typeof toast === 'function') toast('👤 ' + (u.nombre || u.email) + ' ahora es ' + NOMBRE[nuevo], 'ok'); } catch(_){}
+      if (cambiaNom) {
+        var r1 = await window.SB.rpc('lex_cambiar_nombre_miembro', { p_despacho: window.SB_DESPACHO_ID, p_user_id: u.userId, p_nombre: nom });
+        if (r1 && r1.error) throw r1.error;
+        u.nombre = nom;
+        if (String(u.email).toLowerCase() === email()) aplicarMiNombre(nom);
+      }
+      if (cambiaRol) {
+        var r2 = await window.SB.rpc('lex_asignar_rol', { p_despacho: window.SB_DESPACHO_ID, p_user_id: u.userId, p_rol: nuevoRol });
+        if (r2 && r2.error) throw r2.error;
+        u.rol = nuevoRol;
+      }
+      avisarEnVivoRol(u, cambiaRol ? nuevoRol : null);
+      try { if (typeof toast === 'function') toast('✓ Cambios guardados: ' + (u.nombre || u.email) + (cambiaRol ? ' · ' + NOMBRE[nuevoRol] : ''), 'ok'); } catch(_){}
+      _gaEditando = null;
+      window._renderGestionAccesos();
     } catch(e){
-      sel.value = actual;
-      aviso('❌ No se pudo cambiar el rol: ' + (e && e.message || e));
-    } finally { sel.disabled = false; }
+      inp.disabled = false; sel.disabled = false;
+      aviso('❌ No se pudo guardar: ' + (e && e.message || e));
+    }
+  };
+
+  // ── Dar de alta un correo nuevo (función del servidor lex-alta-usuario) ──
+  var CAMPO = 'padding:8px 10px;border:1px solid #d4b870;border-radius:7px;font-size:0.82rem;background:#fff;color:#2a1a06;box-sizing:border-box;width:100%;';
+  function pintarAlta(){
+    var wrap = document.getElementById('ga-tabla-wrap'); if (!wrap || document.getElementById('lex-ga-alta')) return;
+    var d = document.createElement('div'); d.id = 'lex-ga-alta';
+    d.style.cssText = 'margin-top:16px;background:#fff;border:1.5px dashed #c8952a;border-radius:10px;padding:14px 16px;';
+    d.innerHTML = '<div style="font-weight:700;color:#4a2f08;margin-bottom:10px;font-size:0.9rem;">👤➕ Dar de alta un correo nuevo</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;">'
+      + '<input id="lex-alta-email" type="email" autocomplete="off" placeholder="correo@gmail.com" style="' + CAMPO + '">'
+      + '<input id="lex-alta-nombre" type="text" autocomplete="off" placeholder="Nombre completo" maxlength="80" style="' + CAMPO + '">'
+      + '<select id="lex-alta-rol" style="' + CAMPO + 'cursor:pointer;">' + ASIGNABLES.map(function(x){ return '<option value="' + x + '"' + (x === 'recepcionista' ? ' selected' : '') + '>Rol: ' + NOMBRE[x] + '</option>'; }).join('') + '</select>'
+      + '<input id="lex-alta-pass" type="password" autocomplete="new-password" placeholder="Contraseña inicial (mín. 6)" style="' + CAMPO + '">'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:12px;">'
+      + '<span id="lex-alta-msg" style="font-size:0.76rem;"></span>'
+      + '<button type="button" id="lex-alta-btn" onclick="lexGaDarDeAlta()" style="padding:8px 18px;border:none;border-radius:8px;background:#8c6518;color:#fff;font-size:0.8rem;font-weight:700;cursor:pointer;">Dar de alta</button>'
+      + '</div>';
+    wrap.appendChild(d);
+  }
+  window.lexGaDarDeAlta = async function(){
+    var $v = function(id){ var el = document.getElementById(id); return el ? String(el.value || '').trim() : ''; };
+    var msg = document.getElementById('lex-alta-msg'), btn = document.getElementById('lex-alta-btn');
+    var setMsg = function(t, ok){ if (msg) { msg.textContent = t; msg.style.color = ok ? '#27500A' : '#a32d2d'; } };
+    var correo = $v('lex-alta-email').toLowerCase(), nom = $v('lex-alta-nombre').replace(/\s+/g, ' '), rolN = $v('lex-alta-rol'), pass = (document.getElementById('lex-alta-pass') || {}).value || '';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) { setMsg('⚠ Escribe un correo válido'); return; }
+    if (nom.length < 2) { setMsg('⚠ Escribe el nombre'); return; }
+    if (pass.length < 6) { setMsg('⚠ La contraseña debe tener al menos 6 caracteres'); return; }
+    if ((window._gaUsuarios || []).some(function(x){ return String(x.email || '').toLowerCase() === correo; })) { setMsg('⚠ Ese correo ya está en la lista'); return; }
+    var ok = false, txt = '¿Dar de alta a ' + nom + ' (' + correo + ') como ' + NOMBRE[rolN] + '?';
+    try { ok = (typeof confirmarBonito === 'function') ? await confirmarBonito({ titulo: 'Dar de alta', mensaje: txt, btnSi: 'Sí, dar de alta', btnNo: 'Cancelar' }) : window.confirm(txt); } catch(_){ ok = false; }
+    if (!ok) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Creando…'; }
+    setMsg('', true);
+    try {
+      var r = await window.SB.functions.invoke('lex-alta-usuario', { body: { despacho_id: window.SB_DESPACHO_ID, email: correo, nombre: nom, rol: rolN, password: pass } });
+      var data = r && r.data, err = r && r.error;
+      if (err) {
+        var det = '';
+        try { if (err.context && typeof err.context.json === 'function') { var j = await err.context.json(); det = j && j.error; } } catch(_){}
+        throw new Error(det || err.message || 'Error');
+      }
+      if (!data || data.error) throw new Error((data && data.error) || 'Error');
+      ['lex-alta-email', 'lex-alta-nombre', 'lex-alta-pass'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
+      setMsg('✓ ' + nom + ' ya puede entrar con su correo y la contraseña que le asignó', true);
+      try { if (typeof toast === 'function') toast('👤 Alta lista: ' + nom + ' · ' + NOMBRE[rolN], 'ok'); } catch(_){}
+      try { if (typeof cargarGestionAccesos === 'function') await cargarGestionAccesos(); } catch(_){}
+    } catch(e){
+      setMsg('❌ ' + (e && e.message || e));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = 'Dar de alta'; }
+    }
   };
 
   function iniciar(){ envolverGestion(); envolverIr(); envolverFunciones(); try { pasada(); } catch(_){} }

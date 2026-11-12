@@ -1038,6 +1038,7 @@ function registrarLibre(){
   if(total<=0){toast('El precio debe ser mayor a $0','err');return;}
   var desc=validos.length===1?validos[0].desc.trim():validos.map(function(c){return c.desc.trim()+' $'+fmt(c.precio);}).join(' | ');
   elegirResponsable(function(resp){
+    if(!resp){ if(typeof toast==='function') toast('Cancelado — no se registró nada','err'); return; } // Nov-2026: Cancelar en "¿Quién registra?" ya no registra el movimiento
     var mov={id:'M-'+Date.now(),folioCaja:generarFolioMovCaja(),fecha:hoy(),hora:hora(),descripcion:desc,monto:total,
       tipo:_libreTipo,cat:'otro',fuente:'caja',responsable:resp};
     _registrarMovimiento(mov);save();renderCaja();setTimeout(()=>syncEstadoSupabaseDebounced(),100);

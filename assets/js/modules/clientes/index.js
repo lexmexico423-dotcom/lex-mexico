@@ -1266,6 +1266,7 @@ function clickSrv(s){
   if(cajaBloqueada()){toast('🔒 Caja cerrada — se habilita mañana','err');return;}
   if(s.p>0){
     elegirResponsable(function(resp){
+      if(!resp){ if(typeof toast==='function') toast('Cancelado — no se registró nada','err'); return; } // Nov-2026: Cancelar en "¿Quién registra?" ya no registra el movimiento
       const mov={id:'M-'+Date.now(),folioCaja:generarFolioMovCaja(),fecha:hoy(),hora:hora(),descripcion:s.nom,monto:s.p,
         tipo:s.e?'egreso':'ingreso',cat:s.cat,fuente:'caja',responsable:resp};
       _registrarMovimiento(mov);save();renderCaja();setTimeout(()=>syncEstadoSupabaseDebounced(),100);

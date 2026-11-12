@@ -5273,6 +5273,7 @@ async function escConfirmarEntrega(){
   });
   if(quienRecibio===null) return;
   elegirResponsable(function(nombreResponsable){
+    if(!nombreResponsable) return; // Nov-2026: Cancelar = no se confirma la entrega
     // Oct-2026 FIX ("hay que darle varias veces"): mientras se contestaban los
     // diálogos, la sincronización en vivo pudo reemplazar el objeto de la
     // escritura en D.escrituras — se vuelve a buscar por id para no modificar

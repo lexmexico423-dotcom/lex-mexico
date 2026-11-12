@@ -293,6 +293,7 @@
     var ok = await preguntar('Salida de caja', msg, 'Sí, registrar salida', 'Cancelar');
     if (!ok) return false;
     var resp = await responsable();
+    if (!resp) { if (typeof toast === 'function') toast('Cancelado — no se registró la salida', 'err'); return false; }   // Nov-2026
     var folioTxt = adeudo.folioVinculado != null ? ' (folio ' + adeudo.folioVinculado + ')' : '';
     for (var i = 0; i < porRegistrar.length; i++) {
       var c = porRegistrar[i];
@@ -371,6 +372,43 @@
   // ════════════════════════════════════════════════════════════════════
   // COBRAR
   // ════════════════════════════════════════════════════════════════════
+  // Nov-2026 · Anti-duplicado: antes de cobrar se revisa (1) lo que ya llegó a
+  // esta computadora y (2) el servidor, por si en otra computadora ya se cobró
+  // el mismo concepto mientras esta pantalla seguía abierta.
+  function horaDe(iso){ try { var d = new Date(iso); return d.toLocaleDateString('es-MX') + ' a las ' + d.toLocaleTimeString('es-MX', { hour:'2-digit', minute:'2-digit' }); } catch(_){ return ''; } }
+  function revisarCobrado(adeudo, ids){
+    if (!adeudo) return null;
+    var c = (adeudo.conceptos || []).filter(function(x){ return x && ids.indexOf(x.id) >= 0 && x.cobrado; })[0];
+    if (!c) return null;
+    return 'Ya lo cobró ' + (c.cobradoPor || 'otra persona') + (c.cobradoFecha ? ' el ' + horaDe(c.cobradoFecha) : '') + ' (' + c.descripcion + ' — ' + $m(c.monto) + ').';
+  }
+  async function yaCobradoPorOtro(a, cs, soloLocal){
+    var ids = cs.map(function(c){ return c.id; });
+    // 1) Copia local (puede haber llegado por sincronización mientras estaba abierto)
+    var loc = lista().filter(function(x){ return x && x.id === a.id; })[0];
+    var m1 = revisarCobrado(loc, ids); if (m1) return m1;
+    var tomb = {}; try { (D.movimientos_eliminados || []).forEach(function(t){ if (t && t.id) tomb[t.id] = 1; }); } catch(_){}
+    var mv = (D.movimientos || []).filter(function(m){ return m && !tomb[m.id] && m.adeudoId === a.id && m.tipo === 'ingreso' && (m.adeudoConceptoIds || []).some(function(id){ return ids.indexOf(id) >= 0; }); })[0];
+    if (mv) return 'Ya se registró en Caja: ' + (mv.folioCaja || '') + ' · ' + (mv.hora || '') + ' · ' + (mv.responsable || 'sin nombre') + ' — ' + $m(mv.monto) + '.';
+    if (soloLocal) return null;
+    // 2) Servidor (máx. 6 s; si no contesta, se sigue con la confirmación normal)
+    try {
+      if (!window.SB || !window.SB_DESPACHO_ID) return null;
+      var r = await Promise.race([
+        window.SB.from('app_state').select('adeudos:data->adeudosSinRecibo').eq('despacho_id', window.SB_DESPACHO_ID).maybeSingle(),
+        new Promise(function(_, rj){ setTimeout(function(){ rj(new Error('timeout')); }, 6000); })
+      ]);
+      var srv = r && r.data && Array.isArray(r.data.adeudos) ? r.data.adeudos.filter(function(x){ return x && x.id === a.id; })[0] : null;
+      var m2 = revisarCobrado(srv, ids);
+      if (m2 && loc) {
+        // Traer a esta computadora lo que ya está en el servidor
+        (srv.conceptos || []).forEach(function(sc){ var lc = (loc.conceptos || []).filter(function(x){ return x.id === sc.id; })[0]; if (lc && sc.cobrado) { lc.cobrado = true; lc.cobradoFecha = sc.cobradoFecha; lc.cobradoPor = sc.cobradoPor; if (sc.movIngresoId) lc.movIngresoId = sc.movIngresoId; } });
+        if (srv.estado === 'cobrado') { loc.estado = 'cobrado'; loc.fechaResolucion = srv.fechaResolucion || loc.fechaResolucion; loc.cobradoPor = srv.cobradoPor || loc.cobradoPor; }
+        loc.fechaMod = srv.fechaMod || loc.fechaMod;
+      }
+      return m2;
+    } catch(_){ return null; }
+  }
   window.marcarAdeudoCobrado = function(id){ window.lexCobrarAdeudo(id); };
   window.lexCobrarAdeudo = function(id){
     var a = lista().filter(function(x){ return x && x.id === id; })[0]; if (!a) return;
@@ -418,6 +456,19 @@
       var total = r2(cs.reduce(function(s,c){ return s + c.monto; }, 0));
       ov.style.display = 'none';
       var resp = await responsable();
+      // Nov-2026 (caso real 11-nov, folio F-NV2026-31): "Cancelar" en ¿Quién registra?
+      // registraba el cobro SIN nombre. Ahora Cancelar = no se registra nada.
+      if (!resp) { ov.style.display = 'flex'; q('#lex-cob-err').textContent = 'Cobro cancelado — no se registró nada.'; return; }
+      // ¿Ya lo cobró alguien más en otra computadora?
+      var dup = await yaCobradoPorOtro(a, cs);
+      if (dup) { cerrarOv(); await preguntar('Este adeudo ya se cobró', dup + '\n\nNo se registró un segundo cobro.', 'Entendido', 'Cerrar'); refrescarTodo(); return; }
+      // Confirmación final
+      var okCob = await preguntar('¿Está seguro de este COBRO?',
+        String(a.cliente||'').toUpperCase() + '\n\n' + cs.map(function(c){ return '• ' + c.descripcion + ' — ' + $m(c.monto); }).join('\n')
+        + '\n\nTotal: ' + $m(total) + '\nResponsable: ' + resp + '\n\nSe registrará como INGRESO en Caja.', 'Sí, cobrar', 'Cancelar');
+      if (!okCob) { ov.style.display = 'flex'; q('#lex-cob-err').textContent = 'Cobro cancelado — no se registró nada.'; return; }
+      dup = await yaCobradoPorOtro(a, cs, true);   // revisión final (solo local, instantánea)
+      if (dup) { cerrarOv(); await preguntar('Este adeudo ya se cobró', dup + '\n\nNo se registró un segundo cobro.', 'Entendido', 'Cerrar'); refrescarTodo(); return; }
       var mov = { id: nuevoMovId(), folioCaja: (typeof generarFolioMovCaja === 'function' ? generarFolioMovCaja() : ''),
         fecha: (typeof hoy === 'function' ? hoy() : hoyL()), hora: (typeof hora === 'function' ? hora() : ''),
         descripcion: 'Reembolso de ' + String(a.cliente||'').toUpperCase() + ' · ' + cs.map(function(c){ return c.descripcion + (cs.length > 1 ? ' $' + (typeof fmt === 'function' ? fmt(c.monto) : c.monto) : ''); }).join(' | ') + (a.folioVinculado != null ? ' (folio ' + a.folioVinculado + ')' : '') + ' — adeudo',
@@ -432,6 +483,8 @@
     q('#lex-cob-fuera').onclick = async function(){
       var cs = elegidos(); if (!cs.length) { q('#lex-cob-err').textContent = 'Marca al menos un concepto.'; return; }
       ov.style.display = 'none';
+      var dupF = await yaCobradoPorOtro(a, cs);
+      if (dupF) { cerrarOv(); await preguntar('Este adeudo ya se cobró', dupF, 'Entendido', 'Cerrar'); refrescarTodo(); return; }
       var ok = await preguntar('Marcar como cobrado', '¿Confirmas que ' + String(a.cliente||'').toUpperCase() + ' ya pagó ' + $m(cs.reduce(function(s,c){ return s + c.monto; }, 0)) + ' por otro medio?\n\nNo se registrará dinero en Caja.', 'Sí, ya pagó', 'Cancelar');
       if (!ok) { ov.style.display = 'flex'; return; }
       marcar(cs, null, usuario());

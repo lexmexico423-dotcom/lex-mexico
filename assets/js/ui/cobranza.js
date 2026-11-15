@@ -364,6 +364,33 @@
     return (typeof NOMBRE_TITULAR !== 'undefined') ? NOMBRE_TITULAR : '';
   }
   function tareas(){ try { if (typeof D !== 'undefined' && D) { if (!Array.isArray(D.tareasHoy)) D.tareasHoy = []; return D.tareasHoy; } } catch(e){} return []; }
+  // Llamadas de cobranza pendientes del mismo folio (sin contar la tarea "excepto")
+  function llamadasPendientes(c, excepto){
+    var elim = (typeof D !== 'undefined' && D && Array.isArray(D.tareasHoyEliminadas)) ? D.tareasHoyEliminadas : [];
+    return tareas().filter(function(x){
+      return x && x.id !== excepto && x.tipo === 'cobranza-llamada' && x.estado === 'pendiente' && elim.indexOf(x.id) < 0
+        && x.cobranza && String(x.cobranza.folio) === String(c.folio) && String(x.cobranza.letra || '') === String(c.letra || '');
+    }).sort(function(a, b){ return (Number(b.cobranza.intento) || 0) - (Number(a.cobranza.intento) || 0) || String(b.fechaCreacion || '').localeCompare(String(a.fechaCreacion || '')); });
+  }
+  // Limpieza: si quedaron varias llamadas pendientes del mismo folio, se deja
+  // solo la del intento más alto (las demás se quitan con lápida).
+  function limpiarLlamadasRepetidas(){
+    try {
+      if (typeof D === 'undefined' || !D) return;
+      var vistos = {}, quitar = [];
+      tareas().filter(function(x){ return x && x.tipo === 'cobranza-llamada' && x.estado === 'pendiente' && x.cobranza && !(D.tareasHoyEliminadas || []).includes(x.id); })
+        .sort(function(a, b){ return (Number(b.cobranza.intento) || 0) - (Number(a.cobranza.intento) || 0) || String(b.fechaCreacion || '').localeCompare(String(a.fechaCreacion || '')); })
+        .forEach(function(x){ var k = String(x.cobranza.folio) + '|' + String(x.cobranza.letra || ''); if (vistos[k]) quitar.push(x.id); else vistos[k] = 1; });
+      if (!quitar.length) return;
+      if (!Array.isArray(D.tareasHoyEliminadas)) D.tareasHoyEliminadas = [];
+      quitar.forEach(function(id){ if (D.tareasHoyEliminadas.indexOf(id) < 0) D.tareasHoyEliminadas.push(id); });
+      D.tareasHoy = D.tareasHoy.filter(function(x){ return !(x && quitar.indexOf(x.id) >= 0); });
+      console.warn('[Cobranza] llamadas repetidas quitadas:', quitar);
+      guardarTareas();
+    } catch(e){ console.warn('[Cobranza] limpiar', e); }
+  }
+  setInterval(limpiarLlamadasRepetidas, 30000);
+  setTimeout(limpiarLlamadasRepetidas, 8000);
   function guardarTareas(){
     try { if (typeof save === 'function') save(); } catch(e){}
     try { if (typeof renderTareasHoyLista === 'function') renderTareasHoyLista(); } catch(e){}
@@ -545,6 +572,10 @@
       var nota = ov.querySelector('#cob-res-nota').value.trim();
       var err = ov.querySelector('#cob-res-err');
       if (!tipo) { err.textContent = 'Elige qué pasó en la llamada.'; err.style.display = 'block'; return; }
+      // Nov-2026: si esta llamada ya se había resuelto (doble clic u otra computadora), no repetir
+      var tVivo = tareas().filter(function(x){ return x && x.id === t.id; })[0] || t;
+      if (tVivo.estado === 'resuelta') { ov.remove(); if (typeof toast === 'function') toast('Esta llamada ya estaba resuelta — no se repitió', 'err'); guardarTareas(); return; }
+      t = tVivo;
       var fecha = tipo === 'abono' ? fechaAb.value : fechaInp.value;
       var monto = 0; // Oct-2026 (a petición): el abono prometido ya no lleva monto
       if ((tipo === 'promesa' || tipo === 'abono') && (!fecha || fecha < hoyStr(0))) { err.textContent = 'Elige la fecha que prometió (hoy o después).'; err.style.display = 'block'; return; }
@@ -572,8 +603,20 @@
           cobranza: Object.assign({}, c, { montoPrometido: monto || 0 })
         });
       } else if (tipo === 'no-contesto') {
-        tareas().unshift(tareaLlamada(c, hoyStr(1), (Number(c.intento) || 1) + 1));
-        anotar(c.folio, 'reintento', 'Se programó otra llamada para el ' + fCorta(hoyStr(1)) + ' (intento ' + ((Number(c.intento) || 1) + 1) + ')', {});
+        // Nov-2026 (caso real folio 92A: 3 llamadas repetidas): si ya hay otra
+        // llamada pendiente para el mismo folio, NO se crea otra; se usa esa.
+        var sigInt = (Number(c.intento) || 1) + 1;
+        var otra = llamadasPendientes(c, t.id)[0];
+        if (otra) {
+          var intOtra = Number(otra.cobranza && otra.cobranza.intento) || 1;
+          if (sigInt > intOtra) { otra.cobranza = Object.assign({}, otra.cobranza, { intento: sigInt }); otra.texto = textoLlamada(otra.cobranza, sigInt); }
+          if (!otra.fechaProgramada || otra.fechaProgramada < hoyStr(1)) otra.fechaProgramada = hoyStr(1);
+          otra.fechaMod = ahora;
+          anotar(c.folio, 'reintento', 'Ya había otra llamada pendiente: se dejó para el ' + fCorta(otra.fechaProgramada) + ' (intento ' + Math.max(sigInt, intOtra) + ')', {});
+        } else {
+          tareas().unshift(tareaLlamada(c, hoyStr(1), sigInt));
+          anotar(c.folio, 'reintento', 'Se programó otra llamada para el ' + fCorta(hoyStr(1)) + ' (intento ' + sigInt + ')', {});
+        }
       }
       ov.remove();
       guardarTareas();

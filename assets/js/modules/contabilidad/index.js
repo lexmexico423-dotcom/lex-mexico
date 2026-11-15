@@ -1763,6 +1763,12 @@ async function syncEstadoSupabase(_intentoConcurrencia){
     // + excluir movimientos con tombstone (eliminados de forma duradera por reconciliación)
     const _movTombLocal = new Set((Array.isArray(D.movimientos_eliminados) ? D.movimientos_eliminados : []).map(function(t){ return t && t.id; }));
     const movsLimpios = (D.movimientos||[]).filter(m => m && m.id && !/^R-\d+$/.test(m.id) && !_movTombLocal.has(m.id));
+    // Nov-2026 (auditoría): montos siempre a centavos — corrige restos como
+    // 789.999 o 27591.998999999996 que quedaron de versiones viejas.
+    movsLimpios.forEach(function(m){
+      var n = parseFloat(m.monto);
+      if (isFinite(n)) { var r = Math.round(n * 100) / 100; if (r !== n) m.monto = r; }
+    });
     // Filtrar pendientes de placas liquidados antes de subir a Supabase
     const _filtrarPendLiquidados = function(lista){ return (lista || []).filter(function(p){
       if(!p) return false;

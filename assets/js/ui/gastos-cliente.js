@@ -946,6 +946,123 @@
     if (typeof toast === 'function') toast(a.estado === 'cobrado' ? '✅ Reembolso pagado completo' : '✅ Abono registrado — aún debe ' + $m(totalPendiente(a)));
   }
 
+  // ── ✏️ Corregir reembolso (Nov-2026 · mismo estilo de preguntas) ──────
+  window.lexCorregirReembolso = function(id){
+    var a = lista().filter(function(x){ return x && x.id === id; })[0]; if (!a) return;
+    var cs = (a.conceptos || []).filter(function(c){ return !c.parteDe; });
+    var conFolio = a.folioVinculado != null && a.folioVinculado !== '';
+    var tipoActual = (cs[0] && cs[0].tipoGasto) || 'reembolso';
+    var MAP = { adelanto: 'adelanto', reembolso: 'tercero', complementario: 'complementario', incluido: 'incluido' };
+    var S = { modo: MAP[tipoActual] || 'tercero' };
+    var yaCobrado = (a.conceptos || []).some(function(c){ return c.cobrado; }) || a.estado === 'cobrado';
+    var scHecho = tipoActual === 'complementario' && a.estado === 'cobrado';
+    var info = conFolio ? infoFolio(ultimasVersiones()[String(a.folioVinculado)]) : null;
+    var ov = ventana('✏️ CORREGIR REEMBOLSO' + (conFolio ? ' · FOLIO ' + a.folioVinculado : ''));
+    var b = ov.querySelector('#lex-rb-body');
+    var $ = function(s){ return ov.querySelector('#' + s); };
+    var MODOS = [
+      { v: 'adelanto', t: '⏩ El pago lo hizo el despacho para avanzar el trámite', s: 'Dentro de lo pactado · se descuenta de su saldo cuando lo pague' },
+      { v: 'tercero', t: '🧾 Pago a un tercero por falta de requisitos', s: 'Fuera de lo pactado · se cobra por Caja Rápida' },
+      { v: 'complementario', t: '➕ Servicio complementario', s: 'Fuera de lo pactado · se genera su recibo de servicio complementario' } ];
+    if (tipoActual === 'incluido') MODOS.push({ v: 'incluido', t: '✓ Incluido en lo pactado (no se cobra)', s: 'Registro anterior: el despacho lo absorbió' });
+    function resumen(){
+      var tot = r2(cs.reduce(function(s, c){ return s + (parseFloat(c.monto) || 0); }, 0));
+      var caja = r2(cs.reduce(function(s, c){ return s + (parseFloat(c.montoCaja) || 0); }, 0));
+      var gest = r2(cs.reduce(function(s, c){ return s + (parseFloat(c.honorariosGestion) || 0); }, 0));
+      var mov = cs.map(function(c){ return c.movEgresoId ? (D.movimientos || []).filter(function(m){ return m && m.id === c.movEgresoId; })[0] : null; }).filter(Boolean)[0];
+      var estado = a.estado === 'cobrado' ? '<span style="color:#27500A;">✓ Ya pagado</span>' : a.estado === 'pendiente-recibo' ? '<span style="color:#a32d2d;">Falta generar su recibo de servicio complementario</span>'
+        : (yaCobrado ? '<span style="color:#854F0B;">Pagado en parte · debe ' + $m(totalPendiente(a) + totalAdelantoPend(a)) + '</span>' : '<span style="color:#a32d2d;">Pendiente de cobro</span>');
+      return '<div style="background:#fff;border:1px solid #e3d3a8;border-radius:10px;padding:10px 12px;font-size:0.84rem;line-height:1.6;margin-bottom:6px;">'
+        + '<b>' + E(a.cliente) + '</b>' + (conFolio ? ' · Folio ' + E(a.folioVinculado) + (info ? ' (saldo ' + $m(info.saldo) + ')' : '') : ' · sin folio') + '<br>'
+        + 'Se le cobra <b style="color:#791F1F;">' + $m(tot) + '</b>'
+        + (caja > 0 ? ' · Salió de caja <b>' + $m(caja) + '</b>' + (mov ? ' (' + E(mov.folioCaja || '') + ', ' + E(fC(mov.fecha)) + ')' : '') : (cs.some(function(c){ return c.origenDinero === 'lic' || c.origenDinero === 'otro'; }) ? ' · Lo puso el Lic. (no salió de caja)' : ''))
+        + (gest > 0 ? ' · Gestión <b>' + $m(gest) + '</b>' : '') + '<br>' + estado + '</div>';
+    }
+    function pinta(){
+      var h = resumen();
+      cs.forEach(function(c, i){
+        var bloqueado = !!c.cobrado;
+        h += preg(cs.length > 1 ? 'Concepto ' + (i + 1) + ' · ¿Qué se pagó?' : '¿Qué se pagó?')
+          + '<input id="cr-que-' + i + '" style="' + INP + '" value="' + E(c.descripcion || '') + '">'
+          + preg('¿Cuánto se le va a cobrar al cliente?')
+          + (bloqueado ? '<div style="' + INP + 'background:#f5efe0;color:#7a6440;">🔒 ' + $m(c.monto) + ' — ya está pagado, no se puede cambiar</div>'
+                       : '<input id="cr-mon-' + i + '" type="number" step="0.01" min="0" style="' + INP + '" value="' + E(c.monto) + '">');
+      });
+      if (conFolio) {
+        h += preg('Este reembolso o adeudo, ¿cómo lo registramos?');
+        if (scHecho || yaCobrado) {
+          var o0 = MODOS.filter(function(x){ return x.v === S.modo; })[0] || MODOS[1];
+          h += '<div style="' + ELE + 'background:#f5efe0;border-color:#d4b870;"><div><b>' + o0.t + '</b><div style="font-size:0.76rem;color:#7a6440;">🔒 ' + (scHecho ? 'Ya se generó su recibo de servicio complementario' : 'Ya tiene pagos registrados') + '; no se puede cambiar</div></div></div>';
+        } else h += bloqueSel(MODOS, S.modo);
+      }
+      h += preg('¿De dónde salió el dinero?');
+      var cajaTxt = cs.filter(function(c){ return c.movEgresoId; }).map(function(c){ var m = (D.movimientos || []).filter(function(x){ return x && x.id === c.movEgresoId; })[0]; return $m(c.montoCaja || (m && m.monto) || 0) + (m ? ' (' + E(m.folioCaja || '') + ')' : ''); }).join(', ');
+      h += '<div style="' + INP + 'background:#f5efe0;color:#7a6440;line-height:1.45;">🔒 ' + (cajaTxt ? 'Ya registrado: salida de caja ' + cajaTxt + '. Si está mal, se corrige en Caja.' : 'Lo puso el Lic. o salió de otro lado: no se tocó la caja.') + '</div>'
+        + errBox()
+        + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap;">'
+        + '<button type="button" id="cr-quitar" style="background:#fff;border:1.5px solid #e0a0a0;color:#a32d2d;border-radius:8px;padding:9px 14px;font-size:0.84rem;cursor:pointer;">🗑 Quitar reembolso</button>'
+        + '<span><button type="button" id="cr-cancel" style="background:#fff;border:1.5px solid #c8952a;color:#8c6518;border-radius:8px;padding:9px 14px;font-size:0.84rem;cursor:pointer;margin-right:6px;">Cancelar</button>'
+        + '<button type="button" id="cr-ok" style="background:#8c6518;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:0.86rem;font-weight:700;cursor:pointer;">💾 Guardar cambios</button></span></div>';
+      b.innerHTML = h;
+      b.querySelectorAll('[data-modo]').forEach(function(x){ x.onclick = function(){ guardaCampos(); S.modo = x.getAttribute('data-modo'); pinta(); }; });
+      b.querySelectorAll('[data-cambiar]').forEach(function(x){ x.onclick = function(){ guardaCampos(); S.modo = null; pinta(); }; });
+      $('cr-cancel').onclick = function(){ ov.remove(); };
+      $('cr-ok').onclick = guardarCambios;
+      $('cr-quitar').onclick = quitar;
+    }
+    var tmp = {};
+    function guardaCampos(){ cs.forEach(function(c, i){ var q = $('cr-que-' + i), m = $('cr-mon-' + i); if (q) tmp['q' + i] = q.value; if (m) tmp['m' + i] = m.value; }); }
+    function bloqueSel(lst, sel){
+      if (sel) { var o = lst.filter(function(x){ return x.v === sel; })[0];
+        return '<div style="' + ELE + '"><div><b>' + o.t + '</b><div style="font-size:0.76rem;color:#27500A;margin-top:2px;">' + o.s + '</div></div><button type="button" data-cambiar="modo" style="background:none;border:1px solid #3B6D11;color:#27500A;border-radius:7px;padding:4px 10px;font-size:0.76rem;cursor:pointer;white-space:nowrap;">Cambiar</button></div>'; }
+      return lst.map(function(o){ return '<button type="button" data-modo="' + o.v + '" style="' + OPC + '"><b>' + o.t + '</b><div style="font-size:0.76rem;color:#5a4a2a;margin-top:2px;">' + o.s + '</div></button>'; }).join('');
+    }
+    async function guardarCambios(){
+      var e = $('lex-rb-err'); guardaCampos();
+      if (conFolio && !S.modo) { e.textContent = 'Elige cómo lo registramos.'; return; }
+      for (var i = 0; i < cs.length; i++) {
+        var q = String(($('cr-que-' + i) || {}).value || '').trim(); if (!q) { e.textContent = 'Escribe qué se pagó.'; return; }
+        var mi = $('cr-mon-' + i); if (mi) { var mv = r2(mi.value); if (!(mv > 0)) { e.textContent = 'Escribe cuánto se le cobrará.'; return; }
+          if (cs[i].montoCaja && mv < r2(cs[i].montoCaja) - 0.005) { e.textContent = 'No puede ser menor a lo que salió de caja (' + $m(cs[i].montoCaja) + ').'; return; } }
+      }
+      var ahora = new Date().toISOString(), aSC = false;
+      var nuevoTipo = !conFolio ? 'reembolso' : (S.modo === 'adelanto' ? 'adelanto' : S.modo === 'complementario' ? 'complementario' : S.modo === 'incluido' ? 'incluido' : 'reembolso');
+      cs.forEach(function(c, i){
+        c.descripcion = String($('cr-que-' + i).value || '').trim().toUpperCase();
+        var mi = $('cr-mon-' + i); if (mi && !c.cobrado) { c.monto = r2(mi.value); if (c.montoCaja) { var g = r2(c.monto - c.montoCaja); if (g > 0.005) c.honorariosGestion = g; else delete c.honorariosGestion; } }
+        if (!scHecho && !yaCobrado && c.tipoGasto !== nuevoTipo) { c.tipoGasto = nuevoTipo; if (nuevoTipo === 'complementario') aSC = true; }
+      });
+      if (!scHecho && !yaCobrado) {
+        if (nuevoTipo === 'complementario') a.estado = 'pendiente-recibo';
+        else if (nuevoTipo === 'incluido') { a.estado = 'cobrado'; a.fechaResolucion = ahora; }
+        else if (a.estado === 'pendiente-recibo' || a.estado === 'cobrado') { a.estado = 'pendiente'; a.fechaResolucion = ''; }
+      }
+      a.fechaMod = ahora;
+      ov.remove(); guardar(); refrescarTodo();
+      if (typeof toast === 'function') toast('✓ Reembolso corregido');
+      if (aSC) { var c0 = cs[0]; abrirServicioComplementario({ folio: a.folioVinculado, que: c0.descripcion, mon: c0.monto }, a); }
+    }
+    async function quitar(){
+      if ((a.conceptos || []).some(function(c){ return c.cobrado && c.movIngresoId; }) || scHecho) { $('lex-rb-err').textContent = 'No se puede quitar: ya tiene pagos o recibo generado.'; return; }
+      var conCaja = cs.filter(function(c){ return c.movEgresoId; });
+      var msg = '¿Quitar el reembolso de ' + a.cliente + ' por ' + $m(cs.reduce(function(s, c){ return s + (parseFloat(c.monto) || 0); }, 0)) + '?'
+        + (conCaja.length ? '\n\nOJO: la salida de caja ya registrada NO se borra. Si también fue un error, corrígela en Caja.' : '');
+      if (!(await preguntar('Quitar reembolso', msg, 'Sí, quitar', 'Cancelar'))) return;
+      a.eliminado = true; a.eliminadoPor = usuario(); a.fechaMod = new Date().toISOString();
+      ov.remove(); guardar(); refrescarTodo();
+      if (typeof toast === 'function') toast('🗑 Reembolso quitado');
+    }
+    pinta();
+  };
+  // Cualquier "Editar" de un registro existente abre la ventana nueva
+  (function(){
+    var orig = window.abrirEditarAdeudo;
+    if (typeof orig === 'function' && !orig._lexRb) {
+      var w2 = function(id){ var a = id ? lista().filter(function(x){ return x && x.id === id; })[0] : null; if (a && a.tipo !== 'anterior') return window.lexCorregirReembolso(id); return orig.apply(this, arguments); };
+      w2._lexRb = true; window.abrirEditarAdeudo = w2;
+    }
+  })();
+
   window.reabrirAdeudo = async function(id){
     var a = lista().filter(function(x){ return x && x.id === id; })[0]; if (!a) return;
     var enCaja = (a.conceptos||[]).filter(function(c){ return c.cobrado && c.movIngresoId; });
@@ -1001,7 +1118,7 @@
       + '<div style="flex:1;min-width:220px;"><div style="font-weight:700;font-size:0.95rem;">' + E(a.cliente || '(sin nombre)') + '</div>'
       + '<div style="font-size:0.78rem;color:#7a6440;margin-top:2px;">' + que + ' · ' + E(haceDias(a.fechaCreacion)) + extra + ' ' + origen + '</div></div>'
       + '<div style="font-family:monospace;font-weight:700;font-size:1.05rem;color:#791F1F;min-width:100px;text-align:right;">' + $m(pendT) + '</div>'
-      + '<button type="button" onclick="abrirEditarAdeudo(\'' + a.id + '\')" title="Corregir" style="background:#fff;border:1px solid #d4b870;color:#8c6518;border-radius:8px;padding:7px 10px;font-size:0.8rem;cursor:pointer;">✏️</button>'
+      + '<button type="button" onclick="lexCorregirReembolso(\'' + a.id + '\')" title="Corregir" style="background:#fff;border:1px solid #d4b870;color:#8c6518;border-radius:8px;padding:7px 10px;font-size:0.8rem;cursor:pointer;">✏️</button>'
       + '<button type="button" onclick="lexCobrarAdeudo(\'' + a.id + '\')" style="background:#3B6D11;border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:0.84rem;font-weight:700;cursor:pointer;white-space:nowrap;">✓ Ya nos pagó</button>'
       + '</div>';
   }

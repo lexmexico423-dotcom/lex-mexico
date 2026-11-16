@@ -418,7 +418,7 @@
     var ov = document.createElement('div'); ov.id = 'lex-cobrar-ov';
     ov.style.cssText = 'position:fixed;inset:0;z-index:100000;background:rgba(26,16,8,0.55);display:flex;align-items:center;justify-content:center;padding:16px;font-family:Helvetica,Arial,sans-serif;';
     ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#2a1c08;">'
-      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.74rem;letter-spacing:0.1em;font-family:monospace;display:flex;justify-content:space-between;"><span>💰 YA PAGÓ · REGISTRAR EL PAGO DE ' + E(String(a.cliente||'').toUpperCase()) + '</span><span id="lex-cob-x" style="cursor:pointer;">✕</span></div>'
+      + '<div style="background:#1a1008;color:#e8c875;padding:10px 16px;font-size:0.74rem;letter-spacing:0.1em;font-family:monospace;display:flex;justify-content:space-between;"><span>💰 COBRAR REEMBOLSO · ' + E(String(a.cliente||'').toUpperCase()) + '</span><span id="lex-cob-x" style="cursor:pointer;">✕</span></div>'
       + '<div style="padding:14px 16px;font-size:0.8rem;">'
       + (a.folioVinculado != null ? '<div style="color:#1a5fa8;font-size:0.74rem;margin-bottom:6px;">📂 Ligado al folio ' + E(a.folioVinculado) + '</div>' : '')
       + '<div style="color:#7a5410;font-size:0.74rem;margin-bottom:4px;">¿Qué está pagando hoy?</div>'
@@ -894,7 +894,7 @@
     var dup = await yaCobradoPorOtro(a, pend);
     if (dup) { await preguntar('Este reembolso ya se cobró', dup + '\n\nNo se registró un segundo cobro.', 'Entendido', 'Cerrar'); refrescarTodo(); return; }
     var nombre = String(a.cliente || '').toUpperCase();
-    var ov = ventana('✓ YA NOS PAGÓ · ' + nombre);
+    var ov = ventana('💰 COBRAR REEMBOLSO · ' + nombre);
     var b = ov.querySelector('#lex-rb-body');
     b.innerHTML = '<div style="font-size:0.92rem;margin-bottom:12px;">' + E(nombre) + ' nos debe <b style="color:#791F1F;">' + $m(total) + '</b><div style="font-size:0.8rem;color:#5a4a2a;margin-top:2px;">' + pend.map(function(c){ return E(c.descripcion); }).join(' · ') + '</div></div>'
       + preg('¿Cuánto nos pagó?')
@@ -1119,14 +1119,16 @@
       + '<div style="font-size:0.78rem;color:#7a6440;margin-top:2px;">' + que + ' · ' + E(haceDias(a.fechaCreacion)) + extra + ' ' + origen + '</div></div>'
       + '<div style="font-family:monospace;font-weight:700;font-size:1.05rem;color:#791F1F;min-width:100px;text-align:right;">' + $m(pendT) + '</div>'
       + '<button type="button" onclick="lexCorregirReembolso(\'' + a.id + '\')" title="Corregir" style="background:#fff;border:1px solid #d4b870;color:#8c6518;border-radius:8px;padding:7px 10px;font-size:0.8rem;cursor:pointer;">✏️</button>'
-      + '<button type="button" onclick="lexCobrarAdeudo(\'' + a.id + '\')" style="background:#3B6D11;border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:0.84rem;font-weight:700;cursor:pointer;white-space:nowrap;">✓ Ya nos pagó</button>'
+      + '<button type="button" onclick="lexCobrarAdeudo(\'' + a.id + '\')" style="background:#3B6D11;border:none;color:#fff;border-radius:8px;padding:8px 14px;font-size:0.84rem;font-weight:700;cursor:pointer;white-space:nowrap;">💰 Cobrar reembolso</button>'
       + '</div>';
   }
   try { if (typeof TITULOS !== 'undefined') TITULOS['adeudos-sin-recibo'] = '💳 Reembolsos al despacho'; } catch(_){}
   window.renderAdeudosLista = function(){
     var cont = document.getElementById('adeudosLista'); if (!cont) return;
     var q = N((document.getElementById('adeudosBuscar')||{}).value || '');
-    var todos = activos();
+    // Nov-2026: lo que se registró como Servicio complementario vive en el recibo del
+    // folio, no en esta sección (el aviso de "falta generar su recibo" queda en la ficha).
+    var todos = activos().filter(function(a){ return !(a.conceptos || []).some(function(c){ return c && c.tipoGasto === 'complementario'; }); });
     var verCob = (typeof _adeudosVerCobrados !== 'undefined') && _adeudosVerCobrados;
     var porCobrar = function(a){ return a.estado !== 'cobrado' && (totalPendiente(a) > 0.005 || totalAdelantoPend(a) > 0.005 || a.estado === 'pendiente-recibo'); };
     var lst = todos.filter(function(a){ return verCob ? !porCobrar(a) : porCobrar(a); });

@@ -826,10 +826,10 @@ function renderCarp(){
   el.innerHTML=`
     <style>
       .carp-tr { transition: background 0.22s, box-shadow 0.22s; }
-      .carp-tr:hover { background: #FBF5E2 !important; box-shadow: 0 0 0 1.5px #C8AA60; }
-      .carp-tr:hover td:first-child { border-radius: 6px 0 0 6px; }
-      .carp-tr:hover td:last-child  { border-radius: 0 6px 6px 0; }
-      .carp-tr:hover .carp-num-badge { border-color: #C8AA60; }
+      .carp-tr:hover { background: #F5E7BE !important; }
+      .carp-tr:hover td:first-child { box-shadow: inset 5px 0 0 #c8952a; }
+      .carp-tr:hover .carp-num-badge { background: #c8952a !important; border-color: #c8952a !important; color: #fff !important; }
+      .carp-tr:hover .carp-nombre { color: #000 !important; }
       .carp-action-btn { background:none;border:1.5px solid rgba(200,149,42,0.3);color:#b07820;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:0.8rem;display:inline-flex;align-items:center;justify-content:center;transition:all 0.15s;margin:0 1px; }
       .carp-action-btn:hover { background:rgba(200,149,42,0.15);border-color:#c8952a;transform:translateY(-1px);box-shadow:0 2px 8px rgba(200,149,42,0.2); }
     </style>
@@ -866,7 +866,7 @@ function renderCarp(){
             <td style="${tdStyle}text-align:center;">
               <span class="carp-num-badge" title="${esc(c.num||'')}" style="border:1.5px solid #d4b870;padding:3px 0;min-width:52px;font-family:monospace;font-size:0.9rem;font-weight:800;color:#1a0f02;white-space:nowrap;border-radius:6px;background:#fdfaf4;transition:all 0.15s;display:inline-block;text-align:center;">${_carpSoloNum(c.num)}</span>
             </td>
-            <td style="${tdStyle}padding-top:12px;padding-bottom:12px;font-weight:500;font-size:0.7rem;letter-spacing:0.045em;color:#2a1a06;line-height:1.6;word-break:break-word;">${esc(c.cliente||'—')}</td>
+            <td class="carp-nombre" style="${tdStyle}padding-top:12px;padding-bottom:12px;font-weight:700;font-size:0.7rem;letter-spacing:0.045em;color:#2a1a06;line-height:1.6;word-break:break-word;">${esc(c.cliente||'—')}</td>
             <td style="${tdStyle}line-height:1.3;" title="${esc(tipoTexto)}">
               <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;letter-spacing:0.06em;">${esc(tipoLabel)}</div>
               ${subTipo ? `<div style="font-size:0.72rem;color:#5a4a30;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;">${esc(subTipo)}</div>` : ''}

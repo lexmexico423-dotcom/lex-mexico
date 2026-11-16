@@ -1354,16 +1354,13 @@ window.registrarLibreEImprimir = async function(){
   var validos = (_libreConceptos || []).filter(function(c){ return String(c.desc || '').trim() && (parseFloat(c.precio) || 0) > 0; });
   if (!validos.length || cajaBloqueada()) { registrarLibre(); return; }   // mismos avisos de siempre
   var copia = validos.map(function(c){ return { desc: String(c.desc).trim(), precio: Math.round((parseFloat(c.precio) || 0) * 100) / 100 }; });
-  var nombre = '';
-  try {
-    if (typeof pedirTexto === 'function') {
-      var r = await pedirTexto({ titulo: '🧾 Comprobante para el cliente', mensaje: 'Nombre del cliente (opcional). Déjalo vacío si no lo pidió.', placeholder: 'Nombre del cliente', btnSi: 'Continuar', btnNo: 'Sin nombre' });
-      nombre = String(r || '').trim();
-    }
-  } catch(_){}
+  // Nov-2026: ventana propia con Cancelar · Sin nombre · Continuar
+  var r = await _lexPedirNombreComprobante();
+  if (!r || r.accion === 'cancelar') return;   // regresa a Caja Rápida sin registrar nada
+  var nombre = r.accion === 'ok' ? String(r.nombre || '').trim() : '';
   var previo = window._libreVinculo;
   window._libreVinculo = {
-    extra: previo ? previo.extra : null,
+    extra: Object.assign({}, previo && previo.extra ? previo.extra : {}, { comprobante: true, comprobanteCliente: nombre }),
     onRegistrado: function(mov, resp){
       if (previo && typeof previo.onRegistrado === 'function') { try { previo.onRegistrado(mov, resp); } catch(e){ console.warn('[CajaRápida] vínculo', e); } }
       try { _lexComprobanteCaja(mov, copia, nombre, resp); } catch(e){ console.warn('[Comprobante]', e); toast('No se pudo generar el comprobante', 'err'); }
@@ -1452,4 +1449,44 @@ function _lexComprobanteCaja(mov, conceptos, nombre, resp){
   document.body.appendChild(ov);
   ov.querySelector('#cc-x').onclick = function(){ ov.remove(); try { URL.revokeObjectURL(url); } catch(_){} };
   ov.querySelector('#cc-print').onclick = function(){ try { ov.querySelector('#cc-frame').contentWindow.print(); } catch(_){ window.open(url, '_blank'); } };
+}
+
+// Reimprimir desde Contabilidad (🧾): se vuelve a generar el PDF solo con los
+// datos del movimiento; no se guarda nada.
+window.lexReimprimirComprobante = function(id){
+  var m = (D.movimientos || []).filter(function(x){ return x && x.id === id; })[0];
+  if (!m) { toast('No se encontró el movimiento', 'err'); return; }
+  var conceptos = [], partes = String(m.descripcion || '').split(' | ');
+  if (partes.length > 1) {
+    partes.forEach(function(p){ var r = /^(.*)\s\$([\d,]+(?:\.\d+)?)$/.exec(p.trim()); if (r) conceptos.push({ desc: r[1], precio: parseFloat(r[2].replace(/,/g, '')) || 0 }); else conceptos.push({ desc: p.trim(), precio: 0 }); });
+    var suma = conceptos.reduce(function(t, c){ return t + c.precio; }, 0);
+    if (Math.abs(suma - (parseFloat(m.monto) || 0)) > 0.01) conceptos = [{ desc: String(m.descripcion || ''), precio: parseFloat(m.monto) || 0 }];
+  } else conceptos = [{ desc: String(m.descripcion || ''), precio: parseFloat(m.monto) || 0 }];
+  try { _lexComprobanteCaja(m, conceptos, m.comprobanteCliente || '', m.responsable); } catch(e){ console.warn('[Comprobante]', e); toast('No se pudo generar el comprobante', 'err'); }
+};
+
+function _lexPedirNombreComprobante(){
+  return new Promise(function(res){
+    var v = document.getElementById('lex-comp-nombre'); if (v) v.remove();
+    var ov = document.createElement('div'); ov.id = 'lex-comp-nombre';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:100002;background:rgba(10,7,3,0.55);display:flex;align-items:center;justify-content:center;padding:16px;';
+    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fdfaf4;border:1.5px solid #c8952a;border-radius:10px;width:100%;max-width:380px;box-shadow:0 18px 50px rgba(0,0,0,0.45);overflow:hidden;">'
+      + '<div style="background:#f5efe0;padding:14px 18px;border-bottom:1px solid #e3d3a8;text-align:center;font-family:serif;font-size:1.05rem;font-weight:700;color:#8c6518;">🧾 Comprobante para el cliente</div>'
+      + '<div style="padding:16px 18px;text-align:center;">'
+      + '<div style="font-size:0.84rem;color:#5a4a2a;margin-bottom:10px;line-height:1.45;">Nombre del cliente (opcional). Déjalo vacío si no lo pidió.</div>'
+      + '<input id="lcn-inp" type="text" autocomplete="off" placeholder="Nombre del cliente" style="width:100%;box-sizing:border-box;padding:9px 12px;border:1.5px solid #c8952a;border-radius:7px;font-size:0.9rem;background:#fff;color:#2a1a06;">'
+      + '</div>'
+      + '<div style="background:#f5efe0;border-top:1px solid #e3d3a8;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+      + '<button type="button" id="lcn-cancel" style="background:#fff;border:1.5px solid #c8952a;color:#8c6518;border-radius:7px;padding:8px 12px;font-size:0.74rem;font-family:monospace;letter-spacing:0.08em;cursor:pointer;">✕ CANCELAR</button>'
+      + '<span style="display:flex;gap:6px;"><button type="button" id="lcn-sin" style="background:none;border:none;color:#8c6518;padding:8px 10px;font-size:0.74rem;font-family:monospace;letter-spacing:0.08em;cursor:pointer;">SIN NOMBRE</button>'
+      + '<button type="button" id="lcn-ok" style="background:#9a6e18;border:none;color:#fff;border-radius:7px;padding:8px 16px;font-size:0.74rem;font-family:monospace;letter-spacing:0.08em;cursor:pointer;">CONTINUAR</button></span></div></div>';
+    document.body.appendChild(ov);
+    var inp = ov.querySelector('#lcn-inp');
+    var fin = function(accion){ var n = inp.value; ov.remove(); res({ accion: accion, nombre: n }); };
+    ov.querySelector('#lcn-cancel').onclick = function(){ fin('cancelar'); };
+    ov.querySelector('#lcn-sin').onclick = function(){ fin('sin'); };
+    ov.querySelector('#lcn-ok').onclick = function(){ fin('ok'); };
+    inp.onkeydown = function(ev){ if (ev.key === 'Enter') { ev.preventDefault(); fin('ok'); } if (ev.key === 'Escape') { ev.preventDefault(); fin('cancelar'); } };
+    setTimeout(function(){ inp.focus(); }, 30);
+  });
 }

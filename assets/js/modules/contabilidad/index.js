@@ -866,7 +866,7 @@ function renderCarp(){
             <td style="${tdStyle}text-align:center;">
               <span class="carp-num-badge" title="${esc(c.num||'')}" style="border:1.5px solid #d4b870;padding:3px 0;min-width:52px;font-family:monospace;font-size:0.9rem;font-weight:800;color:#1a0f02;white-space:nowrap;border-radius:6px;background:#fdfaf4;transition:all 0.15s;display:inline-block;text-align:center;">${_carpSoloNum(c.num)}</span>
             </td>
-            <td style="${tdStyle}font-weight:600;font-size:0.8rem;color:#1a0f02;line-height:1.3;word-break:break-word;">${esc(c.cliente||'—')}</td>
+            <td style="${tdStyle}padding-top:12px;padding-bottom:12px;font-weight:500;font-size:0.7rem;letter-spacing:0.045em;color:#2a1a06;line-height:1.6;word-break:break-word;">${esc(c.cliente||'—')}</td>
             <td style="${tdStyle}line-height:1.3;" title="${esc(tipoTexto)}">
               <div style="font-family:monospace;font-size:0.62rem;font-weight:700;color:#8c6518;letter-spacing:0.06em;">${esc(tipoLabel)}</div>
               ${subTipo ? `<div style="font-size:0.72rem;color:#5a4a30;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;">${esc(subTipo)}</div>` : ''}

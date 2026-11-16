@@ -1345,3 +1345,111 @@ window.lexCajaRapidaPrecargada = function(op){
   }
   return true;
 };
+
+// ── Nov-2026 · Caja Rápida: "🧾 Registrar e imprimir" ────────────────────────
+// Registra el cobro EXACTAMENTE igual que "Registrar y cerrar" y además abre un
+// comprobante para imprimir con el mismo folio de caja. El comprobante no se
+// guarda en ningún lado (no es recibo oficial ni lleva control aparte).
+window.registrarLibreEImprimir = async function(){
+  var validos = (_libreConceptos || []).filter(function(c){ return String(c.desc || '').trim() && (parseFloat(c.precio) || 0) > 0; });
+  if (!validos.length || cajaBloqueada()) { registrarLibre(); return; }   // mismos avisos de siempre
+  var copia = validos.map(function(c){ return { desc: String(c.desc).trim(), precio: Math.round((parseFloat(c.precio) || 0) * 100) / 100 }; });
+  var nombre = '';
+  try {
+    if (typeof pedirTexto === 'function') {
+      var r = await pedirTexto({ titulo: '🧾 Comprobante para el cliente', mensaje: 'Nombre del cliente (opcional). Déjalo vacío si no lo pidió.', placeholder: 'Nombre del cliente', btnSi: 'Continuar', btnNo: 'Sin nombre' });
+      nombre = String(r || '').trim();
+    }
+  } catch(_){}
+  var previo = window._libreVinculo;
+  window._libreVinculo = {
+    extra: previo ? previo.extra : null,
+    onRegistrado: function(mov, resp){
+      if (previo && typeof previo.onRegistrado === 'function') { try { previo.onRegistrado(mov, resp); } catch(e){ console.warn('[CajaRápida] vínculo', e); } }
+      try { _lexComprobanteCaja(mov, copia, nombre, resp); } catch(e){ console.warn('[Comprobante]', e); toast('No se pudo generar el comprobante', 'err'); }
+    }
+  };
+  registrarLibre();
+};
+function _lexComprobanteCaja(mov, conceptos, nombre, resp){
+  // Nov-2026 · Opción 3 elegida por el Lic.: media carta horizontal, recibo formal
+  // con tabla dorada y pie tipo ticket.
+  var J = window.jspdf && window.jspdf.jsPDF; if (!J) { toast('No se pudo generar el comprobante', 'err'); return; }
+  var doc = new J({ orientation: 'landscape', unit: 'mm', format: [139.7, 215.9] });
+  var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 12, y = 11;
+  var fmt2 = function(n){ return '$' + (typeof fmt === 'function' ? fmt(n) : Number(n || 0).toFixed(2)); };
+  var oro = [140, 101, 24], tinta = [26, 16, 8], gris = [100, 90, 70];
+  // Encabezado: logo + nombre a la izquierda, recuadro de folio a la derecha
+  var lx = M;
+  try { if (typeof LOGO_SRC !== 'undefined' && LOGO_SRC) { var ip = doc.getImageProperties(LOGO_SRC), h = 17, w = h * (ip.width / ip.height); if (w > 26) { w = 26; h = w * (ip.height / ip.width); } doc.addImage(LOGO_SRC, 'JPEG', M, y, w, h); lx = M + w + 4; } } catch(_){}
+  doc.setFont('times', 'bold'); doc.setFontSize(14); doc.setTextColor.apply(doc, oro);
+  doc.text('LEX-MÉXICO · DESPACHO JURÍDICO', lx, y + 6);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.2); doc.setTextColor.apply(doc, gris);
+  doc.text('C. Miguel Hidalgo Esq. México No. 200, Col. Centro · Santiago Juxtlahuaca, Oax.', lx, y + 11);
+  doc.text('Tel. 953 128 7511', lx, y + 15);
+  var fw = 46, fx = W - M - fw;
+  doc.setDrawColor(200, 149, 42); doc.setLineWidth(0.5); doc.roundedRect(fx, y, fw, 17, 1.5, 1.5);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7); doc.setTextColor(122, 84, 16); doc.text('COMPROBANTE DE PAGO', fx + fw / 2, y + 5.5, { align: 'center' });
+  doc.setFont('courier', 'bold'); doc.setFontSize(12); doc.setTextColor(170, 30, 30); doc.text(String(mov.folioCaja || ''), fx + fw / 2, y + 12.5, { align: 'center' });
+  y += 21;
+  doc.setDrawColor(200, 149, 42); doc.setLineWidth(0.8); doc.line(M, y, W - M, y);
+  y += 6;
+  // Cliente y fecha
+  var fechaTxt = mov.fecha || '';
+  try { var p = String(mov.fecha).split('-'); fechaTxt = new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }); } catch(_){}
+  doc.setFontSize(9); doc.setTextColor.apply(doc, tinta);
+  if (nombre) { doc.setFont('helvetica', 'bold'); doc.text('Cliente:', M, y); doc.setFont('helvetica', 'normal'); doc.text(String(nombre), M + 14, y); }
+  doc.setFont('helvetica', 'normal'); doc.setTextColor.apply(doc, gris);
+  doc.text(fechaTxt + (mov.hora ? ' · ' + mov.hora + ' hrs' : '') + ' · Caja 01', W - M, y, { align: 'right' });
+  y += 5;
+  // Tabla con encabezado dorado claro
+  var cCant = W - M - 34, cImp = W - M - 3;
+  // Encabezado de la tabla solo con líneas (sin relleno) para ahorrar tinta
+  doc.setDrawColor(200, 149, 42); doc.setLineWidth(0.4); doc.line(M, y, W - M, y); doc.line(M, y + 7, W - M, y + 7);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(122, 84, 16);
+  doc.text('CONCEPTO', M + 3, y + 4.8); doc.text('CANT.', cCant, y + 4.8, { align: 'center' }); doc.text('IMPORTE', cImp, y + 4.8, { align: 'right' });
+  y += 7;
+  var total = 0, maxY = H - 34;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor.apply(doc, tinta);
+  conceptos.forEach(function(c, k){
+    if (y > maxY) return;
+    var lin = doc.splitTextToSize(String(c.desc), cCant - M - 14);
+    var alto = Math.max(1, lin.length) * 4.2 + 2.6;
+    doc.text(lin, M + 3, y + 4.6); doc.text('1', cCant, y + 4.6, { align: 'center' }); doc.text(fmt2(c.precio), cImp, y + 4.6, { align: 'right' });
+    y += alto; total += c.precio;
+    doc.setDrawColor(230, 222, 200); doc.setLineWidth(0.2); doc.line(M, y, W - M, y);
+  });
+  // Total en recuadro dorado
+  y += 4;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, gris);
+  doc.text(conceptos.length + (conceptos.length === 1 ? ' artículo' : ' artículos'), M, y + 5);
+  var tw = 62, tx = W - M - tw;
+  // Recuadro solo con contorno (sin relleno) para ahorrar tinta
+  doc.setDrawColor(200, 149, 42); doc.setLineWidth(0.5); doc.roundedRect(tx, y, tw, 8, 1.5, 1.5, 'S');
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor.apply(doc, tinta);
+  doc.text('TOTAL PAGADO', tx + 4, y + 5.4); doc.text(fmt2(Math.round(total * 100) / 100), tx + tw - 4, y + 5.4, { align: 'right' });
+  // Pie: servicios del despacho (publicidad), sin nombres de personas
+  var py = H - 19;
+  doc.setDrawColor(200, 149, 42); doc.setLineWidth(0.4); doc.line(M, py, W - M, py);
+  py += 5.5;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, gris);
+  var serv = 'ASESORÍA JURÍDICA · JUICIOS · ESCRITURAS · REGISTRO CIVIL · PLACAS', esp = 0.4;
+  var ancho = doc.getTextWidth(serv) + esp * (serv.length - 1);
+  doc.setCharSpace(esp); doc.text(serv, (W - ancho) / 2, py); doc.setCharSpace(0);
+  py += 4.6;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(110, 100, 80);
+  doc.text('Citas e informes: 953 128 7511 · Gracias por su preferencia', W / 2, py, { align: 'center' });
+  py += 3.8;
+  doc.setFontSize(7); doc.setTextColor(130, 130, 130);
+  doc.text('Este comprobante acredita únicamente el pago de los servicios descritos.', W / 2, py, { align: 'center' });
+  var url = URL.createObjectURL(doc.output('blob'));
+  var viejo = document.getElementById('lex-caja-comprobante'); if (viejo) viejo.remove();
+  var ov = document.createElement('div'); ov.id = 'lex-caja-comprobante';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:100001;background:rgba(10,7,3,0.82);display:flex;flex-direction:column;padding:14px;gap:8px;font-family:Helvetica,Arial,sans-serif;';
+  ov.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;color:#e8c875;font-size:0.82rem;"><span>🧾 Comprobante de pago · ' + String(mov.folioCaja || '') + '</span>'
+    + '<span style="display:flex;gap:8px;"><button type="button" id="cc-print" style="background:#9a6e18;color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;">🖨 Imprimir</button><button type="button" id="cc-x" style="background:#fff;color:#7a5410;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;">✕ Cerrar</button></span></div>'
+    + '<iframe id="cc-frame" src="' + url + '" style="flex:1;width:100%;border:none;border-radius:6px;background:#fff;"></iframe>';
+  document.body.appendChild(ov);
+  ov.querySelector('#cc-x').onclick = function(){ ov.remove(); try { URL.revokeObjectURL(url); } catch(_){} };
+  ov.querySelector('#cc-print').onclick = function(){ try { ov.querySelector('#cc-frame').contentWindow.print(); } catch(_){ window.open(url, '_blank'); } };
+}

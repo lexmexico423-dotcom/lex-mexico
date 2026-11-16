@@ -189,7 +189,7 @@
           badge: a.estado ? { txt:a.estado, color:'#e8c875', bg:'rgba(200,149,42,0.12)' } : null,
           accion: function(){ if (typeof window.lexFichaSaldoAnterior === 'function') window.lexFichaSaldoAnterior(a.id); else irSeccion('recibos-anteriores', 'raQ', a.cliente || ''); } }; } });
     // Adeudos sin recibo
-    F.push({ clave:'adeudo', titulo:'💳 Adeudos sin recibo', icono:'💳', panel:'adeudos-sin-recibo', input:'adeudosBuscar',
+    F.push({ clave:'adeudo', titulo:'💳 Reembolsos', icono:'💳', panel:'adeudos-sin-recibo', input:'adeudosBuscar',
       lista: function(){ return arr(d.adeudosSinRecibo).filter(function(a){ return a && a.tipo !== 'anterior' && !a.eliminado; }); },
       item: function(a){
         var total = 0, debe = 0; arr(a.conceptos).forEach(function(c){ var m = Number(c && c.monto || 0); total += m; if (!(c && c.cobrado)) debe += m; });

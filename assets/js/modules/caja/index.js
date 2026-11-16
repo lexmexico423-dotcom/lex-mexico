@@ -980,6 +980,10 @@ function setLibreTipo(tipo){
 
 function abrirLibre(){
   if(cajaBloqueada()){toast('🔒 Caja cerrada — se habilita mañana','err');return;}
+  // Nov-2026: al abrir Caja Rápida "normal" se borra cualquier precarga anterior
+  window._libreVinculo = null;
+  try { var _bv=document.getElementById('libre-vinculo-aviso'); if(_bv) _bv.remove();
+    ['libreBtn-ingreso','libreBtn-egreso','libreBtn-carrito'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.visibility=''; }); } catch(_){}
   _libreTipo='ingreso';
   _libreConceptos=[];
   // reset visual
@@ -1041,8 +1045,12 @@ function registrarLibre(){
     if(!resp){ if(typeof toast==='function') toast('Cancelado — no se registró nada','err'); return; } // Nov-2026: Cancelar en "¿Quién registra?" ya no registra el movimiento
     var mov={id:'M-'+Date.now(),folioCaja:generarFolioMovCaja(),fecha:hoy(),hora:hora(),descripcion:desc,monto:total,
       tipo:_libreTipo,cat:'otro',fuente:'caja',responsable:resp};
-    _registrarMovimiento(mov);save();renderCaja();setTimeout(()=>syncEstadoSupabaseDebounced(),100);
+    var _vin = window._libreVinculo; window._libreVinculo = null;
+    if(_vin && _vin.extra) Object.assign(mov, _vin.extra);   // Nov-2026: liga con el reembolso
+    if(_registrarMovimiento(mov) === false){ toast('No se registró (movimiento repetido)','err'); return; }
+    save();renderCaja();setTimeout(()=>syncEstadoSupabaseDebounced(),100);
     cerrar('mLibre');
+    if(_vin && typeof _vin.onRegistrado === 'function'){ try { _vin.onRegistrado(mov, resp); } catch(e){ console.warn('[CajaRápida] vínculo', e); } }
     var pref=_libreTipo==='ingreso'?'▲':'▼';
     toast(pref+' '+desc+' — $'+fmt(total));
   });
@@ -1311,3 +1319,29 @@ async function fichaCerrarJuicio() {
     if(typeof ejecutarLiquidacionTotal==='function') ejecutarLiquidacionTotal();
   }, 300);
 }
+
+
+// ── Nov-2026 · Caja Rápida PRECARGADA (reembolsos al despacho) ───────────────
+// Abre Caja Rápida ya llenada (ingreso o egreso, descripción y monto) para que
+// solo se confirme. Al registrar, el movimiento lleva los datos de "extra"
+// (ej. adeudoId) y se llama onRegistrado(mov, responsable).
+window.lexCajaRapidaPrecargada = function(op){
+  op = op || {};
+  if(cajaBloqueada()){ toast('🔒 Caja cerrada — se habilita mañana','err'); return false; }
+  abrirLibre();
+  setLibreTipo(op.tipo === 'egreso' ? 'egreso' : 'ingreso');
+  _libreConceptos = [{ desc: String(op.desc || ''), precio: Math.round((parseFloat(op.monto) || 0) * 100) / 100 }];
+  renderConceptosLibre();
+  try { if(typeof calcLibreTotal === 'function') calcLibreTotal(); } catch(_){}
+  window._libreVinculo = { extra: op.extra || null, onRegistrado: op.onRegistrado || null };
+  // Fijar el tipo (no se puede cambiar a ingreso/egreso ni usar carrito)
+  ['libreBtn-ingreso','libreBtn-egreso','libreBtn-carrito'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.visibility='hidden'; });
+  var body = document.getElementById('mLibreBody');
+  if(body && op.aviso){
+    var av = document.createElement('div'); av.id = 'libre-vinculo-aviso';
+    av.style.cssText = 'background:'+(op.tipo==='egreso'?'#fcebeb':'#eaf3de')+';color:'+(op.tipo==='egreso'?'#791f1f':'#27500a')+';border-radius:8px;padding:9px 12px;font-size:0.8rem;margin-bottom:12px;line-height:1.45;';
+    av.textContent = op.aviso;
+    body.insertBefore(av, body.firstChild);
+  }
+  return true;
+};

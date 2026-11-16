@@ -14038,7 +14038,7 @@ function toggleAdeudosCobrados(){
   _adeudosVerCobrados = !_adeudosVerCobrados;
   const btn = document.getElementById('adeudosVerCobradosBtn');
   if(btn){
-    btn.textContent = _adeudosVerCobrados ? '← Pendientes' : '✓ Cobrados';
+    btn.textContent = _adeudosVerCobrados ? '← Pendientes' : '✓ Ya pagados';
     btn.style.background = _adeudosVerCobrados ? 'var(--gold-d)' : '';
     btn.style.color = _adeudosVerCobrados ? '#fff' : '';
   }

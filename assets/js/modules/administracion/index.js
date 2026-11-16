@@ -1822,8 +1822,8 @@ function renderContab() {
     const resp = _iniciales(m.responsable);
     return `<tr style="background:${m.monto===0?'#fff8e8':bgBody};">
       <td style="font-family:monospace;font-size:0.66rem;color:var(--muted);padding-left:14px;white-space:nowrap;">${esc(m.hora||'—')}</td>
-      <td style="font-family:monospace;font-size:0.68rem;font-weight:700;white-space:nowrap;">${folioTxt}</td>
-      <td style="font-size:0.8rem;font-weight:600;word-break:break-word;">${m.fuente==='recibo'?esc(m.nombre||'—'):''}</td>
+      <td style="font-family:monospace;font-size:0.68rem;font-weight:700;white-space:nowrap;position:relative;">${m.comprobante && m.fuente!=='recibo' ? `<span onclick="lexReimprimirComprobante('${esc(m.id)}')" title="Reimprimir comprobante" style="position:absolute;left:0;top:50%;transform:translate(-50%,-50%);font-size:0.72rem;line-height:1;cursor:pointer;opacity:0.7;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7">🧾</span>` : ''}${folioTxt}</td>
+      <td style="font-size:0.8rem;font-weight:600;word-break:break-word;">${m.fuente==='recibo'?esc(m.nombre||'—'):(m.comprobante?`<span style="font-weight:400;font-style:italic;color:#a8987a;">${esc(m.comprobanteCliente||'(sin nombre)')}</span>`:'')}</td>
       <td style="font-size:0.76rem;color:var(--muted);word-break:break-word;min-width:180px;" title="${descFull}">${desc}</td>
       <td style="white-space:nowrap;">${_badgeEstatus(m)}</td>
       <td><span class="tag ${m.fuente==='recibo'?'tag-b':'tag-v'}" style="font-size:0.52rem;">${m.fuente==='recibo'?'Recibo':'Caja'}</span></td>

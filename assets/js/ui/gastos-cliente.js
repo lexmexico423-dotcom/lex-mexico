@@ -594,8 +594,8 @@
     var MODOS = [
       { v: 'adelanto', g: 'Dentro de lo pactado', t: '⏩ El pago lo hizo el despacho para avanzar el trámite', e: etq('se descuenta del saldo', '#E6F1FB', '#0C447C'),
         s: 'Este pago está <b>dentro de lo pactado</b>. Lo pagamos nosotros para no detener el trámite; cuando el cliente lo pague, <b>se descuenta de su saldo</b>.' },
-      { v: 'tercero', g: 'Fuera de lo pactado', t: '🧾 Pago a un tercero por falta de requisitos', e: etq('reembolso · Caja Rápida', '#FAEEDA', '#633806'),
-        s: 'Este pago <b>no va dentro de lo pactado</b>. Se le pagó a un tercero porque al cliente le faltaba un requisito; el despacho lo cubrió y <b>el cliente nos lo debe reembolsar</b>. Se cobra por Caja Rápida, sin recibo.' },
+      { v: 'tercero', g: 'Fuera de lo pactado', t: '💵 Gasto fuera de lo pactado que el cliente nos debe reembolsar', e: etq('reembolso · Caja Rápida', '#FAEEDA', '#633806'),
+        s: 'Cualquier gasto que cubrió el despacho y <b>no estaba en lo pactado</b>: traslados, viáticos, honorarios de diligencias, pagos a terceros, requisitos faltantes, copias, derechos… <b>El cliente nos lo debe reembolsar.</b> Se cobra por Caja Rápida, sin recibo.' },
       { v: 'complementario', g: '', t: '➕ Servicio complementario', e: etq('genera recibo', '#EAF3DE', '#27500A'),
         s: 'Es un <b>servicio extra</b> fuera de lo pactado. Se le cobra al cliente aparte y se genera su <b>recibo de servicio complementario</b>.' } ];
     function dineroOps(){ var m = r2(S.mon); return [
@@ -962,7 +962,7 @@
     var $ = function(s){ return ov.querySelector('#' + s); };
     var MODOS = [
       { v: 'adelanto', t: '⏩ El pago lo hizo el despacho para avanzar el trámite', s: 'Dentro de lo pactado · se descuenta de su saldo cuando lo pague' },
-      { v: 'tercero', t: '🧾 Pago a un tercero por falta de requisitos', s: 'Fuera de lo pactado · se cobra por Caja Rápida' },
+      { v: 'tercero', t: '💵 Gasto fuera de lo pactado que el cliente nos debe reembolsar', s: 'Traslados, viáticos, honorarios de diligencias, pagos a terceros, requisitos, copias, derechos… · se cobra por Caja Rápida, sin recibo' },
       { v: 'complementario', t: '➕ Servicio complementario', s: 'Fuera de lo pactado · se genera su recibo de servicio complementario' } ];
     if (tipoActual === 'incluido') MODOS.push({ v: 'incluido', t: '✓ Incluido en lo pactado (no se cobra)', s: 'Registro anterior: el despacho lo absorbió' });
     function resumen(){

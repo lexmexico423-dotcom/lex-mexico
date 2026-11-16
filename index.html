@@ -1172,7 +1172,7 @@
         </button>
         <button class="caja-accion-btn" onclick="abrirAdeudosSinRecibo()">
           <span class="caja-accion-icon">💰</span>
-          <span class="caja-accion-texto">Adeudos sin Recibo</span>
+          <span class="caja-accion-texto">Reembolsos</span>
         </button>
       </div>
       <!-- ═══ MEJORA: PANEL DE VENCIMIENTOS PRÓXIMOS ═══ -->
@@ -16458,13 +16458,13 @@ Recibo original im…</td>
     <!-- ═══ PANEL: Adeudos sin Recibo ═══ -->
     <div id="panel-adeudos-sin-recibo" class="panel">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:14px;flex-wrap:wrap;">
-        <input id="adeudosBuscar" type="search" placeholder="Buscar cliente..." oninput="renderAdeudosLista()" autocomplete="off" style="flex:1;min-width:140px;padding:8px 12px;border:1.5px solid var(--border-l);border-radius:20px;font-size:0.82rem;">
+        <input id="adeudosBuscar" type="search" placeholder="Buscar cliente o qué se pagó..." oninput="renderAdeudosLista()" autocomplete="off" style="flex:1;min-width:140px;padding:8px 12px;border:1.5px solid var(--border-l);border-radius:20px;font-size:0.82rem;">
         <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--surface);border:1.5px solid var(--border-l);border-radius:var(--radius-sm);padding:6px 20px;flex-shrink:0;line-height:1.15;">
           <span id="adeudosContador" style="font-size:1.3rem;font-weight:800;color:#c8781a;font-family:monospace;">0</span>
-          <span style="font-size:0.62rem;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Adeudos</span>
+          <span style="font-size:0.62rem;font-weight:700;color:var(--muted);letter-spacing:0.06em;text-transform:uppercase;">Pendientes</span>
         </div>
-        <button class="btn btn-ghost" id="adeudosVerCobradosBtn" onclick="toggleAdeudosCobrados()">✓ Cobrados</button>
-        <button class="btn btn-primary" onclick="abrirNuevoAdeudo()">＋ Nuevo</button>
+        <button class="btn btn-ghost" id="adeudosVerCobradosBtn" onclick="toggleAdeudosCobrados()">✓ Ya pagados</button>
+        <button class="btn btn-primary" onclick="lexNuevoReembolso()">＋ Nuevo reembolso</button>
       </div>
       <div id="adeudosLista"></div>
     </div>
@@ -17512,7 +17512,7 @@ Recibo original im…</td>
 
 <script src="assets/js/config/public-config.js?v=20261004a"></script>
 <script src="assets/js/modules/recibos/index.js?v=20261023n"></script>
-<script src="assets/js/modules/caja/index.js?v=20261112a"></script>
+<script src="assets/js/modules/caja/index.js?v=20261115a"></script>
 <script src="assets/js/modules/contabilidad/index.js?v=20261115a"></script>
 <script src="assets/js/modules/clientes/index.js?v=20261112a"></script>
 <script src="assets/js/modules/directorio/index.js?v=20261023d"></script>
@@ -19451,7 +19451,7 @@ Recibo original im…</td>
     </div>
   </div>
 </div>
-<script src="assets/js/admin/receipt-restoration.js?v=20261112a"></script>
+<script src="assets/js/admin/receipt-restoration.js?v=20261115a"></script>
 <script src="assets/js/ui/form-navigation.js?v=20260904d"></script>
 
 <!-- ═══ MODAL FICHA DEL FOLIO ═══ -->
@@ -19482,14 +19482,14 @@ Recibo original im…</td>
 <script src="assets/js/ui/cobranza.js?v=20261115a"></script>
 <script src="assets/js/ui/mandar-llamada.js?v=20261023g"></script>
 <script src="assets/js/ui/sync-vivo.js?v=20261023i"></script>
-<script src="assets/js/ui/gastos-cliente.js?v=20261112a"></script>
+<script src="assets/js/ui/gastos-cliente.js?v=20261116b"></script>
 <script src="assets/js/ui/escrituras-lista.js?v=20261030a"></script>
 <script src="assets/js/ui/escrituras-asistente.js?v=20261029a"></script>
 <script src="assets/js/ui/saldos-anteriores.js?v=20261028a"></script>
 <script src="assets/js/ui/cotizaciones.js?v=20261023l"></script>
 <script src="assets/js/ui/cerrar-seccion.js?v=20261030b"></script>
-<script src="assets/js/ui/confirmaciones.js?v=20261028a"></script>
-<script src="assets/js/ui/buscador-global.js?v=20261104a"></script>
+<script src="assets/js/ui/confirmaciones.js?v=20261116a"></script>
+<script src="assets/js/ui/buscador-global.js?v=20261115a"></script>
 <script src="assets/js/ui/acceso-bloqueo.js?v=20261104b"></script>
 <script src="assets/js/ui/roles.js?v=20261104d"></script>
 

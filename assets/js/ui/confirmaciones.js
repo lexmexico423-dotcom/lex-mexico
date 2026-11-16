@@ -208,6 +208,11 @@
   function marcarSecciones(ev){
     if (!ev.isTrusted) return;
     var t = ev.target; if (!t || !t.closest || t.type === 'search') return;
+    // Nov-2026: escribir el número en "Consultar folios" (o buscar expediente) es solo
+    // una consulta, no un cambio. En modo consulta solo cuentan los cambios hechos
+    // dentro de un Pago parcial / Pago total / Servicio complementario abierto.
+    if (t.id === 'folio_anterior' || t.id === 'expediente_buscar' || t.id === 'hist-buscar') return;
+    if (document.body.classList.contains('modo-consulta') && !document.body.classList.contains('modo-actualizacion')) return;
     if (t.closest('#panel-nuevo-recibo')) _reciboSucio = true;
     if (t.closest('#pr-panel-contenido') && $('pr-f-nombre')) _cotEl = $('pr-f-nombre');
   }
@@ -215,6 +220,7 @@
   document.addEventListener('change', marcarSecciones, true);
   function reciboPendiente(){
     if (!_reciboSucio || window._edicionCompletaActiva) return false;
+    if (document.body.classList.contains('modo-consulta') && !document.body.classList.contains('modo-actualizacion')) return false;
     var pp = $('actions-post-print'); if (pp && pp.style.display !== 'none' && getComputedStyle(pp).display !== 'none') return false;   // ya se imprimió/guardó
     var p = $('panel-nuevo-recibo'); return !!(p && p.classList.contains('active'));
   }

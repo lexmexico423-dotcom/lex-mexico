@@ -1047,6 +1047,12 @@ function registrarLibre(){
       tipo:_libreTipo,cat:'otro',fuente:'caja',responsable:resp};
     var _vin = window._libreVinculo; window._libreVinculo = null;
     if(_vin && _vin.extra) Object.assign(mov, _vin.extra);   // Nov-2026: liga con el reembolso
+    // Nov-2026 (reembolsos con varios conceptos): una sola línea en Contabilidad con
+    // el texto que arma el reembolso; los renglones se guardan para el comprobante.
+    if(_vin && typeof _vin.describir === 'function'){
+      try { var _dd = _vin.describir(validos); if(_dd) mov.descripcion = _dd; } catch(_eD){ console.warn('[CajaRápida] describir', _eD); }
+      mov.comprobanteConceptos = validos.map(function(c){ return { desc: String(c.desc).trim(), precio: Math.round((parseFloat(c.precio)||0)*100)/100 }; });
+    }
     if(_registrarMovimiento(mov) === false){ toast('No se registró (movimiento repetido)','err'); return; }
     save();renderCaja();setTimeout(()=>syncEstadoSupabaseDebounced(),100);
     cerrar('mLibre');
@@ -1330,10 +1336,12 @@ window.lexCajaRapidaPrecargada = function(op){
   if(cajaBloqueada()){ toast('🔒 Caja cerrada — se habilita mañana','err'); return false; }
   abrirLibre();
   setLibreTipo(op.tipo === 'egreso' ? 'egreso' : 'ingreso');
-  _libreConceptos = [{ desc: String(op.desc || ''), precio: Math.round((parseFloat(op.monto) || 0) * 100) / 100 }];
+  _libreConceptos = (Array.isArray(op.conceptos) && op.conceptos.length)
+    ? op.conceptos.map(function(c){ return { desc: String(c.desc || ''), precio: Math.round((parseFloat(c.precio) || 0) * 100) / 100 }; })
+    : [{ desc: String(op.desc || ''), precio: Math.round((parseFloat(op.monto) || 0) * 100) / 100 }];
   renderConceptosLibre();
   try { if(typeof calcLibreTotal === 'function') calcLibreTotal(); } catch(_){}
-  window._libreVinculo = { extra: op.extra || null, onRegistrado: op.onRegistrado || null };
+  window._libreVinculo = { extra: op.extra || null, onRegistrado: op.onRegistrado || null, describir: op.describir || null, nombre: op.nombreComprobante || '' };
   // Fijar el tipo (no se puede cambiar a ingreso/egreso ni usar carrito)
   ['libreBtn-ingreso','libreBtn-egreso','libreBtn-carrito'].forEach(function(id){ var b=document.getElementById(id); if(b) b.style.visibility='hidden'; });
   var body = document.getElementById('mLibreBody');
@@ -1355,11 +1363,12 @@ window.registrarLibreEImprimir = async function(){
   if (!validos.length || cajaBloqueada()) { registrarLibre(); return; }   // mismos avisos de siempre
   var copia = validos.map(function(c){ return { desc: String(c.desc).trim(), precio: Math.round((parseFloat(c.precio) || 0) * 100) / 100 }; });
   // Nov-2026: ventana propia con Cancelar · Sin nombre · Continuar
-  var r = await _lexPedirNombreComprobante();
+  var previo = window._libreVinculo;
+  var r = await _lexPedirNombreComprobante(previo && previo.nombre ? previo.nombre : '');
   if (!r || r.accion === 'cancelar') return;   // regresa a Caja Rápida sin registrar nada
   var nombre = r.accion === 'ok' ? String(r.nombre || '').trim() : '';
-  var previo = window._libreVinculo;
   window._libreVinculo = {
+    describir: previo && previo.describir ? previo.describir : null,
     extra: Object.assign({}, previo && previo.extra ? previo.extra : {}, { comprobante: true, comprobanteCliente: nombre }),
     onRegistrado: function(mov, resp){
       if (previo && typeof previo.onRegistrado === 'function') { try { previo.onRegistrado(mov, resp); } catch(e){ console.warn('[CajaRápida] vínculo', e); } }
@@ -1420,6 +1429,7 @@ function _lexComprobanteCaja(mov, conceptos, nombre, resp){
   y += 4;
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc, gris);
   doc.text(conceptos.length + (conceptos.length === 1 ? ' artículo' : ' artículos'), M, y + 5);
+  if (mov.comprobanteNota) { doc.setFontSize(7.5); doc.text(String(mov.comprobanteNota), M, y + 10); }
   var tw = 62, tx = W - M - tw;
   // Recuadro solo con contorno (sin relleno) para ahorrar tinta
   doc.setDrawColor(200, 149, 42); doc.setLineWidth(0.5); doc.roundedRect(tx, y, tw, 8, 1.5, 1.5, 'S');
@@ -1457,7 +1467,8 @@ window.lexReimprimirComprobante = function(id){
   var m = (D.movimientos || []).filter(function(x){ return x && x.id === id; })[0];
   if (!m) { toast('No se encontró el movimiento', 'err'); return; }
   var conceptos = [], partes = String(m.descripcion || '').split(' | ');
-  if (partes.length > 1) {
+  if (Array.isArray(m.comprobanteConceptos) && m.comprobanteConceptos.length) conceptos = m.comprobanteConceptos.slice();
+  else if (partes.length > 1) {
     partes.forEach(function(p){ var r = /^(.*)\s\$([\d,]+(?:\.\d+)?)$/.exec(p.trim()); if (r) conceptos.push({ desc: r[1], precio: parseFloat(r[2].replace(/,/g, '')) || 0 }); else conceptos.push({ desc: p.trim(), precio: 0 }); });
     var suma = conceptos.reduce(function(t, c){ return t + c.precio; }, 0);
     if (Math.abs(suma - (parseFloat(m.monto) || 0)) > 0.01) conceptos = [{ desc: String(m.descripcion || ''), precio: parseFloat(m.monto) || 0 }];
@@ -1465,7 +1476,7 @@ window.lexReimprimirComprobante = function(id){
   try { _lexComprobanteCaja(m, conceptos, m.comprobanteCliente || '', m.responsable); } catch(e){ console.warn('[Comprobante]', e); toast('No se pudo generar el comprobante', 'err'); }
 };
 
-function _lexPedirNombreComprobante(){
+function _lexPedirNombreComprobante(defNombre){
   return new Promise(function(res){
     var v = document.getElementById('lex-comp-nombre'); if (v) v.remove();
     var ov = document.createElement('div'); ov.id = 'lex-comp-nombre';
@@ -1482,6 +1493,7 @@ function _lexPedirNombreComprobante(){
       + '<button type="button" id="lcn-ok" style="background:#9a6e18;border:none;color:#fff;border-radius:7px;padding:8px 16px;font-size:0.74rem;font-family:monospace;letter-spacing:0.08em;cursor:pointer;">CONTINUAR</button></span></div></div>';
     document.body.appendChild(ov);
     var inp = ov.querySelector('#lcn-inp');
+    if (defNombre) inp.value = String(defNombre);
     var fin = function(accion){ var n = inp.value; ov.remove(); res({ accion: accion, nombre: n }); };
     ov.querySelector('#lcn-cancel').onclick = function(){ fin('cancelar'); };
     ov.querySelector('#lcn-sin').onclick = function(){ fin('sin'); };

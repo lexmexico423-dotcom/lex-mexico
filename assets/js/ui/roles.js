@@ -52,6 +52,7 @@
   var st = document.createElement('style');
   st.textContent = ''
     + '.lex-rol-oculto{display:none !important;}'
+    + 'body.lex-rol-noadmin #header-pago-btns .btn-serv-comp:not(.btn-nuevo-recibo){display:none !important;}'
     + 'body.lex-rol-sinmontos #panel-caja .caja-top-row>div:first-child,body.lex-rol-sinmontos #panel-caja .stat.verde,body.lex-rol-sinmontos #panel-caja .stat.rojo,'
     + 'body.lex-rol-sinmontos #panel-caja .caja-acciones-titulo,body.lex-rol-sinmontos #panel-caja .caja-acciones-grid,body.lex-rol-sinmontos #panel-caja .srv-card-con-barra,'
     + 'body.lex-rol-sinmontos #panel-caja .cierre-bar{display:none !important;}'
@@ -306,6 +307,9 @@
     if (r !== _rolAnterior) { restaurarTodo(); _rolAnterior = r; }
     document.body.classList.toggle('lex-rol-sinmontos', !!SIN_MONTOS[r]);
     ['recepcionista', 'abogado', 'consultor'].forEach(function(x){ document.body.classList.toggle('lex-rol-' + x, r === x); });
+    // Nov-2026: "＋ Servicio complementario" del folio solo para el administrador
+    // (el botón "Generar nuevo recibo" de juicios abiertos sí se sigue viendo).
+    document.body.classList.toggle('lex-rol-noadmin', r !== 'admin');
     aplicarMenu(); aplicarChip(); envolverIr(); envolverFunciones();
     try { pintarInicio(); } catch(e){ console.warn('[Roles] inicio', e); }
     if (!PERM[r]) { restaurarTodo(); quitarBanners(); return; }

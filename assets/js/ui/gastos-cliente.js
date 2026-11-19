@@ -595,13 +595,14 @@
       { v: 'adelanto', g: 'Dentro de lo pactado', t: '⏩ El pago lo hizo el despacho para avanzar el trámite', e: etq('se descuenta del saldo', '#E6F1FB', '#0C447C'),
         s: 'Este pago está <b>dentro de lo pactado</b>. Lo pagamos nosotros para no detener el trámite; cuando el cliente lo pague, <b>se descuenta de su saldo</b>.' },
       { v: 'tercero', g: 'Fuera de lo pactado', t: '💵 Gasto fuera de lo pactado que el cliente nos debe reembolsar', e: etq('reembolso · Caja Rápida', '#FAEEDA', '#633806'),
-        s: 'Cualquier gasto que cubrió el despacho y <b>no estaba en lo pactado</b>: traslados, viáticos, honorarios de diligencias, pagos a terceros, requisitos faltantes, copias, derechos… <b>El cliente nos lo debe reembolsar.</b> Se cobra por Caja Rápida, sin recibo.' },
-      { v: 'complementario', g: '', t: '➕ Servicio complementario', e: etq('genera recibo', '#EAF3DE', '#27500A'),
-        s: 'Es un <b>servicio extra</b> fuera de lo pactado. Se le cobra al cliente aparte y se genera su <b>recibo de servicio complementario</b>.' } ];
+        s: 'Cualquier gasto que cubrió el despacho y <b>no estaba en lo pactado</b>: traslados, viáticos, emplazamientos, honorarios, pagos a terceros, requisitos faltantes, copias, derechos… <b>El cliente nos lo debe reembolsar.</b> Se cobra por Caja Rápida, sin recibo. <b>El recibo pactado no cambia.</b>' } ];
+    // Nov-2026: "Servicio complementario" se quitó de esta ventana (el Lic. no
+    // quiere que el recibo pactado se vea elevado). Solo queda en el folio, para admin.
     function dineroOps(){ var m = r2(S.mon); return [
       { v: 'total', t: '1. Retirar la totalidad del dinero de la caja', s: 'Se retira de caja todo' + (m > 0 ? ': ' + $m(m) : '') },
       { v: 'parte', t: '2. Retirar una parte del dinero de la caja', s: 'Se retira de caja solo una parte; lo demás es gestión del despacho' },
-      { v: 'lic', t: '3. El Lic. puso la totalidad del dinero', s: 'No se toca la caja' } ]; }
+      { v: 'lic', t: '3. El Lic. puso la totalidad del dinero', s: 'No se toca la caja' },
+      { v: 'nada', t: '4. No salió dinero (honorarios o trabajo del despacho)', s: 'No se toca la caja' + (m > 0 ? ' · El cliente nos debe ' + $m(m) : '') } ]; }
     function bloque(lista, sel, clave){
       if (sel) { var o = lista.filter(function(x){ return x.v === sel; })[0];
         return '<div style="' + ELE + '"><div><b>' + o.t + '</b>' + (o.e || '') + '<div style="font-size:0.76rem;color:#27500A;margin-top:2px;">' + o.s + '</div></div><button type="button" data-cambiar="' + clave + '" style="background:none;border:1px solid #3B6D11;color:#27500A;border-radius:7px;padding:4px 10px;font-size:0.76rem;cursor:pointer;white-space:nowrap;">Cambiar</button></div>'; }
@@ -615,6 +616,7 @@
       if (!(m > 0) || !S.dinero) return '';
       var txt = S.dinero === 'total' ? 'Se retira de caja <b>' + $m(m) + '</b> · ' + E(quien) + ' nos regresará <b>' + $m(m) + '</b>'
         : S.dinero === 'lic' ? 'No se toca la caja · ' + E(quien) + ' nos regresará <b>' + $m(m) + '</b>'
+        : S.dinero === 'nada' ? 'No se toca la caja · ' + E(quien) + ' nos debe <b>' + $m(m) + '</b>'
         : (!(c > 0) ? 'Escribe cuánto se retiró de la caja.' : c > m + 0.005 ? '<span style="color:#a32d2d;">No puede ser mayor a lo que se le cobrará (' + $m(m) + ').</span>'
           : 'Se retira de caja <b>' + $m(c) + '</b> · ' + E(quien) + ' nos regresará <b>' + $m(m) + '</b>' + (c < m - 0.005 ? ' · Diferencia (gestión): <b>' + $m(r2(m - c)) + '</b>' : ''));
       if (S.modo === 'complementario') txt += '<br>Después se abre <b>＋ Servicio complementario</b> del folio ' + E(S.folio) + ' para generar su recibo.';
@@ -632,7 +634,7 @@
       h += '<div id="rb-res">' + resumen() + '</div>' + errBox()
         + '<div style="display:flex;justify-content:space-between;gap:10px;margin-top:8px;">'
         + (S.desdeFicha ? '<span></span>' : '<button type="button" id="rb-atras" style="background:#fff;border:1.5px solid #c8952a;color:#8c6518;border-radius:8px;padding:9px 16px;font-size:0.84rem;cursor:pointer;">← Regresar</button>')
-        + '<button type="button" id="rb-fin" style="background:#8c6518;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:0.88rem;font-weight:700;cursor:pointer;">' + (S.dinero === 'lic' ? (S.modo === 'complementario' ? 'Continuar al recibo' : 'Guardar') : 'Continuar a Caja Rápida') + '</button></div>';
+        + '<button type="button" id="rb-fin" style="background:#8c6518;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:0.88rem;font-weight:700;cursor:pointer;">' + ((S.dinero === 'lic' || S.dinero === 'nada') ? (S.modo === 'complementario' ? 'Continuar al recibo' : 'Guardar') : 'Continuar a Caja Rápida') + '</button></div>';
       b.innerHTML = h;
       var guardaCampos = function(){ S.que = String(($('rb-que')||{}).value || ''); S.mon = String(($('rb-mon')||{}).value || ''); if ($('rb-caja-mon')) S.deCaja = String($('rb-caja-mon').value || ''); };
       ['rb-que','rb-mon','rb-caja-mon'].forEach(function(id){ var i = $(id); if (i) i.oninput = function(){ guardaCampos(); $('rb-res').innerHTML = resumen(); }; });
@@ -645,7 +647,7 @@
     }
     function terminar(){
       var e = $('lex-rb-err'), conFolio = S.tiene === true;
-      var d = { cli: String(S.cli).toUpperCase().trim(), que: String(S.que).trim().toUpperCase(), mon: r2(S.mon), modo: conFolio ? S.modo : 'tercero', folio: conFolio ? S.folio : null };
+      var d = { cli: String(S.cli).toUpperCase().trim(), que: String(S.que).trim().toUpperCase(), mon: r2(S.mon), modo: conFolio ? S.modo : 'tercero', folio: conFolio ? S.folio : null, dinero: S.dinero };
       if (!d.que) { e.textContent = 'Escribe qué se pagó.'; return; }
       if (!(d.mon > 0)) { e.textContent = 'Escribe cuánto se le va a cobrar al cliente.'; return; }
       if (conFolio && !S.modo) { e.textContent = 'Elige cómo lo registramos.'; return; }
@@ -669,7 +671,7 @@
   function registrarReembolso(d, movEgreso){
     var ahora = new Date().toISOString();
     var tipo = d.modo === 'adelanto' ? 'adelanto' : d.modo === 'complementario' ? 'complementario' : 'reembolso';
-    var c = { id: 'C-' + Date.now() + '-0', fecha: hoyL(), monto: d.mon, descripcion: d.que, tipoGasto: tipo, pagadoDespacho: true, origenDinero: movEgreso ? 'caja' : 'lic' };
+    var c = { id: 'C-' + Date.now() + '-0', fecha: hoyL(), monto: d.mon, descripcion: d.que, tipoGasto: tipo, pagadoDespacho: true, origenDinero: movEgreso ? 'caja' : (d.dinero === 'nada' ? 'ninguno' : 'lic') };
     if (movEgreso) { c.movEgresoId = movEgreso.id; c.egresoFecha = movEgreso.fecha; c.egresoPor = movEgreso.responsable || usuario(); c.montoCaja = r2(movEgreso.monto); if (c.montoCaja < d.mon - 0.005) c.honorariosGestion = r2(d.mon - c.montoCaja); }
     var a = { id: 'AR-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), cliente: d.cli, conceptos: [c], estado: 'pendiente',
       creadoPor: usuario(), fechaCreacion: ahora, fechaResolucion: '', fechaMod: ahora };
@@ -962,8 +964,8 @@
     var $ = function(s){ return ov.querySelector('#' + s); };
     var MODOS = [
       { v: 'adelanto', t: '⏩ El pago lo hizo el despacho para avanzar el trámite', s: 'Dentro de lo pactado · se descuenta de su saldo cuando lo pague' },
-      { v: 'tercero', t: '💵 Gasto fuera de lo pactado que el cliente nos debe reembolsar', s: 'Traslados, viáticos, honorarios de diligencias, pagos a terceros, requisitos, copias, derechos… · se cobra por Caja Rápida, sin recibo' },
-      { v: 'complementario', t: '➕ Servicio complementario', s: 'Fuera de lo pactado · se genera su recibo de servicio complementario' } ];
+      { v: 'tercero', t: '💵 Gasto fuera de lo pactado que el cliente nos debe reembolsar', s: 'Traslados, viáticos, honorarios de diligencias, pagos a terceros, requisitos, copias, derechos… · se cobra por Caja Rápida, sin recibo' } ];
+    if (tipoActual === 'complementario') MODOS.push({ v: 'complementario', t: '➕ Servicio complementario', s: 'Registro anterior · se generó su recibo de servicio complementario' });
     if (tipoActual === 'incluido') MODOS.push({ v: 'incluido', t: '✓ Incluido en lo pactado (no se cobra)', s: 'Registro anterior: el despacho lo absorbió' });
     function resumen(){
       var tot = r2(cs.reduce(function(s, c){ return s + (parseFloat(c.monto) || 0); }, 0));
@@ -975,7 +977,7 @@
       return '<div style="background:#fff;border:1px solid #e3d3a8;border-radius:10px;padding:10px 12px;font-size:0.84rem;line-height:1.6;margin-bottom:6px;">'
         + '<b>' + E(a.cliente) + '</b>' + (conFolio ? ' · Folio ' + E(a.folioVinculado) + (info ? ' (saldo ' + $m(info.saldo) + ')' : '') : ' · sin folio') + '<br>'
         + 'Se le cobra <b style="color:#791F1F;">' + $m(tot) + '</b>'
-        + (caja > 0 ? ' · Salió de caja <b>' + $m(caja) + '</b>' + (mov ? ' (' + E(mov.folioCaja || '') + ', ' + E(fC(mov.fecha)) + ')' : '') : (cs.some(function(c){ return c.origenDinero === 'lic' || c.origenDinero === 'otro'; }) ? ' · Lo puso el Lic. (no salió de caja)' : ''))
+        + (caja > 0 ? ' · Salió de caja <b>' + $m(caja) + '</b>' + (mov ? ' (' + E(mov.folioCaja || '') + ', ' + E(fC(mov.fecha)) + ')' : '') : (cs.some(function(c){ return c.origenDinero === 'lic' || c.origenDinero === 'otro'; }) ? ' · Lo puso el Lic. (no salió de caja)' : cs.some(function(c){ return c.origenDinero === 'ninguno'; }) ? ' · No salió dinero (honorarios o trabajo del despacho)' : ''))
         + (gest > 0 ? ' · Gestión <b>' + $m(gest) + '</b>' : '') + '<br>' + estado + '</div>';
     }
     function pinta(){
@@ -1238,7 +1240,7 @@
     if (adelantos.length) {
       var tAd = r2(adelantos.reduce(function(s, f){ return s + (parseFloat(f.c.monto) || 0); }, 0));
       html += '<div style="background:#FAEEDA;border:1px solid #f0d49a;border-radius:8px;padding:9px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">'
-        + '<div><b style="color:#633806;font-size:0.8rem;">⏩ Pagos que adelantó el despacho (dentro de lo pactado)</b><div style="font-size:0.74rem;color:#633806;">' + adelantos.map(function(f){ return E(f.c.descripcion) + ' · ' + $m(f.c.monto) + ' · ' + E(fC(f.c.fecha)) + (f.c.origenDinero === 'caja' ? ' (de caja)' : ' (lo puso el Lic.)'); }).join('<br>') + '</div></div>'
+        + '<div><b style="color:#633806;font-size:0.8rem;">⏩ Pagos que adelantó el despacho (dentro de lo pactado)</b><div style="font-size:0.74rem;color:#633806;">' + adelantos.map(function(f){ return E(f.c.descripcion) + ' · ' + $m(f.c.monto) + ' · ' + E(fC(f.c.fecha)) + (f.c.origenDinero === 'caja' ? ' (de caja)' : f.c.origenDinero === 'ninguno' ? ' (no salió dinero)' : ' (lo puso el Lic.)'); }).join('<br>') + '</div></div>'
         + '<button type="button" onclick="lexReembolsarAdelanto(' + Number(recibo.folio) + ')" style="font-size:0.74rem;border:none;background:#3B6D11;color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer;font-weight:700;">Reembolsar ' + $m(tAd) + '</button></div>';
     }
     if (scPend.length) {

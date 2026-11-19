@@ -388,7 +388,7 @@
     var loc = lista().filter(function(x){ return x && x.id === a.id; })[0];
     var m1 = revisarCobrado(loc, ids); if (m1) return m1;
     var tomb = {}; try { (D.movimientos_eliminados || []).forEach(function(t){ if (t && t.id) tomb[t.id] = 1; }); } catch(_){}
-    var mv = (D.movimientos || []).filter(function(m){ return m && !tomb[m.id] && m.adeudoId === a.id && m.tipo === 'ingreso' && (m.adeudoConceptoIds || []).some(function(id){ return ids.indexOf(id) >= 0; }); })[0];
+    var mv = (D.movimientos || []).filter(function(m){ return m && !tomb[m.id] && (m.adeudoId === a.id || (m.adeudoIds || []).indexOf(a.id) >= 0) && m.tipo === 'ingreso' && (m.adeudoConceptoIds || []).some(function(id){ return ids.indexOf(id) >= 0; }); })[0];
     if (mv) return 'Ya se registró en Caja: ' + (mv.folioCaja || '') + ' · ' + (mv.hora || '') + ' · ' + (mv.responsable || 'sin nombre') + ' — ' + $m(mv.monto) + '.';
     if (soloLocal) return null;
     // 2) Servidor (máx. 6 s; si no contesta, se sigue con la confirmación normal)
@@ -590,7 +590,7 @@
       };
       setTimeout(function(){ if (!S.cli && ci) ci.focus(); }, 30);
     }
-    // ── PASO 2 ──
+    // ── PASO 2 ── (Nov-2026: varios conceptos con ＋; cada uno dice de dónde salió el dinero)
     var MODOS = [
       { v: 'adelanto', g: 'Dentro de lo pactado', t: '⏩ El pago lo hizo el despacho para avanzar el trámite', e: etq('se descuenta del saldo', '#E6F1FB', '#0C447C'),
         s: 'Este pago está <b>dentro de lo pactado</b>. Lo pagamos nosotros para no detener el trámite; cuando el cliente lo pague, <b>se descuenta de su saldo</b>.' },
@@ -598,11 +598,13 @@
         s: 'Cualquier gasto que cubrió el despacho y <b>no estaba en lo pactado</b>: traslados, viáticos, emplazamientos, honorarios, pagos a terceros, requisitos faltantes, copias, derechos… <b>El cliente nos lo debe reembolsar.</b> Se cobra por Caja Rápida, sin recibo. <b>El recibo pactado no cambia.</b>' } ];
     // Nov-2026: "Servicio complementario" se quitó de esta ventana (el Lic. no
     // quiere que el recibo pactado se vea elevado). Solo queda en el folio, para admin.
-    function dineroOps(){ var m = r2(S.mon); return [
-      { v: 'total', t: '1. Retirar la totalidad del dinero de la caja', s: 'Se retira de caja todo' + (m > 0 ? ': ' + $m(m) : '') },
-      { v: 'parte', t: '2. Retirar una parte del dinero de la caja', s: 'Se retira de caja solo una parte; lo demás es gestión del despacho' },
-      { v: 'lic', t: '3. El Lic. puso la totalidad del dinero', s: 'No se toca la caja' },
-      { v: 'nada', t: '4. No salió dinero (honorarios o trabajo del despacho)', s: 'No se toca la caja' + (m > 0 ? ' · El cliente nos debe ' + $m(m) : '') } ]; }
+    function dineroOps(){ var o = [
+      { v: 'total', t: 'Retirar de caja' },
+      { v: 'parte', t: 'Retirar una parte de caja' },
+      { v: 'lic', t: 'Lo puso el Lic.' } ];
+      if (S.modo !== 'adelanto') o.push({ v: 'nada', t: 'No salió dinero (honorarios)' });
+      return o; }
+    if (!S.items) S.items = [{ que: '', mon: '', din: '', caja: '' }];
     function bloque(lista, sel, clave){
       if (sel) { var o = lista.filter(function(x){ return x.v === sel; })[0];
         return '<div style="' + ELE + '"><div><b>' + o.t + '</b>' + (o.e || '') + '<div style="font-size:0.76rem;color:#27500A;margin-top:2px;">' + o.s + '</div></div><button type="button" data-cambiar="' + clave + '" style="background:none;border:1px solid #3B6D11;color:#27500A;border-radius:7px;padding:4px 10px;font-size:0.76rem;cursor:pointer;white-space:nowrap;">Cambiar</button></div>'; }
@@ -611,77 +613,126 @@
         out += '<button type="button" data-' + clave + '="' + o.v + '" style="' + OPC + '"><b>' + o.t + '</b>' + (o.e || '') + '<div style="font-size:0.76rem;color:#5a4a2a;margin-top:2px;line-height:1.4;">' + o.s + '</div></button>'; });
       return out;
     }
+    function deCajaDe(it){ return it.din === 'total' ? r2(it.mon) : it.din === 'parte' ? r2(it.caja) : 0; }
     function resumen(){
-      var m = r2(S.mon), c = r2(S.deCaja), quien = String(S.cli).split(' ')[0] || 'El cliente';
-      if (!(m > 0) || !S.dinero) return '';
-      var txt = S.dinero === 'total' ? 'Se retira de caja <b>' + $m(m) + '</b> · ' + E(quien) + ' nos regresará <b>' + $m(m) + '</b>'
-        : S.dinero === 'lic' ? 'No se toca la caja · ' + E(quien) + ' nos regresará <b>' + $m(m) + '</b>'
-        : S.dinero === 'nada' ? 'No se toca la caja · ' + E(quien) + ' nos debe <b>' + $m(m) + '</b>'
-        : (!(c > 0) ? 'Escribe cuánto se retiró de la caja.' : c > m + 0.005 ? '<span style="color:#a32d2d;">No puede ser mayor a lo que se le cobrará (' + $m(m) + ').</span>'
-          : 'Se retira de caja <b>' + $m(c) + '</b> · ' + E(quien) + ' nos regresará <b>' + $m(m) + '</b>' + (c < m - 0.005 ? ' · Diferencia (gestión): <b>' + $m(r2(m - c)) + '</b>' : ''));
-      if (S.modo === 'complementario') txt += '<br>Después se abre <b>＋ Servicio complementario</b> del folio ' + E(S.folio) + ' para generar su recibo.';
-      return '<div style="background:#FAEEDA;color:#633806;border-radius:8px;padding:9px 12px;font-size:0.82rem;margin-top:6px;line-height:1.5;">' + txt + '</div>';
+      var quien = String(S.cli).split(' ')[0] || 'El cliente';
+      var its = S.items.filter(function(it){ return r2(it.mon) > 0; });
+      if (!its.length) return '';
+      var tot = r2(its.reduce(function(t, it){ return t + r2(it.mon); }, 0));
+      var caja = r2(its.reduce(function(t, it){ return t + deCajaDe(it); }, 0));
+      var gest = r2(its.reduce(function(t, it){ return t + (it.din === 'parte' && r2(it.caja) > 0 ? Math.max(0, r2(r2(it.mon) - r2(it.caja))) : 0); }, 0));
+      var txt = (caja > 0 ? 'Se retira de caja <b>' + $m(caja) + '</b>' + (gest > 0.005 ? ' · Gestión del despacho: <b>' + $m(gest) + '</b>' : '') + '<br>' : 'No se toca la caja<br>')
+        + E(quien) + (S.modo === 'adelanto' ? ' lo cubrirá de su saldo: <b>' : ' nos debe en total <b>') + $m(tot) + '</b>';
+      return '<div style="background:#FAEEDA;color:#633806;border-radius:8px;padding:9px 12px;font-size:0.82rem;margin-top:8px;line-height:1.6;">' + txt + '</div>';
+    }
+    var SEL = 'width:100%;box-sizing:border-box;padding:8px 6px;border:1.5px solid #c8952a;border-radius:8px;font-size:0.82rem;background:#fff;color:#2a1c08;';
+    var INPF = 'width:100%;box-sizing:border-box;padding:8px 9px;border:1.5px solid #c8952a;border-radius:8px;font-size:0.85rem;background:#fff;color:#2a1c08;';
+    function filas(){
+      var ops = dineroOps();
+      var h = '<div style="display:grid;grid-template-columns:minmax(0,1fr) 100px 170px 24px;gap:6px;font-size:0.64rem;color:#8c6518;letter-spacing:0.06em;margin-bottom:4px;"><span>CONCEPTO</span><span>MONTO</span><span>¿DE DÓNDE SALIÓ?</span><span></span></div>';
+      S.items.forEach(function(it, i){
+        if (it.din && !ops.some(function(o){ return o.v === it.din; })) it.din = '';
+        h += '<div style="display:grid;grid-template-columns:minmax(0,1fr) 100px 170px 24px;gap:6px;align-items:center;margin-bottom:6px;">'
+          + '<input class="rb-it-que" data-i="' + i + '" style="' + INPF + 'text-transform:uppercase;" placeholder="Ej. Emplazamiento, copias, ISR…" autocomplete="off" value="' + E(it.que) + '">'
+          + '<input class="rb-it-mon" data-i="' + i + '" type="number" step="0.01" min="0" style="' + INPF + '" placeholder="$0.00" value="' + E(it.mon) + '">'
+          + '<select class="rb-it-din" data-i="' + i + '" style="' + SEL + '"><option value="">Elegir…</option>' + ops.map(function(o){ return '<option value="' + o.v + '"' + (it.din === o.v ? ' selected' : '') + '>' + o.t + '</option>'; }).join('') + '</select>'
+          + (S.items.length > 1 ? '<button type="button" class="rb-it-x" data-i="' + i + '" title="Quitar" style="background:none;border:none;color:#a32d2d;font-size:1rem;cursor:pointer;padding:0;">✕</button>' : '<span></span>')
+          + '</div>';
+        if (it.din === 'parte') h += '<div style="display:flex;align-items:center;gap:8px;margin:-2px 0 8px 0;font-size:0.8rem;color:#5a4a2a;">¿Cuánto se retiró de caja para ' + (E(it.que) || 'este concepto') + '? <input class="rb-it-caja" data-i="' + i + '" type="number" step="0.01" min="0" style="' + INPF + 'width:120px;" placeholder="$0.00" value="' + E(it.caja) + '"></div>';
+      });
+      h += '<button type="button" id="rb-mas" style="display:block;width:100%;border:1.5px dashed #c8952a;background:none;color:#8c6518;border-radius:8px;padding:8px;font-size:0.86rem;font-weight:700;cursor:pointer;margin-top:2px;">＋ Agregar otro concepto</button>';
+      return h;
     }
     function paso2(){
       var conFolio = S.tiene === true;
+      if (!conFolio) S.modo = 'tercero';
+      try { ov.firstChild.style.maxWidth = '640px'; } catch(_){}
       ov.querySelector('span').textContent = conFolio ? '＋ REEMBOLSO DEL FOLIO ' + S.folio : '＋ NUEVO REEMBOLSO AL DESPACHO';
-      var h = '<div style="font-size:0.7rem;color:#8c6518;letter-spacing:0.08em;margin-bottom:4px;">' + (S.desdeFicha ? '' : 'PASO 2 DE 2 · ') + E(S.cli) + (conFolio ? ' · FOLIO ' + E(S.folio) : ' · SIN FOLIO') + '</div>'
-        + preg('¿Qué se pagó?') + '<input id="rb-que" style="' + INP + '" placeholder="Ej. Pago de catastro, ISR, constancia…" autocomplete="off" value="' + E(S.que) + '">'
-        + preg('¿Cuánto se le va a cobrar al cliente?') + '<input id="rb-mon" type="number" step="0.01" min="0" style="' + INP + '" placeholder="$0.00" value="' + E(S.mon) + '">';
+      var hayCajaIt = S.items.some(function(it){ return it.din === 'total' || it.din === 'parte'; });
+      var h = '<div style="font-size:0.7rem;color:#8c6518;letter-spacing:0.08em;margin-bottom:4px;">' + (S.desdeFicha ? '' : 'PASO 2 DE 2 · ') + E(S.cli) + (conFolio ? ' · FOLIO ' + E(S.folio) : ' · SIN FOLIO') + '</div>';
       if (conFolio) h += preg('Este reembolso o adeudo, ¿cómo lo registramos?') + bloque(MODOS, S.modo, 'modo');
-      h += preg('¿Cómo registramos de dónde salió el dinero?') + bloque(dineroOps(), S.dinero, 'dinero');
-      if (S.dinero === 'parte') h += preg('¿Qué cantidad retiramos de la caja?') + '<input id="rb-caja-mon" type="number" step="0.01" min="0" style="' + INP + '" placeholder="$0.00" value="' + E(S.deCaja) + '">';
+      if (!conFolio || S.modo) h += preg('¿Qué se le va a cobrar?') + filas();
       h += '<div id="rb-res">' + resumen() + '</div>' + errBox()
         + '<div style="display:flex;justify-content:space-between;gap:10px;margin-top:8px;">'
         + (S.desdeFicha ? '<span></span>' : '<button type="button" id="rb-atras" style="background:#fff;border:1.5px solid #c8952a;color:#8c6518;border-radius:8px;padding:9px 16px;font-size:0.84rem;cursor:pointer;">← Regresar</button>')
-        + '<button type="button" id="rb-fin" style="background:#8c6518;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:0.88rem;font-weight:700;cursor:pointer;">' + ((S.dinero === 'lic' || S.dinero === 'nada') ? (S.modo === 'complementario' ? 'Continuar al recibo' : 'Guardar') : 'Continuar a Caja Rápida') + '</button></div>';
+        + '<button type="button" id="rb-fin" style="background:#8c6518;color:#fff;border:none;border-radius:8px;padding:10px 18px;font-size:0.88rem;font-weight:700;cursor:pointer;">' + (hayCajaIt ? 'Continuar a Caja Rápida' : 'Guardar') + '</button></div>';
       b.innerHTML = h;
-      var guardaCampos = function(){ S.que = String(($('rb-que')||{}).value || ''); S.mon = String(($('rb-mon')||{}).value || ''); if ($('rb-caja-mon')) S.deCaja = String($('rb-caja-mon').value || ''); };
-      ['rb-que','rb-mon','rb-caja-mon'].forEach(function(id){ var i = $(id); if (i) i.oninput = function(){ guardaCampos(); $('rb-res').innerHTML = resumen(); }; });
-      b.querySelectorAll('[data-modo]').forEach(function(x){ x.onclick = function(){ guardaCampos(); S.modo = x.getAttribute('data-modo'); paso2(); }; });
-      b.querySelectorAll('[data-dinero]').forEach(function(x){ x.onclick = function(){ guardaCampos(); S.dinero = x.getAttribute('data-dinero'); if (S.dinero === 'parte' && !S.deCaja) S.deCaja = S.mon; paso2(); if (S.dinero === 'parte') setTimeout(function(){ var i = $('rb-caja-mon'); if (i) { i.focus(); i.select(); } }, 20); }; });
-      b.querySelectorAll('[data-cambiar]').forEach(function(x){ x.onclick = function(){ guardaCampos(); var k = x.getAttribute('data-cambiar'); if (k === 'modo') S.modo = null; else { S.dinero = null; } paso2(); }; });
-      var at = $('rb-atras'); if (at) at.onclick = function(){ guardaCampos(); paso1(); };
-      $('rb-fin').onclick = function(){ guardaCampos(); terminar(); };
-      if (!S.que) setTimeout(function(){ var i = $('rb-que'); if (i) i.focus(); }, 30);
+      var leer = function(){
+        b.querySelectorAll('.rb-it-que').forEach(function(x){ S.items[+x.getAttribute('data-i')].que = String(x.value || '').toUpperCase(); });
+        b.querySelectorAll('.rb-it-mon').forEach(function(x){ S.items[+x.getAttribute('data-i')].mon = String(x.value || ''); });
+        b.querySelectorAll('.rb-it-caja').forEach(function(x){ S.items[+x.getAttribute('data-i')].caja = String(x.value || ''); });
+      };
+      b.querySelectorAll('.rb-it-que,.rb-it-mon,.rb-it-caja').forEach(function(x){ x.oninput = function(){ leer(); $('rb-res').innerHTML = resumen(); }; });
+      b.querySelectorAll('.rb-it-din').forEach(function(x){ x.onchange = function(){ leer(); var it = S.items[+x.getAttribute('data-i')]; it.din = x.value; if (it.din === 'parte' && !it.caja) it.caja = it.mon; paso2();
+        if (it.din === 'parte') setTimeout(function(){ var c = b.querySelector('.rb-it-caja[data-i="' + x.getAttribute('data-i') + '"]'); if (c) { c.focus(); c.select(); } }, 20); }; });
+      b.querySelectorAll('.rb-it-x').forEach(function(x){ x.onclick = function(){ leer(); S.items.splice(+x.getAttribute('data-i'), 1); paso2(); }; });
+      var mas = $('rb-mas'); if (mas) mas.onclick = function(){ leer(); S.items.push({ que: '', mon: '', din: '', caja: '' }); paso2(); setTimeout(function(){ var q = b.querySelectorAll('.rb-it-que'); if (q.length) q[q.length - 1].focus(); }, 20); };
+      b.querySelectorAll('[data-modo]').forEach(function(x){ x.onclick = function(){ leer(); S.modo = x.getAttribute('data-modo'); paso2(); }; });
+      b.querySelectorAll('[data-cambiar]').forEach(function(x){ x.onclick = function(){ leer(); S.modo = null; paso2(); }; });
+      var at = $('rb-atras'); if (at) at.onclick = function(){ leer(); paso1(); };
+      $('rb-fin').onclick = function(){ leer(); terminar(); };
+      if (S.modo && !S.items[0].que) setTimeout(function(){ var i = b.querySelector('.rb-it-que'); if (i) i.focus(); }, 30);
     }
     function terminar(){
       var e = $('lex-rb-err'), conFolio = S.tiene === true;
-      var d = { cli: String(S.cli).toUpperCase().trim(), que: String(S.que).trim().toUpperCase(), mon: r2(S.mon), modo: conFolio ? S.modo : 'tercero', folio: conFolio ? S.folio : null, dinero: S.dinero };
-      if (!d.que) { e.textContent = 'Escribe qué se pagó.'; return; }
-      if (!(d.mon > 0)) { e.textContent = 'Escribe cuánto se le va a cobrar al cliente.'; return; }
       if (conFolio && !S.modo) { e.textContent = 'Elige cómo lo registramos.'; return; }
-      if (!S.dinero) { e.textContent = 'Elige de dónde salió el dinero.'; return; }
-      var deCaja = S.dinero === 'total' ? d.mon : S.dinero === 'parte' ? r2(S.deCaja) : 0;
-      if (S.dinero === 'parte') { if (!(deCaja > 0)) { e.textContent = 'Escribe qué cantidad se retiró de la caja.'; return; } if (deCaja > d.mon + 0.005) { e.textContent = 'Lo que se retira de caja no puede ser mayor a lo que se le cobrará (' + $m(d.mon) + ').'; return; } }
+      var its = [];
+      for (var i = 0; i < S.items.length; i++) {
+        var it = S.items[i], que = String(it.que || '').trim().toUpperCase(), mon = r2(it.mon);
+        if (!que && !(mon > 0) && S.items.length > 1) continue;   // renglón vacío: se ignora
+        var n = S.items.length > 1 ? ' (renglón ' + (i + 1) + ')' : '';
+        if (!que) { e.textContent = 'Escribe el concepto' + n + '.'; return; }
+        if (!(mon > 0)) { e.textContent = 'Escribe cuánto se le va a cobrar' + n + '.'; return; }
+        if (!it.din) { e.textContent = 'Elige de dónde salió el dinero' + n + '.'; return; }
+        var caja = deCajaDe(it);
+        if (it.din === 'parte') { if (!(caja > 0)) { e.textContent = 'Escribe cuánto se retiró de caja' + n + '.'; return; } if (caja > mon + 0.005) { e.textContent = 'Lo que se retira de caja no puede ser mayor a lo que se le cobrará' + n + '.'; return; } }
+        its.push({ que: que, mon: mon, din: it.din, caja: caja });
+      }
+      if (!its.length) { e.textContent = 'Escribe al menos un concepto.'; return; }
+      var d = { cli: String(S.cli).toUpperCase().trim(), modo: conFolio ? S.modo : 'tercero', folio: conFolio ? S.folio : null, items: its };
+      d.que = its.map(function(x){ return x.que; }).join(', '); d.mon = r2(its.reduce(function(t, x){ return t + x.mon; }, 0));
+      var conCaja = its.filter(function(x){ return x.caja > 0; });
       ov.remove();
-      var fin = function(mov){ var a = registrarReembolso(d, mov); if (d.modo === 'complementario') abrirServicioComplementario(d, a); };
-      if (deCaja > 0) {
-        if (!hayCaja()) { if (typeof toast === 'function') toast('No se pudo abrir Caja Rápida', 'err'); return; }
-        var etqModo = d.modo === 'adelanto' ? 'adelanto dentro de lo pactado' : d.modo === 'complementario' ? 'servicio complementario' : 'reembolso';
-        window.lexCajaRapidaPrecargada({ tipo: 'egreso', desc: 'Pagado por cuenta de ' + d.cli + ' · ' + d.que + (d.folio ? ' (folio ' + d.folio + ')' : '') + ' — ' + etqModo, monto: deCaja,
-          aviso: '💵 Se retira de caja ' + $m(deCaja) + ' pagados por cuenta de ' + d.cli + (d.folio ? ' (folio ' + d.folio + ')' : '') + (deCaja < d.mon - 0.005 ? '. Se le cobrará ' + $m(d.mon) + ' (incluye ' + $m(r2(d.mon - deCaja)) + ' de gestión)' : '') + '. Revisa y presiona Registrar.',
-          extra: { tipoReembolso: 'salida' },
-          onRegistrado: function(mov){ var a = fin(mov); } });
-      } else fin(null);
+      if (!conCaja.length) { registrarReembolso(d, null); return; }
+      if (!hayCaja()) { if (typeof toast === 'function') toast('No se pudo abrir Caja Rápida', 'err'); return; }
+      var etqModo = d.modo === 'adelanto' ? 'adelanto dentro de lo pactado' : 'reembolso';
+      var totCaja = r2(conCaja.reduce(function(t, x){ return t + x.caja; }, 0));
+      var ult = null;
+      window.lexCajaRapidaPrecargada({ tipo: 'egreso',
+        conceptos: conCaja.map(function(x){ return { desc: x.que, precio: x.caja }; }),
+        describir: function(validos){ ult = validos;
+          return 'Pagado por cuenta de ' + d.cli + ' · ' + validos.map(function(c){ return String(c.desc).trim() + (validos.length > 1 ? ' $' + (typeof fmt === 'function' ? fmt(c.precio) : c.precio) : ''); }).join(' | ') + (d.folio ? ' (folio ' + d.folio + ')' : '') + ' — ' + etqModo; },
+        aviso: '💵 Se retira de caja ' + $m(totCaja) + ' pagados por cuenta de ' + d.cli + (d.folio ? ' (folio ' + d.folio + ')' : '') + '. Revisa y presiona Registrar. En Contabilidad queda en una sola línea.',
+        extra: { tipoReembolso: 'salida' },
+        onRegistrado: function(mov){
+          // Si se cambiaron montos en Caja Rápida, se respeta lo que realmente salió
+          if (ult && ult.length === conCaja.length) ult.forEach(function(c, k){ conCaja[k].caja = r2(c.precio); });
+          registrarReembolso(d, mov);
+        } });
     }
     if (S.desdeFicha && S.cli) paso2(); else paso1();
   };
-  // Crea el registro según el modo elegido
+  // Crea el registro (un concepto por renglón) según el modo elegido
   function registrarReembolso(d, movEgreso){
-    var ahora = new Date().toISOString();
+    var ahora = new Date().toISOString(), ts = Date.now();
     var tipo = d.modo === 'adelanto' ? 'adelanto' : d.modo === 'complementario' ? 'complementario' : 'reembolso';
-    var c = { id: 'C-' + Date.now() + '-0', fecha: hoyL(), monto: d.mon, descripcion: d.que, tipoGasto: tipo, pagadoDespacho: true, origenDinero: movEgreso ? 'caja' : (d.dinero === 'nada' ? 'ninguno' : 'lic') };
-    if (movEgreso) { c.movEgresoId = movEgreso.id; c.egresoFecha = movEgreso.fecha; c.egresoPor = movEgreso.responsable || usuario(); c.montoCaja = r2(movEgreso.monto); if (c.montoCaja < d.mon - 0.005) c.honorariosGestion = r2(d.mon - c.montoCaja); }
-    var a = { id: 'AR-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7), cliente: d.cli, conceptos: [c], estado: 'pendiente',
+    var its = d.items || [{ que: d.que, mon: d.mon, din: movEgreso ? 'total' : 'lic', caja: movEgreso ? d.mon : 0 }];
+    var conceptos = its.map(function(x, i){
+      var c = { id: 'C-' + ts + '-' + i, fecha: hoyL(), monto: x.mon, descripcion: x.que, tipoGasto: tipo, pagadoDespacho: x.din !== 'nada',
+        origenDinero: x.caja > 0 ? 'caja' : (x.din === 'nada' ? 'ninguno' : 'lic') };
+      if (x.caja > 0 && movEgreso) { c.movEgresoId = movEgreso.id; c.egresoFecha = movEgreso.fecha; c.egresoPor = movEgreso.responsable || usuario(); c.montoCaja = r2(x.caja); if (c.montoCaja < x.mon - 0.005) c.honorariosGestion = r2(x.mon - c.montoCaja); }
+      return c;
+    });
+    var a = { id: 'AR-' + ts + '-' + Math.random().toString(36).slice(2, 7), cliente: d.cli, conceptos: conceptos, estado: 'pendiente',
       creadoPor: usuario(), fechaCreacion: ahora, fechaResolucion: '', fechaMod: ahora };
     if (d.folio) a.folioVinculado = isNaN(Number(d.folio)) ? d.folio : Number(d.folio);
     if (tipo === 'complementario') { a.estado = 'pendiente-recibo'; }
     lista().unshift(a);
-    if (movEgreso) actualizarMov(movEgreso, { adeudoId: a.id, adeudoConceptoIds: [c.id] });
+    if (movEgreso) actualizarMov(movEgreso, { adeudoId: a.id, adeudoConceptoIds: conceptos.filter(function(c){ return c.movEgresoId; }).map(function(c){ return c.id; }) });
     guardar(); refrescarTodo();
-    if (typeof toast === 'function') toast(tipo === 'adelanto' ? '✅ Anotado: el despacho adelantó ' + $m(d.mon) + ' de ' + d.que + ' (folio ' + d.folio + ')'
-      : tipo === 'complementario' ? '✅ Ahora genera el recibo de servicio complementario' : '✅ Reembolso anotado: ' + d.cli + ' nos debe ' + $m(d.mon));
+    var tot = r2(conceptos.reduce(function(t, c){ return t + c.monto; }, 0));
+    if (typeof toast === 'function') toast(tipo === 'adelanto' ? '✅ Anotado: el despacho adelantó ' + $m(tot) + ' (folio ' + d.folio + ')'
+      : tipo === 'complementario' ? '✅ Ahora genera el recibo de servicio complementario' : '✅ Reembolso anotado: ' + d.cli + ' nos debe ' + $m(tot));
     return a;
   }
 
@@ -886,66 +937,105 @@
     if (typeof toast === 'function') toast('✅ Pago adelantado del despacho recuperado en el recibo ' + recibo);
   }
 
-  // ── ✓ Ya nos pagó ───────────────────────────────────────────────────
+  // ── 💰 Cobrar reembolsos (Nov-2026: "Cobrar todo lo que debe" el cliente) ─────
+  // Junta todo lo pendiente del mismo cliente; en Contabilidad queda UNA sola línea
+  // y el comprobante sale con un renglón por concepto.
+  function etqOrigen(c){
+    if (c.movEgresoId || c.origenDinero === 'caja') return etq('salió de caja', '#FAEEDA', '#633806');
+    if (c.origenDinero === 'ninguno') return etq('honorarios', '#EAF3DE', '#27500A');
+    return etq('lo puso el Lic.', '#E6F1FB', '#0C447C');
+  }
   window.lexCobrarAdeudo = async function(id){
     var a = lista().filter(function(x){ return x && x.id === id; })[0]; if (!a) return;
     if (a.estado === 'pendiente-recibo') { window.lexGenerarComplementario(a.id); return; }
     if (adelantosPend(a).length && !pendientes(a).length) { window.lexReembolsarAdelanto(a.folioVinculado); return; }
-    var pend = pendientes(a), total = totalPendiente(a);
-    if (!pend.length || !(total > 0)) { if (typeof toast === 'function') toast('Este reembolso ya está pagado'); refrescarTodo(); return; }
-    var dup = await yaCobradoPorOtro(a, pend);
-    if (dup) { await preguntar('Este reembolso ya se cobró', dup + '\n\nNo se registró un segundo cobro.', 'Entendido', 'Cerrar'); refrescarTodo(); return; }
+    if (!pendientes(a).length || !(totalPendiente(a) > 0)) { if (typeof toast === 'function') toast('Este reembolso ya está pagado'); refrescarTodo(); return; }
     var nombre = String(a.cliente || '').toUpperCase();
-    var ov = ventana('💰 COBRAR REEMBOLSO · ' + nombre);
+    var grupo = [a].concat(activos().filter(function(x){ return x !== a && N(x.cliente) === N(a.cliente) && x.estado !== 'cobrado' && x.estado !== 'pendiente-recibo' && pendientes(x).length; })
+      .sort(function(p, q){ return String(p.fechaCreacion || '').localeCompare(String(q.fechaCreacion || '')); }));
+    for (var gi = 0; gi < grupo.length; gi++) {
+      var dup = await yaCobradoPorOtro(grupo[gi], pendientes(grupo[gi]));
+      if (dup) { await preguntar('Este reembolso ya se cobró', dup + '\n\nNo se registró un segundo cobro.', 'Entendido', 'Cerrar'); refrescarTodo(); return; }
+    }
+    var items = []; grupo.forEach(function(x){ pendientes(x).forEach(function(c){ items.push({ a: x, c: c }); }); });
+    var variosFolios = grupo.some(function(x){ return String(x.folioVinculado == null ? '' : x.folioVinculado) !== String(a.folioVinculado == null ? '' : a.folioVinculado); });
+    var ov = ventana('💰 COBRAR REEMBOLSOS · ' + nombre + (a.folioVinculado != null && !variosFolios ? ' · FOLIO ' + a.folioVinculado : ''));
+    try { ov.firstChild.style.maxWidth = '600px'; } catch(_){}
     var b = ov.querySelector('#lex-rb-body');
-    b.innerHTML = '<div style="font-size:0.92rem;margin-bottom:12px;">' + E(nombre) + ' nos debe <b style="color:#791F1F;">' + $m(total) + '</b><div style="font-size:0.8rem;color:#5a4a2a;margin-top:2px;">' + pend.map(function(c){ return E(c.descripcion); }).join(' · ') + '</div></div>'
+    b.innerHTML = '<div style="font-size:0.9rem;margin-bottom:8px;">¿Qué está pagando hoy?</div>'
+      + '<div style="background:#fff;border:1px solid #e3d3a8;border-radius:8px;padding:2px 10px;">'
+      + items.map(function(it, k){ return '<label style="display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px solid #f1e6cc;cursor:pointer;font-size:0.86rem;">'
+          + '<input type="checkbox" class="rb-cob-c" data-k="' + k + '" checked style="accent-color:#3B6D11;width:16px;height:16px;">'
+          + '<span style="flex:1;">' + E(it.c.descripcion) + etqOrigen(it.c) + (variosFolios && it.a.folioVinculado != null ? etq('folio ' + it.a.folioVinculado, '#F1EFE8', '#444441') : '') + (it.c.fecha ? ' <span style="color:#8a7a5a;font-size:0.76rem;">· ' + E(fC(it.c.fecha)) + '</span>' : '') + '</span>'
+          + '<b style="font-family:monospace;">' + $m(it.c.monto) + '</b></label>'; }).join('')
+      + '</div>'
+      + '<div style="text-align:right;margin:8px 4px 12px;font-size:0.86rem;">Cobrar hoy: <b id="rb-cob-tot" style="font-family:monospace;font-size:1rem;"></b></div>'
       + preg('¿Cuánto nos pagó?')
-      + opcion('rb-todo', 'Todo — ' + $m(total), 'El reembolso queda pagado')
+      + '<button type="button" id="rb-todo" style="' + OPC + '"><b id="rb-todo-t"></b><div style="font-size:0.76rem;color:#7a6440;margin-top:2px;">Comprobante con un renglón por concepto</div></button>'
       + opcion('rb-parte', 'Solo una parte', 'Escribe cuánto dejó; lo demás sigue pendiente')
       + '<div id="rb-parte-box" style="display:none;"><input id="rb-parte-mon" type="number" step="0.01" min="0" style="' + INP + '" placeholder="¿Cuánto dejó? $"><button type="button" id="rb-parte-ok" style="background:#3B6D11;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:0.85rem;font-weight:700;cursor:pointer;">Continuar</button></div>'
       + errBox()
-      + '<div style="font-size:0.76rem;color:#7a6440;margin-top:6px;">El dinero entra a la caja por Caja Rápida.</div>';
+      + '<div style="font-size:0.76rem;color:#7a6440;margin-top:6px;">El dinero entra por Caja Rápida y en Contabilidad queda en una sola línea. Quita la palomita a lo que no paga hoy.</div>';
     var $ = function(s){ return ov.querySelector('#' + s); };
+    function sel(){ var r = []; b.querySelectorAll('.rb-cob-c').forEach(function(cb){ if (cb.checked) r.push(items[+cb.getAttribute('data-k')]); }); return r; }
+    function totSel(){ return r2(sel().reduce(function(t, it){ return t + (parseFloat(it.c.monto) || 0); }, 0)); }
+    function pinta(){ var t = totSel(); $('rb-cob-tot').textContent = $m(t); $('rb-todo-t').textContent = 'Todo lo marcado — ' + $m(t); $('lex-rb-err').textContent = ''; }
+    b.querySelectorAll('.rb-cob-c').forEach(function(cb){ cb.onchange = pinta; }); pinta();
     function abrirCaja(monto){
+      var s = sel(); if (!s.length) { $('lex-rb-err').textContent = 'Marca al menos un concepto.'; return; }
       if (!hayCaja()) { $('lex-rb-err').textContent = 'No se pudo abrir Caja Rápida.'; return; }
+      var total = totSel(), parcial = monto < total - 0.005;
+      var folios = []; s.forEach(function(it){ var f = it.a.folioVinculado; if (f != null && f !== '' && folios.indexOf(String(f)) < 0) folios.push(String(f)); });
+      var ids = []; s.forEach(function(it){ if (ids.indexOf(it.a.id) < 0) ids.push(it.a.id); });
+      var txtFol = folios.length ? ' (folio ' + folios.join(', ') + ')' : '';
+      var conceptos = parcial ? [{ desc: 'ABONO A ' + s.map(function(it){ return String(it.c.descripcion || '').toUpperCase(); }).join(', '), precio: monto }]
+                              : s.map(function(it){ return { desc: String(it.c.descripcion || '').toUpperCase(), precio: r2(it.c.monto) }; });
       ov.remove();
-      var parcial = monto < total - 0.005;
-      window.lexCajaRapidaPrecargada({ tipo: 'ingreso',
-        desc: 'Reembolso de ' + nombre + ' · ' + pend.map(function(c){ return c.descripcion; }).join(' | ') + (a.folioVinculado != null ? ' (folio ' + a.folioVinculado + ')' : '') + (parcial ? ' (abono)' : '') + ' — adeudo',
-        monto: monto,
-        aviso: '✓ Reembolso: ' + nombre + ' nos paga ' + $m(monto) + (parcial ? ' de ' + $m(total) : '') + '. Revisa y presiona Registrar.',
-        extra: { adeudoId: a.id, adeudoConceptoIds: pend.map(function(c){ return c.id; }), honorariosGestion: parcial ? 0 : r2(pend.reduce(function(t, c){ return t + (parseFloat(c.honorariosGestion) || 0); }, 0)) },
-        onRegistrado: function(mov, resp){ aplicarPago(a.id, monto, mov, resp); } });
+      window.lexCajaRapidaPrecargada({ tipo: 'ingreso', conceptos: conceptos, nombreComprobante: nombre,
+        describir: function(validos){
+          return 'Reembolso de ' + nombre + ' · ' + validos.map(function(c){ return String(c.desc).trim() + (validos.length > 1 ? ' $' + (typeof fmt === 'function' ? fmt(c.precio) : c.precio) : ''); }).join(' | ') + txtFol + ' — adeudo'; },
+        aviso: '✓ Reembolso: ' + nombre + ' nos paga ' + $m(monto) + (parcial ? ' de ' + $m(total) : '') + '. Use 🧾 Registrar e imprimir para darle su comprobante.',
+        extra: { adeudoId: ids[0], adeudoIds: ids, adeudoConceptoIds: s.map(function(it){ return it.c.id; }),
+                 honorariosGestion: parcial ? 0 : r2(s.reduce(function(t, it){ return t + (parseFloat(it.c.honorariosGestion) || 0); }, 0)),
+                 comprobanteNota: 'Gastos del trámite' + txtFol + ' · no modifica lo pactado en su recibo' },
+        onRegistrado: function(mov, resp){ aplicarPagoVarios(s, r2(mov.monto), mov, resp); } });
     }
-    $('rb-todo').onclick = function(){ abrirCaja(total); };
+    $('rb-todo').onclick = function(){ abrirCaja(totSel()); };
     $('rb-parte').onclick = function(){ $('rb-parte-box').style.display = 'block'; setTimeout(function(){ $('rb-parte-mon').focus(); }, 20); };
     $('rb-parte-ok').onclick = function(){
-      var m = r2($('rb-parte-mon').value);
+      var m = r2($('rb-parte-mon').value), t = totSel();
       if (!(m > 0)) { $('lex-rb-err').textContent = 'Escribe cuánto dejó.'; return; }
-      if (m > total + 0.005) { $('lex-rb-err').textContent = 'No puede ser más de lo que debe (' + $m(total) + ').'; return; }
+      if (m > t + 0.005) { $('lex-rb-err').textContent = 'No puede ser más de lo marcado (' + $m(t) + ').'; return; }
       abrirCaja(m);
     };
   };
-  // Marca como pagado lo que alcance el monto; si un concepto queda a medias se parte en dos.
-  function aplicarPago(id, monto, mov, resp){
-    var a = lista().filter(function(x){ return x && x.id === id; })[0]; if (!a) return;
-    var ahora = new Date().toISOString(), resto = r2(monto), cobrados = [];
-    pendientes(a).forEach(function(c){
+  // Marca como pagado lo que alcance el monto (en el orden de la lista); si un
+  // concepto queda a medias se parte en dos. Sirve para uno o varios reembolsos.
+  function aplicarPagoVarios(sel, monto, mov, resp){
+    var ahora = new Date().toISOString(), resto = r2(monto), cobrados = [], tocados = [];
+    sel.forEach(function(it){
       if (resto <= 0.005) return;
+      var a = lista().filter(function(x){ return x && x.id === it.a.id; })[0]; if (!a) return;
+      var c = (a.conceptos || []).filter(function(x){ return x && x.id === it.c.id; })[0]; if (!c || conceptoCobrado(a, c)) return;
+      if (tocados.indexOf(a) < 0) tocados.push(a);
       var mc = r2(c.monto);
       if (resto + 0.005 >= mc) { c.cobrado = true; c.cobradoFecha = ahora; c.cobradoPor = resp || usuario(); c.movIngresoId = mov.id; resto = r2(resto - mc); cobrados.push(c.id); }
       else {
         var pagado = { id: 'C-' + Date.now() + '-p' + Math.random().toString(36).slice(2, 5), fecha: c.fecha, monto: resto, descripcion: c.descripcion + ' (abono)', tipoGasto: c.tipoGasto || 'reembolso',
-          cobrado: true, cobradoFecha: ahora, cobradoPor: resp || usuario(), movIngresoId: mov.id, parteDe: c.id };
+          origenDinero: c.origenDinero, cobrado: true, cobradoFecha: ahora, cobradoPor: resp || usuario(), movIngresoId: mov.id, parteDe: c.id };
         c.monto = r2(mc - resto); a.conceptos.push(pagado); cobrados.push(pagado.id); resto = 0;
       }
     });
-    actualizarMov(mov, { adeudoConceptoIds: cobrados });
-    if (!pendientes(a).length) { a.estado = 'cobrado'; a.fechaResolucion = ahora; a.cobradoPor = resp || usuario(); }
-    a.fechaMod = ahora;
+    actualizarMov(mov, { adeudoConceptoIds: cobrados, adeudoIds: tocados.map(function(a){ return a.id; }) });
+    tocados.forEach(function(a){ if (!pendientes(a).length) { a.estado = 'cobrado'; a.fechaResolucion = ahora; a.cobradoPor = resp || usuario(); } a.fechaMod = ahora; });
     guardar(); refrescarTodo();
-    try { if (a.folioVinculado != null && typeof window.lexRepintarFichaFolio === 'function') window.lexRepintarFichaFolio(a.folioVinculado); } catch(_){}
-    if (typeof toast === 'function') toast(a.estado === 'cobrado' ? '✅ Reembolso pagado completo' : '✅ Abono registrado — aún debe ' + $m(totalPendiente(a)));
+    tocados.forEach(function(a){ try { if (a.folioVinculado != null && typeof window.lexRepintarFichaFolio === 'function') window.lexRepintarFichaFolio(a.folioVinculado); } catch(_){} });
+    var debe = r2(tocados.reduce(function(t, a){ return t + totalPendiente(a); }, 0));
+    if (typeof toast === 'function') toast(debe <= 0.005 ? '✅ Reembolso pagado completo' : '✅ Abono registrado — aún debe ' + $m(debe));
+  }
+  function aplicarPago(id, monto, mov, resp){
+    var a = lista().filter(function(x){ return x && x.id === id; })[0]; if (!a) return;
+    aplicarPagoVarios(pendientes(a).map(function(c){ return { a: a, c: c }; }), monto, mov, resp);
   }
 
   // ── ✏️ Corregir reembolso (Nov-2026 · mismo estilo de preguntas) ──────
@@ -1111,9 +1201,8 @@
         + '</div>';
     }
     var que = pendientesC.map(function(c){ return E(c.descripcion || '(sin descripción)'); }).join(' · ');
-    var origen = (a.conceptos || []).some(function(c){ return c.movEgresoId; })
-      ? '<span style="font-size:0.7rem;background:#FAEEDA;color:#633806;border-radius:10px;padding:1px 8px;white-space:nowrap;">Salió de caja</span>'
-      : '<span style="font-size:0.7rem;background:#E6F1FB;color:#0C447C;border-radius:10px;padding:1px 8px;white-space:nowrap;">Salió de otro lado</span>';
+    // Nov-2026: etiqueta clara de dónde salió el dinero (sin repetir)
+    var _vistos = {}, origen = pendientesC.map(function(c){ var t = etqOrigen(c); if (_vistos[t]) return ''; _vistos[t] = 1; return t; }).join('');
     var abonado = r2(totalReembolso(a) - pendT);
     var extra = abonado > 0.005 ? ' · ya abonó ' + $m(abonado) : '';
     return '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:#fdfaf4;border:1px solid #e3d3a8;border-radius:10px;padding:12px 16px;margin-bottom:8px;color:#2a1a06;">'

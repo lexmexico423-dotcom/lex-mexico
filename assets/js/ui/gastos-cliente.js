@@ -1398,8 +1398,16 @@
     }
     // Botones de cobro de lo pactado: solo si hay saldo, no está cancelado y no es "sin costo pactado"
     if (btns) {
-      var puede = !cancelado && resta > 0.005 && !(infoU && infoU.estado === 'abierto') && typeof window.ejecutarPagoParcial === 'function';
+      var puede = !cancelado && resta > 0.005 && typeof window.ejecutarPagoParcial === 'function';
       btns.style.display = puede ? 'inline-flex' : 'none';
+    }
+    // Servicio complementario (para todos): con saldo, o en juicios/escrituras sin costo pactado
+    var bsc = document.getElementById('ficha-btn-sc');
+    if (bsc) {
+      var abierto = !!(infoU && infoU.estado === 'abierto');
+      var verSC = !cancelado && (resta > 0.005 || abierto) && typeof window.ejecutarServicioComplementario === 'function';
+      bsc.style.display = verSC ? 'inline-block' : 'none';
+      bsc.textContent = (abierto && resta <= 0.005) ? '🧾 Generar nuevo recibo' : '＋ Servicio complementario';
     }
   }
   // Si cambia el "Resta" (p. ej. al terminar de cargar cargos), se recalcula el total
@@ -1417,6 +1425,7 @@
     var listo = function(){
       try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(_){}
       if (tipo === 'total') { if (typeof window.ejecutarLiquidacionTotal === 'function') window.ejecutarLiquidacionTotal(); }
+      else if (tipo === 'sc') { if (typeof window.ejecutarServicioComplementario === 'function') window.ejecutarServicioComplementario(); }
       else if (typeof window.ejecutarPagoParcial === 'function') window.ejecutarPagoParcial();
     };
     if (typeof reciboEnConsulta !== 'undefined' && reciboEnConsulta && String(reciboEnConsulta.folio) === String(folio)) listo();

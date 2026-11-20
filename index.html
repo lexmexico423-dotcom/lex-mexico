@@ -17017,7 +17017,12 @@ Recibo original im…</td>
     #modal-ficha-folio .ffx-btn:hover{filter:brightness(1.08);}
     #modal-ficha-folio .ffx-link{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #d4b870;border-radius:6px;padding:4px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:Helvetica,Arial,sans-serif;}
     #modal-ficha-folio .ffx-link:hover{background:#fdf3dc;}
-    #modal-ficha-folio #ficha-pendiente div{display:inline;margin-left:6px;}
+    #modal-ficha-folio .ffx-tres{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;flex:1 1 100%;min-width:0;}
+    #modal-ficha-folio #ficha-pactado-btns{margin-left:auto;}
+    #modal-ficha-folio .ffx-bx{border-radius:8px;padding:7px 10px;text-align:center;}
+    #modal-ficha-folio .ffx-k{font-family:'DM Mono',monospace;font-size:0.6rem;letter-spacing:0.08em;text-transform:uppercase;}
+    #modal-ficha-folio .ffx-n{font-family:'DM Mono',monospace;font-size:1.05rem;font-weight:700;margin-top:2px;}
+    #modal-ficha-folio #ficha-pendiente div{font-size:0.62rem;}
   </style>
   <!-- Nov-2026 · Ficha del folio rediseñada (estilo tarjetas, opción A): mismos IDs de siempre -->
   <div class="ffx-wrap" style="background:#fbf6ea;border:1.5px solid #c8952a;border-radius:12px;width:max(675px,min(935px,calc(100vw - var(--sidebar-w) - 120px - 185px)));position:relative;left:50%;transform:translateX(-50%);display:flex;flex-direction:row;overflow:visible;box-shadow:0 4px 16px rgba(80,58,12,0.15);">
@@ -17139,11 +17144,16 @@ Recibo original im…</td>
             </div>
           </div>
           <div class="ffx-ft" style="background:#fdf8ec;border-top:1px dashed #e3d3a8;">
-            <span style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;">Costo <b id="ficha-total" style="color:#1a1008;"></b> · Pagado <b id="ficha-abonado" style="color:#1a7a3a;"></b> · <span id="ficha-pendiente-label" style="color:#a32d2d;font-weight:700;">Resta</span> <b id="ficha-pendiente" style="color:#a32d2d;"></b></span>
+            <div class="ffx-tres">
+              <div class="ffx-bx" style="background:#faf6ec;border:1px solid #e3d3a8;"><div class="ffx-k" style="color:#7a6840;">Costo del trámite</div><div id="ficha-total" class="ffx-n" style="color:#1a1008;"></div></div>
+              <div class="ffx-bx" style="background:#EAF3DE;border:1px solid #C0DD97;"><div class="ffx-k" style="color:#27500A;">Ya pagó</div><div id="ficha-abonado" class="ffx-n" style="color:#27500A;"></div></div>
+              <div class="ffx-bx" style="background:#FCEBEB;border:2px solid #E24B4A;"><div id="ficha-pendiente-label" class="ffx-k" style="color:#791F1F;">Le falta</div><div id="ficha-pendiente" class="ffx-n" style="color:#A32D2D;"></div></div>
+            </div>
             <span id="ficha-pactado-btns" style="display:none;gap:6px;">
               <button type="button" class="ffx-btn" style="background:#c8781a;" onclick="lexFichaCobrarFolio('parcial')">💰 Pago parcial</button>
               <button type="button" class="ffx-btn" style="background:#2a7a3a;" onclick="lexFichaCobrarFolio('total')">✅ Pago total</button>
             </span>
+            <button type="button" id="ficha-btn-sc" class="ffx-btn" style="display:none;background:#fff0e0;color:#a05010;border:1.5px solid #d4a060;" onclick="lexFichaCobrarFolio('sc')">＋ Servicio complementario</button>
           </div>
         </div>
 
@@ -17497,7 +17507,7 @@ Recibo original im…</td>
 <!-- ═══ FIN EXPEDIENTE DIGITAL VEHICULAR ═══ -->
 
 <script src="assets/js/config/public-config.js?v=20261004a"></script>
-<script src="assets/js/modules/recibos/index.js?v=20261023n"></script>
+<script src="assets/js/modules/recibos/index.js?v=20261120a"></script>
 <script src="assets/js/modules/caja/index.js?v=20261118a"></script>
 <script src="assets/js/modules/contabilidad/index.js?v=20261116b"></script>
 <script src="assets/js/modules/clientes/index.js?v=20261112a"></script>
@@ -19469,7 +19479,7 @@ Recibo original im…</td>
 <script src="assets/js/ui/cobranza.js?v=20261118a"></script>
 <script src="assets/js/ui/mandar-llamada.js?v=20261023g"></script>
 <script src="assets/js/ui/sync-vivo.js?v=20261023i"></script>
-<script src="assets/js/ui/gastos-cliente.js?v=20261119c"></script>
+<script src="assets/js/ui/gastos-cliente.js?v=20261120a"></script>
 <script src="assets/js/ui/escrituras-lista.js?v=20261030a"></script>
 <script src="assets/js/ui/escrituras-asistente.js?v=20261029a"></script>
 <script src="assets/js/ui/saldos-anteriores.js?v=20261119d"></script>
@@ -19478,6 +19488,6 @@ Recibo original im…</td>
 <script src="assets/js/ui/confirmaciones.js?v=20261116a"></script>
 <script src="assets/js/ui/buscador-global.js?v=20261116a"></script>
 <script src="assets/js/ui/acceso-bloqueo.js?v=20261104b"></script>
-<script src="assets/js/ui/roles.js?v=20261118a"></script>
+<script src="assets/js/ui/roles.js?v=20261120a"></script>
 
 </body></html>

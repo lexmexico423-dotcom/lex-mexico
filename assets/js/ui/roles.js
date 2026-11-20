@@ -52,7 +52,7 @@
   var st = document.createElement('style');
   st.textContent = ''
     + '.lex-rol-oculto{display:none !important;}'
-    + 'body.lex-rol-noadmin #header-pago-btns .btn-serv-comp:not(.btn-nuevo-recibo){display:none !important;}'
+    // (Nov-2026: Servicio complementario vuelve a ser visible para todos, a petición del Lic.)
     + 'body.lex-rol-sinmontos #panel-caja .caja-top-row>div:first-child,body.lex-rol-sinmontos #panel-caja .stat.verde,body.lex-rol-sinmontos #panel-caja .stat.rojo,'
     + 'body.lex-rol-sinmontos #panel-caja .caja-acciones-titulo,body.lex-rol-sinmontos #panel-caja .caja-acciones-grid,body.lex-rol-sinmontos #panel-caja .srv-card-con-barra,'
     + 'body.lex-rol-sinmontos #panel-caja .cierre-bar{display:none !important;}'

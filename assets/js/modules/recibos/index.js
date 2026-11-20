@@ -9222,7 +9222,7 @@ function abrirFichaFolio(){
       _fpEl.innerHTML = '🚫 CANCELADO'+(_canMontoFicha>0.005 && _canLabelFicha ? '<div style="font-size:0.58rem;font-weight:700;color:#8a1a1a;margin-top:2px;">'+_canLabelFicha+': $'+fmt(_canMontoFicha)+'</div>' : '');
     }
   } else {
-    if(_fpLbl) _fpLbl.textContent='Resta';
+    if(_fpLbl) _fpLbl.textContent='Le falta';
     if(_fpEl){ _fpEl.style.color='#a32d2d'; _fpEl.textContent='$'+fmt(_restaFinal); }
   }
   // Actualizar saldoPendiente en memoria para que Pago Parcial tome el valor correcto.

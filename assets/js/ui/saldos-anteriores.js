@@ -690,8 +690,8 @@
             + '<div style="font-size:0.74rem;color:#7a6840;">' + (tels(c) ? '📞 ' + E(tels(c)) : 'Sin teléfono') + (c.domicilio ? ' · 🏠 ' + E(c.domicilio) : '') + '</div>'; }).join('')
       +   '<div style="font-size:0.74rem;color:#7a6840;margin-top:2px;">' + E((TIPOS_T.filter(function(t){ return t[0] === tipoDe(sa); })[0] || ['', ''])[1]) + (sa.anio ? ' · iniciado en ' + E(sa.anio) : '') + '</div></div>'
       +   (totalDebe > 0.005
-          ? '<div style="border:2px solid #a32d2d;border-radius:8px;padding:6px 14px;text-align:right;background:#fff8f6;"><div style="' + MONO + 'font-size:0.62rem;color:#a32d2d;letter-spacing:0.08em;">DEBE EN TOTAL</div><div style="' + MONO + 'font-size:1.25rem;font-weight:800;color:#a32d2d;">' + $m(totalDebe) + '</div>'
-            + (gasPen > 0.005 && d > 0.005 ? '<div style="font-size:0.7rem;color:#7a6840;">Pactado ' + $m(d) + ' + gastos ' + $m(gasPen) + '</div>' : '') + '</div>'
+          ? '<div style="border:2px solid #E24B4A;border-radius:8px;padding:6px 14px;text-align:right;background:#FCEBEB;"><div style="' + MONO + 'font-size:0.62rem;color:#791F1F;letter-spacing:0.08em;">DEBE EN TOTAL</div><div style="' + MONO + 'font-size:1.25rem;font-weight:800;color:#A32D2D;">' + $m(totalDebe) + '</div>'
+            + (gasPen > 0.005 && d > 0.005 ? '<div style="font-size:0.7rem;color:#791F1F;">Pactado ' + $m(d) + ' + gastos ' + $m(gasPen) + '</div>' : '') + '</div>'
           : '<div style="border:2px solid #3B6D11;border-radius:8px;padding:8px 14px;color:#27500A;font-weight:700;">✓ NO DEBE NADA</div>')
       + '</div>'
       // ① Lo pactado

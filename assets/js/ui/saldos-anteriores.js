@@ -912,7 +912,8 @@
     var bt = document.getElementById('raBtnPagados'); if (bt) bt.textContent = _verPagadosRA ? '← Pendientes' : '✓ Con folio / pagados';
     var cn = document.getElementById('raCountNum'); if (cn) cn.textContent = pend.length;
     var rs = document.getElementById('ra-resumen');
-    if (rs) rs.innerHTML = _verPagadosRA ? 'Recibos anteriores que ya tienen folio real o están pagados.' : 'Deben en total: <b style="color:#a32d2d;font-family:monospace;font-size:0.95rem;">' + $m(pend.reduce(function(t, a){ return t + debeTotal(a); }, 0)) + '</b>';
+    // Nov-2026: se quitó "Deben en total" (a petición del Lic.)
+    if (rs) { rs.innerHTML = _verPagadosRA ? 'Recibos anteriores que ya tienen folio real o están pagados.' : ''; rs.style.display = _verPagadosRA ? '' : 'none'; }
     if (!lst.length) { cont.innerHTML = '<div style="text-align:center;color:var(--muted,#7a6a4a);padding:40px 20px;font-size:0.82rem;line-height:1.8;">' + (q ? 'Ninguno coincide con la búsqueda.' : (_verPagadosRA ? 'Todavía no hay recibos anteriores con folio o pagados.' : 'No hay recibos anteriores pendientes.<br>Usa <b>＋ Nuevo recibo anterior</b> para registrar un trámite de años anteriores que todavía tenga saldo.')) + '</div>'; return; }
     cont.innerHTML = lst.map(function(a){
       var dp = debe(a), dg = gastosPendientes(a), d = r2(dp + dg), conv = a.estado === 'convertido', col = conv ? '#1a7a3a' : (d > 0.005 ? '#8c6518' : '#1a7a3a');

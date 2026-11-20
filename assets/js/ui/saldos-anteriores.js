@@ -112,6 +112,56 @@
     if (!out.length && sa && sa.folioPapel) add(sa.folioPapel);
     return out;
   }
+  // Nov-2026 · GASTOS QUE PAGÓ EL DESPACHO (fuera de lo pactado). Viven como un
+  // reembolso normal (id AR-SA-<id del recibo anterior>) para cobrarse por Caja
+  // Rápida con comprobante; NO entran al recibo ni al costo pactado.
+  function idGastos(sa){ return 'AR-SA-' + sa.id; }
+  function adeudoGastos(sa){ return sa ? (lista().filter(function(a){ return a && a.id === idGastos(sa) && !a.eliminado; })[0] || null) : null; }
+  function gastoBloqueado(a, c){ return !!(c.cobrado || (a && a.estado === 'cobrado') || (a && (a.conceptos || []).some(function(x){ return x && x.parteDe === c.id; }))); }
+  function gastosDe(sa){
+    var a = adeudoGastos(sa); if (!a) return [];
+    return (a.conceptos || []).filter(function(c){ return c && !c.parteDe; }).map(function(c){ return { cid: c.id, fecha: c.fecha || '', concepto: c.descripcion || '', monto: r2(c.monto), bloqueado: gastoBloqueado(a, c) }; });
+  }
+  function gastosDetalle(sa){
+    var a = adeudoGastos(sa); if (!a) return [];
+    return (a.conceptos || []).filter(Boolean).map(function(c){ return { fecha: c.fecha || '', concepto: c.descripcion || '', monto: r2(c.monto), cobrado: !!(c.cobrado || a.estado === 'cobrado') }; })
+      .sort(function(x, y){ return String(x.fecha).localeCompare(String(y.fecha)); });
+  }
+  function gastosPendientes(sa){ return r2(gastosDetalle(sa).filter(function(g){ return !g.cobrado; }).reduce(function(t, g){ return t + g.monto; }, 0)); }
+  function sincronizarGastos(sa, filas){
+    var a = adeudoGastos(sa), ahora = new Date().toISOString();
+    if (!a && !filas.length) return;
+    if (!a) {
+      var viejo = lista().filter(function(x){ return x && x.id === idGastos(sa); })[0];
+      if (viejo) { a = viejo; a.eliminado = false; }
+      else { a = { id: idGastos(sa), cliente: '', conceptos: [], estado: 'pendiente', creadoPor: usuario(), fechaCreacion: ahora, fechaResolucion: '', saldoAnteriorId: sa.id }; lista().unshift(a); }
+    }
+    a.cliente = String(sa.cliente || '').toUpperCase();
+    if (sa.folioConvertido != null && sa.folioConvertido !== '') a.folioVinculado = Number(sa.folioConvertido);
+    var prev = {}; (a.conceptos || []).forEach(function(c){ if (c) prev[c.id] = c; });
+    var nuevos = [], usados = {};
+    filas.forEach(function(g, i){
+      var c = g.cid ? prev[g.cid] : null;
+      if (c && gastoBloqueado(a, c)) { nuevos.push(c); usados[c.id] = 1; return; }
+      if (!c) c = { id: 'C-SA-' + Date.now() + '-' + i, tipoGasto: 'reembolso', pagadoDespacho: true, origenDinero: 'anterior' };
+      c.fecha = g.fecha || hoyISO(); c.descripcion = g.concepto; c.monto = r2(g.monto);
+      nuevos.push(c); usados[c.id] = 1;
+    });
+    // Lo ya cobrado (y sus abonos) nunca se borra
+    (a.conceptos || []).forEach(function(c){ if (c && !usados[c.id] && (c.cobrado || c.parteDe || gastoBloqueado(a, c))) nuevos.push(c); });
+    a.conceptos = nuevos;
+    if (!nuevos.length) a.eliminado = true;
+    else if (nuevos.some(function(c){ return !c.cobrado; }) && a.estado === 'cobrado') a.estado = 'pendiente';
+    a.fechaMod = ahora;
+  }
+  function filaGasto(g){
+    var b = !!g.bloqueado;
+    return '<div class="sa-gas" data-cid="' + E(g.cid || '') + '" style="display:grid;grid-template-columns:140px minmax(0,1fr) 130px 26px;gap:6px;margin-bottom:5px;">'
+      + '<input type="date" class="sa-g-fecha" value="' + E(String(g.fecha || '').slice(0, 10)) + '"' + (b ? ' readonly' : '') + ' style="' + EST_IN + 'padding:6px;' + (b ? 'background:#f1ece0;' : '') + '">'
+      + '<input class="sa-g-conc" value="' + E(g.concepto || '') + '" placeholder="Ej. Pago de ISR, traslado de dominio…"' + (b ? ' readonly' : '') + ' style="' + EST_IN + 'text-transform:uppercase;' + (b ? 'background:#f1ece0;' : '') + '">'
+      + '<input class="sa-g-monto" value="' + (r2(g.monto) ? $m(g.monto) : '') + '" placeholder="$0.00" inputmode="decimal"' + (b ? ' readonly' : '') + ' style="' + EST_IN + 'text-align:right;font-family:monospace;' + (b ? 'background:#f1ece0;' : '') + '">'
+      + (b ? '<span title="Ya se cobró (o tiene abonos): no se modifica" style="font-size:0.8rem;color:#3B6D11;align-self:center;">✓</span>' : '<button type="button" class="sa-x" title="Quitar" style="background:none;border:none;color:#a32d2d;cursor:pointer;font-size:1rem;">✕</button>') + '</div>';
+  }
   function listaY(arr){ return arr.length <= 1 ? (arr[0] || '') : arr.slice(0, -1).join(', ') + ' y ' + arr[arr.length - 1]; }
   window._lexSAFolios = foliosDe;
 
@@ -169,6 +219,12 @@
       + '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr) 130px 26px;gap:6px;"><span style="' + EST_LB + '">Concepto</span><span style="' + EST_LB + '">Descripción</span><span style="' + EST_LB + 'text-align:right;">Precio</span><span></span></div>'
       + '<div id="sa-conceptos">' + conceptosDe(sa).map(filaConcepto).join('') + '</div>'
       + '<button type="button" id="sa-add-con" style="' + EST_ADD + '">＋ AGREGAR CONCEPTO</button>'
+      + '<div style="border:2px dashed #97C459;background:#fbfdf7;border-radius:8px;padding:2px 10px 8px;margin-top:12px;">'
+      + '<div style="' + EST_SEC + 'color:#27500A;border-bottom-color:#C0DD97;">Gastos que pagó el despacho (fuera de lo pactado)</div>'
+      + '<div style="display:grid;grid-template-columns:140px minmax(0,1fr) 130px 26px;gap:6px;"><span style="' + EST_LB + '">Fecha</span><span style="' + EST_LB + '">Concepto</span><span style="' + EST_LB + 'text-align:right;">Monto</span><span></span></div>'
+      + '<div id="sa-gastos">' + gastosDe(sa).map(filaGasto).join('') + '</div>'
+      + '<button type="button" id="sa-add-gas" style="' + EST_ADD + 'border-color:#3B6D11;color:#27500A;">＋ AGREGAR GASTO</button>'
+      + '<div style="font-size:0.7rem;color:#27500A;margin-top:6px;">Se cobran aparte por Caja Rápida con su comprobante (sección Reembolsos). No entran al recibo ni al costo pactado.</div></div>'
       + '<div style="' + EST_SEC + '">Pagos que ya dio · recibos de papel (no entran a caja)</div>'
       + '<div style="display:grid;grid-template-columns:140px minmax(0,1fr) 120px 130px 26px;gap:6px;"><span style="' + EST_LB + '">Fecha</span><span style="' + EST_LB + '">Concepto</span><span style="' + EST_LB + '">Folio de papel</span><span style="' + EST_LB + 'text-align:right;">Monto</span><span></span></div>'
       + '<div id="sa-pagos">' + pagosDe(sa).map(filaPago).join('') + '</div>'
@@ -182,6 +238,7 @@
       +     (sis ? lin('Cobrado en el sistema', '<span style="font-family:monospace;color:#a32d2d;">− ' + $m(sis) + '</span>') : '')
       +     '<div style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid #b8862b;margin-top:5px;padding-top:6px;"><span style="' + EST_LB + 'margin:0;color:#2a1c08;font-weight:700;">Total de adeudo 🔒</span>'
       +     '<input id="sa-total" readonly tabindex="-1" title="Se calcula solo: costo pactado − pagos" style="width:130px;text-align:right;font-family:monospace;font-size:1rem;font-weight:800;color:#a32d2d;background:#efe8d6;border:1px solid #c8b88a;border-radius:6px;padding:5px 8px;cursor:not-allowed;"></div>'
+      +     '<div id="sa-t-gas-box" style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 0;"><span style="' + EST_LB + 'margin:0;color:#27500A;">+ Gastos aparte</span><span id="sa-t-gas" style="font-family:monospace;color:#27500A;"></span></div>'
       +   '</div>'
       + '</div>'
       + '<div id="sa-err" style="color:#a32d2d;font-size:0.76rem;min-height:1em;margin-top:8px;"></div>'
@@ -229,11 +286,23 @@
       q('#sa-t-costo').textContent = $m(costo);
       q('#sa-t-papel').textContent = '− ' + $m(pag);
       q('#sa-total').value = $m(Math.max(0, r2(costo - pag - sis)));
+      var gas = r2(leerGastos().reduce(function(t, g){ return t + r2(g.monto); }, 0));
+      q('#sa-t-gas').textContent = $m(gas); q('#sa-t-gas-box').style.display = gas > 0.005 ? 'flex' : 'none';
+    }
+    function leerGastos(){
+      var out = [];
+      ov.querySelectorAll('.sa-gas').forEach(function(r){
+        var f = r.querySelector('.sa-g-fecha').value, c = r.querySelector('.sa-g-conc').value.trim().toUpperCase(), mTxt = r.querySelector('.sa-g-monto').value.trim(), m = r2(mTxt);
+        if (!f && !c && !mTxt) return;
+        out.push({ cid: r.getAttribute('data-cid') || '', fecha: f, concepto: c, monto: m });
+      });
+      return out;
     }
     function enlazar(){
       ov.querySelectorAll('.sa-x').forEach(function(b){ b.onclick = function(){ var fila = b.parentNode, cont = fila.parentNode; fila.remove(); if (cont.id === 'sa-conceptos' && !cont.children.length) { var t = document.createElement('div'); t.innerHTML = filaConcepto({}); cont.appendChild(t.firstChild); enlazar(); } recalcular(); }; });
       ov.querySelectorAll('.sa-cli-x').forEach(function(b){ b.onclick = function(){ b.parentNode.remove(); visFirmas(); }; });
-      ov.querySelectorAll('.sa-k-pre, .sa-p-monto').forEach(function(i){ i.oninput = recalcular; i.onblur = function(){ fmtDinero(i); recalcular(); }; i.onfocus = function(){ try { i.select(); } catch(e){} }; });
+      ov.querySelectorAll('.sa-g-conc').forEach(function(i){ if (!i.readOnly) i.oninput = function(){ var p = i.selectionStart; i.value = i.value.toUpperCase(); try { i.setSelectionRange(p, p); } catch(e){} }; });
+      ov.querySelectorAll('.sa-k-pre, .sa-p-monto, .sa-g-monto').forEach(function(i){ if (i.readOnly) return; i.oninput = recalcular; i.onblur = function(){ fmtDinero(i); recalcular(); }; i.onfocus = function(){ try { i.select(); } catch(e){} }; });
       ov.querySelectorAll('.sa-c-mov, .sa-c-tel').forEach(function(i){ i.oninput = function(){ try { if (typeof formatTelefono === 'function') formatTelefono(i); } catch(e){} }; });
       // Nombre: igual que en Generar recibo → MAYÚSCULAS, sin acentos y sin puntos
       ov.querySelectorAll('.sa-c-nom').forEach(function(i){ i.oninput = function(){ var p = i.selectionStart, antes = i.value.length; i.value = i.value.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\./g, ''); p -= (antes - i.value.length); try { i.setSelectionRange(p, p); } catch(e){} }; });
@@ -249,6 +318,7 @@
     function agregar(cont, html){ var t = document.createElement('div'); t.innerHTML = html; q(cont).appendChild(t.firstChild); enlazar(); var f = q(cont).lastElementChild.querySelector('input'); if (f) f.focus(); }
     q('#sa-add').onclick = function(){ agregar('#sa-pagos', filaPago({})); };
     q('#sa-add-con').onclick = function(){ agregar('#sa-conceptos', filaConcepto({})); };
+    q('#sa-add-gas').onclick = function(){ agregar('#sa-gastos', filaGasto({ fecha: hoyISO() })); };
     q('#sa-add-cli').onclick = function(){ agregar('#sa-clientes', filaCliente({ firma: false }, q('#sa-clientes').children.length || 1)); visFirmas(); };
     ov.querySelectorAll('.sa-tipo').forEach(function(b){ b.onclick = function(){
       tipoSel = b.getAttribute('data-t');
@@ -283,6 +353,11 @@
       conceptos = conceptos.map(function(c){ return { concepto: c.concepto || 'HONORARIOS', descripcion: c.descripcion, precio: c.precio }; });
       var pagos = leerPagos();
       if (pagos.some(function(p){ return !(p.monto > 0); })) { err.textContent = 'Cada pago anterior debe tener monto mayor a $0.'; return null; }
+      var gastos = leerGastos();
+      for (var gi = 0; gi < gastos.length; gi++) {
+        if (!gastos[gi].concepto) { err.textContent = 'A un gasto le falta el concepto (o quítalo con ✕).'; return null; }
+        if (!(gastos[gi].monto > 0)) { err.textContent = 'Cada gasto debe tener monto mayor a $0.'; return null; }
+      }
       var costo = r2(conceptos.reduce(function(s, c){ return s + c.precio; }, 0));
       if (r2(costo - suma(pagos) - sis) < -0.005) { err.textContent = 'Los pagos (' + $m(suma(pagos) + sis) + ') suman más que el costo pactado (' + $m(costo) + ').'; return null; }
       var folios = foliosDe({ pagosAnteriores: pagos, formato: 2 });
@@ -292,7 +367,7 @@
         tipoTramite: tipoSel, categoria: catDeTipo(tipoSel, sa && sa.categoria), anio: q('#sa-anio').value.trim(),
         conceptos: conceptos, costo: costo, debeManual: null,
         concepto: (c0.descripcion || c0.concepto) + (conceptos.length > 1 ? ' (+' + (conceptos.length - 1) + ')' : ''),
-        pagosAnteriores: pagos, folioPapel: folios.join(', '), nota: q('#sa-nota').value.trim()
+        pagosAnteriores: pagos, folioPapel: folios.join(', '), nota: q('#sa-nota').value.trim(), _gastos: gastos
       };
     }
     // ¿Ya existe un recibo anterior del mismo cliente o con el mismo folio de papel?
@@ -317,12 +392,14 @@
         ov.style.display = 'flex';
       }
       var ahora = new Date().toISOString(), idGuardado;
+      var _gastosForm = v2._gastos || []; delete v2._gastos;
       if (sa) { Object.assign(sa, v2); sa.fechaMod = ahora; if (!sa.clave) sa.clave = nuevaClave(foliosDe(sa)[0]); idGuardado = sa.id; }
       else {
         idGuardado = 'SA-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
         lista().unshift(Object.assign({ id: idGuardado, tipo: 'anterior', estado: 'pendiente',
           clave: nuevaClave(foliosDe(v2)[0]), pagosSistema: [], creadoPor: usuario(), fechaCreacion: ahora, fechaMod: ahora }, v2));
       }
+      try { sincronizarGastos(porId(idGuardado), _gastosForm); } catch(eG){ console.warn('[RecibosAnteriores] gastos', eG); }
       cerrarOv(); guardar(); toastS('✅ Recibo anterior guardado');
       if (despues) despues(idGuardado);
       else setTimeout(function(){ try { window.lexFichaSaldoAnterior(idGuardado); } catch(e){} }, 50);
@@ -333,6 +410,7 @@
       var ok = await preguntar('Eliminar saldo', '¿Eliminar el saldo de años anteriores de ' + String(sa.cliente).toUpperCase() + '?' + ((sa.pagosSistema || []).length ? '\n\nLos cobros que ya entraron a Caja NO se borran de Caja.' : ''), 'Sí, eliminar', 'Cancelar');
       if (!ok) return;
       sa.eliminado = true; sa.eliminadoPor = usuario(); sa.fechaMod = new Date().toISOString();
+      var _ag = adeudoGastos(sa); if (_ag && !(_ag.conceptos || []).some(function(c){ return c && (c.cobrado || c.parteDe); })) { _ag.eliminado = true; _ag.fechaMod = sa.fechaMod; }
       cerrarOv(); guardar(); toastS('🗑 Saldo eliminado');
     };
     if (!sa) setTimeout(function(){ var n = q('.sa-c-nom'); if (n) n.focus(); }, 30);
@@ -356,7 +434,7 @@
       + '<div style="margin-top:8px;">Debe: <b style="color:#a32d2d;">' + $m(d) + '</b> · ¿Cuánto paga hoy? <input id="sac-monto" type="number" step="0.01" min="0" max="' + d + '" value="' + d + '" style="width:130px;padding:6px 8px;border:1px solid #c8951a;border-radius:6px;font-size:0.82rem;"></div>'
       + '<div id="sac-err" style="color:#a32d2d;font-size:0.74rem;min-height:1em;margin-top:6px;"></div>'
       + '<button type="button" id="sac-recibo" style="display:block;width:100%;text-align:left;border:2px solid #9a6e18;background:#fff8e6;border-radius:8px;padding:9px 12px;cursor:pointer;color:#2a1c08;font-size:0.8rem;"><b>🧾 Hacer recibo normal por lo que paga</b> <span style="background:#9a6e18;color:#fff;font-size:0.62rem;padding:1px 7px;border-radius:9px;">recomendado</span><div style="font-size:0.72rem;color:#5a4a2a;margin-top:2px;">Abre Generar Recibo ya llenado: total = lo que debe, anticipo = lo que paga hoy. Al imprimir queda su folio (A) y los siguientes abonos serán B, C…</div></button>'
-      + '<button type="button" id="sac-caja" style="display:block;width:100%;text-align:left;margin-top:6px;border:1px solid #d8c08a;background:#fff;border-radius:8px;padding:8px 12px;cursor:pointer;color:#2a1c08;font-size:0.8rem;"><b>⚡ Cobro en Caja sin recibo</b><div style="font-size:0.72rem;color:#5a4a2a;margin-top:2px;">Entra como ingreso de Caja (igual que Caja Rápida) y baja lo que debe.</div></button>'
+      + '<button type="button" id="sac-caja" style="display:block;width:100%;text-align:left;margin-top:6px;border:1px solid #d8c08a;background:#fff;border-radius:8px;padding:8px 12px;cursor:pointer;color:#2a1c08;font-size:0.8rem;"><b>⚡ Cobro en Caja sin recibo</b><div style="font-size:0.72rem;color:#5a4a2a;margin-top:2px;">Abre Caja Rápida ya llenada (con 🧾 Registrar e imprimir para darle comprobante) y baja lo que debe.</div></button>'
       + '</div></div>';
     document.body.appendChild(ov);
     var q = function(s){ return ov.querySelector(s); };
@@ -368,26 +446,29 @@
       return m;
     }
     q('#sac-recibo').onclick = function(){ var m = monto(); if (m == null) return; ov.remove(); prellenarRecibo(sa, d, m); };
-    q('#sac-caja').onclick = async function(){
+    q('#sac-caja').onclick = function(){
       var m = monto(); if (m == null) return;
       try { if (typeof cajaBloqueada === 'function' && cajaBloqueada()) { q('#sac-err').textContent = 'La caja de hoy ya está cerrada.'; return; } } catch(e){}
-      ov.style.display = 'none';
-      var resp = await new Promise(function(res){ try { if (typeof elegirResponsable === 'function') { elegirResponsable(function(r){ res(r); }); return; } } catch(e){} res(usuario()); });
-      if (!resp) { ov.style.display = 'flex'; return; }
-      var mov = { id: 'M-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), folioCaja: (typeof generarFolioMovCaja === 'function' ? generarFolioMovCaja() : ''),
-        fecha: (typeof hoy === 'function' ? hoy() : hoyISO()), hora: (typeof hora === 'function' ? hora() : ''),
-        descripcion: 'Abono a recibo anterior · ' + String(sa.cliente).toUpperCase() + ' · ' + sa.concepto + (sa.folioPapel ? ' (folio de papel ' + sa.folioPapel + ')' : ''),
-        monto: m, tipo: 'ingreso', cat: 'otro', fuente: 'caja', responsable: resp, saldoAnteriorId: sa.id };
-      var ok = false;
-      try { ok = (typeof _registrarMovimiento === 'function') ? _registrarMovimiento(mov) !== false : (D.movimientos.push(mov), true); } catch(e){ ok = false; }
-      if (!ok) { ov.style.display = 'flex'; q('#sac-err').textContent = 'No se registró el cobro en caja.'; return; }
-      if (!Array.isArray(sa.pagosSistema)) sa.pagosSistema = [];
-      sa.pagosSistema.push({ id: mov.id, fecha: mov.fecha, concepto: 'Abono en Caja', monto: m, movId: mov.id, comprobante: 'Caja', por: resp });
-      if (debe(sa) <= 0.005) sa.estado = 'liquidado';
-      sa.fechaMod = new Date().toISOString();
-      try { if (typeof renderCaja === 'function') renderCaja(); } catch(e){}
-      ov.remove(); guardar();
-      toastS('▲ Abono registrado en Caja — ' + $m(m) + (debe(sa) > 0.005 ? ' · debe ' + $m(debe(sa)) : ' · saldo liquidado'));
+      // Nov-2026: se abre Caja Rápida ya llenada, con "🧾 Registrar e imprimir"
+      // para darle comprobante al cliente. En Contabilidad queda una sola línea.
+      if (typeof window.lexCajaRapidaPrecargada !== 'function') { q('#sac-err').textContent = 'No se pudo abrir Caja Rápida.'; return; }
+      ov.remove();
+      var nom = String(sa.cliente || '').toUpperCase();
+      var descCont = 'Abono a recibo anterior · ' + nom + ' · ' + sa.concepto + (sa.folioPapel ? ' (folio de papel ' + sa.folioPapel + ')' : '');
+      window.lexCajaRapidaPrecargada({ tipo: 'ingreso', nombreComprobante: nom,
+        conceptos: [{ desc: 'ABONO A ' + String(sa.concepto || 'TRÁMITE').toUpperCase(), precio: m }],
+        describir: function(){ return descCont; },
+        aviso: '✓ Abono al recibo anterior de ' + nom + ': ' + $m(m) + ' de ' + $m(d) + '. Use 🧾 Registrar e imprimir para darle su comprobante.',
+        extra: { saldoAnteriorId: sa.id, comprobanteNota: 'Abono a saldo de trámite iniciado en ' + (sa.anio || 'años anteriores') + (sa.folioPapel ? ' · folio de papel ' + sa.folioPapel : '') },
+        onRegistrado: function(mov, resp){
+          var s2 = porId(sa.id) || sa, mm = r2(mov.monto);
+          if (!Array.isArray(s2.pagosSistema)) s2.pagosSistema = [];
+          s2.pagosSistema.push({ id: mov.id, fecha: mov.fecha, concepto: 'Abono en Caja', monto: mm, movId: mov.id, comprobante: mov.folioCaja ? 'Caja ' + mov.folioCaja : 'Caja', por: resp });
+          if (debe(s2) <= 0.005) s2.estado = 'liquidado';
+          s2.fechaMod = new Date().toISOString();
+          guardar();
+          toastS('▲ Abono registrado en Caja — ' + $m(mm) + (debe(s2) > 0.005 ? ' · debe ' + $m(debe(s2)) : ' · saldo liquidado'));
+        } });
     };
   }
   // Lleva al formulario de Generar Recibo, ya llenado con TODO lo capturado:
@@ -497,6 +578,7 @@
       if (!Array.isArray(sa.pagosSistema)) sa.pagosSistema = [];
       if (montoA > 0) sa.pagosSistema.push({ id: 'REC-' + cand.folio + 'A', fecha: String(cand.fecha_recibo || hoyISO()).slice(0, 10), concepto: 'Primer pago en el sistema', monto: montoA, comprobante: 'Folio ' + cand.folio + 'A' });
       sa.fechaMod = new Date().toISOString();
+      try { var _ag2 = adeudoGastos(sa); if (_ag2) { _ag2.folioVinculado = Number(cand.folio); _ag2.fechaMod = sa.fechaMod; } } catch(_){}
       ligados[String(cand.folio)] = 1; cambio = true;
       if (p) window._lexSAParaRecibo = null;
     });
@@ -579,7 +661,7 @@
     var viejo = document.getElementById('lex-sa-ficha'); if (viejo) viejo.remove();
     var ov = document.createElement('div'); ov.id = 'lex-sa-ficha';
     ov.style.cssText = 'position:fixed;inset:0;z-index:99990;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
-    var pagos = todosLosPagos(sa), d = debe(sa), pag = totalPagado(sa), costo = costoDe(sa);
+    var pagos = todosLosPagos(sa), d = debe(sa), pag = totalPagado(sa), costo = costoDe(sa), gas = gastosDetalle(sa), gasPen = gastosPendientes(sa);
     var btn = function(id2, txt, est){ return '<button type="button" id="' + id2 + '" style="width:100%;border-radius:7px;padding:9px 8px;font-size:0.72rem;font-weight:700;letter-spacing:0.04em;cursor:pointer;font-family:monospace;' + est + '">' + txt + '</button>'; };
     ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:960px;max-height:94vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#2a1c08;">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #e3d3a8;flex-wrap:wrap;">'
@@ -594,9 +676,15 @@
           return '<div style="margin-top:3px;"><div style="font-size:0.95rem;font-weight:700;">' + E(String(c.nombre || '').toUpperCase()) + '</div>'
             + '<div style="font-size:0.72rem;color:#7a6840;">' + (tels ? '📞 ' + E(tels) : 'Sin teléfono') + (c.domicilio ? ' · 🏠 ' + E(c.domicilio) : '') + '</div></div>'; }).join('')
       + '<div style="font-size:0.74rem;color:#7a6840;margin-top:3px;">' + (sa.anio ? 'Trámite iniciado en ' + E(sa.anio) : '') + (foliosDe(sa).length ? ' · 📄 papel N° ' + E(listaY(foliosDe(sa))) : '') + '</div>'
-      + '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:8px;table-layout:fixed;"><colgroup><col style="width:34%"><col><col style="width:110px"></colgroup>'
+      + '<div style="font-size:0.6rem;color:#7a5410;letter-spacing:0.08em;margin:10px 0 0;font-family:monospace;">LO PACTADO</div>'
+      + '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:4px;table-layout:fixed;"><colgroup><col style="width:34%"><col><col style="width:110px"></colgroup>'
+      +   '<tr style="color:#9a8a6a;font-size:0.62rem;letter-spacing:0.06em;font-family:monospace;"><td style="padding:2px 6px;">CONCEPTO</td><td style="padding:2px 6px;">DESCRIPCIÓN</td><td style="padding:2px 6px;text-align:right;">IMPORTE</td></tr>'
       +   conceptosDe(sa).map(function(c){ return '<tr style="border-top:1px solid #eadfbf;"><td style="padding:4px 6px;font-weight:700;color:#1a5fa8;">' + E(String(c.concepto || '').toUpperCase()) + '</td><td style="padding:4px 6px;color:#5a4a30;">' + E(c.descripcion || '') + '</td><td style="padding:4px 6px;text-align:right;font-family:monospace;">' + $m(c.precio) + '</td></tr>'; }).join('')
       + '</table>'
+      + (gas.length ? '<div style="font-size:0.6rem;color:#27500A;letter-spacing:0.08em;margin:12px 0 0;font-family:monospace;">GASTOS DEL TRÁMITE · APARTE DE LO PACTADO</div>'
+        + '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:4px;table-layout:fixed;"><colgroup><col style="width:105px"><col><col style="width:90px"><col style="width:110px"></colgroup>'
+        + gas.map(function(g){ return '<tr style="border-top:1px solid #eadfbf;"><td style="padding:4px 6px;">' + E(fL(g.fecha)) + '</td><td style="padding:4px 6px;">' + E(String(g.concepto || '').toUpperCase()) + '</td><td style="padding:4px 6px;"><span style="font-size:0.66rem;border-radius:10px;padding:1px 7px;' + (g.cobrado ? 'background:#EAF3DE;color:#27500A;">pagado' : 'background:#FCEBEB;color:#791F1F;">pendiente') + '</span></td><td style="padding:4px 6px;text-align:right;font-family:monospace;">' + $m(g.monto) + '</td></tr>'; }).join('')
+        + '</table>' : '')
       + (sa.nota ? '<div style="font-size:0.72rem;color:#8a7a5a;font-style:italic;margin-top:4px;">📝 ' + E(sa.nota) + ' <span style="font-size:0.62rem;">(uso interno)</span></div>' : '')
       + '</div>'
       + '<div style="font-size:0.6rem;color:#7a5410;letter-spacing:0.08em;margin:12px 0 4px;font-family:monospace;">PAGOS DEL TRÁMITE</div>'
@@ -610,9 +698,11 @@
       + '<div style="display:flex;justify-content:space-between;"><span>COSTO</span><b>' + $m(costo) + '</b></div>'
       + '<div style="display:flex;justify-content:space-between;"><span>PAGADO</span><b style="color:#1a7a3a;">' + $m(pag) + '</b></div>'
       + '<div style="display:flex;justify-content:space-between;border-top:1px dashed #c8952a;padding-top:5px;"><span style="color:#a32d2d;">RESTA</span><b style="color:#a32d2d;font-size:0.95rem;">' + $m(d) + '</b></div>'
+      + (gas.length ? '<div style="display:flex;justify-content:space-between;color:#8a4a10;"><span>GASTOS</span><b>' + $m(gasPen) + '</b></div>' : '')
       + btn('saf-prev', '👁 VISTA PREVIA PDF', 'border:1.5px solid #4a6ea8;color:#1a3a70;background:#e6f1fb;')
       + btn('saf-edo', '📊 ESTADO DE CUENTA', 'border:1.5px solid #2a7a4a;color:#0f5228;background:#e8f5ec;')
       + (d > 0.005 ? btn('saf-cob', '💰 COBRAR', 'border:none;color:#fff;background:#c8781a;') : '<div style="text-align:center;color:#1a7a3a;font-weight:700;">✓ PAGADO</div>')
+      + (gasPen > 0.005 ? btn('saf-gas', '💸 COBRAR GASTOS', 'border:none;color:#fff;background:#3B6D11;') : '')
       + btn('saf-edit', '✏ EDITAR', 'border:1px solid #c8951a;color:#9a6e18;background:#fff;')
       + '</div></div></div>';
     document.body.appendChild(ov);
@@ -623,6 +713,7 @@
     q('#saf-edo').onclick = function(){ verPDF(pdfEstadoCuenta(sa), 'Estado de cuenta · ' + sa.cliente); };
     if (q('#saf-cob')) q('#saf-cob').onclick = function(){ ov.remove(); window.lexCobrarSaldoAnterior(sa.id); };
     q('#saf-edit').onclick = function(){ ov.remove(); window.lexAbrirSaldoAnterior(sa.id); };
+    if (q('#saf-gas')) q('#saf-gas').onclick = function(){ ov.remove(); if (typeof window.lexCobrarAdeudo === 'function') window.lexCobrarAdeudo(idGastos(sa)); };
   };
 
   // ── PDFs (jsPDF ya está cargado en el sistema) ───────────────────────
@@ -726,6 +817,26 @@
     y = filaTabla(doc, y + 1, [{ x: 16 }, { x: W - 16, right: true }], ['SALDO PENDIENTE AL ' + fL(hoyISO()).toUpperCase(), $m(debe(sa))], { bold: true, color: [163, 45, 45], size: 10 });
     doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(122, 106, 74);
     doc.text(doc.splitTextToSize('Documento informativo. Los pagos marcados como "Papel" se recibieron antes del sistema con el recibo de papel indicado. No sustituye los recibos oficiales.', W - 28), 14, y + 6);
+    // Nov-2026 · Gastos del trámite (aparte de lo pactado)
+    var gas = gastosDetalle(sa);
+    if (gas.length) {
+      y += 18; if (y > H - 50) { doc.addPage(); y = 20; }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(39, 80, 10);
+      doc.text('GASTOS DEL TRÁMITE', 14, y); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(122, 106, 74); doc.text('· aparte de lo pactado', 14 + doc.getTextWidth('GASTOS DEL TRÁMITE') * 1.2 + 3, y);
+      y += 5;
+      var gc = [{ x: 16 }, { x: 44 }, { x: W - 46, right: true }, { x: W - 16, right: true }];
+      y = filaTabla(doc, y, gc, ['FECHA', 'CONCEPTO', 'ESTADO', 'IMPORTE'], { bold: true, fondo: [234, 243, 222], color: [39, 80, 10], size: 8 });
+      var gPag = 0, gPen = 0;
+      gas.forEach(function(g){
+        if (y > H - 30) { doc.addPage(); y = 20; }
+        y = filaTabla(doc, y, gc, [fL(g.fecha), String(g.concepto || '').toUpperCase().slice(0, 52), g.cobrado ? 'Pagado' : 'Pendiente', $m(g.monto)]);
+        if (g.cobrado) gPag += g.monto; else gPen += g.monto;
+      });
+      doc.setDrawColor(151, 196, 89); doc.line(14, y - 3, W - 14, y - 3);
+      y = filaTabla(doc, y + 1, [{ x: 16 }, { x: W - 16, right: true }], ['Gastos pagados ' + $m(r2(gPag)) + '   ·   Gastos pendientes', $m(r2(gPen))], { bold: true, color: gPen > 0.005 ? [163, 45, 45] : [39, 80, 10], size: 9 });
+      doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(122, 106, 74);
+      doc.text('Los gastos del trámite no modifican el monto pactado.', 14, y + 3);
+    }
     marcaAgua(doc, 'INFORMATIVO · SIN FOLIO');
     return doc;
   }

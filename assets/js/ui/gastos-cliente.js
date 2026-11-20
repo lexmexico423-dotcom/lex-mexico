@@ -122,6 +122,50 @@
     var t = r2(ads.reduce(function(s,a){ return s + totalPendiente(a); }, 0));
     return { total: t, adeudos: ads };
   };
+  // Nov-2026 · Estado de cuenta: gastos del trámite (aparte de lo pactado) de un folio
+  window.lexGastosTramiteFolio = function(folio){
+    var out = [];
+    gastosDeFolio(folio).forEach(function(a){
+      reembolsables(a).forEach(function(c){
+        out.push({ fecha: c.fecha || String(a.fechaCreacion || '').slice(0, 10), descripcion: String(c.descripcion || ''), monto: r2(c.monto), cobrado: conceptoCobrado(a, c) });
+      });
+    });
+    out.sort(function(x, y){ return String(x.fecha).localeCompare(String(y.fecha)); });
+    return out;
+  };
+  // Nov-2026 · Cobranza: reembolsos pendientes que NO salen ya en un folio con saldo
+  // (recibo liquidado o sin folio). Uno por cliente; clave estable "RB-NOMBRE".
+  function claveRB(nombre){ return 'RB-' + N(nombre).replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+  function telDe(nombre, folios){
+    var recs = (typeof appData !== 'undefined' && appData && Array.isArray(appData.recibos)) ? appData.recibos : [];
+    var n = N(nombre), r = null;
+    for (var i = recs.length - 1; i >= 0 && !r; i--) { var x = recs[i]; if (!x) continue;
+      if ((folios.length && folios.indexOf(String(x.folio)) >= 0) || N(x.nombre) === n) r = x; }
+    var c0 = r && Array.isArray(r.clientes) && r.clientes[0] ? r.clientes[0] : {};
+    return String(c0.movil || c0.tel || (r && r.telefono) || '').trim();
+  }
+  function gruposRB(excluir){
+    var ex = (excluir || []).map(String), g = {};
+    activos().forEach(function(a){
+      if (a.estado === 'cobrado' || a.estado === 'pendiente-recibo') return;
+      var t = totalPendiente(a); if (!(t > 0.005)) return;
+      if (a.folioVinculado != null && a.folioVinculado !== '' && ex.indexOf(String(a.folioVinculado)) >= 0) return;
+      var k = claveRB(a.cliente);
+      if (!g[k]) g[k] = { clave: k, nombre: String(a.cliente || '').trim(), saldo: 0, fecha: '', folios: [], adeudoId: a.id, conceptos: [] };
+      var x = g[k]; x.saldo = r2(x.saldo + t);
+      pendientes(a).forEach(function(c){ x.conceptos.push(String(c.descripcion || '')); var f = c.fecha || String(a.fechaCreacion || '').slice(0, 10); if (!x.fecha || f < x.fecha) { x.fecha = f; x.adeudoId = a.id; } });
+      if (a.folioVinculado != null && a.folioVinculado !== '' && x.folios.indexOf(String(a.folioVinculado)) < 0) x.folios.push(String(a.folioVinculado));
+    });
+    return g;
+  }
+  window.lexReembolsosCobranza = function(foliosConSaldo){
+    var g = gruposRB(foliosConSaldo);
+    return Object.keys(g).map(function(k){ var x = g[k], tel = telDe(x.nombre, x.folios);
+      return { folio: x.clave, letra: '', esReembolso: true, adeudoId: x.adeudoId, folios: x.folios, folioReal: x.folios[0] || null,
+        nombre: x.nombre, tel: tel, personas: [{ nombre: x.nombre, tel: tel }], concepto: 'gastos del trámite', detalle: x.conceptos.join(', '),
+        saldo: x.saldo, fecha: x.fecha, categoria: 'reembolsos' }; });
+  };
+  window.lexReembolsoSaldoPorClave = function(clave){ var g = gruposRB([]); return g[clave] ? g[clave].saldo : 0; };
   window.lexAdeudosDeCliente = function(nombre){
     var n = N(nombre); if (!n) return { total: 0, adeudos: [] };
     var ads = activos().filter(function(a){ return N(a.cliente) === n && totalPendiente(a) > 0.005; });
@@ -943,6 +987,7 @@
   function etqOrigen(c){
     if (c.movEgresoId || c.origenDinero === 'caja') return etq('salió de caja', '#FAEEDA', '#633806');
     if (c.origenDinero === 'ninguno') return etq('honorarios', '#EAF3DE', '#27500A');
+    if (c.origenDinero === 'anterior') return etq('gasto anterior', '#F1EFE8', '#444441');
     return etq('lo puso el Lic.', '#E6F1FB', '#0C447C');
   }
   window.lexCobrarAdeudo = async function(id){

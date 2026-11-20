@@ -17008,182 +17008,168 @@ Recibo original im…</td>
   </div>
   </div><!-- /recibo-body -->
 <div id="modal-ficha-folio" style="display:none;margin:16px 0 0;">
-  <div style="background:#fdfaf4;border:1.5px solid #c8952a;border-radius:8px;width:max(675px,min(935px,calc(100vw - var(--sidebar-w) - 120px - 185px)));position:relative;left:50%;transform:translateX(-50%);display:flex;flex-direction:row;overflow:visible;box-shadow:0 4px 16px rgba(80,58,12,0.15);">
+  <style>
+    #modal-ficha-folio .ffx-card{border-radius:10px;overflow:hidden;background:#fff;}
+    #modal-ficha-folio .ffx-ch{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 12px;font-weight:700;font-size:0.74rem;letter-spacing:0.05em;font-family:'DM Mono',monospace;flex-wrap:wrap;}
+    #modal-ficha-folio .ffx-sub{font-weight:400;font-size:0.66rem;letter-spacing:0;}
+    #modal-ficha-folio .ffx-ft{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;font-family:'DM Mono',monospace;font-size:0.76rem;flex-wrap:wrap;}
+    #modal-ficha-folio .ffx-btn{font-size:0.76rem;font-weight:700;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;color:#fff;font-family:Helvetica,Arial,sans-serif;white-space:nowrap;}
+    #modal-ficha-folio .ffx-btn:hover{filter:brightness(1.08);}
+    #modal-ficha-folio .ffx-link{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #d4b870;border-radius:6px;padding:4px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:Helvetica,Arial,sans-serif;}
+    #modal-ficha-folio .ffx-link:hover{background:#fdf3dc;}
+    #modal-ficha-folio #ficha-pendiente div{display:inline;margin-left:6px;}
+  </style>
+  <!-- Nov-2026 · Ficha del folio rediseñada (estilo tarjetas, opción A): mismos IDs de siempre -->
+  <div class="ffx-wrap" style="background:#fbf6ea;border:1.5px solid #c8952a;border-radius:12px;width:max(675px,min(935px,calc(100vw - var(--sidebar-w) - 120px - 185px)));position:relative;left:50%;transform:translateX(-50%);display:flex;flex-direction:row;overflow:visible;box-shadow:0 4px 16px rgba(80,58,12,0.15);">
 
-    <!-- CONTENIDO PRINCIPAL -->
-    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;">
 
-      <!-- MARCA DE AGUA CANCELADO — solo visible si el folio está cancelado -->
+      <!-- MARCA DE AGUA CANCELADO -->
       <div id="ficha-watermark-cancelado" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;overflow:hidden;border-radius:12px;">
-        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:&#39;DM Mono&#39;,monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.10);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
-        <div style="position:absolute;top:25%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:&#39;DM Mono&#39;,monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
-        <div style="position:absolute;top:75%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:&#39;DM Mono&#39;,monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.10);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
+        <div style="position:absolute;top:25%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
+        <div style="position:absolute;top:75%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(80,80,80,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">CANCELADO</div>
       </div>
-      <!-- MARCA DE AGUA PAGADO — solo visible si el folio está liquidado -->
+      <!-- MARCA DE AGUA PAGADO -->
       <div id="ficha-watermark-liquidado" style="display:none;position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10;overflow:hidden;border-radius:12px;">
-        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:&#39;DM Mono&#39;,monospace;font-size:5rem;font-weight:900;color:rgba(26,122,58,0.10);letter-spacing:0.15em;white-space:nowrap;user-select:none;">PAGADO</div>
-        <div style="position:absolute;top:25%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:&#39;DM Mono&#39;,monospace;font-size:5rem;font-weight:900;color:rgba(26,122,58,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">PAGADO</div>
-        <div style="position:absolute;top:75%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:&#39;DM Mono&#39;,monospace;font-size:5rem;font-weight:900;color:rgba(26,122,58,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">PAGADO</div>
+        <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(26,122,58,0.10);letter-spacing:0.15em;white-space:nowrap;user-select:none;">PAGADO</div>
+        <div style="position:absolute;top:25%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(26,122,58,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">PAGADO</div>
+        <div style="position:absolute;top:75%;left:50%;transform:translate(-50%,-50%) rotate(-35deg);font-family:'DM Mono',monospace;font-size:5rem;font-weight:900;color:rgba(26,122,58,0.07);letter-spacing:0.15em;white-space:nowrap;user-select:none;">PAGADO</div>
       </div>
 
-      <!-- HEADER -->
-      <div style="background:#f5f0e0;border-bottom:1px solid #d4b870;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <!-- ENCABEZADO: folio, estado y ligas -->
+      <div style="background:#f5f0e0;border-bottom:1px solid #d4b870;border-radius:12px 12px 0 0;padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;flex-shrink:0;">
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span style="font-family:&#39;DM Mono&#39;,monospace;font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#5a3e10;">📋 Ficha del Folio</span>
-          <span id="ficha-folio-num" style="font-family:&#39;DM Mono&#39;,monospace;font-size:0.8rem;font-weight:700;color:#1a5fa8;background:#e6f1fb;padding:2px 10px;border-radius:20px;"></span>
-          <span id="ficha-carpeta-badge" style="display:none;font-family:&#39;DM Mono&#39;,monospace;font-size:0.68rem;font-weight:700;color:#0f5228;background:#d4f5e0;padding:2px 10px;border-radius:20px;border:0.5px solid #2a9a50;">📁 <span id="ficha-carpeta-txt"></span></span>
-          <span id="ficha-expediente-badge" style="display:none;font-family:&#39;DM Mono&#39;,monospace;font-size:0.68rem;font-weight:700;color:#1a3a7a;background:#dce8ff;padding:2px 10px;border-radius:20px;border:0.5px solid #4a6ea8;">📂 <span id="ficha-expediente-txt"></span></span>
-          <span id="ficha-badge-liquidado" style="display:none;font-family:&#39;DM Mono&#39;,monospace;font-size:0.68rem;font-weight:700;color:#0f5228;background:#d4f5e0;padding:2px 10px;border-radius:20px;border:0.5px solid #2a9a50;">✅ LIQUIDADO · Solo lectura</span>
-          <span id="ficha-badge-tipo-tramite" style="display:none;font-family:&#39;DM Mono&#39;,monospace;font-size:0.68rem;font-weight:700;color:#5a3e10;background:#f5ecd0;padding:2px 10px;border-radius:20px;border:0.5px solid #c8952a;text-transform:uppercase;letter-spacing:0.06em;"></span>
+          <span style="font-family:'DM Mono',monospace;font-size:0.7rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#5a3e10;">📋 Ficha del Folio</span>
+          <span id="ficha-folio-num" style="font-family:'DM Mono',monospace;font-size:0.8rem;font-weight:700;color:#1a5fa8;background:#e6f1fb;padding:2px 10px;border-radius:20px;"></span>
+          <span id="ficha-carpeta-badge" style="display:none;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#0f5228;background:#d4f5e0;padding:2px 10px;border-radius:20px;border:0.5px solid #2a9a50;">📁 <span id="ficha-carpeta-txt"></span></span>
+          <span id="ficha-expediente-badge" style="display:none;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#1a3a7a;background:#dce8ff;padding:2px 10px;border-radius:20px;border:0.5px solid #4a6ea8;">📂 <span id="ficha-expediente-txt"></span></span>
+          <span id="ficha-badge-liquidado" style="display:none;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#0f5228;background:#d4f5e0;padding:2px 10px;border-radius:20px;border:0.5px solid #2a9a50;">✅ LIQUIDADO · Solo lectura</span>
+          <span id="ficha-badge-tipo-tramite" style="display:none;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;color:#5a3e10;background:#f5ecd0;padding:2px 10px;border-radius:20px;border:0.5px solid #c8952a;text-transform:uppercase;letter-spacing:0.06em;"></span>
           <span id="ficha-btn-llamada-wrap" style="display:inline-flex;align-items:center;"></span>
-          <!-- Barra tipo para Escritura y Juicio — sin total -->
-          <span id="ficha-header-tipo-total" style="display:none;font-family:&#39;DM Mono&#39;,monospace;font-size:0.75rem;font-weight:700;color:#1a3a70;background:#e6f1fb;padding:4px 14px;border-radius:20px;border:1.5px solid #4a6ea8;letter-spacing:0.06em;align-items:center;gap:6px;">
+          <span id="ficha-header-tipo-total" style="display:none;font-family:'DM Mono',monospace;font-size:0.75rem;font-weight:700;color:#1a3a70;background:#e6f1fb;padding:4px 14px;border-radius:20px;border:1.5px solid #4a6ea8;letter-spacing:0.06em;align-items:center;gap:6px;">
             <span id="ficha-header-tipo-label"></span>
           </span>
         </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button id="ficha-btn-exp-digital" class="ffx-link" style="color:#1a3a70;">🗂 Exp. digital</button>
+          <button onclick="abrirEstadoCuenta()" class="ffx-link" style="color:#0f5228;">📊 Estado de cuenta</button>
+          <button id="ficha-btn-cerrar-juicio" onclick="fichaCerrarJuicio()" class="ffx-link" style="display:none;color:#712B13;border-color:#993C1D;">⚖️ Cerrar Juicio</button>
+        </div>
       </div>
-      <!-- RETRO ACTIVO INFO BAR — visible cuando retro está activo -->
-      <div id="ficha-retro-bar" style="display:none;background:rgba(90,58,138,0.12);border-bottom:1px solid rgba(90,58,138,0.3);padding:5px 16px;font-family:&#39;DM Mono&#39;,monospace;font-size:0.62rem;color:#8b5cf6;display:none;align-items:center;gap:8px;flex-shrink:0;">
+      <!-- RETRO ACTIVO INFO BAR -->
+      <div id="ficha-retro-bar" style="display:none;background:rgba(90,58,138,0.12);border-bottom:1px solid rgba(90,58,138,0.3);padding:5px 16px;font-family:'DM Mono',monospace;font-size:0.62rem;color:#8b5cf6;align-items:center;gap:8px;flex-shrink:0;">
         ⏰ RETRO ACTIVO — <span id="ficha-retro-fecha-display" style="font-weight:700;"></span>
         <span onclick="fichaRetroEditar()" style="cursor:pointer;text-decoration:underline;margin-left:4px;">Editar</span>
         <span onclick="fichaRetroDesactivar()" style="cursor:pointer;text-decoration:underline;margin-left:4px;">Desactivar</span>
       </div>
 
-      <!-- SCROLL AREA -->
-      <div style="overflow-y:auto;flex:1;padding:14px 18px;">
+      <div style="overflow-y:auto;flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:12px;">
 
-        <!-- ENCABEZADO CLIENTE -->
-        <div style="background:#f7f3e8;border:0.5px solid #e0d4a8;border-radius:6px;padding:12px 14px;margin-bottom:12px;">
-          <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;">
-            <div>
-              <div style="font-size:0.58rem;font-family:&#39;DM Mono&#39;,monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">Cliente</div>
-              <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
-                <div id="ficha-cliente-nombre" style="font-size:0.9rem;font-weight:700;color:#1a1008;"></div>
-                <div id="ficha-cliente-tel" style="font-size:0.72rem;color:#1a7a3a;font-weight:600;white-space:nowrap;"></div>
-              </div>
-              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px;">
-                <!-- Modo lectura concepto -->
-                <span id="ficha-concepto-read-wrap" style="display:flex;align-items:center;gap:4px;">
-                  <div id="ficha-concepto" style="font-size:0.72rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;"></div>
-                  <button id="ficha-concepto-lapiz" onclick="fichaActivarEdicionConcepto()" title="Editar título" style="display:none;background:none;border:none;cursor:pointer;font-size:0.65rem;color:#aaa;padding:0 3px;line-height:1;transition:color 0.15s;" onmouseover="this.style.color=&#39;#4a6ea8&#39;" onmouseout="this.style.color=&#39;#aaa&#39;">▸</button>
-                </span>
-                <!-- Modo edición concepto -->
-                <span id="ficha-concepto-edit-wrap" style="display:none;align-items:center;gap:4px;">
-                  <input id="ficha-concepto-input" type="text" style="font-size:0.72rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;border:1.5px solid #4a6ea8;border-radius:4px;padding:2px 6px;background:#f0f7ff;font-family:inherit;width:220px;" onkeydown="if(event.key===&#39;Enter&#39;)fichaGuardarConcepto()">
-                  <button id="ficha-concepto-save" onclick="fichaGuardarConcepto()" title="Guardar" style="font-size:0.72rem;font-family:&#39;DM Mono&#39;,monospace;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid #2a7a4a;background:#e8f5ec;color:#0a4020;cursor:pointer;">✓</button>
-                  <button onclick="fichaCancelarEdicionConcepto()" title="Cancelar" style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid #d4b870;background:#f5f0e0;color:#7a6840;cursor:pointer;">✕</button>
-                </span>
-                <div id="ficha-domicilio" style="font-size:0.72rem;color:#7a6840;"></div>
-              </div>
+        <!-- CLIENTE + DEBE EN TOTAL -->
+        <div style="background:#fff;border:1px solid #eadfbf;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+          <div style="min-width:0;flex:1;">
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+              <div id="ficha-cliente-nombre" style="font-size:0.98rem;font-weight:700;color:#1a1008;"></div>
+              <div id="ficha-cliente-tel" style="font-size:0.74rem;color:#1a7a3a;font-weight:600;white-space:nowrap;"></div>
             </div>
-            <div style="text-align:right;">
-              <div style="font-size:0.58rem;font-family:&#39;DM Mono&#39;,monospace;color:#7a6840;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">Folio</div>
-              <div id="ficha-folio-ref" style="font-size:0.9rem;font-weight:700;color:#1a5fa8;font-family:&#39;DM Mono&#39;,monospace;"></div>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:3px;">
+              <span id="ficha-concepto-read-wrap" style="display:flex;align-items:center;gap:4px;">
+                <div id="ficha-concepto" style="font-size:0.76rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;"></div>
+                <button id="ficha-concepto-lapiz" onclick="fichaActivarEdicionConcepto()" title="Editar título" style="display:none;background:none;border:none;cursor:pointer;font-size:0.65rem;color:#aaa;padding:0 3px;line-height:1;">▸</button>
+              </span>
+              <span id="ficha-concepto-edit-wrap" style="display:none;align-items:center;gap:4px;">
+                <input id="ficha-concepto-input" type="text" style="font-size:0.72rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;border:1.5px solid #4a6ea8;border-radius:4px;padding:2px 6px;background:#f0f7ff;font-family:inherit;width:220px;" onkeydown="if(event.key==='Enter')fichaGuardarConcepto()">
+                <button id="ficha-concepto-save" onclick="fichaGuardarConcepto()" title="Guardar" style="font-size:0.72rem;font-family:'DM Mono',monospace;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid #2a7a4a;background:#e8f5ec;color:#0a4020;cursor:pointer;">✓</button>
+                <button onclick="fichaCancelarEdicionConcepto()" title="Cancelar" style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid #d4b870;background:#f5f0e0;color:#7a6840;cursor:pointer;">✕</button>
+              </span>
             </div>
+            <div id="ficha-domicilio" style="font-size:0.72rem;color:#7a6840;margin-top:2px;"></div>
+            <div id="ficha-folio-ref" style="display:none;"></div>
           </div>
-          <div style="height:0.5px;background:#d4b870;margin:10px 0;"></div>
-          <div id="fichaNotasDisplay" onclick="fichaToggleNotas()" style="font-size:0.78rem;color:#7a6840;font-style:italic;cursor:pointer;padding:6px 8px;border-radius:4px;border:0.5px solid transparent;transition:all 0.15s;text-align:justify;word-break:break-word;overflow-wrap:break-word;white-space:pre-wrap;" onmouseover="this.style.background=&#39;#fffdf5&#39;;this.style.borderColor=&#39;#d4b870&#39;" onmouseout="this.style.background=&#39;transparent&#39;;this.style.borderColor=&#39;transparent&#39;">✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.</div>
-          <textarea id="fichaNotasInput" placeholder="Notas libres..." style="display:none;width:100%;font-size:0.78rem;padding:8px 10px;border:0.5px solid #c8952a;border-radius:4px;background:#fffdf5;resize:none;min-height:70px;font-family:inherit;box-sizing:border-box;margin-top:4px;"></textarea>
-          <button id="fichaSaveNotas" onclick="fichaGuardarNotas()" style="display:none;margin-top:5px;font-size:0.7rem;padding:4px 12px;border-radius:4px;border:0.5px solid #d4b870;background:#f5f0e0;cursor:pointer;color:#5a3e10;">✓ Guardar</button>
+          <div id="ficha-debe-total" style="display:none;border:2px solid #a32d2d;border-radius:8px;padding:6px 14px;text-align:right;background:#fff8f6;"></div>
         </div>
 
-        <!-- BANDA CANCELACIÓN — solo visible si está cancelado -->
-        <div id="ficha-banda-cancelacion" style="display:none;border-radius:6px;overflow:hidden;margin-bottom:12px;border:1px solid rgba(180,20,20,0.25);">
+        <!-- BANDA CANCELACIÓN -->
+        <div id="ficha-banda-cancelacion" style="display:none;border-radius:6px;overflow:hidden;border:1px solid rgba(180,20,20,0.25);">
           <div style="background:rgba(180,20,20,0.08);padding:8px 14px;border-bottom:1px solid rgba(180,20,20,0.15);">
-            <div style="font-size:0.58rem;font-family:&#39;DM Mono&#39;,monospace;color:#8a1a1a;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:3px;">⚠ Motivo de cancelación</div>
+            <div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#8a1a1a;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:3px;">⚠ Motivo de cancelación</div>
             <div id="ficha-cancelacion-motivo" style="font-size:0.78rem;color:#8a1a1a;font-weight:600;line-height:1.4;"></div>
           </div>
           <div id="ficha-cancelacion-concepto-wrap" style="display:none;background:rgba(26,95,168,0.05);padding:8px 14px;">
-            <div style="font-size:0.58rem;font-family:&#39;DM Mono&#39;,monospace;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:3px;">📋 Concepto interno</div>
+            <div style="font-size:0.58rem;font-family:'DM Mono',monospace;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;margin-bottom:3px;">📋 Concepto interno</div>
             <div id="ficha-cancelacion-concepto" style="font-size:0.78rem;color:#1a3a7a;font-weight:500;line-height:1.4;"></div>
           </div>
         </div>
 
-        <!-- RECIBOS -->
-        <div style="margin-bottom:12px;">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;"><span style="font-size:0.6rem;font-family:&#39;DM Mono&#39;,monospace;font-weight:700;color:#7a6840;text-transform:uppercase;letter-spacing:0.1em;">Recibos Oficiales del Folio</span><div id="ficha-total-header-wrap" style="text-align:right;font-family:&#39;DM Mono&#39;,monospace;font-size:0.72rem;line-height:1.6;"><span style="color:#7a6840;">💵 COSTO DEL TRÁMITE <span id="ficha-total-header" style="font-weight:700;color:#7a6840;"></span></span></div></div>
-          <div id="ficha-antecedentes" style="display:none;margin-bottom:8px;"></div>
-          <div id="ficha-recibos-lista" style="display:flex;flex-direction:column;gap:5px;"></div>
-          <div id="ficha-gastos-extra" style="display:none;margin-top:12px;"></div>
-        </div>
-
-        <!-- CARGOS SIN COSTO PACTADO — cronológico con recibos -->
-        <div id="ficha-cargos-wrap" style="display:none;margin-bottom:12px;">
-          <div style="font-size:0.6rem;font-family:&#39;DM Mono&#39;,monospace;font-weight:700;color:#1a3a70;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">📋 Cargos por Honorarios <span style="font-size:0.58rem;font-weight:400;text-transform:none;letter-spacing:0;">(sin costo pactado)</span></div>
-          <div id="ficha-cargos-lista" style="display:flex;flex-direction:column;gap:5px;"></div>
-          <div id="fichaFormCargo" style="display:none;margin-top:8px;">
-            <table style="width:100%;border-collapse:collapse;">
-              <thead>
-                <tr>
-                  <th style="width:26%;font-size:0.58rem;font-family:&#39;DM Mono&#39;,monospace;letter-spacing:0.1em;text-transform:uppercase;color:#7a6840;text-align:left;padding:4px 6px;background:#f5f0e0;border-bottom:1.5px solid #d4b870;">Concepto</th>
-                  <th style="width:38%;font-size:0.58rem;font-family:&#39;DM Mono&#39;,monospace;letter-spacing:0.1em;text-transform:uppercase;color:#7a6840;text-align:left;padding:4px 6px;background:#f5f0e0;border-bottom:1.5px solid #d4b870;">Descripción</th>
-                  <th style="width:16%;font-size:0.58rem;font-family:&#39;DM Mono&#39;,monospace;letter-spacing:0.1em;text-transform:uppercase;color:#7a6840;text-align:left;padding:4px 6px;background:#f5f0e0;border-bottom:1.5px solid #d4b870;">Fecha</th>
-                  <th style="width:12%;font-size:0.58rem;font-family:&#39;DM Mono&#39;,monospace;letter-spacing:0.1em;text-transform:uppercase;color:#7a6840;text-align:right;padding:4px 6px;background:#f5f0e0;border-bottom:1.5px solid #d4b870;">Monto ($)</th>
-                  <th style="width:8%;background:#f5f0e0;border-bottom:1.5px solid #d4b870;"></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style="padding:3px 3px;"><textarea id="fichaCargoConcepto" rows="1" placeholder="Concepto" style="width:100%;font-size:0.78rem;padding:4px 6px;border:1px solid #d4b870;border-radius:3px;background:#fffdf5;resize:none;font-family:inherit;box-sizing:border-box;"></textarea></td>
-                  <td style="padding:3px 3px;"><textarea id="fichaCargoDescripcion" rows="1" placeholder="Descripción (opcional)" style="width:100%;font-size:0.78rem;padding:4px 6px;border:1px solid #d4b870;border-radius:3px;background:#fffdf5;resize:none;font-family:inherit;box-sizing:border-box;"></textarea></td>
-                  <td style="padding:3px 3px;"><input id="fichaCargoFecha" type="date" style="width:100%;font-size:0.72rem;padding:4px 5px;border:1px solid #d4b870;border-radius:3px;background:#fffdf5;box-sizing:border-box;"></td>
-                  <td style="padding:3px 3px;"><input id="fichaCargoMonto" type="number" placeholder="0.00" onfocus="this.select()" style="width:100%;font-size:0.78rem;padding:4px 6px;border:1px solid #d4b870;border-radius:3px;background:#fffdf5;text-align:right;box-sizing:border-box;"></td>
-                  <td style="padding:3px 3px;text-align:center;white-space:nowrap;">
-                    <button onclick="fichaGuardarCargo()" title="Agregar" style="padding:4px 8px;border-radius:3px;border:1px solid #185FA5;background:#B5D4F4;color:#042C53;font-weight:700;font-size:0.72rem;cursor:pointer;">✓</button>
-                    <button onclick="document.getElementById(&#39;fichaFormCargo&#39;).style.display=&#39;none&#39;" title="Cancelar" style="padding:4px 7px;border-radius:3px;border:1px solid #d4b870;background:#f5f0e0;color:#7a6840;font-size:0.72rem;cursor:pointer;">✕</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+        <!-- ① LO PACTADO -->
+        <div class="ffx-card" style="border:2px solid #c8952a;">
+          <div class="ffx-ch" style="background:#fdf3dc;color:#7a5410;">
+            <span>① LO PACTADO <span class="ffx-sub">· se cobra con recibo</span></span>
+            <div id="ficha-total-header-wrap" style="text-align:right;font-family:'DM Mono',monospace;font-size:0.72rem;line-height:1.6;font-weight:400;"><span style="color:#7a6840;">💵 COSTO DEL TRÁMITE <span id="ficha-total-header" style="font-weight:700;color:#7a6840;"></span></span></div>
+          </div>
+          <!-- CARGOS SIN COSTO PACTADO -->
+          <div id="ficha-cargos-wrap" style="display:none;padding:8px 12px 4px;">
+            <div style="font-size:0.6rem;font-family:'DM Mono',monospace;font-weight:700;color:#1a3a70;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px;">📋 Cargos por Honorarios <span style="font-size:0.58rem;font-weight:400;text-transform:none;letter-spacing:0;">(sin costo pactado)</span></div>
+            <div id="ficha-cargos-lista" style="display:flex;flex-direction:column;gap:5px;"></div>
+            <div id="fichaFormCargo" style="display:none;margin-top:8px;">
+              <table style="width:100%;border-collapse:collapse;">
+                <thead>
+                  <tr>
+                    <th style="width:26%;font-size:0.58rem;font-family:'DM Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#7a6840;text-align:left;padding:4px 6px;background:#f5f0e0;border-bottom:1.5px solid #d4b870;">Concepto</th>
+                    <th style="width:38%;font-size:0.58rem;font-family:'DM Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#7a6840;text-align:left;padding:4px 6px;background:#f5f0e0;border-bottom:1.5px solid #d4b870;">Descripción</th>
+                    <th style="width:16%;font-size:0.58rem;font-family:'DM Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#7a6840;text-align:left;padding:4px 6px;background:#f5f0e0;border-bottom:1.5px solid #d4b870;">Fecha</th>
+                    <th style="width:12%;font-size:0.58rem;font-family:'DM Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;color:#7a6840;text-align:right;padding:4px 6px;background:#f5f0e0;border-bottom:1.5px solid #d4b870;">Monto ($)</th>
+                    <th style="width:8%;background:#f5f0e0;border-bottom:1.5px solid #d4b870;"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td style="padding:3px 3px;"><textarea id="fichaCargoConcepto" rows="1" placeholder="Concepto" style="width:100%;font-size:0.78rem;padding:4px 6px;border:1px solid #d4b870;border-radius:3px;background:#fffdf5;resize:none;font-family:inherit;box-sizing:border-box;"></textarea></td>
+                    <td style="padding:3px 3px;"><textarea id="fichaCargoDescripcion" rows="1" placeholder="Descripción (opcional)" style="width:100%;font-size:0.78rem;padding:4px 6px;border:1px solid #d4b870;border-radius:3px;background:#fffdf5;resize:none;font-family:inherit;box-sizing:border-box;"></textarea></td>
+                    <td style="padding:3px 3px;"><input id="fichaCargoFecha" type="date" style="width:100%;font-size:0.72rem;padding:4px 5px;border:1px solid #d4b870;border-radius:3px;background:#fffdf5;box-sizing:border-box;"></td>
+                    <td style="padding:3px 3px;"><input id="fichaCargoMonto" type="number" placeholder="0.00" onfocus="this.select()" style="width:100%;font-size:0.78rem;padding:4px 6px;border:1px solid #d4b870;border-radius:3px;background:#fffdf5;text-align:right;box-sizing:border-box;"></td>
+                    <td style="padding:3px 3px;text-align:center;white-space:nowrap;">
+                      <button onclick="fichaGuardarCargo()" title="Agregar" style="padding:4px 8px;border-radius:3px;border:1px solid #185FA5;background:#B5D4F4;color:#042C53;font-weight:700;font-size:0.72rem;cursor:pointer;">✓</button>
+                      <button onclick="document.getElementById('fichaFormCargo').style.display='none'" title="Cancelar" style="padding:4px 7px;border-radius:3px;border:1px solid #d4b870;background:#f5f0e0;color:#7a6840;font-size:0.72rem;cursor:pointer;">✕</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="ffx-ft" style="background:#fdf8ec;border-top:1px dashed #e3d3a8;">
+            <span style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;">Costo <b id="ficha-total" style="color:#1a1008;"></b> · Pagado <b id="ficha-abonado" style="color:#1a7a3a;"></b> · <span id="ficha-pendiente-label" style="color:#a32d2d;font-weight:700;">Resta</span> <b id="ficha-pendiente" style="color:#a32d2d;"></b></span>
+            <span id="ficha-pactado-btns" style="display:none;gap:6px;">
+              <button type="button" class="ffx-btn" style="background:#c8781a;" onclick="lexFichaCobrarFolio('parcial')">💰 Pago parcial</button>
+              <button type="button" class="ffx-btn" style="background:#2a7a3a;" onclick="lexFichaCobrarFolio('total')">✅ Pago total</button>
+            </span>
           </div>
         </div>
 
+        <!-- ② GASTOS DEL TRÁMITE (lo pinta lexPintarGastosFicha) -->
+        <div id="ficha-gastos-extra" class="ffx-card" style="display:none;border:2px solid #97C459;"></div>
+
+        <!-- ③ RECIBOS OFICIALES Y PAGOS -->
+        <div class="ffx-card" style="border:2px solid #85B7EB;">
+          <div class="ffx-ch" style="background:#E6F1FB;color:#0C447C;"><span><span id="ficha-num-recibos">③</span> RECIBOS OFICIALES Y PAGOS <span class="ffx-sub">· de lo pactado</span></span></div>
+          <div style="padding:8px 10px;">
+            <div id="ficha-antecedentes" style="display:none;margin-bottom:8px;"></div>
+            <div id="ficha-recibos-lista" style="display:flex;flex-direction:column;gap:5px;"></div>
+          </div>
+        </div>
+
+        <!-- NOTAS DEL EXPEDIENTE -->
+        <div style="background:#fff;border:1px dashed #d8c08a;border-radius:8px;padding:6px 10px;">
+          <div id="fichaNotasDisplay" onclick="fichaToggleNotas()" style="font-size:0.78rem;color:#7a6840;font-style:italic;cursor:pointer;padding:4px 6px;border-radius:4px;border:0.5px solid transparent;transition:all 0.15s;text-align:justify;word-break:break-word;overflow-wrap:break-word;white-space:pre-wrap;" onmouseover="this.style.background='#fffdf5';this.style.borderColor='#d4b870'" onmouseout="this.style.background='transparent';this.style.borderColor='transparent'">✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.</div>
+          <textarea id="fichaNotasInput" placeholder="Notas libres..." style="display:none;width:100%;font-size:0.78rem;padding:8px 10px;border:0.5px solid #c8952a;border-radius:4px;background:#fffdf5;resize:none;min-height:70px;font-family:inherit;box-sizing:border-box;margin-top:4px;"></textarea>
+          <button id="fichaSaveNotas" onclick="fichaGuardarNotas()" style="display:none;margin-top:5px;font-size:0.7rem;padding:4px 12px;border-radius:4px;border:0.5px solid #d4b870;background:#f5f0e0;cursor:pointer;color:#5a3e10;">✓ Guardar</button>
         </div>
 
       </div>
-
-      <!-- FOOTER FIJO -->
-      <div style="flex-shrink:0;border-top:1px solid #d4b870;background:#f5f0e0;padding:8px 16px;display:flex;justify-content:flex-end;">
-        <!-- CUADRO DE RECIBO — resumen del folio (esquina inferior derecha) -->
-        <div id="ficha-resumen-recibo" style="width:190px;flex-shrink:0;background:#fffdf7;border:1.5px solid #c8952a;border-radius:8px;box-shadow:0 4px 14px rgba(80,58,12,0.18);font-family:&#39;DM Mono&#39;,monospace;overflow:hidden;display:flex;flex-direction:column;">
-          <!-- Encabezado tipo recibo -->
-          <div style="background:#f5ecd0;border-bottom:1px dashed #c8952a;padding:4px 12px;display:flex;align-items:center;gap:6px;">
-            <span style="font-size:0.72rem;line-height:1;">🧾</span>
-            <span style="font-size:0.55rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#5a3e10;">Resumen del Folio</span>
-          </div>
-          <!-- Líneas del recibo -->
-          <div style="padding:6px 12px 8px;">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;">
-              <span style="font-size:0.55rem;letter-spacing:0.08em;text-transform:uppercase;color:#7a6840;">Total</span>
-              <div id="ficha-total" style="font-size:0.82rem;font-weight:700;color:#1a1008;"></div>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:2px;">
-              <span style="font-size:0.55rem;letter-spacing:0.08em;text-transform:uppercase;color:#7a6840;">Abonado</span>
-              <div id="ficha-abonado" style="font-size:0.82rem;font-weight:700;color:#1a7a3a;"></div>
-            </div>
-            <div style="border-top:1px dashed #d4b870;margin:5px 0 4px;"></div>
-            <div style="display:flex;justify-content:space-between;align-items:baseline;">
-              <span id="ficha-pendiente-label" style="font-size:0.58rem;letter-spacing:0.08em;text-transform:uppercase;color:#a32d2d;font-weight:700;">Resta</span>
-              <div id="ficha-pendiente" style="font-size:0.92rem;font-weight:700;color:#a32d2d;text-align:right;"></div>
-            </div>
-          </div>
-          <!-- Acciones ancladas al fondo del resumen: Exp. Digital, Estado de Cuenta, Cerrar Juicio/Escritura -->
-          <div style="margin-top:auto;padding:8px 10px 10px;border-top:1px dashed #d4b870;display:flex;flex-direction:column;gap:6px;">
-            <button id="ficha-btn-exp-digital" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #4a6ea8;background:#e6f1fb;color:#1a3a70;font-family:&#39;DM Mono&#39;,monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;box-sizing:border-box;" onmouseover="this.style.background=&#39;#c8dcf4&#39;" onmouseout="this.style.background=&#39;#e6f1fb&#39;">
-              <span style="font-size:15px;line-height:1;">📋</span>Exp. Digital
-            </button>
-            <button onclick="abrirEstadoCuenta()" style="display:flex;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #2a7a4a;background:#e8f5ec;color:#0a4020;font-family:&#39;DM Mono&#39;,monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;box-sizing:border-box;" onmouseover="this.style.background=&#39;#c8f5d8&#39;" onmouseout="this.style.background=&#39;#e8f5ec&#39;">
-              <span style="font-size:15px;line-height:1;">📊</span>Estado de Cuenta
-            </button>
-            <button id="ficha-btn-cerrar-juicio" onclick="fichaCerrarJuicio()" style="display:none;align-items:center;gap:7px;padding:9px 10px;border-radius:4px;border:2.5px solid #993C1D;background:#FAECE7;color:#712B13;font-family:&#39;DM Mono&#39;,monospace;font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;width:100%;text-align:left;transition:all 0.15s;box-sizing:border-box;" onmouseover="this.style.background=&#39;#F5C4B3&#39;" onmouseout="this.style.background=&#39;#FAECE7&#39;">
-              <span style="font-size:15px;line-height:1;">⚖️</span>Cerrar Juicio
-            </button>
-          </div>
-        </div>
-      </div>
-
     </div>
   </div>
+</div>
 </div>
   <!-- PDF VIEWER para modo consulta -->
   <div id="pdf-consulta-wrap">
@@ -19483,7 +19469,7 @@ Recibo original im…</td>
 <script src="assets/js/ui/cobranza.js?v=20261118a"></script>
 <script src="assets/js/ui/mandar-llamada.js?v=20261023g"></script>
 <script src="assets/js/ui/sync-vivo.js?v=20261023i"></script>
-<script src="assets/js/ui/gastos-cliente.js?v=20261119b"></script>
+<script src="assets/js/ui/gastos-cliente.js?v=20261119c"></script>
 <script src="assets/js/ui/escrituras-lista.js?v=20261030a"></script>
 <script src="assets/js/ui/escrituras-asistente.js?v=20261029a"></script>
 <script src="assets/js/ui/saldos-anteriores.js?v=20261119d"></script>

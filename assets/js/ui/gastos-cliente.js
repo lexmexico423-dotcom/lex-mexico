@@ -1374,73 +1374,139 @@
   // ════════════════════════════════════════════════════════════════════
   // FICHA DEL FOLIO: "Gastos extra por cuenta del cliente"
   // ════════════════════════════════════════════════════════════════════
+  // Nov-2026 · Ficha del folio rediseñada (opción A): tarjeta ② GASTOS DEL TRÁMITE
+  // con casillas, "DEBE EN TOTAL" junto al cliente y botones de cobro en ① LO PACTADO.
+  var _fichaFolioActual = null;
+  function montoDeTexto(t){ var m = /\$\s*([\d,]+(?:\.\d+)?)/.exec(String(t || '')); return m ? r2(m[1].replace(/,/g, '')) : null; }
+  function pintarDebeTotal(){
+    var folio = _fichaFolioActual; if (folio == null) return;
+    var box = document.getElementById('ficha-debe-total'), btns = document.getElementById('ficha-pactado-btns');
+    var fpEl = document.getElementById('ficha-pendiente');
+    var infoU = infoFolio(ultimasVersiones()[String(folio)]);
+    var cancelado = !!(infoU && infoU.estado === 'cancelado');
+    var resta = cancelado ? 0 : (montoDeTexto(fpEl && fpEl.textContent) != null ? montoDeTexto(fpEl.textContent) : (infoU ? infoU.saldo : 0));
+    var gas = r2(gastosDeFolio(folio).reduce(function(s, a){ return s + totalPendiente(a); }, 0));
+    var tot = r2(resta + gas);
+    if (box) {
+      if (tot > 0.005) {
+        box.innerHTML = '<div style="font-family:monospace;font-size:0.62rem;color:#a32d2d;letter-spacing:0.08em;">DEBE EN TOTAL</div>'
+          + '<div style="font-family:monospace;font-size:1.25rem;font-weight:800;color:#a32d2d;">' + $m(tot) + '</div>'
+          + (gas > 0.005 && resta > 0.005 ? '<div style="font-size:0.7rem;color:#7a6840;">Pactado ' + $m(resta) + ' + gastos ' + $m(gas) + '</div>'
+             : gas > 0.005 ? '<div style="font-size:0.7rem;color:#7a6840;">Solo gastos del trámite</div>' : '');
+        box.style.display = 'block';
+      } else { box.innerHTML = ''; box.style.display = 'none'; }
+    }
+    // Botones de cobro de lo pactado: solo si hay saldo, no está cancelado y no es "sin costo pactado"
+    if (btns) {
+      var puede = !cancelado && resta > 0.005 && !(infoU && infoU.estado === 'abierto') && typeof window.ejecutarPagoParcial === 'function';
+      btns.style.display = puede ? 'inline-flex' : 'none';
+    }
+  }
+  // Si cambia el "Resta" (p. ej. al terminar de cargar cargos), se recalcula el total
+  (function(){
+    var obs = null;
+    function engancha(){
+      var fp = document.getElementById('ficha-pendiente'); if (!fp || obs || typeof MutationObserver === 'undefined') return;
+      obs = new MutationObserver(function(){ try { pintarDebeTotal(); } catch(_){} });
+      obs.observe(fp, { childList: true, characterData: true, subtree: true });
+    }
+    window._lexFichaEnganchaResta = engancha;
+  })();
+  window.lexFichaCobrarFolio = function(tipo){
+    var folio = _fichaFolioActual; if (folio == null) return;
+    var listo = function(){
+      try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch(_){}
+      if (tipo === 'total') { if (typeof window.ejecutarLiquidacionTotal === 'function') window.ejecutarLiquidacionTotal(); }
+      else if (typeof window.ejecutarPagoParcial === 'function') window.ejecutarPagoParcial();
+    };
+    if (typeof reciboEnConsulta !== 'undefined' && reciboEnConsulta && String(reciboEnConsulta.folio) === String(folio)) listo();
+    else abrirFolioEnConsulta(folio, listo);
+  };
   window.lexPintarGastosFicha = function(recibo){
     var box = document.getElementById('ficha-gastos-extra'); if (!box) return;
-    if (!recibo || recibo.folio == null) { box.innerHTML = ''; box.style.display = 'none'; return; }
+    var numRec = document.getElementById('ficha-num-recibos');
+    if (!recibo || recibo.folio == null) { box.innerHTML = ''; box.style.display = 'none'; if (numRec) numRec.textContent = '②'; return; }
+    _fichaFolioActual = recibo.folio;
+    try { window._lexFichaEnganchaResta(); } catch(_){}
     var ads = gastosDeFolio(recibo.folio);
     var nombre = recibo.nombre || ((recibo.clientes||[])[0]||{}).nombre || '';
     var sueltos = pendientesSinFolioDe(nombre);
-    var filas = [], incluidos = [];
-    var adelantos = [], scPend = [];
+    var filas = [], incluidos = [], adelantos = [], scPend = [];
     ads.forEach(function(a){ (a.conceptos||[]).forEach(function(c){
       if (esAdelanto(c)) { if (!c.cobrado) adelantos.push({ a: a, c: c }); return; }
       if (esComplementario(c)) { if (a.estado === 'pendiente-recibo') scPend.push({ a: a, c: c }); return; }
       (esIncluido(c) ? incluidos : filas).push({ a: a, c: c }); }); });
-    if (!filas.length && !incluidos.length && !sueltos.length && !adelantos.length && !scPend.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
     incluidos.sort(function(x,y){ return String(x.c.fecha||'').localeCompare(String(y.c.fecha||'')); });
     filas.sort(function(x,y){ return String(x.c.fecha||'').localeCompare(String(y.c.fecha||'')); });
     var pend = r2(ads.reduce(function(s,a){ return s + totalPendiente(a); }, 0));
-    // Saldo de la versión MÁS RECIENTE del folio (la ficha puede recibir cualquier letra)
     var infoU = infoFolio(ultimasVersiones()[String(recibo.folio)] || recibo);
-    var saldo = infoU ? infoU.saldo : (parseFloat(recibo.saldoPendiente) || 0);
-    var conSaldo = !!(infoU && infoU.estado === 'saldo');
-    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
-      + '<span style="font-size:0.6rem;font-family:\'DM Mono\',monospace;font-weight:700;color:#8a4a10;text-transform:uppercase;letter-spacing:0.1em;">💵 Reembolsos al despacho <span style="text-transform:none;letter-spacing:0;font-weight:400;color:#7a6840;">(fuera de lo pactado)</span></span>'
-      + '<button type="button" onclick="lexNuevoGastoFolio(' + Number(recibo.folio) + ')" style="font-size:0.66rem;border:1px solid #c8781a;background:#fff;color:#c8781a;border-radius:5px;padding:3px 9px;cursor:pointer;">＋ Agregar reembolso</button></div>';
+    var cancelado = !!(infoU && infoU.estado === 'cancelado');
+    var hayAlgo = filas.length || incluidos.length || sueltos.length || adelantos.length || scPend.length;
+    if (cancelado && !hayAlgo) { box.innerHTML = ''; box.style.display = 'none'; if (numRec) numRec.textContent = '②'; pintarDebeTotal(); return; }
+    if (numRec) numRec.textContent = '③';
+    var MONO = 'font-family:\'DM Mono\',monospace;';
+    var pendientesF = filas.filter(function(f){ return !conceptoCobrado(f.a, f.c); });
+    var html = '<div class="ffx-ch" style="background:#EAF3DE;color:#27500A;"><span>② GASTOS DEL TRÁMITE <span class="ffx-sub">· aparte de lo pactado · Caja Rápida</span></span>'
+      + '<span style="display:flex;align-items:center;gap:10px;font-weight:400;">'
+      +   (cancelado ? '' : '<button type="button" onclick="lexNuevoGastoFolio(' + Number(recibo.folio) + ')" style="font-size:0.68rem;border:1px solid #3B6D11;background:#fff;color:#27500A;border-radius:6px;padding:2px 9px;cursor:pointer;font-family:Helvetica,Arial,sans-serif;">＋ Agregar gasto</button>')
+      +   (pendientesF.length ? '<label style="display:flex;align-items:center;gap:5px;font-size:0.7rem;cursor:pointer;font-family:Helvetica,Arial,sans-serif;"><input type="checkbox" id="ffg-todos" checked style="accent-color:#3B6D11;width:15px;height:15px;margin:0;"> Todos</label>' : '')
+      + '</span></div>';
+    if (!hayAlgo) html += '<div style="padding:7px 12px;font-size:0.74rem;color:#7a6a4a;">Sin gastos aparte de lo pactado.</div>';
+    if (filas.length) {
+      html += '<div style="padding:2px 12px;">' + filas.map(function(f){
+        var cob = conceptoCobrado(f.a, f.c);
+        return '<label style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f1e6cc;font-size:0.78rem;' + (cob ? 'color:#8a7a5a;' : 'cursor:pointer;') + '">'
+          + '<span style="display:flex;align-items:center;gap:8px;min-width:0;">' + (cob ? '<span style="width:15px;text-align:center;color:#3B6D11;">✓</span>' : '<input type="checkbox" class="ffg-c" data-aid="' + E(f.a.id) + '" data-cid="' + E(f.c.id) + '" data-m="' + r2(f.c.monto) + '" checked style="accent-color:#3B6D11;width:15px;height:15px;margin:0;flex-shrink:0;">')
+          +   '<span style="' + MONO + 'font-size:0.7rem;color:#7a6840;white-space:nowrap;">' + E(fC(f.c.fecha)) + '</span> <span>' + E(String(f.c.descripcion || '').toUpperCase()) + ' ' + etqOrigen(f.c) + '</span></span>'
+          + '<span style="' + MONO + 'white-space:nowrap;">' + $m(f.c.monto) + ' <span style="font-size:0.64rem;border-radius:10px;padding:1px 7px;' + (cob ? 'background:#EAF3DE;color:#27500A;">pagado' : 'background:#FCEBEB;color:#791F1F;">pendiente') + '</span></span></label>';
+      }).join('') + '</div>';
+    }
     if (adelantos.length) {
       var tAd = r2(adelantos.reduce(function(s, f){ return s + (parseFloat(f.c.monto) || 0); }, 0));
-      html += '<div style="background:#FAEEDA;border:1px solid #f0d49a;border-radius:8px;padding:9px 12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">'
-        + '<div><b style="color:#633806;font-size:0.8rem;">⏩ Pagos que adelantó el despacho (dentro de lo pactado)</b><div style="font-size:0.74rem;color:#633806;">' + adelantos.map(function(f){ return E(f.c.descripcion) + ' · ' + $m(f.c.monto) + ' · ' + E(fC(f.c.fecha)) + (f.c.origenDinero === 'caja' ? ' (de caja)' : f.c.origenDinero === 'ninguno' ? ' (no salió dinero)' : ' (lo puso el Lic.)'); }).join('<br>') + '</div></div>'
-        + '<button type="button" onclick="lexReembolsarAdelanto(' + Number(recibo.folio) + ')" style="font-size:0.74rem;border:none;background:#3B6D11;color:#fff;border-radius:6px;padding:6px 12px;cursor:pointer;font-weight:700;">Reembolsar ' + $m(tAd) + '</button></div>';
+      html += '<div style="background:#FAEEDA;border-top:1px solid #f0d49a;padding:8px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">'
+        + '<div><b style="color:#633806;font-size:0.78rem;">⏩ Pagos que adelantó el despacho (dentro de lo pactado)</b><div style="font-size:0.72rem;color:#633806;">' + adelantos.map(function(f){ return E(f.c.descripcion) + ' · ' + $m(f.c.monto) + ' · ' + E(fC(f.c.fecha)); }).join('<br>') + '</div></div>'
+        + '<button type="button" onclick="lexReembolsarAdelanto(' + Number(recibo.folio) + ')" class="ffx-btn" style="background:#3B6D11;">Reembolsar ' + $m(tAd) + '</button></div>';
     }
     if (scPend.length) {
-      html += scPend.map(function(f){ return '<div style="background:#FCEBEB;border:1px solid #f0b4b4;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:0.76rem;color:#791F1F;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+      html += scPend.map(function(f){ return '<div style="background:#FCEBEB;border-top:1px solid #f0b4b4;padding:7px 12px;font-size:0.74rem;color:#791F1F;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
         + '<span>⚠ Falta generar el recibo de servicio complementario: <b>' + E(f.c.descripcion) + ' ' + $m(f.c.monto) + '</b></span>'
-        + '<button type="button" onclick="lexGenerarComplementario(\'' + f.a.id + '\')" style="font-size:0.72rem;border:none;background:#8c6518;color:#fff;border-radius:6px;padding:5px 10px;cursor:pointer;">Generar recibo</button></div>'; }).join('');
-    }
-    if (filas.length) {
-      html += '<div style="background:#fff;border:1px solid #ecd9b5;border-radius:6px;overflow:hidden;">' + filas.map(function(f){
-        var cob = conceptoCobrado(f.a, f.c);
-        return '<div style="display:grid;grid-template-columns:62px 1fr 150px 92px;gap:6px;padding:5px 10px;border-bottom:1px solid #f1e6cc;font-size:0.74rem;align-items:center;' + (cob ? 'color:#8a7a5a;' : '') + '">'
-          + '<span>' + E(fC(f.c.fecha)) + '</span>'
-          + '<span>' + (cob ? '<s>' : '') + E(f.c.descripcion) + (cob ? '</s>' : '') + (f.c.movEgresoId ? ' <span style="font-size:0.62rem;background:#fdf0dc;color:#8a4a10;border-radius:4px;padding:0 5px;">lo pagó el despacho' + (f.c.honorariosGestion ? ' · salió de caja ' + $m(f.c.montoCaja) + ' + ' + $m(f.c.honorariosGestion) + ' de gestión' : '') + '</span>' : '') + '</span>'
-          + '<span style="font-size:0.66rem;color:' + (cob ? '#3b6d11' : '#a32d2d') + ';">' + (cob ? '✓ cobrado ' + E(fC(f.c.cobradoFecha)) : 'pendiente') + '</span>'
-          + '<span style="text-align:right;font-family:monospace;">' + $m(f.c.monto) + '</span></div>';
-      }).join('') + '</div>';
-      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:0.74rem;">'
-        + '<span>Reembolsos pendientes: <b style="font-family:monospace;color:#a32d2d;">' + $m(pend) + '</b>'
-        + (pend > 0.005 && conSaldo ? ' &nbsp;·&nbsp; Total para liquidar (saldo ' + $m(saldo) + ' + reembolsos): <b style="font-family:monospace;">' + $m(r2(saldo + pend)) + '</b>' : '') + '</span>'
-        + (pend > 0.005 ? '<button type="button" onclick="lexCobrarGastosFolio(' + Number(recibo.folio) + ')" style="font-size:0.7rem;border:none;background:#c8781a;color:#fff;border-radius:5px;padding:5px 11px;cursor:pointer;font-weight:700;">💰 Cobrar reembolso</button>' : '')
-        + '</div>';
+        + '<button type="button" onclick="lexGenerarComplementario(\'' + f.a.id + '\')" class="ffx-btn" style="background:#8c6518;">Generar recibo</button></div>'; }).join('');
     }
     if (incluidos.length) {
       var ti = r2(incluidos.reduce(function(s,f){ return s + (parseFloat(f.c.monto)||0); }, 0));
-      html += '<div style="margin-top:10px;font-size:0.6rem;font-family:\'DM Mono\',monospace;font-weight:700;color:#1a6a3a;text-transform:uppercase;letter-spacing:0.1em;">✓ Costos incluidos en lo pactado <span style="text-transform:none;letter-spacing:0;font-weight:400;color:#5a7a5a;">(los pagó el despacho — no se cobran aparte)</span></div>'
-        + '<div style="background:#fff;border:1px solid #cfe3cf;border-radius:6px;overflow:hidden;margin-top:4px;">' + incluidos.map(function(f){
-          return '<div style="display:grid;grid-template-columns:62px 1fr 150px 92px;gap:6px;padding:5px 10px;border-bottom:1px solid #e3efe3;font-size:0.74rem;align-items:center;">'
-            + '<span>' + E(fC(f.c.fecha)) + '</span><span>' + E(f.c.descripcion) + '</span>'
-            + '<span style="font-size:0.66rem;color:#1a6a3a;">' + (f.c.movEgresoId ? 'salida de caja ' + E(fC(f.c.egresoFecha)) : 'incluido') + '</span>'
-            + '<span style="text-align:right;font-family:monospace;">' + $m(f.c.monto) + '</span></div>';
-        }).join('') + '</div>'
-        + '<div style="font-size:0.72rem;margin-top:4px;color:#1a6a3a;">Total que absorbió el despacho dentro de lo pactado: <b style="font-family:monospace;">' + $m(ti) + '</b></div>';
+      html += '<div style="border-top:1px solid #e3efe3;padding:6px 12px;font-size:0.72rem;color:#1a6a3a;">✓ Costos incluidos en lo pactado (los pagó el despacho, no se cobran aparte): '
+        + incluidos.map(function(f){ return E(f.c.descripcion) + ' ' + $m(f.c.monto); }).join(' · ') + ' — <b style="' + MONO + '">' + $m(ti) + '</b></div>';
     }
     if (sueltos.length) {
       var ts = r2(sueltos.reduce(function(s,a){ return s + totalPendiente(a); }, 0));
-      html += '<div style="margin-top:8px;background:#fdf0dc;border:1px solid #e8c58a;border-radius:6px;padding:7px 10px;font-size:0.74rem;color:#6a3a08;">⚠ Este cliente también debe <b>' + $m(ts) + '</b> en reembolsos sin folio. '
+      html += '<div style="border-top:1px solid #e8c58a;background:#fdf0dc;padding:7px 12px;font-size:0.74rem;color:#6a3a08;">⚠ Este cliente también debe <b>' + $m(ts) + '</b> en reembolsos sin folio. '
         + '<button type="button" onclick="lexLigarAdeudosAFolio(' + Number(recibo.folio) + ')" style="font-size:0.68rem;border:1px solid #c8781a;background:#fff;color:#c8781a;border-radius:5px;padding:2px 8px;cursor:pointer;margin-left:4px;">Ligarlos a este folio</button></div>';
+    }
+    if (filas.length) {
+      html += '<div class="ffx-ft" style="background:#f6fbef;border-top:1px dashed #C0DD97;"><span>Pendiente <b style="color:#a32d2d;">' + $m(pend) + '</b>'
+        + (pendientesF.length ? ' · Marcado <b id="ffg-sel" style="color:#27500A;">' + $m(pend) + '</b>' : '') + '</span>'
+        + (pendientesF.length ? '<button type="button" id="ffg-cobrar" class="ffx-btn" style="background:#3B6D11;">💸 Cobrar</button>' : '<span style="color:#1a7a3a;font-weight:700;">✓ PAGADOS</span>') + '</div>';
     }
     box.innerHTML = html;
     box.style.display = 'block';
+    // Casillas
+    var cks = Array.prototype.slice.call(box.querySelectorAll('.ffg-c')), todos = box.querySelector('#ffg-todos');
+    function marcados(){ return cks.filter(function(c){ return c.checked; }); }
+    function pintaSel(){
+      var m = marcados(), t = r2(m.reduce(function(s, c){ return s + (parseFloat(c.getAttribute('data-m')) || 0); }, 0));
+      var el = box.querySelector('#ffg-sel'); if (el) el.textContent = $m(t);
+      if (todos) { todos.checked = m.length === cks.length; todos.indeterminate = m.length > 0 && m.length < cks.length; }
+      var b = box.querySelector('#ffg-cobrar'); if (b) b.style.opacity = m.length ? '1' : '0.5';
+    }
+    cks.forEach(function(c){ c.onchange = pintaSel; });
+    if (todos) todos.onchange = function(){ cks.forEach(function(c){ c.checked = todos.checked; }); pintaSel(); };
+    var bc = box.querySelector('#ffg-cobrar');
+    if (bc) bc.onclick = function(){
+      var m = marcados(); if (!m.length) { if (typeof toast === 'function') toast('Marca qué gastos va a pagar', 'err'); return; }
+      window.lexCobrarAdeudo(m[0].getAttribute('data-aid'), { marcados: m.map(function(c){ return c.getAttribute('data-cid'); }) });
+    };
+    pintarDebeTotal();
+    setTimeout(pintarDebeTotal, 1500);
   };
   window.lexNuevoGastoFolio = function(folio){
     var r = ultimasVersiones()[String(folio)];

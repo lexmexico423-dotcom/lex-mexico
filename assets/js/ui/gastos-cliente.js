@@ -990,7 +990,18 @@
     if (c.origenDinero === 'anterior') return etq('gasto anterior', '#F1EFE8', '#444441');
     return etq('lo puso el Lic.', '#E6F1FB', '#0C447C');
   }
-  window.lexCobrarAdeudo = async function(id){
+  // Reparte un monto entre los conceptos marcados, en el orden de la lista
+  function repartir(sel, monto){
+    var resto = r2(monto), out = [];
+    sel.forEach(function(it){
+      if (resto <= 0.005) return;
+      var mc = r2(it.c.monto), ap = r2(Math.min(resto, mc));
+      out.push({ it: it, aplica: ap, resta: r2(mc - ap) }); resto = r2(resto - ap);
+    });
+    return out;
+  }
+  window.lexCobrarAdeudo = async function(id, opts){
+    opts = opts || {};
     var a = lista().filter(function(x){ return x && x.id === id; })[0]; if (!a) return;
     if (a.estado === 'pendiente-recibo') { window.lexGenerarComplementario(a.id); return; }
     if (adelantosPend(a).length && !pendientes(a).length) { window.lexReembolsarAdelanto(a.folioVinculado); return; }
@@ -1010,7 +1021,7 @@
     b.innerHTML = '<div style="font-size:0.9rem;margin-bottom:8px;">¿Qué está pagando hoy?</div>'
       + '<div style="background:#fff;border:1px solid #e3d3a8;border-radius:8px;padding:2px 10px;">'
       + items.map(function(it, k){ return '<label style="display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px solid #f1e6cc;cursor:pointer;font-size:0.86rem;">'
-          + '<input type="checkbox" class="rb-cob-c" data-k="' + k + '" checked style="accent-color:#3B6D11;width:16px;height:16px;">'
+          + '<input type="checkbox" class="rb-cob-c" data-k="' + k + '"' + (!opts.marcados || opts.marcados.indexOf(it.c.id) >= 0 ? ' checked' : '') + ' style="accent-color:#3B6D11;width:16px;height:16px;">'
           + '<span style="flex:1;">' + E(it.c.descripcion) + etqOrigen(it.c) + (variosFolios && it.a.folioVinculado != null ? etq('folio ' + it.a.folioVinculado, '#F1EFE8', '#444441') : '') + (it.c.fecha ? ' <span style="color:#8a7a5a;font-size:0.76rem;">· ' + E(fC(it.c.fecha)) + '</span>' : '') + '</span>'
           + '<b style="font-family:monospace;">' + $m(it.c.monto) + '</b></label>'; }).join('')
       + '</div>'
@@ -1018,13 +1029,26 @@
       + preg('¿Cuánto nos pagó?')
       + '<button type="button" id="rb-todo" style="' + OPC + '"><b id="rb-todo-t"></b><div style="font-size:0.76rem;color:#7a6440;margin-top:2px;">Comprobante con un renglón por concepto</div></button>'
       + opcion('rb-parte', 'Solo una parte', 'Escribe cuánto dejó; lo demás sigue pendiente')
-      + '<div id="rb-parte-box" style="display:none;"><input id="rb-parte-mon" type="number" step="0.01" min="0" style="' + INP + '" placeholder="¿Cuánto dejó? $"><button type="button" id="rb-parte-ok" style="background:#3B6D11;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:0.85rem;font-weight:700;cursor:pointer;">Continuar</button></div>'
+      + '<div id="rb-parte-box" style="display:none;"><input id="rb-parte-mon" type="number" step="0.01" min="0" style="' + INP + '" placeholder="¿Cuánto dejó? $"><div id="rb-reparto"></div><button type="button" id="rb-parte-ok" style="background:#3B6D11;color:#fff;border:none;border-radius:8px;padding:9px 16px;font-size:0.85rem;font-weight:700;cursor:pointer;">Continuar</button></div>'
       + errBox()
-      + '<div style="font-size:0.76rem;color:#7a6440;margin-top:6px;">El dinero entra por Caja Rápida y en Contabilidad queda en una sola línea. Quita la palomita a lo que no paga hoy.</div>';
+      + '<div style="font-size:0.76rem;color:#7a6440;margin-top:6px;">El dinero entra por Caja Rápida y en Contabilidad queda en una sola línea. Quita la palomita a lo que no paga hoy. Un abono se descuenta en el orden de la lista.</div>';
     var $ = function(s){ return ov.querySelector('#' + s); };
     function sel(){ var r = []; b.querySelectorAll('.rb-cob-c').forEach(function(cb){ if (cb.checked) r.push(items[+cb.getAttribute('data-k')]); }); return r; }
     function totSel(){ return r2(sel().reduce(function(t, it){ return t + (parseFloat(it.c.monto) || 0); }, 0)); }
-    function pinta(){ var t = totSel(); $('rb-cob-tot').textContent = $m(t); $('rb-todo-t').textContent = 'Todo lo marcado — ' + $m(t); $('lex-rb-err').textContent = ''; }
+    // Nov-2026: al escribir un abono se ve a qué se va a descontar
+    function pintaReparto(){
+      var box = $('rb-reparto'); if (!box) return;
+      var m = r2(($('rb-parte-mon') || {}).value), s = sel();
+      if (!(m > 0) || !s.length) { box.innerHTML = ''; return; }
+      if (m > totSel() + 0.005) { box.innerHTML = '<div style="color:#a32d2d;font-size:0.78rem;margin:-4px 0 8px;">Es más de lo marcado (' + $m(totSel()) + ').</div>'; return; }
+      var rp = repartir(s, m), tocados = rp.map(function(x){ return x.it; });
+      box.innerHTML = '<div style="background:#fff;border:1px solid #C0DD97;border-radius:8px;padding:6px 10px;margin:-4px 0 10px;font-size:0.8rem;">'
+        + '<div style="font-size:0.66rem;color:#27500A;letter-spacing:0.06em;margin-bottom:3px;">ASÍ SE VA A DESCONTAR</div>'
+        + rp.map(function(x){ return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;"><span>' + (x.resta <= 0.005 ? '✓ ' : '◐ ') + E(x.it.c.descripcion) + (x.resta <= 0.005 ? ' <span style="color:#27500A;font-size:0.72rem;">pagado</span>' : ' <span style="color:#854F0B;font-size:0.72rem;">abono · resta ' + $m(x.resta) + '</span>') + '</span><b style="font-family:monospace;">' + $m(x.aplica) + '</b></div>'; }).join('')
+        + s.filter(function(it){ return tocados.indexOf(it) < 0; }).map(function(it){ return '<div style="display:flex;justify-content:space-between;gap:8px;padding:2px 0;color:#8a7a5a;"><span>○ ' + E(it.c.descripcion) + ' <span style="font-size:0.72rem;">sigue pendiente</span></span><span style="font-family:monospace;">' + $m(it.c.monto) + '</span></div>'; }).join('')
+        + '</div>';
+    }
+    function pinta(){ var t = totSel(); $('rb-cob-tot').textContent = $m(t); $('rb-todo-t').textContent = 'Todo lo marcado — ' + $m(t); $('lex-rb-err').textContent = ''; pintaReparto(); }
     b.querySelectorAll('.rb-cob-c').forEach(function(cb){ cb.onchange = pinta; }); pinta();
     function abrirCaja(monto){
       var s = sel(); if (!s.length) { $('lex-rb-err').textContent = 'Marca al menos un concepto.'; return; }
@@ -1033,7 +1057,8 @@
       var folios = []; s.forEach(function(it){ var f = it.a.folioVinculado; if (f != null && f !== '' && folios.indexOf(String(f)) < 0) folios.push(String(f)); });
       var ids = []; s.forEach(function(it){ if (ids.indexOf(it.a.id) < 0) ids.push(it.a.id); });
       var txtFol = folios.length ? ' (folio ' + folios.join(', ') + ')' : '';
-      var conceptos = parcial ? [{ desc: 'ABONO A ' + s.map(function(it){ return String(it.c.descripcion || '').toUpperCase(); }).join(', '), precio: monto }]
+      // Nov-2026: el comprobante dice exactamente a qué se aplicó (y cuánto resta)
+      var conceptos = parcial ? repartir(s, monto).map(function(x){ return { desc: String(x.it.c.descripcion || '').toUpperCase() + (x.resta > 0.005 ? ' (ABONO, RESTA ' + $m(x.resta) + ')' : ''), precio: x.aplica }; })
                               : s.map(function(it){ return { desc: String(it.c.descripcion || '').toUpperCase(), precio: r2(it.c.monto) }; });
       ov.remove();
       window.lexCajaRapidaPrecargada({ tipo: 'ingreso', conceptos: conceptos, nombreComprobante: nombre,
@@ -1047,6 +1072,7 @@
     }
     $('rb-todo').onclick = function(){ abrirCaja(totSel()); };
     $('rb-parte').onclick = function(){ $('rb-parte-box').style.display = 'block'; setTimeout(function(){ $('rb-parte-mon').focus(); }, 20); };
+    $('rb-parte-mon').oninput = pintaReparto;
     $('rb-parte-ok').onclick = function(){
       var m = r2($('rb-parte-mon').value), t = totSel();
       if (!(m > 0)) { $('lex-rb-err').textContent = 'Escribe cuánto dejó.'; return; }

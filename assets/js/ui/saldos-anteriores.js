@@ -889,7 +889,9 @@
   // MENÚ "🗂 Recibos Anteriores": lista de todos + contador de pendientes
   // ════════════════════════════════════════════════════════════════════
   var _verPagadosRA = false;
-  function pendientesRA(){ return todos().filter(function(a){ return a.estado !== 'convertido' && debe(a) > 0.005; }); }
+  // Nov-2026: lo que debe = lo pactado + los gastos aparte pendientes
+  function debeTotal(a){ return r2(debe(a) + gastosPendientes(a)); }
+  function pendientesRA(){ return todos().filter(function(a){ return a.estado !== 'convertido' && debeTotal(a) > 0.005; }); }
   window.lexBadgeRecibosAnteriores = function(){
     var b = document.getElementById('badgeRecibosAnteriores'); if (!b) return;
     var n = pendientesRA().length;
@@ -910,10 +912,10 @@
     var bt = document.getElementById('raBtnPagados'); if (bt) bt.textContent = _verPagadosRA ? '← Pendientes' : '✓ Con folio / pagados';
     var cn = document.getElementById('raCountNum'); if (cn) cn.textContent = pend.length;
     var rs = document.getElementById('ra-resumen');
-    if (rs) rs.innerHTML = _verPagadosRA ? 'Recibos anteriores que ya tienen folio real o están pagados.' : 'Deben en total: <b style="color:#a32d2d;font-family:monospace;font-size:0.95rem;">' + $m(pend.reduce(function(t, a){ return t + debe(a); }, 0)) + '</b>';
+    if (rs) rs.innerHTML = _verPagadosRA ? 'Recibos anteriores que ya tienen folio real o están pagados.' : 'Deben en total: <b style="color:#a32d2d;font-family:monospace;font-size:0.95rem;">' + $m(pend.reduce(function(t, a){ return t + debeTotal(a); }, 0)) + '</b>';
     if (!lst.length) { cont.innerHTML = '<div style="text-align:center;color:var(--muted,#7a6a4a);padding:40px 20px;font-size:0.82rem;line-height:1.8;">' + (q ? 'Ninguno coincide con la búsqueda.' : (_verPagadosRA ? 'Todavía no hay recibos anteriores con folio o pagados.' : 'No hay recibos anteriores pendientes.<br>Usa <b>＋ Nuevo recibo anterior</b> para registrar un trámite de años anteriores que todavía tenga saldo.')) + '</div>'; return; }
     cont.innerHTML = lst.map(function(a){
-      var d = debe(a), conv = a.estado === 'convertido', col = conv ? '#1a7a3a' : (d > 0.005 ? '#8c6518' : '#1a7a3a');
+      var dp = debe(a), dg = gastosPendientes(a), d = r2(dp + dg), conv = a.estado === 'convertido', col = conv ? '#1a7a3a' : (d > 0.005 ? '#8c6518' : '#1a7a3a');
       return '<div class="ra-fila" data-id="' + E(a.id) + '" style="position:relative;display:flex;align-items:stretch;background:var(--surface,#fdfaf4);border:1.5px solid var(--border-l,#d4b870);border-radius:8px;margin-bottom:8px;overflow:hidden;">'
         + '<div style="width:5px;background:' + col + ';flex-shrink:0;"></div>'
         + '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 14px;min-width:78px;border-right:1px dashed rgba(0,0,0,0.08);line-height:1.15;">'
@@ -925,7 +927,7 @@
         +   '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;align-items:center;font-size:0.66rem;">'
         +     '<span style="background:#f1efe8;color:#5f5e5a;border-radius:3px;padding:2px 7px;">🗂 Recibo anterior</span>'
         +     (a.tel ? '<span style="background:rgba(0,0,0,0.04);color:#5a4a30;border-radius:3px;padding:2px 7px;">📞 ' + E(a.tel) + '</span>' : '<span style="color:#a32d2d;">sin teléfono</span>')
-        +     '<span style="background:rgba(0,0,0,0.04);color:#5a4a30;border-radius:3px;padding:2px 7px;">Último pago ' + E(fL(ultimaFecha(a))) + '</span>'
+        +     '<span style="background:rgba(0,0,0,0.04);color:#5a4a30;border-radius:3px;padding:2px 7px;">' + (todosLosPagos(a).length ? 'Último pago ' + E(fL(ultimaFecha(a))) : 'Sin pagos') + '</span>'
         +     ((a.pagosAnteriores || []).length ? '<span style="background:rgba(0,0,0,0.04);color:#5a4a30;border-radius:3px;padding:2px 7px;">' + a.pagosAnteriores.length + ' pago(s) de papel</span>' : '')
         +   '</div>'
         +   (a.nota ? '<div style="font-size:10px;color:#7a4a10;font-style:italic;margin-top:5px;padding:4px 8px;background:rgba(200,149,42,0.07);border-radius:4px;">' + E(a.nota) + '</div>' : '')
@@ -933,7 +935,8 @@
         + '</div>'
         + '<div style="display:flex;flex-direction:column;align-items:flex-end;justify-content:space-between;padding:10px 12px;gap:6px;flex-shrink:0;">'
         +   '<div style="text-align:right;line-height:1.1;"><div style="font-family:monospace;font-size:0.55rem;letter-spacing:0.1em;color:#8c6518;font-weight:700;">' + (conv ? 'FOLIO' : 'DEBE') + '</div>'
-        +   '<div style="font-size:1.05rem;font-weight:800;color:' + (conv ? '#1a4a8a' : (d > 0.005 ? '#a32d2d' : '#1a7a3a')) + ';">' + (conv ? E(a.folioConvertido) + 'A' : (d > 0.005 ? $m(d) : '✓ Pagado')) + '</div></div>'
+        +   '<div style="font-size:1.05rem;font-weight:800;color:' + (conv ? '#1a4a8a' : (d > 0.005 ? '#a32d2d' : '#1a7a3a')) + ';">' + (conv ? E(a.folioConvertido) + 'A' : (d > 0.005 ? $m(d) : '✓ Pagado')) + '</div>'
+        +   (!conv && dg > 0.005 ? '<div style="font-size:0.66rem;color:#7a6840;margin-top:2px;">Pactado ' + $m(dp) + ' + gastos ' + $m(dg) + '</div>' : '') + '</div>'
         +   '<div style="display:flex;gap:5px;align-items:center;">'
         +     ((typeof lexBtnLlamada === 'function') ? lexBtnLlamada('ra', a.id, 'padding:4px 9px;') : '')
         +     (!conv && d > 0.005 ? '<button type="button" class="ra-cobrar" style="background:#c8781a;color:#fff;border:none;border-radius:5px;padding:4px 10px;font-size:10px;font-weight:700;cursor:pointer;">💰 Cobrar</button>' : '')
@@ -944,7 +947,8 @@
       var id = f.getAttribute('data-id');
       f.querySelector('.ra-abrir').onclick = function(){ window.lexFichaSaldoAnterior(id); };
       f.querySelector('.ra-ficha').onclick = function(){ window.lexFichaSaldoAnterior(id); };
-      var c = f.querySelector('.ra-cobrar'); if (c) c.onclick = function(){ window.lexCobrarSaldoAnterior(id); };
+      // Si lo pactado ya está pagado y solo quedan gastos, Cobrar abre el cobro de gastos
+      var c = f.querySelector('.ra-cobrar'); if (c) c.onclick = function(){ var a0 = porId(id); if (a0 && debe(a0) <= 0.005 && gastosPendientes(a0) > 0.005 && typeof window.lexCobrarAdeudo === 'function') window.lexCobrarAdeudo(idGastos(a0)); else window.lexCobrarSaldoAnterior(id); };
     });
   }
   // Pintar al entrar a la página

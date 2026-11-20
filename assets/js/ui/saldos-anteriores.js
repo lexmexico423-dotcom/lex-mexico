@@ -661,51 +661,64 @@
     var viejo = document.getElementById('lex-sa-ficha'); if (viejo) viejo.remove();
     var ov = document.createElement('div'); ov.id = 'lex-sa-ficha';
     ov.style.cssText = 'position:fixed;inset:0;z-index:99990;background:rgba(26,16,8,0.6);display:flex;align-items:center;justify-content:center;padding:14px;font-family:Helvetica,Arial,sans-serif;';
-    var pagos = todosLosPagos(sa), d = debe(sa), pag = totalPagado(sa), costo = costoDe(sa), gas = gastosDetalle(sa), gasPen = gastosPendientes(sa);
-    var btn = function(id2, txt, est){ return '<button type="button" id="' + id2 + '" style="width:100%;border-radius:7px;padding:9px 8px;font-size:0.72rem;font-weight:700;letter-spacing:0.04em;cursor:pointer;font-family:monospace;' + est + '">' + txt + '</button>'; };
-    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:960px;max-height:94vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#2a1c08;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid #e3d3a8;flex-wrap:wrap;">'
-      + '<div style="font-size:0.72rem;letter-spacing:0.08em;color:#7a5410;font-family:monospace;">📋 FICHA DEL RECIBO ANTERIOR <span style="background:#f1efe8;color:#5f5e5a;border-radius:10px;padding:2px 9px;margin-left:6px;">🗂 RECIBO ANTERIOR · SIN FOLIO</span></div>'
-      + '<div style="display:flex;gap:8px;align-items:center;">' + (sa.folioPapel ? '<span style="font-size:0.72rem;background:#fdf0dc;color:#8a4a10;border-radius:10px;padding:2px 9px;">📄 papel N° ' + E(sa.folioPapel) + (sa.anio ? ' · ' + E(sa.anio) : '') + '</span>' : '')
-      + '<span id="saf-x" style="cursor:pointer;font-size:1.1rem;color:#7a5410;">✕</span></div></div>'
-      + '<div style="display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px;padding:12px 16px;">'
-      + '<div style="min-width:0;">'
-      + '<div style="background:#fff;border:1px solid #eadfbf;border-radius:8px;padding:9px 12px;">'
-      + '<div style="font-size:0.6rem;color:#9a8a6a;letter-spacing:0.08em;font-family:monospace;">' + (clientesDe(sa).length > 1 ? 'CLIENTES' : 'CLIENTE') + ' · ' + E((TIPOS_T.filter(function(t){ return t[0] === tipoDe(sa); })[0] || ['', ''])[1]) + '</div>'
-      + clientesDe(sa).map(function(c){ var tels = [c.movil, c.telCasa].filter(Boolean).join(' / ');
-          return '<div style="margin-top:3px;"><div style="font-size:0.95rem;font-weight:700;">' + E(String(c.nombre || '').toUpperCase()) + '</div>'
-            + '<div style="font-size:0.72rem;color:#7a6840;">' + (tels ? '📞 ' + E(tels) : 'Sin teléfono') + (c.domicilio ? ' · 🏠 ' + E(c.domicilio) : '') + '</div></div>'; }).join('')
-      + '<div style="font-size:0.74rem;color:#7a6840;margin-top:3px;">' + (sa.anio ? 'Trámite iniciado en ' + E(sa.anio) : '') + (foliosDe(sa).length ? ' · 📄 papel N° ' + E(listaY(foliosDe(sa))) : '') + '</div>'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.6rem;color:#7a5410;letter-spacing:0.08em;margin:10px 0 0;font-family:monospace;"><span>LO PACTADO</span>'
-      +   (d > 0.005 ? '<button type="button" id="saf-cob" style="font-size:0.7rem;font-weight:700;border:none;border-radius:6px;padding:4px 11px;cursor:pointer;color:#fff;letter-spacing:0.02em;font-family:Helvetica,Arial,sans-serif;background:#c8781a;">💰 Cobrar ' + $m(d) + '</button>' : '<span style="color:#1a7a3a;font-weight:700;">✓ PAGADO</span>') + '</div>'
-      + '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:4px;table-layout:fixed;"><colgroup><col style="width:34%"><col><col style="width:110px"></colgroup>'
-      +   '<tr style="color:#9a8a6a;font-size:0.62rem;letter-spacing:0.06em;font-family:monospace;"><td style="padding:2px 6px;">CONCEPTO</td><td style="padding:2px 6px;">DESCRIPCIÓN</td><td style="padding:2px 6px;text-align:right;">IMPORTE</td></tr>'
-      +   conceptosDe(sa).map(function(c){ return '<tr style="border-top:1px solid #eadfbf;"><td style="padding:4px 6px;font-weight:700;color:#1a5fa8;">' + E(String(c.concepto || '').toUpperCase()) + '</td><td style="padding:4px 6px;color:#5a4a30;">' + E(c.descripcion || '') + '</td><td style="padding:4px 6px;text-align:right;font-family:monospace;">' + $m(c.precio) + '</td></tr>'; }).join('')
-      + '</table>'
-      + (gas.length ? '<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.6rem;color:#27500A;letter-spacing:0.08em;margin:12px 0 0;font-family:monospace;"><span>GASTOS DEL TRÁMITE · APARTE DE LO PACTADO</span>'
-        + (gasPen > 0.005 ? '<button type="button" id="saf-gas" style="font-size:0.7rem;font-weight:700;border:none;border-radius:6px;padding:4px 11px;cursor:pointer;color:#fff;letter-spacing:0.02em;font-family:Helvetica,Arial,sans-serif;background:#3B6D11;">💸 Cobrar ' + $m(gasPen) + '</button>' : '<span style="color:#1a7a3a;font-weight:700;">✓ PAGADOS</span>') + '</div>'
-        + '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:4px;table-layout:fixed;"><colgroup><col style="width:105px"><col><col style="width:90px"><col style="width:110px"></colgroup>'
-        + gas.map(function(g){ return '<tr style="border-top:1px solid #eadfbf;"><td style="padding:4px 6px;">' + E(fL(g.fecha)) + '</td><td style="padding:4px 6px;">' + E(String(g.concepto || '').toUpperCase()) + '</td><td style="padding:4px 6px;"><span style="font-size:0.66rem;border-radius:10px;padding:1px 7px;' + (g.cobrado ? 'background:#EAF3DE;color:#27500A;">pagado' : 'background:#FCEBEB;color:#791F1F;">pendiente') + '</span></td><td style="padding:4px 6px;text-align:right;font-family:monospace;">' + $m(g.monto) + '</td></tr>'; }).join('')
-        + '</table>' : '')
-      + (sa.nota ? '<div style="font-size:0.72rem;color:#8a7a5a;font-style:italic;margin-top:4px;">📝 ' + E(sa.nota) + ' <span style="font-size:0.62rem;">(uso interno)</span></div>' : '')
+    var pagos = todosLosPagos(sa), d = debe(sa), pag = totalPagado(sa), costo = costoDe(sa);
+    // Nov-2026 · rediseño A: tarjetas ① lo pactado ② gastos (con casillas) ③ pagos
+    var ag = adeudoGastos(sa);
+    var gasItems = ag ? (ag.conceptos || []).filter(Boolean).map(function(c){ return { id: c.id, fecha: c.fecha || '', concepto: c.descripcion || '', monto: r2(c.monto), cobrado: !!(c.cobrado || ag.estado === 'cobrado') }; })
+      .sort(function(x, y){ return String(x.fecha).localeCompare(String(y.fecha)); }) : [];
+    var gasPen = r2(gasItems.filter(function(g){ return !g.cobrado; }).reduce(function(t, g){ return t + g.monto; }, 0));
+    var totalDebe = r2(d + gasPen);
+    var MONO = 'font-family:monospace;';
+    var CARD = 'border-radius:10px;overflow:hidden;background:#fff;';
+    var CH = 'display:flex;justify-content:space-between;align-items:center;padding:7px 12px;font-weight:700;font-size:0.78rem;letter-spacing:0.02em;';
+    var FT = 'display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 12px;font-size:0.74rem;' + MONO;
+    var BTN = 'font-size:0.76rem;font-weight:700;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;color:#fff;font-family:Helvetica,Arial,sans-serif;white-space:nowrap;';
+    var LNK = 'text-decoration:none;font-size:0.72rem;cursor:pointer;';
+    var tels = function(c){ return [c.movil, c.telCasa].filter(Boolean).join(' / '); };
+    ov.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fbf6ea;border:1.5px solid #c8951a;border-radius:12px;width:100%;max-width:820px;max-height:94vh;overflow-y:auto;box-shadow:0 18px 50px rgba(0,0,0,0.45);color:#2a1c08;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #e3d3a8;flex-wrap:wrap;">'
+      +   '<div style="font-size:0.7rem;letter-spacing:0.08em;color:#7a5410;font-family:monospace;">📋 FICHA DEL RECIBO ANTERIOR · SIN FOLIO' + (foliosDe(sa).length ? ' · 📄 papel N° ' + E(listaY(foliosDe(sa))) : '') + '</div>'
+      +   '<div style="display:flex;gap:14px;align-items:center;">'
+      +     '<a href="#" id="saf-prev" style="' + LNK + 'color:#1a3a70;">👁 Vista previa</a>'
+      +     '<a href="#" id="saf-edo" style="' + LNK + 'color:#0f5228;">📊 Estado de cuenta</a>'
+      +     '<a href="#" id="saf-edit" style="' + LNK + 'color:#9a6e18;">✏ Editar</a>'
+      +     '<span id="saf-x" style="cursor:pointer;font-size:1.1rem;color:#7a5410;">✕</span></div></div>'
+      + '<div style="padding:12px 16px;display:flex;flex-direction:column;gap:12px;">'
+      // Cliente + total que debe
+      + '<div style="background:#fff;border:1px solid #eadfbf;border-radius:8px;padding:9px 12px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">'
+      +   '<div style="min-width:0;flex:1;">' + clientesDe(sa).map(function(c){ return '<div style="font-size:0.98rem;font-weight:700;">' + E(String(c.nombre || '').toUpperCase()) + '</div>'
+            + '<div style="font-size:0.74rem;color:#7a6840;">' + (tels(c) ? '📞 ' + E(tels(c)) : 'Sin teléfono') + (c.domicilio ? ' · 🏠 ' + E(c.domicilio) : '') + '</div>'; }).join('')
+      +   '<div style="font-size:0.74rem;color:#7a6840;margin-top:2px;">' + E((TIPOS_T.filter(function(t){ return t[0] === tipoDe(sa); })[0] || ['', ''])[1]) + (sa.anio ? ' · iniciado en ' + E(sa.anio) : '') + '</div></div>'
+      +   (totalDebe > 0.005
+          ? '<div style="border:2px solid #a32d2d;border-radius:8px;padding:6px 14px;text-align:right;background:#fff8f6;"><div style="' + MONO + 'font-size:0.62rem;color:#a32d2d;letter-spacing:0.08em;">DEBE EN TOTAL</div><div style="' + MONO + 'font-size:1.25rem;font-weight:800;color:#a32d2d;">' + $m(totalDebe) + '</div>'
+            + (gasPen > 0.005 && d > 0.005 ? '<div style="font-size:0.7rem;color:#7a6840;">Pactado ' + $m(d) + ' + gastos ' + $m(gasPen) + '</div>' : '') + '</div>'
+          : '<div style="border:2px solid #3B6D11;border-radius:8px;padding:8px 14px;color:#27500A;font-weight:700;">✓ NO DEBE NADA</div>')
       + '</div>'
-      + '<div style="font-size:0.6rem;color:#7a5410;letter-spacing:0.08em;margin:12px 0 4px;font-family:monospace;">PAGOS DEL TRÁMITE</div>'
-      + (pagos.length ? '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;background:#fff;table-layout:fixed;"><colgroup><col style="width:105px"><col><col style="width:130px"><col style="width:100px"></colgroup>'
-        + '<tr style="background:#f5ecd6;color:#7a5410;font-size:0.66rem;"><th style="text-align:left;padding:5px 8px;">Fecha</th><th style="text-align:left;padding:5px 8px;">Concepto</th><th style="text-align:left;padding:5px 8px;">Comprobante</th><th style="text-align:right;padding:5px 8px;">Monto</th></tr>'
-        + pagos.map(function(p){ return '<tr style="border-top:1px solid #eadfbf;' + (p.papel ? '' : 'background:#f3f9ee;') + '"><td style="padding:5px 8px;">' + E(fL(p.fecha)) + '</td><td style="padding:5px 8px;">' + E(p.concepto) + '</td><td style="padding:5px 8px;">' + (p.papel ? '📄 ' : '🧾 ') + E(p.comprobante) + '</td><td style="padding:5px 8px;text-align:right;font-family:monospace;">' + $m(p.monto) + '</td></tr>'; }).join('')
-        + '</table>' : '<div style="font-size:0.76rem;color:#7a6a4a;padding:8px;background:#fff;border:1px solid #eadfbf;border-radius:6px;">Sin pagos registrados todavía.</div>')
+      // ① Lo pactado
+      + '<div style="' + CARD + 'border:2px solid #c8952a;">'
+      +   '<div style="' + CH + 'background:#fdf3dc;color:#7a5410;"><span>① LO PACTADO <span style="font-weight:400;font-size:0.7rem;">· se cobra con recibo</span></span></div>'
+      +   '<div style="padding:2px 12px;">' + conceptosDe(sa).map(function(c){ return '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid #f1e6cc;font-size:0.8rem;"><span><b style="color:#1a5fa8;">' + E(String(c.concepto || '').toUpperCase()) + '</b>' + (c.descripcion ? ' <span style="color:#5a4a30;">· ' + E(c.descripcion) + '</span>' : '') + '</span><span style="' + MONO + 'white-space:nowrap;">' + $m(c.precio) + '</span></div>'; }).join('') + '</div>'
+      +   '<div style="' + FT + 'background:#fdf8ec;border-top:1px dashed #e3d3a8;"><span>Costo ' + $m(costo) + ' · Pagado <span style="color:#1a7a3a;">' + $m(pag) + '</span> · <b style="color:#a32d2d;">Resta ' + $m(d) + '</b></span>'
+      +   (d > 0.005 ? '<button type="button" id="saf-cob" style="' + BTN + 'background:#c8781a;">💰 Cobrar</button>' : '<span style="color:#1a7a3a;font-weight:700;">✓ PAGADO</span>') + '</div></div>'
+      // ② Gastos
+      + (gasItems.length ? '<div style="' + CARD + 'border:2px solid #97C459;">'
+      +   '<div style="' + CH + 'background:#EAF3DE;color:#27500A;"><span>② GASTOS DEL TRÁMITE <span style="font-weight:400;font-size:0.7rem;">· aparte de lo pactado · Caja Rápida</span></span>'
+      +   (gasPen > 0.005 ? '<label style="display:flex;align-items:center;gap:6px;font-weight:400;font-size:0.72rem;cursor:pointer;"><input type="checkbox" id="saf-todos" checked style="accent-color:#3B6D11;width:15px;height:15px;margin:0;"> Todos</label>' : '') + '</div>'
+      +   '<div style="padding:2px 12px;">' + gasItems.map(function(g){ return '<label style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f1e6cc;font-size:0.8rem;' + (g.cobrado ? '' : 'cursor:pointer;') + '">'
+            + '<span style="display:flex;align-items:center;gap:8px;">' + (g.cobrado ? '<span style="width:15px;text-align:center;color:#3B6D11;">✓</span>' : '<input type="checkbox" class="saf-g" data-cid="' + E(g.id) + '" data-m="' + g.monto + '" checked style="accent-color:#3B6D11;width:15px;height:15px;margin:0;">')
+            + '<span style="color:#7a6840;' + MONO + 'font-size:0.74rem;">' + E(fL(g.fecha)) + '</span> ' + E(String(g.concepto || '').toUpperCase()) + '</span>'
+            + '<span style="' + MONO + 'white-space:nowrap;">' + $m(g.monto) + ' <span style="font-size:0.66rem;border-radius:10px;padding:1px 7px;' + (g.cobrado ? 'background:#EAF3DE;color:#27500A;">pagado' : 'background:#FCEBEB;color:#791F1F;">pendiente') + '</span></span></label>'; }).join('') + '</div>'
+      +   '<div style="' + FT + 'background:#f6fbef;border-top:1px dashed #C0DD97;"><span>Pendiente <b style="color:#a32d2d;">' + $m(gasPen) + '</b>' + (gasPen > 0.005 ? ' · Marcado <b id="saf-gsel" style="color:#27500A;">' + $m(gasPen) + '</b>' : '') + '</span>'
+      +   (gasPen > 0.005 ? '<button type="button" id="saf-gas" style="' + BTN + 'background:#3B6D11;">💸 Cobrar</button>' : '<span style="color:#1a7a3a;font-weight:700;">✓ PAGADOS</span>') + '</div></div>' : '')
+      // ③ Pagos recibidos
+      + '<div style="' + CARD + 'border:2px solid #85B7EB;">'
+      +   '<div style="' + CH + 'background:#E6F1FB;color:#0C447C;"><span>' + (gasItems.length ? '③' : '②') + ' PAGOS RECIBIDOS <span style="font-weight:400;font-size:0.7rem;">· de lo pactado</span></span></div>'
+      +   (pagos.length ? '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;table-layout:fixed;"><colgroup><col style="width:105px"><col><col style="width:140px"><col style="width:110px"></colgroup>'
+          + pagos.map(function(p){ return '<tr style="border-top:1px solid #eef2f8;' + (p.papel ? '' : 'background:#f3f9ee;') + '"><td style="padding:5px 12px;">' + E(fL(p.fecha)) + '</td><td style="padding:5px 8px;">' + E(p.concepto) + '</td><td style="padding:5px 8px;">' + (p.papel ? '📄 ' : '🧾 ') + E(p.comprobante) + '</td><td style="padding:5px 12px;text-align:right;' + MONO + '">' + $m(p.monto) + '</td></tr>'; }).join('')
+          + '</table>' : '<div style="padding:8px 12px;font-size:0.76rem;color:#7a6a4a;">Sin pagos registrados todavía.</div>')
       + '</div>'
-      + '<div style="background:#fffdf7;border:1.5px solid #c8952a;border-radius:8px;padding:10px;font-size:0.8rem;display:flex;flex-direction:column;gap:7px;align-self:start;font-family:monospace;">'
-      + '<div style="font-size:0.6rem;letter-spacing:0.1em;color:#7a5410;">RESUMEN</div>'
-      + '<div style="display:flex;justify-content:space-between;"><span>COSTO</span><b>' + $m(costo) + '</b></div>'
-      + '<div style="display:flex;justify-content:space-between;"><span>PAGADO</span><b style="color:#1a7a3a;">' + $m(pag) + '</b></div>'
-      + '<div style="display:flex;justify-content:space-between;border-top:1px dashed #c8952a;padding-top:5px;"><span style="color:#a32d2d;">RESTA</span><b style="color:#a32d2d;font-size:0.95rem;">' + $m(d) + '</b></div>'
-      + (gas.length ? '<div style="display:flex;justify-content:space-between;color:#8a4a10;"><span>GASTOS</span><b>' + $m(gasPen) + '</b></div>' : '')
-      + '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 8px;border-top:1px dashed #e3d3a8;margin-top:4px;padding-top:7px;font-size:0.66rem;white-space:nowrap;">'
-      +   '<a href="#" id="saf-prev" style="color:#1a3a70;text-decoration:none;">👁 Vista previa</a>'
-      +   '<a href="#" id="saf-edo" style="color:#0f5228;text-decoration:none;">📊 Estado</a>'
-      +   '<a href="#" id="saf-edit" style="color:#9a6e18;text-decoration:none;">✏ Editar</a></div>'
-      + '</div></div></div>';
+      + (sa.nota ? '<div style="font-size:0.72rem;color:#8a7a5a;font-style:italic;">📝 ' + E(sa.nota) + ' <span style="font-size:0.62rem;">(uso interno)</span></div>' : '')
+      + '</div></div>';
     document.body.appendChild(ov);
     var q = function(s){ return ov.querySelector(s); };
     q('#saf-x').onclick = function(){ ov.remove(); };
@@ -715,7 +728,23 @@
     q('#saf-edo').onclick = function(){ verPDF(pdfEstadoCuenta(sa), 'Estado de cuenta · ' + sa.cliente); };
     if (q('#saf-cob')) q('#saf-cob').onclick = function(){ ov.remove(); window.lexCobrarSaldoAnterior(sa.id); };
     q('#saf-edit').onclick = function(){ ov.remove(); window.lexAbrirSaldoAnterior(sa.id); };
-    if (q('#saf-gas')) q('#saf-gas').onclick = function(){ ov.remove(); if (typeof window.lexCobrarAdeudo === 'function') window.lexCobrarAdeudo(idGastos(sa)); };
+    // Casillas de gastos: "Todos", total marcado y botón Cobrar con lo marcado
+    var cks = Array.prototype.slice.call(ov.querySelectorAll('.saf-g')), todos = q('#saf-todos');
+    function marcados(){ return cks.filter(function(c){ return c.checked; }); }
+    function pintaSel(){
+      var m = marcados(), t = r2(m.reduce(function(s, c){ return s + (parseFloat(c.getAttribute('data-m')) || 0); }, 0));
+      if (q('#saf-gsel')) q('#saf-gsel').textContent = $m(t);
+      if (todos) { todos.checked = m.length === cks.length; todos.indeterminate = m.length > 0 && m.length < cks.length; }
+      var b = q('#saf-gas'); if (b) { b.style.opacity = m.length ? '1' : '0.5'; b.title = m.length ? '' : 'Marca qué va a pagar'; }
+    }
+    cks.forEach(function(c){ c.onchange = pintaSel; });
+    if (todos) todos.onchange = function(){ cks.forEach(function(c){ c.checked = todos.checked; }); pintaSel(); };
+    if (q('#saf-gas')) q('#saf-gas').onclick = function(){
+      var ids = marcados().map(function(c){ return c.getAttribute('data-cid'); });
+      if (!ids.length) { toastS('Marca qué gastos va a pagar', 'err'); return; }
+      ov.remove();
+      if (typeof window.lexCobrarAdeudo === 'function') window.lexCobrarAdeudo(idGastos(sa), { marcados: ids });
+    };
   };
 
   // ── PDFs (jsPDF ya está cargado en el sistema) ───────────────────────

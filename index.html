@@ -16517,6 +16517,8 @@ Recibo original im…</td>
         </div>
       </div>
       <div class="folio-recibo">Folio oficial</div>
+      <!-- Nov-2026: "Anular trámite" se movió aquí (antes en la fila de botones de pago) -->
+      <div id="lex-anular-link" onclick="ejecutarTramiteCancelado()" title="Anular este trámite">Anular trámite ›››</div>
     </div>
   </div>
   <!-- BOTONES PAGO — visibles solo en modo consulta -->
@@ -16538,25 +16540,25 @@ Recibo original im…</td>
   <!-- ── BARRA SUPERIOR UNIFICADA: botón único despliega Buscar Cliente + Consultar Folios ── -->
   <div id="panel-busqueda-cliente" style="background:#fdfaf4;border-bottom:1px solid var(--border-light);">
     <!-- ── FILA SUPERIOR: tres celdas horizontales centradas ── -->
-    <div style="display:flex;align-items:stretch;justify-content:center;gap:0;padding:8px 20px;">
+    <div id="fila-sup-consulta" style="display:flex;align-items:stretch;justify-content:center;gap:0;padding:8px 20px;">
       <!-- CELDA 1 — Buscar Cliente & Folios -->
       <button onclick="togglePanelesBusqueda()" id="btn-toggle-paneles" class="btn-buscar-cliente">
         <span id="toggle-paneles-arrow" style="font-size:0.82rem;transition:transform 0.22s ease;display:inline-block;">▸</span>
         📋 Consultar Folios
       </button>
       <!-- Separador -->
-      <div style="width:10px;flex-shrink:0;"></div>
-      <div style="width:1px;background:var(--border-light);flex-shrink:0;"></div>
-      <div style="width:10px;flex-shrink:0;"></div>
+      <div class="lex-sep-ini" style="width:10px;flex-shrink:0;"></div>
+      <div class="lex-sep-ini" style="width:1px;background:var(--border-light);flex-shrink:0;"></div>
+      <div class="lex-sep-ini" style="width:10px;flex-shrink:0;"></div>
       <!-- Slot que solo se muestra en modo consulta: aquí se reubica por JS el campo real
            #folio_anterior (mismo id, misma función, mismo estilo), renombrado a "Consultar
            Folios". Fuera de modo consulta permanece oculto y el campo regresa a su lugar
            original en el panel "Consultar Folios y Expedientes". -->
       <div id="folio-consulta-slot-wrap" style="display:none;align-items:center;">
         <div id="folio-consulta-slot" style="display:flex;align-items:center;flex-shrink:0;"></div>
-        <div style="width:10px;flex-shrink:0;"></div>
-        <div style="width:1px;background:var(--border-light);flex-shrink:0;align-self:stretch;"></div>
-        <div style="width:10px;flex-shrink:0;"></div>
+        <div class="lex-sep-slot" style="width:10px;flex-shrink:0;"></div>
+        <div class="lex-sep-slot" style="width:1px;background:var(--border-light);flex-shrink:0;align-self:stretch;"></div>
+        <div class="lex-sep-slot" style="width:10px;flex-shrink:0;"></div>
       </div>
       <!-- BOTÓN VINCULAR ARCHIVO — solo control interno, no imprime -->
       <button onclick="abrirVincularArchivo()" id="btn-vincular-archivo" class="btn-vincular-archivo" title="Vincular con Carpetas (solo interno)" style="border-color: rgb(26, 74, 138); color: rgb(26, 74, 138);">
@@ -16582,6 +16584,32 @@ Recibo original im…</td>
         <div id="hora_recibo_display" style="font-size: 0.84rem; font-family: &quot;DM Mono&quot;, monospace; white-space: nowrap; line-height: 1;">22:11 hrs.</div>
         <input type="hidden" id="hora_recibo" value="22:11">
       </div>
+      <!-- Nov-2026: Cerrar consulta junto a la hora (los pagos ya están en la Ficha del Folio) -->
+      <button type="button" id="btn-cerrar-consulta-barra" onclick="cerrarConsulta()">✕ Cerrar consulta</button>
+      <style>
+        #lex-anular-link{display:none;margin-top:6px;font-family:'DM Sans',sans-serif;font-size:0.7rem;color:#888;cursor:pointer;opacity:0.75;text-align:center;}
+        #lex-anular-link:hover{opacity:1;color:#222;text-decoration:underline;}
+        body.modo-consulta #lex-anular-link{display:block;}
+        body.modo-consulta.folio-cancelado #lex-anular-link,
+        body.modo-consulta.folio-liquidado #lex-anular-link,
+        body.modo-consulta.folio-abierto-sin-adeudo #lex-anular-link,
+        body.modo-actualizacion #lex-anular-link{display:none !important;}
+        #btn-cerrar-consulta-barra{display:none;align-items:center;margin-left:8px;padding:0 14px;height:44px;border:2px solid #4a6ea8;border-radius:5px;background:#eef2ff;color:#1e3a70;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;white-space:nowrap;cursor:pointer;flex-shrink:0;transition:all 0.2s;}
+        #btn-cerrar-consulta-barra:hover{background:#d8e2ff;border-color:#1e3a70;}
+        body.modo-consulta #btn-cerrar-consulta-barra{display:flex;}
+        body.modo-actualizacion #btn-cerrar-consulta-barra{display:none !important;}
+        /* Barra más compacta en consulta para que quepa "Cerrar consulta" */
+        body.modo-consulta #fila-sup-consulta .lex-sep-ini{display:none !important;}
+        body.modo-consulta #fila-sup-consulta .lex-sep-slot{width:4px !important;}
+        body.modo-consulta #fila-sup-consulta .lex-sep-slot[style*="background"]{width:0 !important;}
+        body.modo-consulta #fila-sup-consulta #btn-vincular-archivo{padding:0 12px;margin-right:8px;}
+        body.modo-consulta #fila-sup-consulta{padding-left:8px;padding-right:8px;}
+        /* Los botones de pago de arriba ya no se muestran: están en la Ficha del Folio */
+        /* (si la ficha se cierra, p. ej. al ir a Exp. digital, vuelven a aparecer para no perder el cobro) */
+        body.modo-consulta.lex-ficha-visible #header-pago-btns,
+        body.modo-consulta.lex-ficha-visible.folio-liquidado #header-liquidado-btns{display:none !important;}
+        @media print{#lex-anular-link,#btn-cerrar-consulta-barra{display:none !important;}}
+      </style>
     </div>
     <!-- ── CUERPO COLAPSABLE: Buscar Cliente (izq) + Consultar Folios (der) — ambos con contorno verde ── -->
     <div id="paneles-busqueda-cuerpo" style="display:none;padding:0 20px 14px;">
@@ -19479,7 +19507,7 @@ Recibo original im…</td>
 <script src="assets/js/ui/cobranza.js?v=20261118a"></script>
 <script src="assets/js/ui/mandar-llamada.js?v=20261023g"></script>
 <script src="assets/js/ui/sync-vivo.js?v=20261023i"></script>
-<script src="assets/js/ui/gastos-cliente.js?v=20261120a"></script>
+<script src="assets/js/ui/gastos-cliente.js?v=20261120b"></script>
 <script src="assets/js/ui/escrituras-lista.js?v=20261030a"></script>
 <script src="assets/js/ui/escrituras-asistente.js?v=20261029a"></script>
 <script src="assets/js/ui/saldos-anteriores.js?v=20261119d"></script>

@@ -676,12 +676,14 @@
           return '<div style="margin-top:3px;"><div style="font-size:0.95rem;font-weight:700;">' + E(String(c.nombre || '').toUpperCase()) + '</div>'
             + '<div style="font-size:0.72rem;color:#7a6840;">' + (tels ? '📞 ' + E(tels) : 'Sin teléfono') + (c.domicilio ? ' · 🏠 ' + E(c.domicilio) : '') + '</div></div>'; }).join('')
       + '<div style="font-size:0.74rem;color:#7a6840;margin-top:3px;">' + (sa.anio ? 'Trámite iniciado en ' + E(sa.anio) : '') + (foliosDe(sa).length ? ' · 📄 papel N° ' + E(listaY(foliosDe(sa))) : '') + '</div>'
-      + '<div style="font-size:0.6rem;color:#7a5410;letter-spacing:0.08em;margin:10px 0 0;font-family:monospace;">LO PACTADO</div>'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.6rem;color:#7a5410;letter-spacing:0.08em;margin:10px 0 0;font-family:monospace;"><span>LO PACTADO</span>'
+      +   (d > 0.005 ? '<button type="button" id="saf-cob" style="font-size:0.7rem;font-weight:700;border:none;border-radius:6px;padding:4px 11px;cursor:pointer;color:#fff;letter-spacing:0.02em;font-family:Helvetica,Arial,sans-serif;background:#c8781a;">💰 Cobrar ' + $m(d) + '</button>' : '<span style="color:#1a7a3a;font-weight:700;">✓ PAGADO</span>') + '</div>'
       + '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:4px;table-layout:fixed;"><colgroup><col style="width:34%"><col><col style="width:110px"></colgroup>'
       +   '<tr style="color:#9a8a6a;font-size:0.62rem;letter-spacing:0.06em;font-family:monospace;"><td style="padding:2px 6px;">CONCEPTO</td><td style="padding:2px 6px;">DESCRIPCIÓN</td><td style="padding:2px 6px;text-align:right;">IMPORTE</td></tr>'
       +   conceptosDe(sa).map(function(c){ return '<tr style="border-top:1px solid #eadfbf;"><td style="padding:4px 6px;font-weight:700;color:#1a5fa8;">' + E(String(c.concepto || '').toUpperCase()) + '</td><td style="padding:4px 6px;color:#5a4a30;">' + E(c.descripcion || '') + '</td><td style="padding:4px 6px;text-align:right;font-family:monospace;">' + $m(c.precio) + '</td></tr>'; }).join('')
       + '</table>'
-      + (gas.length ? '<div style="font-size:0.6rem;color:#27500A;letter-spacing:0.08em;margin:12px 0 0;font-family:monospace;">GASTOS DEL TRÁMITE · APARTE DE LO PACTADO</div>'
+      + (gas.length ? '<div style="display:flex;justify-content:space-between;align-items:center;font-size:0.6rem;color:#27500A;letter-spacing:0.08em;margin:12px 0 0;font-family:monospace;"><span>GASTOS DEL TRÁMITE · APARTE DE LO PACTADO</span>'
+        + (gasPen > 0.005 ? '<button type="button" id="saf-gas" style="font-size:0.7rem;font-weight:700;border:none;border-radius:6px;padding:4px 11px;cursor:pointer;color:#fff;letter-spacing:0.02em;font-family:Helvetica,Arial,sans-serif;background:#3B6D11;">💸 Cobrar ' + $m(gasPen) + '</button>' : '<span style="color:#1a7a3a;font-weight:700;">✓ PAGADOS</span>') + '</div>'
         + '<table style="width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:4px;table-layout:fixed;"><colgroup><col style="width:105px"><col><col style="width:90px"><col style="width:110px"></colgroup>'
         + gas.map(function(g){ return '<tr style="border-top:1px solid #eadfbf;"><td style="padding:4px 6px;">' + E(fL(g.fecha)) + '</td><td style="padding:4px 6px;">' + E(String(g.concepto || '').toUpperCase()) + '</td><td style="padding:4px 6px;"><span style="font-size:0.66rem;border-radius:10px;padding:1px 7px;' + (g.cobrado ? 'background:#EAF3DE;color:#27500A;">pagado' : 'background:#FCEBEB;color:#791F1F;">pendiente') + '</span></td><td style="padding:4px 6px;text-align:right;font-family:monospace;">' + $m(g.monto) + '</td></tr>'; }).join('')
         + '</table>' : '')
@@ -699,16 +701,16 @@
       + '<div style="display:flex;justify-content:space-between;"><span>PAGADO</span><b style="color:#1a7a3a;">' + $m(pag) + '</b></div>'
       + '<div style="display:flex;justify-content:space-between;border-top:1px dashed #c8952a;padding-top:5px;"><span style="color:#a32d2d;">RESTA</span><b style="color:#a32d2d;font-size:0.95rem;">' + $m(d) + '</b></div>'
       + (gas.length ? '<div style="display:flex;justify-content:space-between;color:#8a4a10;"><span>GASTOS</span><b>' + $m(gasPen) + '</b></div>' : '')
-      + btn('saf-prev', '👁 VISTA PREVIA PDF', 'border:1.5px solid #4a6ea8;color:#1a3a70;background:#e6f1fb;')
-      + btn('saf-edo', '📊 ESTADO DE CUENTA', 'border:1.5px solid #2a7a4a;color:#0f5228;background:#e8f5ec;')
-      + (d > 0.005 ? btn('saf-cob', '💰 COBRAR', 'border:none;color:#fff;background:#c8781a;') : '<div style="text-align:center;color:#1a7a3a;font-weight:700;">✓ PAGADO</div>')
-      + (gasPen > 0.005 ? btn('saf-gas', '💸 COBRAR GASTOS', 'border:none;color:#fff;background:#3B6D11;') : '')
-      + btn('saf-edit', '✏ EDITAR', 'border:1px solid #c8951a;color:#9a6e18;background:#fff;')
+      + '<div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 8px;border-top:1px dashed #e3d3a8;margin-top:4px;padding-top:7px;font-size:0.66rem;white-space:nowrap;">'
+      +   '<a href="#" id="saf-prev" style="color:#1a3a70;text-decoration:none;">👁 Vista previa</a>'
+      +   '<a href="#" id="saf-edo" style="color:#0f5228;text-decoration:none;">📊 Estado</a>'
+      +   '<a href="#" id="saf-edit" style="color:#9a6e18;text-decoration:none;">✏ Editar</a></div>'
       + '</div></div></div>';
     document.body.appendChild(ov);
     var q = function(s){ return ov.querySelector(s); };
     q('#saf-x').onclick = function(){ ov.remove(); };
     ov.onclick = function(ev){ if (ev.target === ov) ov.remove(); };
+    ['#saf-prev', '#saf-edo', '#saf-edit'].forEach(function(k){ var el = q(k); if (el) el.addEventListener('click', function(ev){ ev.preventDefault(); }); });
     q('#saf-prev').onclick = function(){ verPDF(pdfVistaPrevia(sa), 'Vista previa · ' + sa.cliente); };
     q('#saf-edo').onclick = function(){ verPDF(pdfEstadoCuenta(sa), 'Estado de cuenta · ' + sa.cliente); };
     if (q('#saf-cob')) q('#saf-cob').onclick = function(){ ov.remove(); window.lexCobrarSaldoAnterior(sa.id); };

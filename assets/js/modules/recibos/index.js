@@ -8877,7 +8877,7 @@ function abrirFichaFolio(){
   if(recibo.clientes&&recibo.clientes[0])dom=recibo.clientes[0].domicilio||'';
   else if(recibo.domicilio)dom=recibo.domicilio;
   var domEl=document.getElementById('ficha-domicilio');
-  if(domEl)domEl.textContent=dom?'· '+dom:'';
+  if(domEl)domEl.textContent=dom||'';
   var c0=recibo.conceptos&&recibo.conceptos[0];
   // Concepto en mayúsculas y azul
   document.getElementById('ficha-concepto').textContent=c0?(c0.concepto||'').toUpperCase():'—';

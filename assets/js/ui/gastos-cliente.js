@@ -1420,6 +1420,16 @@
     }
     window._lexFichaEnganchaResta = engancha;
   })();
+  // Marca en <body> si la Ficha del Folio está visible (los botones de pago de arriba
+  // solo se ocultan mientras la ficha está abierta, porque ahí ya están)
+  (function(){
+    function marca(){ var m = document.getElementById('modal-ficha-folio'); document.body.classList.toggle('lex-ficha-visible', !!(m && m.style.display !== 'none' && m.style.display !== '')); }
+    function engancha(){
+      var m = document.getElementById('modal-ficha-folio'); if (!m || typeof MutationObserver === 'undefined') return;
+      new MutationObserver(marca).observe(m, { attributes: true, attributeFilter: ['style'] }); marca();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', engancha); else engancha();
+  })();
   window.lexFichaCobrarFolio = function(tipo){
     var folio = _fichaFolioActual; if (folio == null) return;
     var listo = function(){

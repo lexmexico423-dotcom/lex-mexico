@@ -16490,6 +16490,8 @@ Recibo original im…</td>
   </div>
 </div>
 <div class="recibo-card">
+  <!-- Nov-2026: ✕ en la esquina para cerrar la consulta (igual que "Cerrar consulta") -->
+  <button type="button" id="btn-x-cerrar-consulta" onclick="cerrarConsulta()" title="Cerrar consulta" aria-label="Cerrar consulta">✕</button>
   <!-- HEADER -->
   <div class="recibo-header">
     <div class="header-logo" style="position:relative;overflow:hidden;">
@@ -16597,13 +16599,25 @@ Recibo original im…</td>
         #btn-cerrar-consulta-barra{display:none;align-items:center;margin-left:8px;padding:0 14px;height:44px;border:2px solid #4a6ea8;border-radius:5px;background:#eef2ff;color:#1e3a70;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;white-space:nowrap;cursor:pointer;flex-shrink:0;transition:all 0.2s;}
         #btn-cerrar-consulta-barra:hover{background:#d8e2ff;border-color:#1e3a70;}
         body.modo-consulta #btn-cerrar-consulta-barra{display:flex;}
+        #btn-x-cerrar-consulta{display:none;position:absolute;top:-12px;right:-12px;z-index:5;width:28px;height:28px;border-radius:50%;border:2px solid #c8952a;background:#fdfaf4;color:#8c6518;font-size:0.9rem;font-weight:700;line-height:1;cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,0.25);padding:0;}
+        #btn-x-cerrar-consulta:hover{background:#c8952a;color:#fff;}
+        body.modo-consulta .recibo-card{position:relative;}
+        body.modo-consulta #btn-x-cerrar-consulta{display:block;}
+        body.modo-actualizacion #btn-x-cerrar-consulta{display:none !important;}
+        @media print{#btn-x-cerrar-consulta{display:none !important;}}
+        /* Nov-2026: se quita la franja oscura (nombre · saldo · folio) arriba del PDF */
+        #pdf-consulta-wrap .pdf-toolbar{display:none !important;}
         body.modo-actualizacion #btn-cerrar-consulta-barra{display:none !important;}
         /* Barra más compacta en consulta para que quepa "Cerrar consulta" */
         body.modo-consulta #fila-sup-consulta .lex-sep-ini{display:none !important;}
         body.modo-consulta #fila-sup-consulta .lex-sep-slot{width:4px !important;}
         body.modo-consulta #fila-sup-consulta .lex-sep-slot[style*="background"]{width:0 !important;}
-        body.modo-consulta #fila-sup-consulta #btn-vincular-archivo{padding:0 12px;margin-right:8px;}
-        body.modo-consulta #fila-sup-consulta{padding-left:8px;padding-right:8px;}
+        body.modo-consulta #fila-sup-consulta #btn-vincular-archivo{margin-right:6px;}
+        body.modo-consulta #fila-sup-consulta{padding-left:6px !important;padding-right:6px !important;flex-wrap:nowrap !important;gap:0 !important;}
+        body.modo-consulta #fila-sup-consulta > div[style*="padding:0 16px"]{padding:0 10px !important;}
+        body.modo-consulta #fila-sup-consulta > div[style*="padding:0 16px"] > div:first-child{letter-spacing:0.06em !important;}
+        body.modo-consulta #fila-sup-consulta #btn-vincular-archivo{padding:0 10px !important;letter-spacing:0.06em !important;}
+        body.modo-consulta #btn-cerrar-consulta-barra{padding:0 10px;letter-spacing:0.05em;margin-left:6px;}
         /* Los botones de pago de arriba ya no se muestran: están en la Ficha del Folio */
         /* (si la ficha se cierra, p. ej. al ir a Exp. digital, vuelven a aparecer para no perder el cobro) */
         body.modo-consulta.lex-ficha-visible #header-pago-btns,
@@ -17043,6 +17057,11 @@ Recibo original im…</td>
     #modal-ficha-folio .ffx-ft{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 12px;font-family:'DM Mono',monospace;font-size:0.76rem;flex-wrap:wrap;}
     #modal-ficha-folio .ffx-btn{font-size:0.76rem;font-weight:700;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;color:#fff;font-family:Helvetica,Arial,sans-serif;white-space:nowrap;}
     #modal-ficha-folio .ffx-btn:hover{filter:brightness(1.08);}
+    #modal-ficha-folio .ffx-pb{padding:8px 16px;border-radius:5px;font-family:'DM Mono',monospace;font-size:0.68rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:all 0.15s;}
+    #modal-ficha-folio .ffx-pb:hover{transform:translateY(-1px);filter:brightness(0.97);}
+    #modal-ficha-folio .ffx-pb-parcial{background:#fff8ec;border:2px solid #c8781a;color:#7a4a10;}
+    #modal-ficha-folio .ffx-pb-total{background:#e3f7e7;border:2px solid #1a6a2a;color:#0f5228;}
+    #modal-ficha-folio .ffx-pb-sc{background:#fff0e0;border:2px solid #d4a060;color:#a05010;}
     #modal-ficha-folio .ffx-link{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #d4b870;border-radius:6px;padding:4px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:Helvetica,Arial,sans-serif;}
     #modal-ficha-folio .ffx-link:hover{background:#fdf3dc;}
     #modal-ficha-folio .ffx-tres{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;flex:1 1 100%;min-width:0;}
@@ -17120,7 +17139,7 @@ Recibo original im…</td>
             <div id="ficha-domicilio" style="font-size:0.72rem;color:#7a6840;margin-top:2px;"></div>
             <div id="ficha-folio-ref" style="display:none;"></div>
           </div>
-          <div id="ficha-debe-total" style="display:none;border:2px solid #a32d2d;border-radius:8px;padding:6px 14px;text-align:right;background:#fff8f6;"></div>
+          <div id="ficha-debe-total" style="display:none;border:2px solid #E24B4A;border-radius:8px;padding:6px 14px;text-align:right;background:#FCEBEB;"></div>
         </div>
 
         <!-- BANDA CANCELACIÓN -->
@@ -17171,34 +17190,29 @@ Recibo original im…</td>
               </table>
             </div>
           </div>
-          <div class="ffx-ft" style="background:#fdf8ec;border-top:1px dashed #e3d3a8;">
-            <div class="ffx-tres">
-              <div class="ffx-bx" style="background:#faf6ec;border:1px solid #e3d3a8;"><div class="ffx-k" style="color:#7a6840;">Costo del trámite</div><div id="ficha-total" class="ffx-n" style="color:#1a1008;"></div></div>
-              <div class="ffx-bx" style="background:#EAF3DE;border:1px solid #C0DD97;"><div class="ffx-k" style="color:#27500A;">Ya pagó</div><div id="ficha-abonado" class="ffx-n" style="color:#27500A;"></div></div>
-              <div class="ffx-bx" style="background:#FCEBEB;border:2px solid #E24B4A;"><div id="ficha-pendiente-label" class="ffx-k" style="color:#791F1F;">Le falta</div><div id="ficha-pendiente" class="ffx-n" style="color:#A32D2D;"></div></div>
-            </div>
-            <span id="ficha-pactado-btns" style="display:none;gap:6px;">
-              <button type="button" class="ffx-btn" style="background:#c8781a;" onclick="lexFichaCobrarFolio('parcial')">💰 Pago parcial</button>
-              <button type="button" class="ffx-btn" style="background:#2a7a3a;" onclick="lexFichaCobrarFolio('total')">✅ Pago total</button>
+          <!-- Recibos oficiales del folio (antes en la tarjeta ③) -->
+          <div style="padding:8px 10px 4px;">
+            <div id="ficha-antecedentes" style="display:none;margin-bottom:8px;"></div>
+            <div id="ficha-recibos-lista" style="display:flex;flex-direction:column;gap:5px;"></div>
+          </div>
+          <!-- Totales (ocultos: los usa el sistema para calcular "DEBE EN TOTAL" e imprimir) -->
+          <div style="display:none;">
+            <div id="ficha-total"></div><div id="ficha-abonado"></div><div id="ficha-pendiente-label">Le falta</div><div id="ficha-pendiente"></div>
+          </div>
+          <div class="ffx-ft" style="justify-content:flex-end;padding:4px 10px 10px;">
+            <span id="ficha-pactado-btns" style="display:none;gap:8px;">
+              <button type="button" class="ffx-pb ffx-pb-parcial" onclick="lexFichaCobrarFolio('parcial')">💰 Pago parcial</button>
+              <button type="button" class="ffx-pb ffx-pb-total" onclick="lexFichaCobrarFolio('total')">✅ Pago total</button>
             </span>
-            <button type="button" id="ficha-btn-sc" class="ffx-btn" style="display:none;background:#fff0e0;color:#a05010;border:1.5px solid #d4a060;" onclick="lexFichaCobrarFolio('sc')">＋ Servicio complementario</button>
+            <button type="button" id="ficha-btn-sc" class="ffx-pb ffx-pb-sc" style="display:none;" onclick="lexFichaCobrarFolio('sc')">＋ Servicio complementario</button>
           </div>
         </div>
 
         <!-- ② GASTOS DEL TRÁMITE (lo pinta lexPintarGastosFicha) -->
         <div id="ficha-gastos-extra" class="ffx-card" style="display:none;border:2px solid #97C459;"></div>
 
-        <!-- ③ RECIBOS OFICIALES Y PAGOS -->
-        <div class="ffx-card" style="border:2px solid #85B7EB;">
-          <div class="ffx-ch" style="background:#E6F1FB;color:#0C447C;"><span><span id="ficha-num-recibos">③</span> RECIBOS OFICIALES Y PAGOS <span class="ffx-sub">· de lo pactado</span></span></div>
-          <div style="padding:8px 10px;">
-            <div id="ficha-antecedentes" style="display:none;margin-bottom:8px;"></div>
-            <div id="ficha-recibos-lista" style="display:flex;flex-direction:column;gap:5px;"></div>
-          </div>
-        </div>
-
-        <!-- NOTAS DEL EXPEDIENTE -->
-        <div style="background:#fff;border:1px dashed #d8c08a;border-radius:8px;padding:6px 10px;">
+        <!-- NOTAS DEL EXPEDIENTE (Nov-2026: oculto a petición del Lic.; se conserva para que nada falle) -->
+        <div id="ficha-notas-wrap" style="display:none;background:#fff;border:1px dashed #d8c08a;border-radius:8px;padding:6px 10px;">
           <div id="fichaNotasDisplay" onclick="fichaToggleNotas()" style="font-size:0.78rem;color:#7a6840;font-style:italic;cursor:pointer;padding:4px 6px;border-radius:4px;border:0.5px solid transparent;transition:all 0.15s;text-align:justify;word-break:break-word;overflow-wrap:break-word;white-space:pre-wrap;" onmouseover="this.style.background='#fffdf5';this.style.borderColor='#d4b870'" onmouseout="this.style.background='transparent';this.style.borderColor='transparent'">✎ Escribe aquí notas del expediente — volumen, instrumento, fecha de firma, ubicación, etc.</div>
           <textarea id="fichaNotasInput" placeholder="Notas libres..." style="display:none;width:100%;font-size:0.78rem;padding:8px 10px;border:0.5px solid #c8952a;border-radius:4px;background:#fffdf5;resize:none;min-height:70px;font-family:inherit;box-sizing:border-box;margin-top:4px;"></textarea>
           <button id="fichaSaveNotas" onclick="fichaGuardarNotas()" style="display:none;margin-top:5px;font-size:0.7rem;padding:4px 12px;border-radius:4px;border:0.5px solid #d4b870;background:#f5f0e0;cursor:pointer;color:#5a3e10;">✓ Guardar</button>
@@ -19507,10 +19521,10 @@ Recibo original im…</td>
 <script src="assets/js/ui/cobranza.js?v=20261118a"></script>
 <script src="assets/js/ui/mandar-llamada.js?v=20261023g"></script>
 <script src="assets/js/ui/sync-vivo.js?v=20261023i"></script>
-<script src="assets/js/ui/gastos-cliente.js?v=20261120b"></script>
+<script src="assets/js/ui/gastos-cliente.js?v=20261120c"></script>
 <script src="assets/js/ui/escrituras-lista.js?v=20261030a"></script>
 <script src="assets/js/ui/escrituras-asistente.js?v=20261029a"></script>
-<script src="assets/js/ui/saldos-anteriores.js?v=20261119d"></script>
+<script src="assets/js/ui/saldos-anteriores.js?v=20261120a"></script>
 <script src="assets/js/ui/cotizaciones.js?v=20261023l"></script>
 <script src="assets/js/ui/cerrar-seccion.js?v=20261030b"></script>
 <script src="assets/js/ui/confirmaciones.js?v=20261116a"></script>

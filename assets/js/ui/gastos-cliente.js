@@ -1389,10 +1389,10 @@
     var tot = r2(resta + gas);
     if (box) {
       if (tot > 0.005) {
-        box.innerHTML = '<div style="font-family:monospace;font-size:0.62rem;color:#a32d2d;letter-spacing:0.08em;">DEBE EN TOTAL</div>'
-          + '<div style="font-family:monospace;font-size:1.25rem;font-weight:800;color:#a32d2d;">' + $m(tot) + '</div>'
-          + (gas > 0.005 && resta > 0.005 ? '<div style="font-size:0.7rem;color:#7a6840;">Pactado ' + $m(resta) + ' + gastos ' + $m(gas) + '</div>'
-             : gas > 0.005 ? '<div style="font-size:0.7rem;color:#7a6840;">Solo gastos del trámite</div>' : '');
+        box.innerHTML = '<div style="font-family:monospace;font-size:0.62rem;color:#791F1F;letter-spacing:0.08em;">DEBE EN TOTAL</div>'
+          + '<div style="font-family:monospace;font-size:1.25rem;font-weight:800;color:#A32D2D;">' + $m(tot) + '</div>'
+          + (gas > 0.005 && resta > 0.005 ? '<div style="font-size:0.7rem;color:#791F1F;">Pactado ' + $m(resta) + ' + gastos ' + $m(gas) + '</div>'
+             : gas > 0.005 ? '<div style="font-size:0.7rem;color:#791F1F;">Solo gastos del trámite</div>' : '');
         box.style.display = 'block';
       } else { box.innerHTML = ''; box.style.display = 'none'; }
     }

@@ -1756,6 +1756,51 @@ function generarPDFEstadoCuenta(datos){
   y += 6;
   linea(W/2 - 45, y, W/2 + 45, y, ORO, 0.3);
 
+  // ── 4. GASTOS DEL TRÁMITE (Nov-2026) ── aparte de lo pactado; solo si hay
+  var _gt = [];
+  try { if (typeof window.lexGastosTramiteFolio === 'function') _gt = window.lexGastosTramiteFolio(parseInt(folioTxt, 10)) || []; } catch(_eG){ _gt = []; }
+  if (_gt.length) {
+    y += 9;
+    asegurarEspacio(34);
+    encabezadoSeccion('4. GASTOS DEL TRÁMITE', '');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
+    var _tw = doc.getTextWidth('4. GASTOS DEL TRÁMITE') + 0.3 * 20;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); color(GRIS);
+    doc.text('·  aparte de lo pactado', mL + 5 + _tw + 3, y - 3);
+    y += 6;
+    etiqueta('Fecha', mL + 5, y); etiqueta('Concepto', mL + 45, y); etiqueta('Estado', mR - 40, y); etiqueta('Importe', mR - 4, y, 'right');
+    y += 2.5; linea(mL, y, mR, y, GRIS_CLARO, 0.3); y += 5.5;
+    var _gPag = 0, _gPen = 0;
+    _gt.forEach(function(g){
+      var ls = doc.splitTextToSize(String(g.descripcion || '').toUpperCase(), mR - 40 - (mL + 45) - 4);
+      asegurarEspacio(4.6 * ls.length + 5);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.2); color(TINTA);
+      doc.text(_ecFechaLarga(g.fecha), mL + 5, y);
+      doc.text(ls, mL + 45, y);
+      doc.setFontSize(8.5); color(g.cobrado ? VERDE : [168,40,30]);
+      doc.text(g.cobrado ? 'Pagado' : 'Pendiente', mR - 40, y);
+      doc.setFontSize(9.2); color(TINTA);
+      doc.text('$' + fmt(g.monto), mR - 4, y, {align:'right'});
+      if (g.cobrado) _gPag += g.monto; else _gPen += g.monto;
+      y += 4.6 * (ls.length - 1) + 3; linea(mL, y, mR, y, GRIS_CLARO, 0.2); y += 5.5;
+    });
+    // Resumen compacto en un solo renglón (para que quepa en la misma hoja)
+    if (y + 11 > H - 21) { pie(); doc.addPage(); y = 20; }
+    y += 1;
+    var _gbW = 112, _gbX = mR - _gbW, _gbY = y, _gbH = 9;
+    doc.setDrawColor(ORO[0],ORO[1],ORO[2]); doc.setLineWidth(0.45);
+    doc.roundedRect(_gbX, _gbY, _gbW, _gbH, 1.5, 1.5, 'S');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); color(TINTA);
+    doc.text('Pagados', _gbX + 4, _gbY + 6); color(VERDE); doc.text('$' + fmt(_gPag), _gbX + _gbW / 2 - 3, _gbY + 6, {align:'right'});
+    linea(_gbX + _gbW / 2, _gbY + 2, _gbX + _gbW / 2, _gbY + _gbH - 2, ORO_CLARO, 0.3);
+    color(TINTA); doc.text('Pendientes', _gbX + _gbW / 2 + 4, _gbY + 6);
+    color(_gPen > 0.005 ? [168,40,30] : TINTA); doc.text('$' + fmt(_gPen), mR - 4, _gbY + 6, {align:'right'});
+    doc.setFont('helvetica','italic'); doc.setFontSize(7.8); color(GRIS);
+    var _nota = doc.splitTextToSize('Los gastos del trámite no modifican el monto pactado.', _gbX - mL - 8);
+    doc.text(_nota, mL + 5, _gbY + 5.5);
+    y = _gbY + _gbH + 4;
+  }
+
   pie();
   var total = doc.internal.getNumberOfPages();
   for(var i=1;i<=total;i++){

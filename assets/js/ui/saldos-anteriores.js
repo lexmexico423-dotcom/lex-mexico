@@ -867,6 +867,22 @@
       y = filaTabla(doc, y + 1, [{ x: 16 }, { x: W - 16, right: true }], ['Gastos pagados ' + $m(r2(gPag)) + '   ·   Gastos pendientes', $m(r2(gPen))], { bold: true, color: gPen > 0.005 ? [163, 45, 45] : [39, 80, 10], size: 9 });
       doc.setFont('helvetica', 'italic'); doc.setFontSize(7.5); doc.setTextColor(122, 106, 74);
       doc.text('Los gastos del trámite no modifican el monto pactado.', 14, y + 3);
+      // Nov-2026 · TOTAL GENERAL = saldo de lo pactado + gastos pendientes
+      var tPac = debe(sa), tGas = r2(gPen), tTot = r2(tPac + tGas);
+      y += 10; if (y > H - 40) { doc.addPage(); y = 20; }
+      var bx = 14, bw = W - 28;
+      // Sin rellenos (ahorro de tinta): solo contorno y letra
+      doc.setLineWidth(0.5); doc.setDrawColor(200, 149, 42);
+      doc.roundedRect(bx, y, bw, 31, 2, 2, 'S');
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(122, 84, 16);
+      doc.text('RESUMEN AL ' + fL(hoyISO()).toUpperCase(), bx + 4, y + 6);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(26, 16, 8);
+      doc.text('Saldo pendiente de lo pactado', bx + 4, y + 12); doc.text($m(tPac), bx + bw - 4, y + 12, { align: 'right' });
+      doc.text('Gastos del trámite pendientes', bx + 4, y + 17.5); doc.text('+ ' + $m(tGas), bx + bw - 4, y + 17.5, { align: 'right' });
+      doc.setLineWidth(0.4); doc.line(bx + 4, y + 21, bx + bw - 4, y + 21);
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(26, 16, 8);
+      doc.text('TOTAL A PAGAR', bx + 5, y + 26.8); doc.text($m(tTot), bx + bw - 5, y + 26.8, { align: 'right' });
+      doc.setLineWidth(0.2);
     }
     marcaAgua(doc, 'INFORMATIVO · SIN FOLIO');
     return doc;

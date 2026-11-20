@@ -17062,6 +17062,9 @@ Recibo original im…</td>
     #modal-ficha-folio .ffx-pb-parcial{background:#fff8ec;border:2px solid #c8781a;color:#7a4a10;}
     #modal-ficha-folio .ffx-pb-total{background:#e3f7e7;border:2px solid #1a6a2a;color:#0f5228;}
     #modal-ficha-folio .ffx-pb-sc{background:#fff0e0;border:2px solid #d4a060;color:#a05010;}
+    #modal-ficha-folio #ficha-cliente-tel span:first-child{display:none;}
+    #modal-ficha-folio #ficha-cliente-tel span{color:#7a6840 !important;font-weight:400 !important;}
+    #modal-ficha-folio #ficha-cliente-tel:not(:empty)::before{content:'📞 ';}
     #modal-ficha-folio .ffx-link{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #d4b870;border-radius:6px;padding:4px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:Helvetica,Arial,sans-serif;}
     #modal-ficha-folio .ffx-link:hover{background:#fdf3dc;}
     #modal-ficha-folio .ffx-tres{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;flex:1 1 100%;min-width:0;}
@@ -17118,28 +17121,29 @@ Recibo original im…</td>
 
       <div style="overflow-y:auto;flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:12px;">
 
-        <!-- CLIENTE + DEBE EN TOTAL -->
-        <div style="background:#fff;border:1px solid #eadfbf;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-          <div style="min-width:0;flex:1;">
-            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
-              <div id="ficha-cliente-nombre" style="font-size:0.98rem;font-weight:700;color:#1a1008;"></div>
-              <div id="ficha-cliente-tel" style="font-size:0.74rem;color:#1a7a3a;font-weight:600;white-space:nowrap;"></div>
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:3px;">
-              <span id="ficha-concepto-read-wrap" style="display:flex;align-items:center;gap:4px;">
-                <div id="ficha-concepto" style="font-size:0.76rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;"></div>
-                <button id="ficha-concepto-lapiz" onclick="fichaActivarEdicionConcepto()" title="Editar título" style="display:none;background:none;border:none;cursor:pointer;font-size:0.65rem;color:#aaa;padding:0 3px;line-height:1;">▸</button>
-              </span>
-              <span id="ficha-concepto-edit-wrap" style="display:none;align-items:center;gap:4px;">
-                <input id="ficha-concepto-input" type="text" style="font-size:0.72rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;border:1.5px solid #4a6ea8;border-radius:4px;padding:2px 6px;background:#f0f7ff;font-family:inherit;width:220px;" onkeydown="if(event.key==='Enter')fichaGuardarConcepto()">
-                <button id="ficha-concepto-save" onclick="fichaGuardarConcepto()" title="Guardar" style="font-size:0.72rem;font-family:'DM Mono',monospace;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid #2a7a4a;background:#e8f5ec;color:#0a4020;cursor:pointer;">✓</button>
-                <button onclick="fichaCancelarEdicionConcepto()" title="Cancelar" style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid #d4b870;background:#f5f0e0;color:#7a6840;cursor:pointer;">✕</button>
-              </span>
-            </div>
-            <div id="ficha-domicilio" style="font-size:0.72rem;color:#7a6840;margin-top:2px;"></div>
+        <!-- CLIENTE + DEBE EN TOTAL (Nov-2026 · opción C: nombre arriba y franja fina con datos y total) -->
+        <div style="background:#fff;border:1px solid #eadfbf;border-radius:8px;overflow:hidden;">
+          <div style="padding:8px 14px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+            <div id="ficha-cliente-nombre" style="font-size:0.92rem;font-weight:700;color:#1a1008;"></div>
+            <span id="ficha-concepto-read-wrap" style="display:flex;align-items:center;gap:4px;">
+              <span style="color:#9a8a6a;">·</span>
+              <div id="ficha-concepto" style="font-size:0.74rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;"></div>
+              <button id="ficha-concepto-lapiz" onclick="fichaActivarEdicionConcepto()" title="Editar título" style="display:none;background:none;border:none;cursor:pointer;font-size:0.65rem;color:#aaa;padding:0 3px;line-height:1;">▸</button>
+            </span>
+            <span id="ficha-concepto-edit-wrap" style="display:none;align-items:center;gap:4px;">
+              <input id="ficha-concepto-input" type="text" style="font-size:0.72rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;border:1.5px solid #4a6ea8;border-radius:4px;padding:2px 6px;background:#f0f7ff;font-family:inherit;width:220px;" onkeydown="if(event.key==='Enter')fichaGuardarConcepto()">
+              <button id="ficha-concepto-save" onclick="fichaGuardarConcepto()" title="Guardar" style="font-size:0.72rem;font-family:'DM Mono',monospace;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid #2a7a4a;background:#e8f5ec;color:#0a4020;cursor:pointer;">✓</button>
+              <button onclick="fichaCancelarEdicionConcepto()" title="Cancelar" style="font-size:0.72rem;padding:2px 6px;border-radius:4px;border:1px solid #d4b870;background:#f5f0e0;color:#7a6840;cursor:pointer;">✕</button>
+            </span>
             <div id="ficha-folio-ref" style="display:none;"></div>
           </div>
-          <div id="ficha-debe-total" style="display:none;border:2px solid #E24B4A;border-radius:8px;padding:6px 14px;text-align:right;background:#FCEBEB;"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;border-top:1px dashed #eadfbf;padding:5px 14px;font-size:0.72rem;color:#7a6840;">
+            <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;min-width:0;flex:1;">
+              <span id="ficha-cliente-tel" style="white-space:nowrap;"></span>
+              <span id="ficha-domicilio"></span>
+            </div>
+            <div id="ficha-debe-total" style="display:none;white-space:nowrap;"></div>
+          </div>
         </div>
 
         <!-- BANDA CANCELACIÓN -->
@@ -17555,7 +17559,7 @@ Recibo original im…</td>
 <script src="assets/js/modules/clientes/index.js?v=20261112a"></script>
 <script src="assets/js/modules/directorio/index.js?v=20261023d"></script>
 <script src="assets/js/modules/expedientes/index.js?v=20261030c"></script>
-<script src="assets/js/modules/documentos/index.js?v=20261118a"></script>
+<script src="assets/js/modules/documentos/index.js?v=20261120b"></script>
 <script src="assets/js/modules/integraciones/index.js?v=20261104c"></script>
 <script src="assets/js/modules/administracion/index.js?v=20261116a"></script>
 <script src="assets/js/modules/core/index.js?v=20261019h"></script>
@@ -19521,7 +19525,7 @@ Recibo original im…</td>
 <script src="assets/js/ui/cobranza.js?v=20261118a"></script>
 <script src="assets/js/ui/mandar-llamada.js?v=20261023g"></script>
 <script src="assets/js/ui/sync-vivo.js?v=20261023i"></script>
-<script src="assets/js/ui/gastos-cliente.js?v=20261120c"></script>
+<script src="assets/js/ui/gastos-cliente.js?v=20261120e"></script>
 <script src="assets/js/ui/escrituras-lista.js?v=20261030a"></script>
 <script src="assets/js/ui/escrituras-asistente.js?v=20261029a"></script>
 <script src="assets/js/ui/saldos-anteriores.js?v=20261120a"></script>

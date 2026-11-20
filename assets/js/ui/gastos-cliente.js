@@ -127,7 +127,10 @@
     var out = [];
     gastosDeFolio(folio).forEach(function(a){
       reembolsables(a).forEach(function(c){
-        out.push({ fecha: c.fecha || String(a.fechaCreacion || '').slice(0, 10), descripcion: String(c.descripcion || ''), monto: r2(c.monto), cobrado: conceptoCobrado(a, c) });
+        var mv = c.movIngresoId ? (D.movimientos || []).filter(function(m){ return m && m.id === c.movIngresoId; })[0] : null;
+        out.push({ fecha: c.fecha || String(a.fechaCreacion || '').slice(0, 10), descripcion: String(c.descripcion || ''), monto: r2(c.monto), cobrado: conceptoCobrado(a, c),
+          cobradoFecha: c.cobradoFecha ? String(mv && mv.fecha ? mv.fecha : (typeof _adeudoFechaLocal === 'function' ? _adeudoFechaLocal(c.cobradoFecha) : c.cobradoFecha)).slice(0, 10) : '',
+          comprobante: mv && mv.folioCaja ? 'Caja ' + mv.folioCaja : (c.cobradoSinCaja ? 'Otro medio' : (c.cobrado ? 'Caja' : '')) });
       });
     });
     out.sort(function(x, y){ return String(x.fecha).localeCompare(String(y.fecha)); });
@@ -1389,10 +1392,9 @@
     var tot = r2(resta + gas);
     if (box) {
       if (tot > 0.005) {
-        box.innerHTML = '<div style="font-family:monospace;font-size:0.62rem;color:#791F1F;letter-spacing:0.08em;">DEBE EN TOTAL</div>'
-          + '<div style="font-family:monospace;font-size:1.25rem;font-weight:800;color:#A32D2D;">' + $m(tot) + '</div>'
-          + (gas > 0.005 && resta > 0.005 ? '<div style="font-size:0.7rem;color:#791F1F;">Pactado ' + $m(resta) + ' + gastos ' + $m(gas) + '</div>'
-             : gas > 0.005 ? '<div style="font-size:0.7rem;color:#791F1F;">Solo gastos del trámite</div>' : '');
+        box.innerHTML = '<span style="color:#791F1F;">Debe en total</span> <b style="font-family:monospace;font-size:0.95rem;color:#A32D2D;">' + $m(tot) + '</b>'
+          + (gas > 0.005 && resta > 0.005 ? ' <span style="font-size:0.66rem;color:#7a6840;">(pactado ' + $m(resta) + ' + gastos ' + $m(gas) + ')</span>'
+             : gas > 0.005 ? ' <span style="font-size:0.66rem;color:#7a6840;">(solo gastos del trámite)</span>' : '');
         box.style.display = 'block';
       } else { box.innerHTML = ''; box.style.display = 'none'; }
     }

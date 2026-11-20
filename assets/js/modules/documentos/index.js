@@ -1679,7 +1679,7 @@ function generarPDFEstadoCuenta(datos){
   var _cargoOrig = listas.cargos.filter(function(c){ return c.esOriginal; })[0];
   var _filaA = (datos.filas||[]).filter(function(f){ return String(f.folioStr||'').slice(-1).toUpperCase()==='A'; })[0];
   var _fechaFirma = (_cargoOrig && _cargoOrig.fecha) || (_filaA && _filaA.fecha) || '';
-  encabezadoSeccion('1. COSTO DEL TRÁMITE', '$' + fmt(t.cargo), _fechaFirma ? _ecFechaLarga(_fechaFirma) : '');
+  encabezadoSeccion('1. LO PACTADO', '$' + fmt(t.cargo), _fechaFirma ? _ecFechaLarga(_fechaFirma) : '');
   var cargosVisibles = listas.cargos.filter(function(c){ return !c.cancelado; });
   if(cargosVisibles.length > 1){
     y += 5.5;
@@ -1696,110 +1696,130 @@ function generarPDFEstadoCuenta(datos){
   }
   y += 10;
 
-  // ── 2. CUÁNTO HA PAGADO ──
-  asegurarEspacio(30);
-  encabezadoSeccion('2. CUÁNTO HA PAGADO', '');
-  y += 6;
-  var xRec = mL + 70;
-  etiqueta('Fecha de pago', mL + 5, y);
-  etiqueta('Recibo', xRec, y);
-  etiqueta('Importe', mR - 4, y, 'right');
-  y += 2.5;
-  linea(mL, y, mR, y, GRIS_CLARO, 0.3);
-  y += 5.5;
-  if(!listas.pagos.length){
-    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); color(GRIS);
-    doc.text('Sin pagos registrados', mL + 5, y);
-    doc.text('$0.00', mR - 4, y, {align:'right'});
-    y += 3; linea(mL, y, mR, y, GRIS_CLARO, 0.2); y += 5.5;
-  } else {
-    listas.pagos.forEach(function(p){
-      asegurarEspacio(9);
-      doc.setFont('helvetica','normal'); doc.setFontSize(9.5); color(TINTA);
-      doc.text(_ecFechaLarga(p.fecha), mL + 5, y);
-      doc.text(String(p.recibo||''), xRec, y);
-      doc.text('$' + fmt(p.monto), mR - 4, y, {align:'right'});
-      y += 3; linea(mL, y, mR, y, GRIS_CLARO, 0.2); y += 5.5;
-    });
-  }
-  // Recuadro aparte con "Total pagado" y "Resta por cubrir" — a petición
-  // expresa, para distinguir los totales de la lista de pagos. Solo contorno
-  // (sin relleno) para ahorrar tinta.
+  // ── Nov-2026 (a petición del Lic.): estado de cuenta estilo bancario y con
+  // el TOTAL claro al final. Sin rellenos (ahorro de tinta): solo texto y
+  // filetes finos. Orden: 1) Lo pactado (pagos y resta) · 2) Gastos del
+  // trámite (aparte de lo pactado) · 3) Total a pagar.
   var _resta = t.cancelado ? 0 : Math.max(0, parseFloat(t.adeudo||0));
-  asegurarEspacio(26);
-  y += 2;
-  var _bxW = 95, _bxX = mR - _bxW, _bxY = y, _bxH = 20;
-  doc.setDrawColor(ORO[0],ORO[1],ORO[2]); doc.setLineWidth(0.45);
-  doc.roundedRect(_bxX, _bxY, _bxW, _bxH, 1.5, 1.5, 'S');
+  var ROJO = [163,45,45];
+  var xRec = mL + 78;
+  // Resumen de lo pactado (los pagos van en el HISTORIAL más abajo)
+  var _MC = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  var fCorta = function(f){ var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(f||'')); return m ? (+m[3]) + ' ' + _MC[+m[2]-1] + ' ' + m[1] : String(f||''); };
+  y += 1;
+  asegurarEspacio(20);
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); color(TINTA);
+  doc.text('Pagado de lo pactado', mL + 5, y);
+  doc.text('$' + fmt(t.abono), mR - 4, y, {align:'right'});
+  y += 3; linea(mL, y, mR, y, GRIS_CLARO, 0.15); y += 5.5;
   doc.setFont('helvetica','bold'); doc.setFontSize(10); color(TINTA);
-  doc.text('Total pagado', _bxX + 5, _bxY + 7.5);
-  color(VERDE);
-  doc.text('$' + fmt(t.abono), mR - 5, _bxY + 7.5, {align:'right'});
-  linea(_bxX + 4, _bxY + 10.5, mR - 4, _bxY + 10.5, ORO_CLARO, 0.3);
-  color(TINTA);
-  doc.text('Resta por cubrir', _bxX + 5, _bxY + 16);
-  color(_resta > 0.005 ? [168,40,30] : TINTA);
-  doc.text('$' + fmt(_resta), mR - 5, _bxY + 16, {align:'right'});
-  y = _bxY + _bxH + 12;
-
-  // ── 3. CUÁNTO DEBE ── (una sola leyenda, sin recuadro)
-  asegurarEspacio(34);
-  encabezadoSeccion('3. CUÁNTO DEBE', '');
-  y += 11;
-  doc.setFont('helvetica','bold'); doc.setFontSize(14); color(estado.rgb);
-  espaciado(estado.texto, W/2, y, 'center', 0.6);
-  if(estado.extra){
-    y += 6;
-    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); color(GRIS);
-    doc.text(estado.extra, W/2, y, {align:'center'});
+  if(t.cancelado){
+    doc.text(estado.texto, mL + 5, y);
+    if(estado.extra){ doc.setFont('helvetica','normal'); doc.setFontSize(8.5); color(GRIS); doc.text(estado.extra, mR - 4, y, {align:'right'}); }
+  } else {
+    doc.text('Resta de lo pactado', mL + 5, y);
+    doc.text('$' + fmt(_resta), mR - 4, y, {align:'right'});
   }
-  y += 6;
-  linea(W/2 - 45, y, W/2 + 45, y, ORO, 0.3);
+  y += 9;
 
-  // ── 4. GASTOS DEL TRÁMITE (Nov-2026) ── aparte de lo pactado; solo si hay
+  // ── 2. GASTOS DEL TRÁMITE (solo si hay) ──
   var _gt = [];
   try { if (typeof window.lexGastosTramiteFolio === 'function') _gt = window.lexGastosTramiteFolio(parseInt(folioTxt, 10)) || []; } catch(_eG){ _gt = []; }
+  var _gPen = 0;
   if (_gt.length) {
-    y += 9;
     asegurarEspacio(34);
-    encabezadoSeccion('4. GASTOS DEL TRÁMITE', '');
+    encabezadoSeccion('2. GASTOS DEL TRÁMITE', '');
     doc.setFont('helvetica','bold'); doc.setFontSize(9.5);
-    var _tw = doc.getTextWidth('4. GASTOS DEL TRÁMITE') + 0.3 * 20;
+    var _tw = doc.getTextWidth('2. GASTOS DEL TRÁMITE') + 0.3 * 21;
     doc.setFont('helvetica','normal'); doc.setFontSize(8); color(GRIS);
     doc.text('·  aparte de lo pactado', mL + 5 + _tw + 3, y - 3);
     y += 6;
-    etiqueta('Fecha', mL + 5, y); etiqueta('Concepto', mL + 45, y); etiqueta('Estado', mR - 40, y); etiqueta('Importe', mR - 4, y, 'right');
-    y += 2.5; linea(mL, y, mR, y, GRIS_CLARO, 0.3); y += 5.5;
-    var _gPag = 0, _gPen = 0;
+    var xCon = mL + 36, xEst = mR - 44;
+    etiqueta('Fecha', mL + 5, y); etiqueta('Concepto', xCon, y); etiqueta('Estado', xEst, y); etiqueta('Importe', mR - 4, y, 'right');
+    y += 2.5; linea(mL, y, mR, y, GRIS_CLARO, 0.25); y += 5.5;
     _gt.forEach(function(g){
-      var ls = doc.splitTextToSize(String(g.descripcion || '').toUpperCase(), mR - 40 - (mL + 45) - 4);
-      asegurarEspacio(4.6 * ls.length + 5);
-      doc.setFont('helvetica','normal'); doc.setFontSize(9.2); color(TINTA);
-      doc.text(_ecFechaLarga(g.fecha), mL + 5, y);
-      doc.text(ls, mL + 45, y);
-      doc.setFontSize(8.5); color(g.cobrado ? VERDE : [168,40,30]);
-      doc.text(g.cobrado ? 'Pagado' : 'Pendiente', mR - 40, y);
-      doc.setFontSize(9.2); color(TINTA);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+      var ls = doc.splitTextToSize(String(g.descripcion || '').toUpperCase(), xEst - xCon - 5);
+      asegurarEspacio(4.4 * ls.length + 6);
+      color(TINTA);
+      doc.text(fCorta(g.fecha), mL + 5, y);
+      doc.text(ls, xCon, y);
+      doc.setFontSize(8.8); color(g.cobrado ? VERDE : GRIS);
+      doc.text(g.cobrado ? 'Pagado' : 'Pendiente', xEst, y);
+      doc.setFontSize(9.5); color(TINTA);
       doc.text('$' + fmt(g.monto), mR - 4, y, {align:'right'});
-      if (g.cobrado) _gPag += g.monto; else _gPen += g.monto;
-      y += 4.6 * (ls.length - 1) + 3; linea(mL, y, mR, y, GRIS_CLARO, 0.2); y += 5.5;
+      if (!g.cobrado) _gPen += g.monto;
+      y += 4.4 * (ls.length - 1) + 3; linea(mL, y, mR, y, GRIS_CLARO, 0.15); y += 5.5;
     });
-    // Resumen compacto en un solo renglón (para que quepa en la misma hoja)
-    if (y + 11 > H - 21) { pie(); doc.addPage(); y = 20; }
-    y += 1;
-    var _gbW = 112, _gbX = mR - _gbW, _gbY = y, _gbH = 9;
-    doc.setDrawColor(ORO[0],ORO[1],ORO[2]); doc.setLineWidth(0.45);
-    doc.roundedRect(_gbX, _gbY, _gbW, _gbH, 1.5, 1.5, 'S');
-    doc.setFont('helvetica','bold'); doc.setFontSize(9); color(TINTA);
-    doc.text('Pagados', _gbX + 4, _gbY + 6); color(VERDE); doc.text('$' + fmt(_gPag), _gbX + _gbW / 2 - 3, _gbY + 6, {align:'right'});
-    linea(_gbX + _gbW / 2, _gbY + 2, _gbX + _gbW / 2, _gbY + _gbH - 2, ORO_CLARO, 0.3);
-    color(TINTA); doc.text('Pendientes', _gbX + _gbW / 2 + 4, _gbY + 6);
-    color(_gPen > 0.005 ? [168,40,30] : TINTA); doc.text('$' + fmt(_gPen), mR - 4, _gbY + 6, {align:'right'});
-    doc.setFont('helvetica','italic'); doc.setFontSize(7.8); color(GRIS);
-    var _nota = doc.splitTextToSize('Los gastos del trámite no modifican el monto pactado.', _gbX - mL - 8);
-    doc.text(_nota, mL + 5, _gbY + 5.5);
-    y = _gbY + _gbH + 4;
+    asegurarEspacio(10);
+    doc.setFont('helvetica','bold'); doc.setFontSize(10); color(TINTA);
+    doc.text('Gastos pendientes', mL + 5, y);
+    doc.text('$' + fmt(_gPen), mR - 4, y, {align:'right'});
+    y += 9;
   }
+
+  var _num = _gt.length ? 3 : 2;
+  // ── TOTAL A PAGAR ──
+  var _totalPagar = (t.cancelado ? 0 : _resta) + _gPen;
+  asegurarEspacio(_gt.length ? 44 : 36);
+  encabezadoSeccion(_num + '. TOTAL A PAGAR', '');
+  y += 4;
+  var _bxY = y, _bxH = _gt.length ? 29 : 21;
+  doc.setDrawColor(ROJO[0],ROJO[1],ROJO[2]); doc.setLineWidth(0.4);
+  doc.roundedRect(mL, _bxY, mR - mL, _bxH, 1.5, 1.5, 'S');
+  var yy = _bxY + 7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(9.5); color(TINTA);
+  doc.text(t.cancelado ? 'Lo pactado (trámite cancelado)' : 'Resta de lo pactado', mL + 6, yy);
+  doc.text('$' + fmt(t.cancelado ? 0 : _resta), mR - 6, yy, {align:'right'});
+  if (_gt.length) {
+    yy += 7;
+    doc.text('+ Gastos del trámite pendientes', mL + 6, yy);
+    doc.text('$' + fmt(_gPen), mR - 6, yy, {align:'right'});
+  }
+  linea(mL + 5, yy + 3, mR - 5, yy + 3, [230,200,200], 0.2);
+  yy += 10;
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); color(_totalPagar > 0.005 ? ROJO : VERDE);
+  espaciado(_totalPagar > 0.005 ? 'TOTAL A PAGAR' : (t.cancelado ? 'SIN SALDO · TRÁMITE CANCELADO' : 'SIN SALDO PENDIENTE'), mL + 6, yy, 'left', 0.6);
+  doc.text('$' + fmt(_totalPagar), mR - 6, yy, {align:'right'});
+  y = _bxY + _bxH + 6;
+  if (_gt.length) {
+    doc.setFont('helvetica','italic'); doc.setFontSize(7.8); color(GRIS);
+    doc.text('Los gastos del trámite no modifican el monto pactado.', mL + 2, y);
+  }
+
+  y += 9;
+
+  // ── HISTORIAL DE PAGOS (todo lo que ya pagó, en orden de fecha) ──
+  var _hist = listas.pagos.map(function(p){
+    var letra = String(p.recibo||'').slice(-1).toUpperCase();
+    return { fecha: String(p.fecha||'').slice(0,10), concepto: letra === 'A' ? 'Anticipo de lo pactado' : 'Abono a lo pactado', comp: 'Recibo ' + (p.recibo||''), monto: p.monto };
+  }).concat(_gt.filter(function(g){ return g.cobrado; }).map(function(g){
+    return { fecha: g.cobradoFecha || g.fecha, concepto: 'Gasto: ' + String(g.descripcion||'').toUpperCase(), comp: g.comprobante || 'Caja', monto: g.monto };
+  })).sort(function(a, b){ return String(a.fecha).localeCompare(String(b.fecha)); });
+  asegurarEspacio(22);
+  encabezadoSeccion((_num + 1) + '. HISTORIAL DE PAGOS', '');
+  y += 6;
+  var hCon = mL + 36, hComp = mR - 70;
+  etiqueta('Fecha', mL + 5, y); etiqueta('Concepto', hCon, y); etiqueta('Comprobante', hComp, y); etiqueta('Importe', mR - 4, y, 'right');
+  y += 2.5; linea(mL, y, mR, y, GRIS_CLARO, 0.25); y += 5.5;
+  if(!_hist.length){
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5); color(GRIS);
+    doc.text('Sin pagos registrados', mL + 5, y);
+    y += 3; linea(mL, y, mR, y, GRIS_CLARO, 0.15); y += 5.5;
+  } else {
+    _hist.forEach(function(h){
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+      var ls = doc.splitTextToSize(h.concepto, hComp - hCon - 5);
+      asegurarEspacio(4.4 * ls.length + 6);
+      color(TINTA);
+      doc.text(fCorta(h.fecha), mL + 5, y);
+      doc.text(ls, hCon, y);
+      doc.setFontSize(8.8); color(GRIS); doc.text(String(h.comp), hComp, y);
+      doc.setFontSize(9.5); color(TINTA); doc.text('$' + fmt(h.monto), mR - 4, y, {align:'right'});
+      y += 4.4 * (ls.length - 1) + 3; linea(mL, y, mR, y, GRIS_CLARO, 0.15); y += 5.5;
+    });
+  }
+  y += 8;
 
   pie();
   var total = doc.internal.getNumberOfPages();

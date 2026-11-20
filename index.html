@@ -16579,7 +16579,7 @@ Recibo original im…</td>
         <input type="hidden" id="fecha_recibo" value="2026-07-16">
       </div>
       <!-- Divisor entre Fecha y Hora -->
-      <div style="width:1px;background:var(--border-light);flex-shrink:0;"></div>
+      <div class="lex-div-fh" style="width:1px;background:var(--border-light);flex-shrink:0;"></div>
       <!-- CELDA 3 — Hora de Generación -->
       <div onclick="actualizarHoraDisplay()" title="Clic para actualizar la hora" style="display:flex;flex-direction:column;justify-content:center;gap:3px;padding:0 16px;height:44px;background:var(--field-bg);border:1px solid var(--border-light);border-left:none;border-radius:0 3px 3px 0;flex-shrink:0;cursor:pointer;transition:background 0.18s;" onmouseenter="this.style.background=&#39;rgba(200,149,42,0.08)&#39;" onmouseleave="this.style.background=&#39;var(--field-bg)&#39;">
         <div style="font-family:&#39;DM Mono&#39;,monospace;font-size:0.55rem;letter-spacing:0.13em;text-transform:uppercase;color:var(--muted);">🕐 Hora de Generación</div>
@@ -16618,14 +16618,23 @@ Recibo original im…</td>
         body.modo-actualizacion #btn-cerrar-consulta-barra{display:none !important;}
         /* Barra más compacta en consulta para que quepa "Cerrar consulta" */
         body.modo-consulta #fila-sup-consulta .lex-sep-ini{display:none !important;}
-        body.modo-consulta #fila-sup-consulta .lex-sep-slot{width:4px !important;}
+        /* Nov-2026: margen superior de la hoja más justo y botones de Tipo de trámite centrados */
+        .recibo-card{padding-top:10px !important;}
+        .tramite-btns-wrap{text-align:center !important;justify-content:center !important;}
+        /* Nov-2026: formulario normal — con fechas largas ("20 de noviembre") la Hora se bajaba
+           a otro renglón; se mantiene todo en una línea con márgenes un poco más justos */
+        body:not(.modo-consulta) #fila-sup-consulta{flex-wrap:nowrap !important;padding-left:10px !important;padding-right:10px !important;}
+        body:not(.modo-consulta) #fila-sup-consulta .lex-sep-ini[style*="width:10px"]{width:7px !important;}
+        body:not(.modo-consulta) #fila-sup-consulta #btn-toggle-paneles{padding:0 12px !important;}
+        body:not(.modo-consulta) #fila-sup-consulta #btn-vincular-archivo{padding:0 12px !important;}
+        body:not(.modo-consulta) #fila-sup-consulta > div[style*="padding:0 16px"]{padding:0 12px !important;}
+        /* Nov-2026: ya sin "Cerrar consulta" en la barra → cada cuadro con su espacio */
+        body.modo-consulta #fila-sup-consulta{flex-wrap:nowrap !important;gap:0 !important;padding-left:8px !important;padding-right:8px !important;}
+        body.modo-consulta #fila-sup-consulta .lex-sep-slot{width:7px !important;}
         body.modo-consulta #fila-sup-consulta .lex-sep-slot[style*="background"]{width:0 !important;}
-        body.modo-consulta #fila-sup-consulta #btn-vincular-archivo{margin-right:6px;}
-        body.modo-consulta #fila-sup-consulta{padding-left:6px !important;padding-right:6px !important;flex-wrap:nowrap !important;gap:0 !important;}
-        body.modo-consulta #fila-sup-consulta > div[style*="padding:0 16px"]{padding:0 10px !important;}
-        body.modo-consulta #fila-sup-consulta > div[style*="padding:0 16px"] > div:first-child{letter-spacing:0.06em !important;}
-        body.modo-consulta #fila-sup-consulta #btn-vincular-archivo{padding:0 10px !important;letter-spacing:0.06em !important;}
-        body.modo-consulta #btn-cerrar-consulta-barra{padding:0 10px;letter-spacing:0.05em;margin-left:6px;}
+        body.modo-consulta #fila-sup-consulta #btn-vincular-archivo{padding:0 18px !important;margin-right:14px !important;}
+        body.modo-consulta #fila-sup-consulta > div[style*="padding:0 16px"]{padding:0 14px !important;border:1px solid var(--border-light) !important;border-radius:5px !important;}
+        body.modo-consulta #fila-sup-consulta .lex-div-fh{width:14px !important;background:transparent !important;}
         /* Los botones de pago de arriba ya no se muestran: están en la Ficha del Folio */
         /* (si la ficha se cierra, p. ej. al ir a Exp. digital, vuelven a aparecer para no perder el cobro) */
         body.modo-consulta.lex-ficha-visible #header-pago-btns,
@@ -17070,9 +17079,6 @@ Recibo original im…</td>
     #modal-ficha-folio .ffx-pb-parcial{background:#fff8ec;border:2px solid #c8781a;color:#7a4a10;}
     #modal-ficha-folio .ffx-pb-total{background:#e3f7e7;border:2px solid #1a6a2a;color:#0f5228;}
     #modal-ficha-folio .ffx-pb-sc{background:#fff0e0;border:2px solid #d4a060;color:#a05010;}
-    #modal-ficha-folio #ficha-cliente-tel span:first-child{display:none;}
-    #modal-ficha-folio #ficha-cliente-tel span{color:#7a6840 !important;font-weight:400 !important;}
-    #modal-ficha-folio #ficha-cliente-tel:not(:empty)::before{content:'📞 ';}
     #modal-ficha-folio #ficha-dom-wrap:has(#ficha-domicilio:not(:empty))::before{content:'🏠 ';}
     #modal-ficha-folio #ficha-cliente-tel:empty{display:none;}
     #modal-ficha-folio .ffx-link{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #d4b870;border-radius:6px;padding:4px 10px;font-size:0.72rem;font-weight:700;cursor:pointer;font-family:Helvetica,Arial,sans-serif;}
@@ -17135,7 +17141,10 @@ Recibo original im…</td>
         <div style="background:#fff;border:1px solid #eadfbf;border-radius:8px;overflow:hidden;">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid #eadfbf;flex-wrap:wrap;">
             <div style="min-width:0;flex:1;">
-              <div id="ficha-cliente-nombre" style="font-size:0.95rem;font-weight:700;color:#1a1008;"></div>
+              <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;">
+                <div id="ficha-cliente-nombre" style="font-size:0.95rem;font-weight:700;color:#1a1008;"></div>
+                <div id="ficha-cliente-tel" style="font-size:0.74rem;white-space:nowrap;"></div>
+              </div>
               <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:1px;">
                 <span id="ficha-concepto-read-wrap" style="display:flex;align-items:center;gap:4px;">
                   <div id="ficha-concepto" style="font-size:0.76rem;font-weight:700;color:#1a5fa8;text-transform:uppercase;letter-spacing:0.04em;"></div>
@@ -17152,7 +17161,6 @@ Recibo original im…</td>
             <div id="ficha-debe-total" style="display:none;text-align:right;white-space:nowrap;"></div>
           </div>
           <div style="padding:6px 14px;font-size:0.76rem;color:#5a4a30;line-height:1.7;">
-            <div id="ficha-cliente-tel"></div>
             <div id="ficha-dom-wrap"><span id="ficha-domicilio"></span></div>
           </div>
         </div>

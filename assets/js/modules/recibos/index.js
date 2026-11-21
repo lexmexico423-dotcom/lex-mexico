@@ -127,6 +127,18 @@ async function sincronizarFolio(forzarSB){
           folio_actual: 100
         });
         appData = { folioActual: 1, anioFolioActual: new Date().getFullYear(), recibos: [] };
+      } else if(error.code === '42501' || error.code === 'PGRST301' || /JWT|permission denied/i.test(String(error.message||''))){
+        // Nov-2026: la sesión se perdió (token vencido o se cerró en otra pestaña) y la
+        // pestaña seguía consultando como "anónimo" cada pocos segundos (151 errores en
+        // una noche). Se intenta renovar UNA vez; si no hay sesión, se deja de consultar
+        // y se muestra la pantalla de inicio de sesión.
+        var _sesOk = false;
+        try { var _rs = await window.SB.auth.refreshSession(); _sesOk = !!(_rs && _rs.data && _rs.data.session); } catch(_eRs){}
+        if(!_sesOk){
+          console.warn('[SB] sincronizarFolio: la sesión ya no es válida — se pide iniciar sesión de nuevo');
+          window.SB_DESPACHO_ID = null;
+          try { if(typeof mostrarLoginSupabase === 'function') mostrarLoginSupabase(); } catch(_eLg){}
+        }
       } else {
         console.error('[SB] sincronizarFolio:', error);
       }
